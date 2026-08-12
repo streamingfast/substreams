@@ -206,6 +206,7 @@ var fromProtoSchemaFlagNames = []string{
 	"disable-foreign-keys",
 	"disable-primary-keys",
 	"disable-unique-constraints",
+	"disable-block-number-index",
 	"no-constraints",
 	"proto-file-override",
 }
@@ -258,6 +259,7 @@ func addFromProtoSchemaFlags(flags *pflag.FlagSet) {
 	flags.Bool("disable-foreign-keys", false, "Never create foreign keys, including the one every table has to the block table. They are what a load pays most for, and without them a reorg is undone by deleting from each table rather than by a cascade.")
 	flags.StringSlice("disable-primary-keys", nil, "Tables that go without a primary key, or 'all'. No primary key also means no index on the entity id.")
 	flags.StringSlice("disable-unique-constraints", nil, "Tables whose unique constraints are left out, or 'all'.")
+	flags.Bool("disable-block-number-index", false, "Leave out the index on _block_number_. Every table carries that column and every reorg deletes from every table by it, so without the index each undo is a sequential scan per table — a foreign key indexes its referenced side only. It is created in the same pass as the constraints, being the same kind of expensive, and it is the one thing that pass has to do for an output with no schema annotations. Only dead weight on a run that can never reorg, such as --final-blocks-only.")
 	flags.String("proto-file-override", "", "Override protobuf file to use instead of extracting from substreams package")
 
 	flags.Bool("no-constraints", false, "Deprecated, use --disable-foreign-keys --disable-primary-keys=all --disable-unique-constraints=all.")
@@ -267,7 +269,7 @@ func addFromProtoSchemaFlags(flags *pflag.FlagSet) {
 // addFromProtoRunFlags registers the from-proto flags that only apply while the sink is
 // running. The ClickHouse specific ones are only registered for the clickhouse engine.
 func addFromProtoRunFlags(flags *pflag.FlagSet, driver string) {
-	flags.String("apply-constraints", string(protosql.ConstraintsAuto), "When the schema's constraints are created: 'auto' has the sink create them once the backfill reaches chain HEAD or the end of a bounded run, 'manual' leaves it to the 'sink postgres constraints apply' command, 'always' creates them before the load. Creating them is a stop-the-world operation — indexes to build, foreign keys to validate, tables locked throughout — so on a large database 'manual' is how that pass goes into a maintenance window instead. Loading with them already in place is the expensive option: measured through binary COPY, 27x slower than loading without, where building the same constraints afterwards costs 3.3x.")
+	flags.String("apply-constraints", string(protosql.ConstraintsAuto), "When the schema's constraints are created: 'auto' has the sink create them once the backfill reaches chain HEAD or the end of a bounded run, 'manual' leaves it to the 'sink postgres constraints apply' command, 'always' creates them before the load. Creating them is a stop-the-world operation — indexes to build, foreign keys to validate, tables locked throughout — so on a large database 'manual' is how that pass goes into a maintenance window instead. Loading with them already in place is the expensive option: measured through binary COPY, 27x slower than loading without, where building the same constraints afterwards costs 3.3x. The index on _block_number_ is built in the same pass, see --disable-block-number-index.")
 
 	flags.String("write-mode", string(protosql.WriteModeAuto), "How a sealed spool segment reaches the database: 'copy' loads each table file with binary COPY, 'batch-insert' builds one multi-row INSERT per table, 'row-insert' issues one prepared INSERT per row. 'auto' picks copy on PostgreSQL, batch-insert on ClickHouse, and row-insert for a schema whose foreign keys cannot be ordered. An explicit mode the driver or the schema cannot support is an error rather than a downgrade. Ignored once the stream reaches chain HEAD, where the sink always inserts directly.")
 
@@ -468,12 +470,13 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 		return err
 	}
 	if !useProtoOption {
-		// Without the schema annotations there are no relations to constrain.
-		constraints = protosql.DisableAllConstraints()
+		// Without the schema annotations there are no relations to constrain. The index on
+		// _block_number_ is not declared by them either, so it stays.
+		constraints = protosql.DisableAllConstraints().WithBlockNumberIndex(constraints)
 
-		zlog.Warn("the module's output carries no schema.proto annotations, so its tables get no primary keys, no unique constraints and no foreign keys — " +
-			"and therefore no indexes. Queries against them are sequential scans and duplicate ids are not rejected. " +
-			"Annotate the output to have the sink derive them")
+		zlog.Warn("the module's output carries no schema.proto annotations, so its tables get no primary keys, no unique constraints and no foreign keys. " +
+			"Queries against them are sequential scans and duplicate ids are not rejected. " +
+			"`substreams tools extract-proto --sql` writes the annotated proto to start from, and --proto-file-override points the sink at it")
 	}
 	warnAboutConstraints(constraints)
 
@@ -699,7 +702,7 @@ func newSinkConstraintsE(driver string, action constraintsAction) func(*cobra.Co
 			return err
 		}
 		if constraints.SkipsEverything() {
-			return fmt.Errorf("every constraint is disabled by the flags, so there is nothing to %s", action)
+			return fmt.Errorf("every constraint and the block number index are disabled by the flags, so there is nothing to %s", action)
 		}
 
 		dsn, err := db.ParseDSN(dsnString)
@@ -713,9 +716,14 @@ func newSinkConstraintsE(driver string, action constraintsAction) func(*cobra.Co
 			return err
 		}
 		if !useProtoOption {
-			return fmt.Errorf("the module's output carries no schema.proto annotations, so the sink has no primary keys, unique constraints or foreign keys to %s. "+
-				"Its tables are derived from the message structure alone and have no indexes at all — annotate the output with `schema.field { primary_key: true }` "+
-				"and the relations you want, then re-run the sink, for this command to have anything to do", action)
+			// Without annotations the sink has no declared keys or relations, but the
+			// index it creates for its own reorg path is not declared either — so there is
+			// still something to do, and refusing would leave every table unindexed.
+			constraints = protosql.DisableAllConstraints().WithBlockNumberIndex(constraints)
+
+			zlog.Warn("the module's output carries no schema.proto annotations, so there are no primary keys, unique constraints or foreign keys to " + string(action) + ". " +
+				"Only the index on _block_number_ is, which is what the reorg path deletes by. " +
+				"`substreams tools extract-proto --sql` writes the annotated proto to start from")
 		}
 
 		encoding, err := sinkBytesEncoding(cmd)
@@ -863,12 +871,13 @@ func runFromProtoSetup(cmd *cobra.Command, driver, dsnString string, spkg *pbsub
 		return err
 	}
 	if !useProtoOption {
-		// Without the schema annotations there are no relations to constrain.
-		constraints = protosql.DisableAllConstraints()
+		// Without the schema annotations there are no relations to constrain. The index on
+		// _block_number_ is not declared by them either, so it stays.
+		constraints = protosql.DisableAllConstraints().WithBlockNumberIndex(constraints)
 
-		zlog.Warn("the module's output carries no schema.proto annotations, so its tables get no primary keys, no unique constraints and no foreign keys — " +
-			"and therefore no indexes. Queries against them are sequential scans and duplicate ids are not rejected. " +
-			"Annotate the output to have the sink derive them")
+		zlog.Warn("the module's output carries no schema.proto annotations, so its tables get no primary keys, no unique constraints and no foreign keys. " +
+			"Queries against them are sequential scans and duplicate ids are not rejected. " +
+			"`substreams tools extract-proto --sql` writes the annotated proto to start from, and --proto-file-override points the sink at it")
 	}
 	warnAboutConstraints(constraints)
 
@@ -1143,7 +1152,9 @@ func fromProtoConstraintPolicy(cmd *cobra.Command) (protosql.ConstraintPolicy, e
 		DisableForeignKeys: boolFlag(cmd, "disable-foreign-keys"),
 		DisablePrimaryKeys: stringSliceFlag(cmd, "disable-primary-keys"),
 		DisableUniques:     stringSliceFlag(cmd, "disable-unique-constraints"),
-		PerTransaction:     intFlag(cmd, "constraints-per-transaction"),
+
+		DisableBlockNumberIndex: boolFlag(cmd, "disable-block-number-index"),
+		PerTransaction:          intFlag(cmd, "constraints-per-transaction"),
 	}
 
 	// --no-constraints shipped in v1.21.0 and said "none of them at all", which is exactly

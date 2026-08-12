@@ -203,6 +203,13 @@ foreign key validated, tables locked while it runs. A backfill that ends with no
 constraints is a silent wrong result that looks like success; a stall is at least a
 visible one. Use `manual` to put that pass in a maintenance window instead.
 
+An index on `_block_number_` is created in the same pass, on every table. It is the sink's
+own rather than the schema's: every table carries that column and every reorg deletes from
+every table by it, and a foreign key indexes only its referenced side — so without it each
+undo is a sequential scan per table. `--disable-block-number-index` leaves it out, which
+only makes sense for a run that can never reorg. It is also the one thing the pass has to
+do for an output with no schema annotations at all.
+
 Constraints are created one per transaction, committing as it goes: building an index and
 validating a foreign key are the two most memory-hungry things the sink asks of the server,
 and holding them all open at once is what turns a large schema into an OOM that loses the
@@ -344,6 +351,26 @@ expensive and is never queried by id:
 substreams sink postgres constraints apply substreams.yaml --dsn $DSN \
   --disable-primary-keys=order_items
 ```
+
+## Starting from a package with no annotations
+
+An output with no `schema.proto` annotations still sinks: the tables come from the message
+structure. What it has no way to declare is which field is the primary key, which are
+unique and which reference another table — so those are not created, and the sink says so
+on every start.
+
+`substreams tools extract-proto --sql` writes the module's output proto back out with
+every option commented out beside the message and field it applies to, and the annotations
+file next to it so the result parses as-is:
+
+```bash
+substreams tools extract-proto --sql substreams.yaml map_events
+# uncomment the options that describe the schema, then:
+substreams sink postgres setup substreams.yaml --proto-file-override=./events.proto --dsn=$DSN
+```
+
+Pass the same `--proto-file-override` to the run and to `constraints apply`, or they derive
+the unannotated schema again.
 
 ## Performance flags
 

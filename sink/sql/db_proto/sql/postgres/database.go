@@ -403,6 +403,12 @@ func (d *Database) applyConstraints() error {
 	collect("unique", d.dialect.UniqueConstraintSql, d.constraints.SkipUnique)
 	collect("fk constraint", d.dialect.ForeignKeySql, d.constraints.SkipForeignKey)
 
+	indexes, err := d.pendingIndexes()
+	if err != nil {
+		return err
+	}
+	pending = append(pending, indexes...)
+
 	if err := d.runStatements(pending); err != nil {
 		return err
 	}
@@ -410,6 +416,71 @@ func (d *Database) applyConstraints() error {
 	d.logger.Info("applying constraints", zap.Int("created", len(pending)), zapx.HumanDuration("duration", time.Since(startAt)))
 
 	return nil
+}
+
+// pendingIndexes is the indexes the sink creates for itself and the schema does not have.
+//
+// They are built in the same pass as the constraints because they are the same kind of
+// expensive — an index build over the whole table — and wanted at the same moment, once
+// the load is done.
+func (d *Database) pendingIndexes() ([]statement, error) {
+	if d.constraints.DisableBlockNumberIndex {
+		return nil, nil
+	}
+
+	existing, err := d.existingIndexes(d.querier())
+	if err != nil {
+		return nil, err
+	}
+
+	var pending []statement
+	for _, index := range d.dialect.IndexSql {
+		key, ok := indexTarget(index.Sql)
+		if ok && existing[key] {
+			d.logger.Debug("index already in place, skipping", zap.String("index", key.name))
+			continue
+		}
+
+		pending = append(pending, statement{kind: "index", sql: index.Sql})
+	}
+
+	return pending, nil
+}
+
+// existingIndexes reads which indexes the schema carries. They live in pg_indexes rather
+// than pg_constraint, a plain index not being a constraint.
+func (d *Database) existingIndexes(from rowQuerier) (map[constraintKey]bool, error) {
+	rows, err := from.Query(`
+		SELECT indexname, schemaname || '.' || tablename
+		FROM pg_indexes
+		WHERE schemaname = $1`, d.schema.Name)
+	if err != nil {
+		return nil, fmt.Errorf("listing the existing indexes of schema %q: %w", d.schema.Name, err)
+	}
+	defer rows.Close()
+
+	existing := map[constraintKey]bool{}
+	for rows.Next() {
+		var name, relation string
+		if err := rows.Scan(&name, &relation); err != nil {
+			return nil, fmt.Errorf("scanning index name: %w", err)
+		}
+		existing[constraintKey{relation: normalizeRelation(relation), name: name}] = true
+	}
+
+	return existing, rows.Err()
+}
+
+// indexTargetPattern pulls the name and the relation out of the dialect's own CREATE INDEX.
+var indexTargetPattern = regexp.MustCompile(`(?i)create\s+index\s+(?:if\s+not\s+exists\s+)?"?([a-z0-9_]+)"?\s+on\s+(\S+)`)
+
+func indexTarget(statement string) (constraintKey, bool) {
+	match := indexTargetPattern.FindStringSubmatch(statement)
+	if len(match) != 3 {
+		return constraintKey{}, false
+	}
+
+	return constraintKey{relation: normalizeRelation(match[2]), name: match[1]}, true
 }
 
 // statement is one piece of DDL the constraint pass has to run.
@@ -493,6 +564,16 @@ func (d *Database) MissingConstraints() ([]string, error) {
 	collect(d.dialect.UniqueConstraintSql, d.constraints.SkipUnique)
 	collect(d.dialect.ForeignKeySql, d.constraints.SkipForeignKey)
 
+	indexes, err := d.pendingIndexes()
+	if err != nil {
+		return nil, err
+	}
+	for _, index := range indexes {
+		if key, ok := indexTarget(index.sql); ok {
+			missing = append(missing, key.relation+"."+key.name)
+		}
+	}
+
 	return missing, nil
 }
 
@@ -529,6 +610,22 @@ func (d *Database) DropConstraints() error {
 	collect("fk constraint", d.dialect.ForeignKeySql)
 	collect("unique constraint", d.dialect.UniqueConstraintSql)
 	collect("pk", d.dialect.PrimaryKeySql)
+
+	indexes, err := d.existingIndexes(d.querier())
+	if err != nil {
+		return err
+	}
+	for _, index := range d.dialect.IndexSql {
+		key, ok := indexTarget(index.Sql)
+		if !ok || !indexes[key] {
+			continue
+		}
+
+		pending = append(pending, statement{
+			kind: "index",
+			sql:  fmt.Sprintf("DROP INDEX IF EXISTS %s.%s", pq.QuoteIdentifier(d.schema.Name), pq.QuoteIdentifier(key.name)),
+		})
+	}
 
 	return d.runStatements(pending)
 }

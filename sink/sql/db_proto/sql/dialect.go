@@ -34,8 +34,12 @@ type BaseDialect struct {
 	PrimaryKeySql       []*Constraint
 	ForeignKeySql       []*Constraint
 	UniqueConstraintSql []*Constraint
-	TableRegistry       map[string]*schema.Table
-	Logger              *zap.Logger
+	// IndexSql holds the indexes the sink creates for itself rather than because the
+	// schema asked for one. They are built in the same pass as the constraints, being the
+	// same kind of expensive.
+	IndexSql      []*Constraint
+	TableRegistry map[string]*schema.Table
+	Logger        *zap.Logger
 }
 
 func NewBaseDialect(registry map[string]*schema.Table, logger *zap.Logger) *BaseDialect {
@@ -161,6 +165,10 @@ func (d *BaseDialect) TableApplyRanks() (map[string]int, error) {
 	}
 
 	return ranks, nil
+}
+
+func (d *BaseDialect) AddIndexSql(table string, sql string) {
+	d.IndexSql = append(d.IndexSql, &Constraint{Table: table, Sql: sql})
 }
 
 func (d *BaseDialect) AddUniqueConstraintSql(table string, sql string) {

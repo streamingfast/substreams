@@ -50,6 +50,12 @@ type ConstraintPolicy struct {
 	DisablePrimaryKeys []string
 	DisableUniques     []string
 
+	// DisableBlockNumberIndex leaves out the index on _block_number_. Every table carries
+	// that column and the reorg path deletes by it on every table, so without the index
+	// each undo is a sequential scan per table. It is only dead weight on a run that can
+	// never reorg.
+	DisableBlockNumberIndex bool
+
 	// PerTransaction is how many constraints are created or dropped per transaction.
 	// Zero means one, which is what keeps the pass restartable and its memory bounded:
 	// each index build and each foreign key validation is committed before the next
@@ -82,20 +88,40 @@ func (p ConstraintPolicy) SkipForeignKey(string) bool {
 	return p.DisableForeignKeys
 }
 
-// SkipsEverything reports a policy that leaves the schema with no constraints at all, in
-// which case there is nothing to apply and nothing to wait for.
+// SkipsEverything reports a policy that leaves the schema with nothing to build, in which
+// case there is nothing to apply and nothing to wait for. The block number index counts:
+// a schema with no constraints at all still wants it.
 func (p ConstraintPolicy) SkipsEverything() bool {
+	return p.SkipsEveryConstraint() && p.DisableBlockNumberIndex
+}
+
+// SkipsEveryConstraint reports a policy that declares no constraints, index aside.
+func (p ConstraintPolicy) SkipsEveryConstraint() bool {
 	return p.DisableForeignKeys && matchesTable(p.DisablePrimaryKeys, AllTables) && matchesTable(p.DisableUniques, AllTables)
 }
 
-// DisableAllConstraints returns the policy that creates none of them, which is what a
-// pure bulk load into a throwaway database wants.
+// SkipBlockNumberIndex reports whether the index on _block_number_ is left out.
+func (p ConstraintPolicy) SkipBlockNumberIndex(string) bool { return p.DisableBlockNumberIndex }
+
+// DisableAllConstraints returns the policy that declares none of them, which is what an
+// output with no schema annotations leaves the sink with. The block number index survives
+// it: nothing in the annotations asks for that one, the reorg path does.
 func DisableAllConstraints() ConstraintPolicy {
 	return ConstraintPolicy{
 		DisableForeignKeys: true,
 		DisablePrimaryKeys: []string{AllTables},
 		DisableUniques:     []string{AllTables},
 	}
+}
+
+// WithBlockNumberIndex carries the index switch over from another policy, the index being
+// the one thing that survives an output having no annotations to declare anything.
+func (p ConstraintPolicy) WithBlockNumberIndex(from ConstraintPolicy) ConstraintPolicy {
+	p.Timing = from.Timing
+	p.PerTransaction = from.PerTransaction
+	p.DisableBlockNumberIndex = from.DisableBlockNumberIndex
+
+	return p
 }
 
 // Describe renders the policy for a log line.
@@ -105,6 +131,9 @@ func (p ConstraintPolicy) Describe() string {
 	}
 
 	var parts []string
+	if p.DisableBlockNumberIndex {
+		parts = append(parts, "no block number index")
+	}
 	if p.DisableForeignKeys {
 		parts = append(parts, "no foreign keys")
 	}

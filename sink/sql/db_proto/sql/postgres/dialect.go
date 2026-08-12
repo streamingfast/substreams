@@ -201,6 +201,12 @@ func (d *DialectPostgres) createTable(table *schema.Table) error {
 	sb.WriteString(");\n")
 
 	d.AddForeignKeyReferencing(table.Name, sql2.DialectTableBlock, fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT fk_block FOREIGN KEY (%s) REFERENCES %s.%s(number) ON DELETE CASCADE", tableName, sql2.DialectFieldBlockNumber, d.schemaName, sql2.DialectTableBlock))
+
+	// A foreign key indexes its referenced side only, so _block_number_ would carry none.
+	// Every undo deletes from every table by that column, which without this is a
+	// sequential scan per table, and a cascade would be worse still: PostgreSQL looks the
+	// child rows up once per deleted parent row.
+	d.AddIndexSql(table.Name, fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_block_number_idx ON %s (%s)", table.Name, tableName, sql2.DialectFieldBlockNumber))
 	d.AddCreateTableSql(table.Name, sb.String())
 
 	return nil

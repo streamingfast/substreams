@@ -45,8 +45,6 @@ jobs:
 
       - name: Run Tests
         env:
-          # Docker-backed sink/sql integration tests, only ubuntu runners have Docker
-          SF_SINK_SQL_INTEGRATION_TESTS: ${{ matrix.os == 'ubuntu-latest' && 'true' || '' }}
           # `go test ./...` builds several packages that each start their own containers
           # and runs them in parallel, so more than one test binary is connected to the
           # shared Ryuk reaper at a time. Runs have failed with every container in one

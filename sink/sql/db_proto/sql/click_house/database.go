@@ -20,7 +20,6 @@ import (
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 type Database struct {
@@ -222,11 +221,11 @@ func (d *Database) Insert(table string, values []any) error {
 	return d.inserter.insert(table, values)
 }
 
-func (d *Database) WalkMessageDescriptorAndInsert(dm *dynamicpb.Message, blockNum uint64, blockTimestamp time.Time, parent *sql.Parent) (time.Duration, error) {
+func (d *Database) WalkMessageDescriptorAndInsert(dm protoreflect.Message, blockNum uint64, blockTimestamp time.Time, parent *sql.Parent) (time.Duration, error) {
 	return d.BaseDatabase.WalkMessageDescriptorAndInsertWithDialect(dm, blockNum, blockTimestamp, parent, d.dialect, d)
 }
 
-func (d *Database) WalkMessageDescriptorAndInsertInto(dm *dynamicpb.Message, blockNum uint64, blockTimestamp time.Time, parent *sql.Parent, inserter sql.Inserter) (time.Duration, error) {
+func (d *Database) WalkMessageDescriptorAndInsertInto(dm protoreflect.Message, blockNum uint64, blockTimestamp time.Time, parent *sql.Parent, inserter sql.Inserter) (time.Duration, error) {
 	return d.BaseDatabase.WalkMessageDescriptorAndInsertWithDialect(dm, blockNum, blockTimestamp, parent, d.dialect, inserter)
 }
 

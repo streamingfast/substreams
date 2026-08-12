@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"hash/fnv"
 	"regexp"
-	"sort"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -547,17 +546,26 @@ func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) (err error) {
 	d.logger.Info("undoing blocks", zap.Uint64("last_valid_block_num", lastValidBlockNum))
 	startAt := time.Now()
 
-	tables := d.dialect.GetTables()
-	sort.Slice(tables, func(i, j int) bool {
-		return tables[i].Ordinal > tables[j].Ordinal
-	})
+	// Reverse apply order: a referencing table is emptied before the table it points at,
+	// so a foreign key never blocks its own cleanup. Nesting depth would order the
+	// parent-child keys and quietly get sibling references wrong.
+	ordered, err := d.dialect.TableApplyOrder()
+	if err != nil {
+		return err
+	}
 
 	var rowsAffected int64
-	for _, table := range tables {
-		query := fmt.Sprintf(`DELETE FROM %s WHERE %s > $1`, tableName(d.schema.Name, table.Name), sql.DialectFieldBlockNumber)
+	for i := len(ordered) - 1; i >= 0; i-- {
+		name := ordered[i]
+		if name == sql.DialectTableBlock {
+			// Deleted last, below, and counted separately.
+			continue
+		}
+
+		query := fmt.Sprintf(`DELETE FROM %s WHERE %s > $1`, tableName(d.schema.Name, name), sql.DialectFieldBlockNumber)
 		result, err := tx.Exec(query, lastValidBlockNum)
 		if err != nil {
-			return fmt.Errorf("deleting rows of %q from %d: %w", table.Name, lastValidBlockNum, err)
+			return fmt.Errorf("deleting rows of %q from %d: %w", name, lastValidBlockNum, err)
 		}
 
 		affected, err := result.RowsAffected()

@@ -36,6 +36,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - CLI: `substreams tools devenv` boots a complete local stack — a dummy blockchain in a container plus a tier1 and a tier2 built from the current source tree — prints the endpoint and stays up until interrupted. Requires Docker. `--burst` sets how many blocks exist at genesis and `--bundle-size` the segment size, which together decide how much parallel work a request has to do; the state store lives under `--data-dir`, so deleting it is what gives a cold backprocess again. The command waits for the merger to catch up with the burst before starting tier1, since tier1 bootstraps its block hub from merged blocks and cannot become ready until they exist. The end-to-end tests now share this same setup code, so what a developer watches locally is the path CI exercises.
 
+  Running the tiers in-process pulls in the wasmtime runtime, whose bindings are cgo-only, so the command is built only when cgo is enabled — that is, in a local `go build` or `go install`, but not in the released Docker image, which is deliberately static. That image could not run it anyway, having no Docker daemon of its own.
+
 ### Changed
 
 - Sink: `substreams sink postgres` and `substreams sink clickhouse` in from-proto mode now unmarshal and walk blocks on a worker pool instead of one at a time at flush. Decoding a block was where the sink spent its time — around 7.8µs of the 9.3µs a wide entity cost — while PostgreSQL sat on roughly eight times that in headroom, so the sink itself was the throughput limit. Measured at 4.1x on a wide entity. Workers only fill a per-block buffer; the inserts are still replayed in block order, in the same transaction as before, so the resulting database is unchanged.

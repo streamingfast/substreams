@@ -923,6 +923,20 @@ func (d *Database) StoreCursor(cursor *sink.Cursor) error {
 func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) (err error) {
 	// Rows for the undone blocks may still be sitting in the buffer, on their way to a
 	// COPY; applying them after the delete would resurrect exactly what it removed.
+	//
+	// The spool holds no undoable block whenever this runs: an undo only ever concerns a
+	// block delivered at STEP_NEW, everything spooled arrived at STEP_NEW_IRREVERSIBLE, and
+	// the first STEP_NEW block closes the spool before it is held — see the live switch in
+	// db_proto.Sinker's HandleBlockScopedData. The drain is not therefore dead code: a run
+	// that resumes on a block which forked out while it was down gets the undo signal as its
+	// first message, with the spool open and empty. It also stands as a guard, since the
+	// invariant it rests on lives in another package and losing it silently would mean
+	// deleted rows coming back.
+	//
+	// Note that the delete below does not prune `_segments_`. It does not have to while that
+	// invariant holds: every recorded segment ends at a block that was irreversible when it
+	// was written, so none can cover a block above lastValidBlockNum. Prune it here if a
+	// spool is ever allowed to hold undoable blocks.
 	if inserter, ok := d.inserter.(*localBufferInserter); ok {
 		if err := inserter.buffer.Drain(context.Background()); err != nil {
 			return fmt.Errorf("draining the local buffer before an undo: %w", err)

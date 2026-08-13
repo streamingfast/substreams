@@ -67,6 +67,18 @@ func (s *Sinker) Run(ctx context.Context) error {
 		return fmt.Errorf("fetch cursor: %w", err)
 	}
 
+	// The step of the stored cursor deliberately decides nothing here. It says where the
+	// previous run stopped, not where the chain is now: a sink that was live, went down for
+	// an hour and comes back has a STEP_NEW — or, if its block forked out meanwhile, a
+	// STEP_UNDO — cursor with a full backfill ahead of it, which is precisely the run the
+	// spool exists for. Only the step of the blocks now arriving says whether we are at the
+	// head, and HandleBlockScopedData already reads it per block.
+	//
+	// A run that resumes on a forked-out block gets the undo signal as its first message,
+	// before any block. That is handled where it lands: HandleBlockUndoSignal drains the
+	// spool, which is empty, deletes the rows and records the cursor on the open segment.
+	// Whatever follows — irreversible blocks to catch up on, or live ones — then decides
+	// what happens to the spool, as it would on any other run.
 	//clean up the mess from running without a transaction
 	if cursor != nil {
 		err = s.db.HandleBlocksUndo(cursor.Block().Num())
@@ -123,6 +135,15 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 	}
 	s.stats.BlockCount++
 
+	// The switch happens before this block is held, which is what makes the spool safe
+	// against reorgs: `isLive` here comes from the cursor-based liveness checker the sink
+	// installs itself (see runFromProtoSink; --live-block-time-delta is deliberately not
+	// registered on this command), so it turns true on the first cursor at STEP_NEW —
+	// the first block that can ever be undone. Everything spooled up to here was delivered
+	// at STEP_NEW_IRREVERSIBLE and cannot be undone, and from here on there is no spool.
+	// An undo therefore never reaches a spool holding undoable blocks. It can still reach a
+	// spool holding nothing — a run resuming on a block that forked out while it was down
+	// gets the undo before any block — which is what the drain in HandleBlocksUndo is for.
 	if isLive != nil && *isLive && !s.directInserts {
 		// Write what is held before the switch, with the cursor of the last held block:
 		// those blocks belong to the buffered path, and this block's cursor covers a

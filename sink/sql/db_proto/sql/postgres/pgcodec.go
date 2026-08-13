@@ -149,8 +149,10 @@ func (s *pgSegment) WriteRow(table string, values []any) error {
 
 	if s.codec.format == spool.FormatPGCopy {
 		// Binary COPY does no coercion, so the values have to match the column types the
-		// server reported exactly. The rendered formats go through the dialect instead.
-		if err := pgcopy.NormalizeRow(target.target.Columns, values); err != nil {
+		// server reported exactly. This is value normalization, including materializing
+		// the configured protobuf-bytes representation for text columns; it is not SQL
+		// rendering. The rendered formats go through the dialect instead.
+		if err := pgcopy.NormalizeRowWithEncoding(target.target.Columns, values, s.codec.encoding); err != nil {
 			return fmt.Errorf("normalizing a row of %q: %w", table, err)
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	sqlbytes "github.com/streamingfast/substreams/sink/sql/bytes"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -17,6 +18,17 @@ import (
 // to a NUMERIC column: it would be rejected outright, and values above 2^63 would
 // be wrong even if it were not.
 func Normalize(oid uint32, value any) (any, error) {
+	return normalize(oid, value, sqlbytes.EncodingRaw)
+}
+
+// NormalizeWithEncoding converts a value for binary COPY while applying the configured
+// protobuf-bytes representation. Non-raw bytes columns are text columns, so their payload
+// must be encoded before the COPY encoder sees it.
+func NormalizeWithEncoding(oid uint32, value any, encoding sqlbytes.Encoding) (any, error) {
+	return normalize(oid, value, encoding)
+}
+
+func normalize(oid uint32, value any, encoding sqlbytes.Encoding) (any, error) {
 	switch v := value.(type) {
 	case nil:
 		return nil, nil
@@ -67,8 +79,15 @@ func Normalize(oid uint32, value any) (any, error) {
 		}
 		return v, nil
 
+	case []byte:
+		encoded, err := encoding.EncodeBytes(v)
+		if err != nil {
+			return nil, fmt.Errorf("encoding bytes: %w", err)
+		}
+		return encoded, nil
+
 	case []any:
-		return normalizeSlice(oid, v)
+		return normalizeSlice(oid, v, encoding)
 
 	default:
 		return value, nil
@@ -77,12 +96,17 @@ func Normalize(oid uint32, value any) (any, error) {
 
 // NormalizeRow applies [Normalize] to every value of a row, in place.
 func NormalizeRow(cols []Column, values []any) error {
+	return NormalizeRowWithEncoding(cols, values, sqlbytes.EncodingRaw)
+}
+
+// NormalizeRowWithEncoding applies NormalizeWithEncoding to every value of a row, in place.
+func NormalizeRowWithEncoding(cols []Column, values []any, encoding sqlbytes.Encoding) error {
 	if len(cols) != len(values) {
 		return fmt.Errorf("expected %d values, got %d", len(cols), len(values))
 	}
 
 	for i := range values {
-		normalized, err := Normalize(cols[i].OID, values[i])
+		normalized, err := NormalizeWithEncoding(cols[i].OID, values[i], encoding)
 		if err != nil {
 			return fmt.Errorf("column %q: %w", cols[i].Name, err)
 		}
@@ -94,7 +118,7 @@ func NormalizeRow(cols []Column, values []any) error {
 
 // normalizeSlice turns the walker's []any array into a concretely typed slice, which
 // the pgtype array codec can then encode against the array's element OID.
-func normalizeSlice(oid uint32, in []any) (any, error) {
+func normalizeSlice(oid uint32, in []any, encoding sqlbytes.Encoding) (any, error) {
 	if len(in) == 0 {
 		// Element type does not matter for an empty array, but the slice must still be
 		// typed for the codec to find a plan.
@@ -114,6 +138,22 @@ func normalizeSlice(oid uint32, in []any) (any, error) {
 		return out, nil
 
 	case []byte:
+		if encoding.IsStringType() {
+			out := make([]string, len(in))
+			for i, v := range in {
+				b, ok := v.([]byte)
+				if !ok {
+					return nil, fmt.Errorf("mixed element types in array: %T and []byte", v)
+				}
+				encoded, err := encoding.EncodeBytes(b)
+				if err != nil {
+					return nil, fmt.Errorf("encoding array element %d: %w", i, err)
+				}
+				out[i] = encoded.(string)
+			}
+			return out, nil
+		}
+
 		out := make([][]byte, len(in))
 		for i, v := range in {
 			b, ok := v.([]byte)

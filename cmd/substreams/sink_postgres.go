@@ -101,11 +101,18 @@ func init() {
 	addBytesEncodingFlag(setupFlags)
 	addFromProtoSchemaFlags(setupFlags)
 
-	for _, constraintsCmd := range []*cobra.Command{sinkPostgresConstraintsApplyCmd, sinkPostgresConstraintsDropCmd} {
-		addBytesEncodingFlag(constraintsCmd.Flags())
-		addFromProtoSchemaFlags(constraintsCmd.Flags())
-		addConstraintPassFlags(constraintsCmd.Flags())
-	}
+	applyFlags := sinkPostgresConstraintsApplyCmd.Flags()
+	addBytesEncodingFlag(applyFlags)
+	addFromProtoSchemaFlags(applyFlags)
+	addConstraintPassFlags(applyFlags)
+
+	// Drop always removes every constraint managed by the sink. The disable-* and
+	// --no-constraints flags describe what should be created, so exposing them here would
+	// suggest that drop honors a policy it cannot apply.
+	dropFlags := sinkPostgresConstraintsDropCmd.Flags()
+	addBytesEncodingFlag(dropFlags)
+	dropFlags.String("proto-file-override", "", "Override protobuf file to use instead of extracting from substreams package")
+	addConstraintPassFlags(dropFlags)
 	sinkPostgresConstraintsCmd.AddCommand(sinkPostgresConstraintsApplyCmd)
 	sinkPostgresConstraintsCmd.AddCommand(sinkPostgresConstraintsDropCmd)
 

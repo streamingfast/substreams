@@ -324,7 +324,12 @@ func addClickhouseStateFlags(flags *pflag.FlagSet) {
 // everything. What the run command can do is say which half applies — see
 // setModeGroupedUsage — and fail on a flag typed for the other one.
 func addSinkRunFlags(flags *pflag.FlagSet, driver string) {
-	sink.AddFlagsToSet(flags, sink.FlagExcludeDefault(sink.FlagUndoBufferSize))
+	// --live-block-time-delta is excluded because this sink overrides the liveness checker
+	// with the cursor-based one (see runFromProtoSink): the flag would be accepted and then
+	// silently ignored. It is also what the spool's safety rests on — liveness has to turn
+	// on the first undo-able block, not on a wall-clock guess. The database-changes sink
+	// does not look at liveness at all.
+	sink.AddFlagsToSet(flags, sink.FlagExcludeDefault(sink.FlagUndoBufferSize, sink.FlagLiveBlockTimeDelta))
 	addBytesEncodingFlag(flags)
 	if driver == "clickhouse" {
 		addClusterFlag(flags)

@@ -330,11 +330,20 @@ func (d *Database) VerifySchemaCompatibility(ctx context.Context) error {
 // rowIDColumnByTable reports, for every table of the schema that exists in ClickHouse,
 // whether it carries the _row_id_ column. An absent schema yields an empty map rather
 // than an error: nothing is set up yet, so there is nothing to disagree with.
+//
+// It connects to 'default' rather than to the schema, for the same reason CreateDatabase
+// does: this runs before the database exists on a first run, and dialing one that is not
+// there never comes back — newClient retries a failed dial forever. system.columns is
+// global, so which database the connection names does not change the answer.
 func (d *Database) rowIDColumnByTable(ctx context.Context) (map[string]bool, error) {
-	client, err := d.client()
+	dsn := d.dsn.Clone()
+	dsn.Database = "default"
+
+	client, err := d.clientNoCache(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("getting clickhouse client: %w", err)
 	}
+	defer client.Close()
 
 	var (
 		tables  chproto.ColStr

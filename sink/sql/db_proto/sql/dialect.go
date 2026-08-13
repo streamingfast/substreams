@@ -105,13 +105,7 @@ func (d *BaseDialect) AddForeignKeyReferencing(table string, referencedTable str
 // order of rows within one table, which no table-level ordering can address — so those
 // edges are skipped.
 func (d *BaseDialect) TableApplyOrder() ([]string, error) {
-	// The block table is referenced by every other one and referenced by nothing, so it
-	// always leads.
-	names := []string{DialectTableBlock}
-	for name := range d.TableRegistry {
-		names = append(names, name)
-	}
-	sort.Strings(names[1:])
+	names := d.TableNames()
 
 	known := make(map[string]bool, len(names))
 	for _, name := range names {
@@ -165,6 +159,21 @@ func (d *BaseDialect) TableApplyOrder() ([]string, error) {
 	}
 
 	return ordered, nil
+}
+
+// TableNames lists every table of the schema in a stable order: the block table first,
+// being referenced by every other one and referencing none, then the rest sorted.
+//
+// It is what TableApplyOrder starts from, and what the reorg path falls back to when no
+// foreign key order exists.
+func (d *BaseDialect) TableNames() []string {
+	names := []string{DialectTableBlock}
+	for name := range d.TableRegistry {
+		names = append(names, name)
+	}
+	sort.Strings(names[1:])
+
+	return names
 }
 
 // TableApplyRanks is TableApplyOrder as a lookup, for sorting a set of tables that is not

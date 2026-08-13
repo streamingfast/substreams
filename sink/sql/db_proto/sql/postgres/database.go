@@ -968,7 +968,15 @@ func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) (err error) {
 	// parent-child keys and quietly get sibling references wrong.
 	ordered, err := d.dialect.TableApplyOrder()
 	if err != nil {
-		return err
+		// A cyclic foreign key graph has no such order, and refusing here would leave the
+		// sink unable to undo a reorg — or even to start, since Run undoes from the stored
+		// cursor — on exactly the schema row-insert mode exists to support. The deletes all
+		// run in one transaction and key on _block_number_ alone, so a stable arbitrary
+		// order is right wherever the references are absent, and where a cycle really is
+		// enforced no order would have worked either.
+		d.logger.Debug("the schema's tables cannot be ordered by their foreign keys, undoing in schema order",
+			zap.Error(err))
+		ordered = d.dialect.TableNames()
 	}
 
 	var rowsAffected int64

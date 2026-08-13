@@ -222,6 +222,7 @@ var fromProtoSchemaFlagNames = []string{
 	"disable-primary-keys",
 	"disable-unique-constraints",
 	"disable-block-number-index",
+	"disable-all-constraints",
 	"no-constraints",
 	"proto-file-override",
 }
@@ -277,14 +278,27 @@ func addFromProtoSchemaFlags(flags *pflag.FlagSet) {
 	flags.Bool("disable-block-number-index", false, "Leave out the index on _block_number_. Every table carries that column and every reorg deletes from every table by it, so without the index each undo is a sequential scan per table — a foreign key indexes its referenced side only. It is created when the sink starts, concurrently and outside the constraint pass: --apply-constraints describes the schema and is yours to schedule, where this one the sink depends on to undo a reorg. Measured over 10GiB it costs 2.6s to build and 2% of the table. Only dead weight on a run that can never reorg, such as --final-blocks-only.")
 	flags.String("proto-file-override", "", "Override protobuf file to use instead of extracting from substreams package")
 
-	flags.Bool("no-constraints", false, "Deprecated, use --disable-foreign-keys --disable-primary-keys=all --disable-unique-constraints=all.")
-	_ = flags.MarkDeprecated("no-constraints", "use --disable-foreign-keys --disable-primary-keys=all --disable-unique-constraints=all")
+	flags.Bool("disable-all-constraints", false, "Leave out every primary key, unique constraint and foreign key, the same as passing --disable-foreign-keys --disable-primary-keys=all --disable-unique-constraints=all together. The index on _block_number_ survives it: nothing in the annotations asks for that one, the reorg path does.")
+
+	flags.Bool("no-constraints", false, "Deprecated, use --disable-all-constraints.")
+	_ = flags.MarkDeprecated("no-constraints", "use --disable-all-constraints")
+}
+
+// addConstraintTimingFlag registers --apply-constraints, which says when the constraints
+// are created and so only means something to a command that loads rows.
+//
+// It is deliberately not on `setup`. There the question is not when but whether, since
+// `setup` either leaves the schema constrained or it does not, and two of the three values
+// would collapse onto the same answer. What `setup` creates is said by the --disable-*
+// flags instead.
+func addConstraintTimingFlag(flags *pflag.FlagSet) {
+	flags.String("apply-constraints", string(protosql.ConstraintsAuto), "When the schema's constraints are created: 'auto' has the sink create them once the backfill reaches chain HEAD or the end of a bounded run, 'manual' leaves it to the 'sink postgres constraints apply' command, 'always' creates them before the load. Creating them is a stop-the-world operation — indexes to build, foreign keys to validate, tables locked throughout — so on a large database 'manual' is how that pass goes into a maintenance window instead. Loading with them already in place is the expensive option: measured through binary COPY, 27x slower than loading without, where building the same constraints afterwards costs 3.3x. The index on _block_number_ is not one of these: the sink creates it when it starts, see --disable-block-number-index.")
 }
 
 // addFromProtoRunFlags registers the from-proto flags that only apply while the sink is
 // running. The ClickHouse specific ones are only registered for the clickhouse engine.
 func addFromProtoRunFlags(flags *pflag.FlagSet, driver string) {
-	flags.String("apply-constraints", string(protosql.ConstraintsAuto), "When the schema's constraints are created: 'auto' has the sink create them once the backfill reaches chain HEAD or the end of a bounded run, 'manual' leaves it to the 'sink postgres constraints apply' command, 'always' creates them before the load. Creating them is a stop-the-world operation — indexes to build, foreign keys to validate, tables locked throughout — so on a large database 'manual' is how that pass goes into a maintenance window instead. Loading with them already in place is the expensive option: measured through binary COPY, 27x slower than loading without, where building the same constraints afterwards costs 3.3x. The index on _block_number_ is not one of these: the sink creates it when it starts, see --disable-block-number-index.")
+	addConstraintTimingFlag(flags)
 
 	flags.String("write-mode", string(protosql.WriteModeAuto), "How a sealed spool segment reaches the database: 'copy' loads each table file with binary COPY, 'batch-insert' builds one multi-row INSERT per table, 'row-insert' issues one prepared INSERT per row. 'auto' picks copy on PostgreSQL, batch-insert on ClickHouse, and row-insert for a schema whose foreign keys cannot be ordered. An explicit mode the driver or the schema cannot support is an error rather than a downgrade. Ignored once the stream reaches chain HEAD, where the sink always inserts directly.")
 
@@ -882,6 +896,12 @@ func runFromProtoSetup(cmd *cobra.Command, driver, dsnString string, spkg *pbsub
 		return err
 	}
 
+	// `setup` creates the schema it is asked for, constraints included, and the --disable-*
+	// flags are what take them back out. There is no third answer here the way there is for
+	// a run, which can defer them until the backfill is over: this command creates the
+	// schema and exits, so a constraint it leaves out is one nothing will put back.
+	constraints.Timing = protosql.ConstraintsAlways
+
 	encoding, err := sinkBytesEncoding(cmd)
 	if err != nil {
 		return err
@@ -1184,9 +1204,9 @@ func fromProtoConstraintPolicy(cmd *cobra.Command) (protosql.ConstraintPolicy, e
 		PerTransaction:          intFlag(cmd, "constraints-per-transaction"),
 	}
 
-	// --no-constraints shipped in v1.21.0 and said "none of them at all", which is exactly
-	// what the three switches say together. It stays honoured for a release.
-	if flagChanged(cmd, "no-constraints") && boolFlag(cmd, "no-constraints") {
+	// --no-constraints shipped in v1.21.0 and said "none of them at all", which is what
+	// --disable-all-constraints says now. It stays honoured for a release.
+	if boolFlag(cmd, "disable-all-constraints") || (flagChanged(cmd, "no-constraints") && boolFlag(cmd, "no-constraints")) {
 		disabled := protosql.DisableAllConstraints()
 		policy.DisableForeignKeys = true
 		policy.DisablePrimaryKeys = disabled.DisablePrimaryKeys

@@ -102,12 +102,34 @@ func verifyTrailer(path string) error {
 	return nil
 }
 
-// rowWriter is one table's open stream, whichever format it is in.
+// rowWriter is one table's open stream, whichever format it is in. Closing one closes the
+// file it was writing to: the segment hands the stream its file and never touches it
+// again, so nothing else is left to release it.
 type rowWriter interface {
 	WriteRow(values []any) error
 	Rows() int64
 	Bytes() int64
 	Close() error
+}
+
+// pgCopyWriter closes the file under a binary COPY stream.
+//
+// pgcopy.Writer.Close only writes the trailer and flushes, deliberately leaving the
+// underlying writer to whoever opened it — which here is the segment, and a segment is
+// sealed and forgotten. Without this every sealed segment leaks one descriptor per table,
+// and the applier's os.RemoveAll then frees no space while they are held.
+type pgCopyWriter struct {
+	*pgcopy.Writer
+	file *os.File
+}
+
+func (w *pgCopyWriter) Close() error {
+	err := w.Writer.Close()
+	if closeErr := w.file.Close(); err == nil {
+		err = closeErr
+	}
+
+	return err
 }
 
 // pgTableFile is one table's stream within a segment. Under FormatRowLog there is no
@@ -214,7 +236,7 @@ func (s *pgSegment) openTable(table string, layout *pgcopy.Table) (*pgTableFile,
 			file.Close()
 			return nil, fmt.Errorf("starting pgcopy stream for %q: %w", table, err)
 		}
-		target.path, target.file, target.writer = path, file, writer
+		target.path, target.file, target.writer = path, file, &pgCopyWriter{Writer: writer, file: file}
 	}
 
 	s.tables[table] = target

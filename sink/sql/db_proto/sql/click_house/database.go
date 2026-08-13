@@ -424,9 +424,16 @@ func (d *Database) GetDialect() sql.Dialect {
 	return d.dialect
 }
 
+// InsertBlock writes the block row through the same path as every other row.
+//
+// It must not reach the accumulator directly: with a spool open that instance belongs to
+// the applier's goroutine, so appending to it from here is an unsynchronised write to the
+// map the applier swaps out on every flush. Going through Insert is also what tells the
+// spool which block the rows now being written belong to, without which a segment records
+// no block range at all.
 func (d *Database) InsertBlock(blockNum uint64, hash string, timestamp time.Time) error {
 	d.logger.Debug("inserting _block_", zap.Uint64("block_num", blockNum), zap.String("block_hash", hash))
-	err := d.inserter.insert("_blocks_", []any{blockNum, hash, timestamp, time.Now().UnixNano(), false})
+	err := d.Insert(sql.DialectTableBlock, []any{blockNum, hash, timestamp, time.Now().UnixNano(), false})
 	if err != nil {
 		return fmt.Errorf("inserting block %d: %w", blockNum, err)
 	}

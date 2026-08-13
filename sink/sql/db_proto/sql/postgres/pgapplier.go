@@ -30,8 +30,9 @@ type pgApplier struct {
 	// manifest so that segments written by an earlier build still apply correctly.
 	copyRanks map[string]int
 
-	// applied is the segments table read once, on the first recovery question.
-	applied map[uint64]bool
+	// applied is the segments table read once, on the first recovery question: first block
+	// to last block of every segment the database already holds.
+	applied map[uint64]uint64
 }
 
 func newPGApplier(pool *pgxpool.Pool, schema string, copyRanks map[string]int, logger *zap.Logger) *pgApplier {
@@ -182,25 +183,32 @@ func (a *pgApplier) AlreadyApplied(ctx context.Context, manifest *spool.Manifest
 		a.applied = applied
 	}
 
-	return a.applied[manifest.FirstBlock], nil
+	// Both ends have to match. Segments are keyed by their first block, but the block a
+	// segment ends on is whatever the sizer settled on at the time, so a range re-streamed
+	// after its segment was discarded comes back starting at the same block and ending
+	// somewhere else. Answering from the first block alone would call that one applied and
+	// drop every row it carries.
+	lastBlock, found := a.applied[manifest.FirstBlock]
+
+	return found && lastBlock == manifest.LastBlock, nil
 }
 
-// appliedSegments returns the first_block of every segment already in the database, so
+// appliedSegments returns the block range of every segment already in the database, so
 // recovery can tell what still needs replaying.
-func (a *pgApplier) appliedSegments(ctx context.Context) (map[uint64]bool, error) {
-	rows, err := a.pool.Query(ctx, fmt.Sprintf(`SELECT first_block FROM %s`, a.segmentsTable()))
+func (a *pgApplier) appliedSegments(ctx context.Context) (map[uint64]uint64, error) {
+	rows, err := a.pool.Query(ctx, fmt.Sprintf(`SELECT first_block, last_block FROM %s`, a.segmentsTable()))
 	if err != nil {
 		return nil, fmt.Errorf("listing applied segments: %w", err)
 	}
 	defer rows.Close()
 
-	applied := map[uint64]bool{}
+	applied := map[uint64]uint64{}
 	for rows.Next() {
-		var firstBlock uint64
-		if err := rows.Scan(&firstBlock); err != nil {
+		var firstBlock, lastBlock uint64
+		if err := rows.Scan(&firstBlock, &lastBlock); err != nil {
 			return nil, fmt.Errorf("scanning an applied segment: %w", err)
 		}
-		applied[firstBlock] = true
+		applied[firstBlock] = lastBlock
 	}
 
 	return applied, rows.Err()

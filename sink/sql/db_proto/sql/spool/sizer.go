@@ -45,18 +45,27 @@ func (s *sizer) size() int64 {
 }
 
 // observe folds one measured commit back into the target.
+//
+// The size to aim for comes from the throughput the commit actually demonstrated, not
+// from scaling the current target by target/elapsed: a segment is routinely sealed well
+// short of the target — the idle seal, the drain before an undo, the seal at shutdown —
+// and such a segment applies quickly for reasons that say nothing about how fast the
+// database is. Scaling the target on that evidence doubles it while the database may in
+// fact be slow. Deriving from bytes/elapsed cannot make that mistake, and it errs on the
+// conservative side for a short segment, whose elapsed time is mostly per-segment
+// overhead and therefore understates throughput.
 func (s *sizer) observe(bytes int64, elapsed time.Duration) {
-	if elapsed <= 0 {
+	if elapsed <= 0 || bytes <= 0 {
 		return
 	}
-
-	ratio := s.target.Seconds() / elapsed.Seconds()
-	// Clamp per step so the sizer converges instead of oscillating.
-	ratio = min(max(ratio, 0.5), 2.0)
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	next := int64(float64(s.current) * ratio)
-	s.current = min(max(next, segmentFloorBytes), s.maxBytes)
+	next := float64(bytes) * (s.target.Seconds() / elapsed.Seconds())
+
+	// Clamp per step so the sizer converges instead of oscillating.
+	next = min(max(next, float64(s.current)*0.5), float64(s.current)*2.0)
+
+	s.current = min(max(int64(next), segmentFloorBytes), s.maxBytes)
 }

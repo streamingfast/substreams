@@ -34,10 +34,12 @@ var extractProtoCmd = &cobra.Command{
 
 		With --sql, the file comes annotated for 'substreams sink postgres' in from-proto
 		mode: the schema annotations are imported, every message carries a commented-out
-		table option and every field a commented-out column option, and the annotations
-		file itself is written next to it so the result parses as-is. Uncomment what the
-		schema should declare — which field is the primary key, which are unique, which
-		reference another table — and point the sink at the result:
+		table option, every field a commented-out copy of itself per column option, and the
+		annotations file itself is written next to it so the result parses as-is. Uncomment
+		the table option; for a field, a column option lives inside the field's own
+		brackets, so replace the field with the commented variant that describes it — which
+		is the primary key, which are unique, which reference another table — and point the
+		sink at the result:
 
 		    substreams tools extract-proto --sql substreams.yaml map_events
 		    substreams sink postgres setup <manifest> --proto-file-override=./map_events.proto --dsn=...
@@ -112,7 +114,7 @@ func runExtractProtoE(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Printf("Wrote %s\n", schemaTarget)
 
-		fmt.Printf("\nUncomment the options that describe the schema, then:\n"+
+		fmt.Printf("\nUncomment the table options, replace a field with the commented variant that describes it, then:\n"+
 			"  substreams sink postgres setup <manifest> --proto-file-override=%s --dsn=...\n", target)
 	}
 
@@ -219,14 +221,18 @@ func renderProtoFile(file *descriptorpb.FileDescriptorProto, outputType string, 
 	}
 
 	for _, enum := range file.EnumType {
-		out.WriteString("enum " + enum.GetName() + " {\n")
-		for _, value := range enum.Value {
-			fmt.Fprintf(&out, "  %s = %d;\n", value.GetName(), value.GetNumber())
-		}
-		out.WriteString("}\n\n")
+		renderEnum(&out, enum, "")
 	}
 
 	return out.String()
+}
+
+func renderEnum(out *strings.Builder, enum *descriptorpb.EnumDescriptorProto, indent string) {
+	out.WriteString(indent + "enum " + enum.GetName() + " {\n")
+	for _, value := range enum.Value {
+		fmt.Fprintf(out, "%s  %s = %d;\n", indent, value.GetName(), value.GetNumber())
+	}
+	out.WriteString(indent + "}\n\n")
 }
 
 func hasDependency(file *descriptorpb.FileDescriptorProto, name string) bool {
@@ -253,20 +259,38 @@ func renderMessage(out *strings.Builder, file *descriptorpb.FileDescriptorProto,
 	}
 
 	for _, field := range message.Field {
-		if annotate {
-			fmt.Fprintf(out, "%s  // [("+schemaProtoPackage+".field) = { primary_key: true }]  // one per message\n", indent)
-			fmt.Fprintf(out, "%s  // [("+schemaProtoPackage+".field) = { unique: true }]\n", indent)
-			fmt.Fprintf(out, "%s  // [("+schemaProtoPackage+".field) = { foreign_key: \"other_table.column\" }]\n", indent)
+		declaration := declarationOf(message, field)
+
+		// A map is walked into a table of its own rather than into a column, so none of the
+		// column options apply to the field declaring it.
+		if annotate && mapEntryOf(message, field) == nil {
+			// A field option lives inside the field's own brackets, before the semicolon,
+			// so it cannot be a comment line of its own the way the table option can.
+			// These are whole declarations: the one that describes the column replaces the
+			// plain one under it.
+			fmt.Fprintf(out, "%s  // %s [("+schemaProtoPackage+".field) = { primary_key: true }];  // replaces the line below, one per message\n", indent, declaration)
+			fmt.Fprintf(out, "%s  // %s [("+schemaProtoPackage+".field) = { unique: true }];\n", indent, declaration)
+			fmt.Fprintf(out, "%s  // %s [("+schemaProtoPackage+".field) = { foreign_key: \"other_table.column\" }];\n", indent, declaration)
 		}
 
-		fmt.Fprintf(out, "%s  %s%s %s = %d;\n", indent, labelOf(field), typeOf(field), field.GetName(), field.GetNumber())
+		fmt.Fprintf(out, "%s  %s;\n", indent, declaration)
 
 		if annotate {
 			out.WriteString("\n")
 		}
 	}
 
+	// A nested enum is declared by the message and referenced by its fields, so leaving it
+	// out writes a file naming a type nothing declares — which is the file the command
+	// tells the operator to feed back through --proto-file-override.
+	for _, enum := range message.EnumType {
+		out.WriteString("\n")
+		renderEnum(out, enum, indent+"  ")
+	}
+
 	for _, nested := range message.NestedType {
+		// The synthetic entry type of a map field. The field renders as `map<k, v>`, which
+		// declares it again, so writing it out here would be a duplicate definition.
 		if nested.GetOptions().GetMapEntry() {
 			continue
 		}
@@ -275,6 +299,56 @@ func renderMessage(out *strings.Builder, file *descriptorpb.FileDescriptorProto,
 	}
 
 	out.WriteString(indent + "}\n\n")
+}
+
+// declarationOf renders a field without its trailing semicolon, so the annotated form and
+// the plain one are built from the same string.
+func declarationOf(message *descriptorpb.DescriptorProto, field *descriptorpb.FieldDescriptorProto) string {
+	if entry := mapEntryOf(message, field); entry != nil {
+		// A map field is carried in the descriptor as a repeated message of a synthetic
+		// entry type. Rendering what the descriptor says — `repeated Msg.FooEntry foo` —
+		// names a type the file does not declare, and does not parse.
+		return fmt.Sprintf("map<%s, %s> %s = %d", typeOf(entryField(entry, 1)), typeOf(entryField(entry, 2)), field.GetName(), field.GetNumber())
+	}
+
+	return fmt.Sprintf("%s%s %s = %d", labelOf(field), typeOf(field), field.GetName(), field.GetNumber())
+}
+
+// mapEntryOf returns the synthetic entry type of a map field, or nil for anything else.
+func mapEntryOf(message *descriptorpb.DescriptorProto, field *descriptorpb.FieldDescriptorProto) *descriptorpb.DescriptorProto {
+	if field.GetType() != descriptorpb.FieldDescriptorProto_TYPE_MESSAGE || field.GetLabel() != descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
+		return nil
+	}
+
+	name := field.GetTypeName()
+	if index := strings.LastIndex(name, "."); index >= 0 {
+		name = name[index+1:]
+	}
+
+	for _, nested := range message.NestedType {
+		if nested.GetName() != name || !nested.GetOptions().GetMapEntry() {
+			continue
+		}
+		if entryField(nested, 1) == nil || entryField(nested, 2) == nil {
+			return nil
+		}
+
+		return nested
+	}
+
+	return nil
+}
+
+// entryField picks the key (1) or the value (2) of a map entry by its field number, which
+// is what the encoding fixes, rather than by its position in the descriptor.
+func entryField(entry *descriptorpb.DescriptorProto, number int32) *descriptorpb.FieldDescriptorProto {
+	for _, field := range entry.Field {
+		if field.GetNumber() == number {
+			return field
+		}
+	}
+
+	return nil
 }
 
 func labelOf(field *descriptorpb.FieldDescriptorProto) string {

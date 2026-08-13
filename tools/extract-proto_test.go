@@ -37,6 +37,51 @@ func TestRenderProtoFileParsesWithAnnotations(t *testing.T) {
 						Label:  descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
 						Type:   descriptorpb.FieldDescriptorProto_TYPE_UINT64.Enum(),
 					},
+					{
+						// A map field, which the descriptor carries as a repeated message
+						// of a synthetic entry type.
+						Name:     proto.String("balances"),
+						Number:   proto.Int32(3),
+						Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+						Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+						TypeName: proto.String(".test.output.Event.BalancesEntry"),
+					},
+					{
+						Name:     proto.String("kind"),
+						Number:   proto.Int32(4),
+						Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+						Type:     descriptorpb.FieldDescriptorProto_TYPE_ENUM.Enum(),
+						TypeName: proto.String(".test.output.Event.Kind"),
+					},
+				},
+				NestedType: []*descriptorpb.DescriptorProto{
+					{
+						Name:    proto.String("BalancesEntry"),
+						Options: &descriptorpb.MessageOptions{MapEntry: proto.Bool(true)},
+						Field: []*descriptorpb.FieldDescriptorProto{
+							{
+								Name:   proto.String("key"),
+								Number: proto.Int32(1),
+								Label:  descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+								Type:   descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
+							},
+							{
+								Name:   proto.String("value"),
+								Number: proto.Int32(2),
+								Label:  descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+								Type:   descriptorpb.FieldDescriptorProto_TYPE_UINT64.Enum(),
+							},
+						},
+					},
+				},
+				EnumType: []*descriptorpb.EnumDescriptorProto{
+					{
+						Name: proto.String("Kind"),
+						Value: []*descriptorpb.EnumValueDescriptorProto{
+							{Name: proto.String("KIND_UNSPECIFIED"), Number: proto.Int32(0)},
+							{Name: proto.String("KIND_TRANSFER"), Number: proto.Int32(1)},
+						},
+					},
 				},
 			},
 		},
@@ -46,7 +91,15 @@ func TestRenderProtoFileParsesWithAnnotations(t *testing.T) {
 
 	require.Contains(t, rendered, `import "`+schemaProtoPath+`"`)
 	require.Contains(t, rendered, "// option ("+schemaProtoPackage+".table)")
-	require.Contains(t, rendered, "// [("+schemaProtoPackage+".field) = { primary_key: true }]")
+	require.Contains(t, rendered, "// string id = 1 [("+schemaProtoPackage+".field) = { primary_key: true }];")
+
+	// A map field renders as a map, not as the entry type it is carried by, and the entry
+	// type is not declared a second time.
+	require.Contains(t, rendered, "map<string, uint64> balances = 3;")
+	require.NotContains(t, rendered, "BalancesEntry")
+
+	// A nested enum is declared where it is referenced from.
+	require.Contains(t, rendered, "enum Kind {")
 
 	// Uncomment what an operator would, then require the result to parse.
 	rendered = strings.Replace(rendered, `  // option (schema.table) = { name: "event" };`, `  option (schema.table) = { name: "event" };`, 1)

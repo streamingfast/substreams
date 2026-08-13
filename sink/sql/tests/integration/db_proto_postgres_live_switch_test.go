@@ -159,7 +159,7 @@ func TestDbProtoPostgresSwitchToDirectInserts(t *testing.T) {
 	write(1, "customer-1")
 	require.Zero(t, countCustomers(), "a buffered write must not have reached the database yet")
 
-	require.NoError(t, database.SwitchToDirectInserts(ctx))
+	require.NoError(t, database.SwitchToDirectInserts(ctx, "stream reached the chain head"))
 	require.Equal(t, 1, countCustomers(), "the switch drains what the buffer was holding")
 
 	write(2, "customer-2")

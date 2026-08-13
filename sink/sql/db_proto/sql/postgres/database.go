@@ -271,7 +271,8 @@ func (d *Database) openDirectInserter() error {
 }
 
 // SwitchToDirectInserts drains the spool and inserts straight into the database from here
-// on.
+// on. The reason says what brought the switch on, since the database cannot tell the chain
+// head from the end of a bounded range.
 //
 // The spool trades freshness for throughput: rows sit on disk until a segment fills,
 // which is what a backfill wants and the opposite of what a sink at the chain head wants,
@@ -281,13 +282,13 @@ func (d *Database) openDirectInserter() error {
 //
 // Everything spooled is applied before the switch, so no row is left behind, and the
 // spool is closed for good — a stream that has reached the head does not go back.
-func (d *Database) SwitchToDirectInserts(ctx context.Context) error {
+func (d *Database) SwitchToDirectInserts(ctx context.Context, reason string) error {
 	inserter, ok := d.inserter.(*localBufferInserter)
 	if !ok {
 		return nil
 	}
 
-	d.logger.Info("stream reached the chain head, draining the spool and switching to direct inserts. "+
+	d.logger.Info(reason+", draining the spool and switching to direct inserts. "+
 		"--write-mode, --db-write-* and --spool-* no longer apply from here on",
 		zap.String("write_mode_was", string(d.resolvedWriteMode)))
 

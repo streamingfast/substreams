@@ -187,17 +187,19 @@ func (d *Database) clientNoCache(dsn *db.DSN) (*ch.Client, error) {
 	return client, nil
 }
 
-// SwitchToDirectInserts drains the spool and inserts inline from here on.
+// SwitchToDirectInserts drains the spool and inserts inline from here on. The reason says
+// what brought the switch on, since the database cannot tell the chain head from the end
+// of a bounded range.
 //
 // The spool trades freshness for throughput, which is what a backfill wants and the
 // opposite of what a sink at the chain head wants, where a block should be queryable when
 // it arrives rather than when the segment it lands in is full.
-func (d *Database) SwitchToDirectInserts(ctx context.Context) error {
+func (d *Database) SwitchToDirectInserts(ctx context.Context, reason string) error {
 	if d.spool == nil {
 		return nil
 	}
 
-	d.logger.Info("stream reached the chain head, draining the spool and switching to direct inserts. " +
+	d.logger.Info(reason + ", draining the spool and switching to direct inserts. " +
 		"--db-write-* and --spool-* no longer apply from here on")
 
 	if err := d.spool.Close(ctx); err != nil {

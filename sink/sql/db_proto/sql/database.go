@@ -47,9 +47,11 @@ type Database interface {
 	// second setup.
 	DropConstraints() error
 	// SwitchToDirectInserts leaves any buffered write path behind and inserts straight
-	// into the database from now on. It is a one-way switch, called when the stream
-	// reaches the chain head, and a no-op for a backend that never buffered.
-	SwitchToDirectInserts(ctx context.Context) error
+	// into the database from now on. It is a one-way switch, and a no-op for a backend
+	// that never buffered. The reason is what the caller knows and the database does not
+	// — reaching the chain head, or reaching the end of a bounded range — and it is what
+	// the switch reports, so the log does not claim a head the stream never saw.
+	SwitchToDirectInserts(ctx context.Context, reason string) error
 	// WalkMessageDescriptorAndInsert reads the message through protoreflect only, so it
 	// does not care which dynamic implementation produced it — dynamicpb and hyperpb are
 	// both accepted, and the decoder picks.

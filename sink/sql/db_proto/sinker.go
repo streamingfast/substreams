@@ -133,7 +133,7 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 			}
 		}
 
-		if err := s.db.SwitchToDirectInserts(ctx); err != nil {
+		if err := s.db.SwitchToDirectInserts(ctx, "stream reached the chain head"); err != nil {
 			return fmt.Errorf("switching to direct inserts: %w", err)
 		}
 
@@ -187,7 +187,7 @@ func (s *Sinker) HandleBlockRangeCompletion(ctx context.Context, cursor *sink.Cu
 	// transactions while it is open. Draining it first is what keeps those blocks from
 	// being streamed, and paid for, twice, and what leaves the constraints to be created
 	// against a database that already holds every row of the range.
-	if err := s.db.SwitchToDirectInserts(ctx); err != nil {
+	if err := s.db.SwitchToDirectInserts(ctx, "stream reached the end of the requested range"); err != nil {
 		return fmt.Errorf("draining before the end of the range: %w", err)
 	}
 

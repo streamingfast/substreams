@@ -127,6 +127,22 @@ func normalizeSlice(oid uint32, in []any, encoding sqlbytes.Encoding) (any, erro
 
 	switch in[0].(type) {
 	case string:
+		if elementOID(oid) == pgtype.NumericOID {
+			out := make([]any, len(in))
+			for i, v := range in {
+				s, ok := v.(string)
+				if !ok {
+					return nil, fmt.Errorf("mixed element types in array: %T and string", v)
+				}
+				normalized, err := normalize(pgtype.NumericOID, s, encoding)
+				if err != nil {
+					return nil, fmt.Errorf("normalizing array element %d: %w", i, err)
+				}
+				out[i] = normalized
+			}
+			return out, nil
+		}
+
 		out := make([]string, len(in))
 		for i, v := range in {
 			s, ok := v.(string)

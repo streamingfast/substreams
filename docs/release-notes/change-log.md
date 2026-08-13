@@ -40,6 +40,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- Dependencies: bumped the `all` group, notably `github.com/ClickHouse/clickhouse-go/v2` to v2.48.0, `github.com/AfterShip/clickhouse-sql-parser` to v0.5.5, `google.golang.org/grpc` to v1.83.0 and the OpenTelemetry SDK to v1.45.0.
+
+  `clickhouse-sql-parser` v0.5.x replaced the `String()` method on AST nodes with a `Formatter`; the ClickHouse `ON CLUSTER` schema rewriting path was updated to `parser.Format()`, which emits the same single-line SQL as before.
+
 - Sink: `substreams sink postgres` and `substreams sink clickhouse` in from-proto mode now unmarshal and walk blocks on a worker pool instead of one at a time at flush. Decoding a block was where the sink spent its time — around 7.8µs of the 9.3µs a wide entity cost — while PostgreSQL sat on roughly eight times that in headroom, so the sink itself was the throughput limit. Measured at 4.1x on a wide entity. Workers only fill a per-block buffer; the inserts are still replayed in block order, in the same transaction as before, so the resulting database is unchanged.
 
   The pool defaults to one worker per core less one, capped at eight, since the work is allocator-bound before it runs out of cores. `SinkerFactoryOptions.DecodeWorkers` overrides it.

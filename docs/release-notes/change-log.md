@@ -58,6 +58,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- Sink: the gRPC User-Agent of a SQL sink run now names the engine as well as the mode: `sink_from_proto_pg`, `sink_from_proto_ch`, `sink_database_changes_pg`, `sink_database_changes_ch`. Both engines run the same commands, so `sink_from_proto` alone said nothing about where the rows were going.
 - Sink: `substreams sink postgres` in from-proto mode leaves the spool behind once the stream reaches the chain head. The spool holds rows on disk until a segment fills, which is what a backfill wants and the opposite of what a live sink wants: at the head a block should be queryable when it arrives, not when the segment it happens to land in is full. On the first live block — a cursor at `STEP_NEW` rather than `STEP_NEW_IRREVERSIBLE` — whatever is spooled is applied, the spool is closed and inserts go straight to the database from there on. It is one-way: a stream that reached the head does not go back to buffering.
 
   This also required wiring a liveness checker for the from-proto sink, which nothing did before, so `isLive` was always nil there. Blocks are now also flushed per block once live, rather than per batch, which is the existing behaviour that the missing checker had made unreachable.

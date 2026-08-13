@@ -170,6 +170,21 @@ func sinkManifestAndModule(args []string) (manifestPath string, outputModule str
 	return args[0], sink.InferOutputModuleFromPackage
 }
 
+// sinkUserAgent is what the server sees as the gRPC User-Agent of a sink run. It names the
+// mode, which decides how rows are written, and the engine they are written to: both
+// engines share every command here, so the mode alone said nothing about where the data
+// went.
+func sinkUserAgent(mode, driver string) string {
+	switch driver {
+	case sinkClickhouseDriver:
+		return mode + "_ch"
+	case sinkPostgresDriver:
+		return mode + "_pg"
+	default:
+		return mode
+	}
+}
+
 func isDatabaseChangesType(outputType string) bool {
 	unprefixed := strings.TrimPrefix(outputType, "proto:")
 	for _, t := range strings.Split(supportedOutputTypes, ",") {
@@ -386,7 +401,7 @@ func newSinkRunE(driver string) func(*cobra.Command, []string) error {
 				return err
 			}
 
-			return runDatabaseChangesSink(cmd, manifestPath, outputModule, dsnString)
+			return runDatabaseChangesSink(cmd, driver, manifestPath, outputModule, dsnString)
 		}
 
 		if err := rejectDatabaseChangesFlags(cmd); err != nil {
@@ -397,7 +412,7 @@ func newSinkRunE(driver string) func(*cobra.Command, []string) error {
 	}
 }
 
-func runDatabaseChangesSink(cmd *cobra.Command, manifestPath, outputModule, dsnString string) error {
+func runDatabaseChangesSink(cmd *cobra.Command, driver, manifestPath, outputModule, dsnString string) error {
 	sinkDBPreStart(cmd)
 
 	app := cli.NewApplication(cmd.Context())
@@ -409,7 +424,7 @@ func runDatabaseChangesSink(cmd *cobra.Command, manifestPath, outputModule, dsnS
 		supportedOutputTypes,
 		manifestPath,
 		outputModule,
-		"sink_database_changes",
+		sinkUserAgent("sink_database_changes", driver),
 		zlog,
 		tracer,
 	)
@@ -492,7 +507,7 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 		outputType,
 		manifestPath,
 		outputModuleName,
-		"sink_from_proto",
+		sinkUserAgent("sink_from_proto", driver),
 		zlog,
 		tracer,
 	)

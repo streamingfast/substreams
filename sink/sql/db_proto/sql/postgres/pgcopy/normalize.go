@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 	sqlbytes "github.com/streamingfast/substreams/sink/sql/bytes"
+	sql2 "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -181,6 +182,20 @@ func normalizeSlice(oid uint32, in []any, encoding sqlbytes.Encoding) (any, erro
 			}
 			out[i] = b
 		}
+		return out, nil
+
+	case sql2.EnumValue:
+		// An enum column is declared TEXT, so pgtype renders each element through its
+		// String method — the name, which is exactly what the rendered write modes emit.
+		out := make([]sql2.EnumValue, len(in))
+		for i, v := range in {
+			enum, ok := v.(sql2.EnumValue)
+			if !ok {
+				return nil, fmt.Errorf("mixed element types in array: %T and sql.EnumValue", v)
+			}
+			out[i] = enum
+		}
+
 		return out, nil
 
 	case int32, int64, uint32, uint64, float32, float64, bool:

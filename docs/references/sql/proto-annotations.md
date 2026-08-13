@@ -206,8 +206,10 @@ visible one. Use `manual` to put that pass in a maintenance window instead.
 An index on `_block_number_` is created in the same pass, on every table. It is the sink's
 own rather than the schema's: every table carries that column and every reorg deletes from
 every table by it, and a foreign key indexes only its referenced side — so without it each
-undo is a sequential scan per table. `--disable-block-number-index` leaves it out, which
-only makes sense for a run that can never reorg. It is also the one thing the pass has to
+undo is a sequential scan per table. Measured over 10GiB of `erc20-balance-changes`-shaped
+rows (`TestBlockNumberIndexCost`), building it costs 2.6s on a 44s load and 218MiB against
+10GiB, and takes one table's undo from 1.3s to 15ms. `--disable-block-number-index` leaves
+it out, which only makes sense for a run that can never reorg. It is also the one thing the pass has to
 do for an output with no schema annotations at all.
 
 Constraints are created one per transaction, committing as it goes: building an index and

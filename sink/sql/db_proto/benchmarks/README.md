@@ -371,3 +371,40 @@ representation. `TestValueToStringRawBytesAreDoubleEncoded` pins the current beh
 against a live server; the correct literal is `'\x<hex>'::bytea`. This affects the
 `db_proto` accumulator path with `--bytes-encoding=raw` today, independently of any of
 the work above.
+
+
+## What the block number index costs, and buys
+
+`TestBlockNumberIndexCost`, 10GiB of rows shaped like `erc20-balance-changes`'
+`map_balance_changes` — 32.7M rows over 500,000 blocks — into a containerised
+PostgreSQL 17 with `maintenance_work_mem=1GB`:
+
+| variant | load | index build | table | index | undo 1k blocks | plan |
+|---|--:|--:|--:|--:|--:|---|
+| load bare, index after (the default) | 44.31s | 2.62s | 10.0GiB | 217.8MiB | 15ms | Index Scan |
+| same data, undo without the index | | | | | 1.296s | Seq Scan |
+| index in place during the load | 42.21s | | 10.0GiB | 217.8MiB | 25ms | Index Scan |
+
+Building it after the load costs **2.6s on a 44s load, around 6%**, and **218MiB against
+10GiB, around 2%** of the table. Having it in place while the rows arrive costs nothing
+measurable: `_block_number_` only ever increases during a backfill, so every insert lands
+on the rightmost page of the btree and splits almost nothing.
+
+What it buys is the reorg path, which deletes from **every** table by that column: 1.296s
+of sequential scan against 15ms of index scan, **86x**, for one table. Those are warm
+numbers — the same sequential scan measured 5.9s on first touch after the load, against
+the index's 15ms either way, since it reads a handful of pages rather than 10GiB.
+
+`ANALYZE` matters to reproducing this. A `COPY` leaves no statistics behind, and without
+them the planner will sequentially scan a predicate matching 0.2% of the table — the first
+version of this measurement reported 4.7s for an indexed undo for exactly that reason. The
+test analyses before measuring and reports the chosen plan alongside every number.
+
+```bash
+SF_SINK_SQL_BENCHMARKS=true go test ./sink/sql/db_proto/benchmarks/ \
+  -run TestBlockNumberIndexCost -count=1 -v -timeout 120m
+
+# smaller, for a quick check
+SF_SINK_SQL_BENCHMARKS=true PGBENCH_TARGET_BYTES=$((200*1024*1024)) PGBENCH_BLOCKS=20000 \
+  go test ./sink/sql/db_proto/benchmarks/ -run TestBlockNumberIndexCost -count=1 -v
+```

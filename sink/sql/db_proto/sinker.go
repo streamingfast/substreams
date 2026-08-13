@@ -61,6 +61,7 @@ func NewSinker(rootMessageDescriptor protoreflect.MessageDescriptor, sink *sink.
 func (s *Sinker) Run(ctx context.Context) error {
 	// Show stats one last time before exiting run
 	defer s.LogStats()
+	defer s.closeDatabase()
 
 	cursor, err := s.db.FetchCursor()
 	if err != nil {
@@ -102,6 +103,31 @@ func (s *Sinker) Run(ctx context.Context) error {
 
 func (s *Sinker) LogStats() {
 	s.stats.Log()
+}
+
+// closeTimeout bounds the shutdown seal. Writing the open segment's manifest and fsyncing
+// it is local work of a few milliseconds; anything past this is a disk that is not coming
+// back, and holding the process there helps nobody.
+const closeTimeout = 30 * time.Second
+
+// closeDatabase seals whatever is still held and releases the connections, on every way
+// out of the run rather than only on the one that ends a bounded range.
+//
+// A backfill is normally interrupted rather than completed — Ctrl-C, a killed pod, a
+// stream that errors — and not sealing the open segment on the way out throws away every
+// block in it, up to --db-write-max-size: recovery discards an unsealed segment, so those
+// blocks are streamed, and paid for, a second time. That is the outcome the spool exists
+// to prevent.
+//
+// It closes on a fresh context because the run's is already cancelled by the time an
+// interrupt reaches here, and the seal it has to perform is a write.
+func (s *Sinker) closeDatabase() {
+	ctx, cancel := context.WithTimeout(context.Background(), closeTimeout)
+	defer cancel()
+
+	if err := s.db.Close(ctx); err != nil {
+		s.logger.Warn("closing the database", zap.Error(err))
+	}
 }
 
 type Holder struct {

@@ -83,6 +83,12 @@ func SinkerFactory(
 			return nil, fmt.Errorf("opening database: %w", err)
 		}
 
+		// Before anything is streamed, and concurrently, so a restart onto a loaded table
+		// neither waits for a lock nor takes one.
+		if err := database.EnsureBlockNumberIndexes(ctx); err != nil {
+			return nil, fmt.Errorf("creating the block number indexes: %w", err)
+		}
+
 		warnAboutMissingConstraints(database, options.Constraints, logger)
 
 		return NewSinker(

@@ -30,6 +30,12 @@ type Database interface {
 	// none of them, and only this puts them there.
 	ApplyConstraints() error
 
+	// EnsureBlockNumberIndexes creates the index the sink needs for its own reorg path,
+	// when it starts. It is not part of the constraint pass: --apply-constraints describes
+	// the schema and is the operator's to schedule, where this one the sink depends on to
+	// undo a reorg without sequentially scanning every table.
+	EnsureBlockNumberIndexes(ctx context.Context) error
+
 	// MissingConstraints names the constraints the policy says the schema should carry and
 	// the database does not have. It is what turns "this schema has no indexes" from
 	// something you find out by querying it into something the sink says on every start.

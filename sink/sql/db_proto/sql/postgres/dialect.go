@@ -206,7 +206,12 @@ func (d *DialectPostgres) createTable(table *schema.Table) error {
 	// Every undo deletes from every table by that column, which without this is a
 	// sequential scan per table, and a cascade would be worse still: PostgreSQL looks the
 	// child rows up once per deleted parent row.
-	d.AddIndexSql(table.Name, fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_block_number_idx ON %s (%s)", table.Name, tableName, sql2.DialectFieldBlockNumber))
+	//
+	// CONCURRENTLY because this is built when the sink starts rather than when the load is
+	// over: a restart onto an already-loaded table must not lock out the writers. It is
+	// also why the index cannot be part of the constraint pass, which runs in transactions
+	// and a concurrent build cannot.
+	d.AddIndexSql(table.Name, fmt.Sprintf("CREATE INDEX CONCURRENTLY IF NOT EXISTS %s_block_number_idx ON %s (%s)", table.Name, tableName, sql2.DialectFieldBlockNumber))
 	d.AddCreateTableSql(table.Name, sb.String())
 
 	return nil

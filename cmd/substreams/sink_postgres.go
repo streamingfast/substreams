@@ -35,12 +35,12 @@ var sinkPostgresSetupCmd = &cobra.Command{
 
 var sinkPostgresConstraintsCmd = &cobra.Command{
 	Use:   "constraints",
-	Short: "Create or drop the schema's constraints and indexes on an already loaded database",
+	Short: "Create or drop the schema's constraints on an already loaded database",
 }
 
 var sinkPostgresConstraintsApplyCmd = &cobra.Command{
 	Use:   "apply <manifest> [<module>]",
-	Short: "Create the schema's constraints and indexes on an already loaded database",
+	Short: "Create the schema's constraints on an already loaded database",
 	Long: cli.Dedent(`
 		Create the primary keys, unique and foreign key constraints of a from-proto schema
 		on a database the sink has already loaded, skipping the ones already in place.
@@ -52,12 +52,11 @@ var sinkPostgresConstraintsApplyCmd = &cobra.Command{
 		tables locked while it runs — so on a large database this belongs in a maintenance
 		window, which is what --apply-constraints=manual leaves it to this command for.
 
-		The index on _block_number_ is created here too, and is the one thing this command
-		does for an output with no schema annotations: every table carries that column and
-		every reorg deletes from every table by it, so without it each undo is a sequential
-		scan per table. --disable-block-number-index leaves it out.
+		The index on _block_number_ is not created here. The sink creates that one when it
+		starts, concurrently: this command is yours to schedule, and the reorg path cannot
+		wait for a maintenance window.
 
-		Running it again is safe: constraints and indexes already in place are left alone.
+		Running it again is safe: constraints already in place are left alone.
 
 		The module is inferred from the package when it is left out. A package with more
 		than one candidate has to be told which, or the schema this derives will not be the
@@ -69,11 +68,11 @@ var sinkPostgresConstraintsApplyCmd = &cobra.Command{
 
 var sinkPostgresConstraintsDropCmd = &cobra.Command{
 	Use:   "drop <manifest> [<module>]",
-	Short: "Drop the schema's constraints and indexes",
+	Short: "Drop the schema's constraints",
 	Long: cli.Dedent(`
 		Drop the primary keys, unique and foreign key constraints of a from-proto schema,
-		and the index on _block_number_ it creates for its own reorg path, leaving anything
-		the sink did not create alone.
+		leaving anything the sink did not create alone — the index on _block_number_
+		included, that one being the sink's own and recreated when it next starts.
 
 		This is the escape hatch after --apply-constraints=always, and what makes a
 		backfill that has to be resumed fast again without setting the schema up afresh:

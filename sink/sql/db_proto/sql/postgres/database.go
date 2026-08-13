@@ -403,12 +403,6 @@ func (d *Database) applyConstraints() error {
 	collect("unique", d.dialect.UniqueConstraintSql, d.constraints.SkipUnique)
 	collect("fk constraint", d.dialect.ForeignKeySql, d.constraints.SkipForeignKey)
 
-	indexes, err := d.pendingIndexes()
-	if err != nil {
-		return err
-	}
-	pending = append(pending, indexes...)
-
 	if err := d.runStatements(pending); err != nil {
 		return err
 	}
@@ -418,33 +412,91 @@ func (d *Database) applyConstraints() error {
 	return nil
 }
 
-// pendingIndexes is the indexes the sink creates for itself and the schema does not have.
+// EnsureBlockNumberIndexes creates the index the sink needs for its own reorg path, on
+// every table, when the sink starts.
 //
-// They are built in the same pass as the constraints because they are the same kind of
-// expensive — an index build over the whole table — and wanted at the same moment, once
-// the load is done.
-func (d *Database) pendingIndexes() ([]statement, error) {
+// It is not part of the constraint pass and not governed by --apply-constraints. Those
+// describe the schema and are the operator's to schedule; this one the sink depends on to
+// undo a reorg without sequentially scanning every table, so waiting for a maintenance
+// window would mean running without it for as long as the operator likes.
+//
+// Concurrently, and therefore outside any transaction: a restart onto an already-loaded
+// table must not lock out the writers. On a schema that already has them this is one
+// catalog query and nothing else.
+func (d *Database) EnsureBlockNumberIndexes(ctx context.Context) error {
 	if d.constraints.DisableBlockNumberIndex {
-		return nil, nil
+		return nil
 	}
 
-	existing, err := d.existingIndexes(d.querier())
+	existing, err := d.existingIndexes(d.db)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var pending []statement
+	invalid, err := d.invalidIndexes()
+	if err != nil {
+		return err
+	}
+
+	startAt := time.Now()
+	created := 0
+
 	for _, index := range d.dialect.IndexSql {
 		key, ok := indexTarget(index.Sql)
-		if ok && existing[key] {
-			d.logger.Debug("index already in place, skipping", zap.String("index", key.name))
+		if !ok {
 			continue
 		}
 
-		pending = append(pending, statement{kind: "index", sql: index.Sql})
+		if invalid[key.name] {
+			// A concurrent build that was interrupted leaves an index behind that no query
+			// will ever use, and IF NOT EXISTS would happily keep it forever.
+			d.logger.Info("dropping an index a previous concurrent build left unusable", zap.String("index", key.name))
+			if _, err := d.db.ExecContext(ctx, fmt.Sprintf("DROP INDEX CONCURRENTLY IF EXISTS %s.%s",
+				pq.QuoteIdentifier(d.schema.Name), pq.QuoteIdentifier(key.name))); err != nil {
+				return fmt.Errorf("dropping the invalid index %q: %w", key.name, err)
+			}
+		} else if existing[key] {
+			continue
+		}
+
+		d.logger.Info("creating the block number index", zap.String("index", key.name), zap.String("sql", index.Sql))
+		if _, err := d.db.ExecContext(ctx, index.Sql); err != nil {
+			return fmt.Errorf("creating the index %q: %w", key.name, err)
+		}
+		created++
 	}
 
-	return pending, nil
+	if created > 0 {
+		d.logger.Info("block number indexes created", zap.Int("created", created), zapx.HumanDuration("duration", time.Since(startAt)))
+	}
+
+	return nil
+}
+
+// invalidIndexes names the indexes an interrupted concurrent build left behind. They exist
+// as far as IF NOT EXISTS is concerned and are used by nothing.
+func (d *Database) invalidIndexes() (map[string]bool, error) {
+	rows, err := d.db.Query(`
+		SELECT cl.relname
+		FROM pg_index i
+		JOIN pg_class cl ON cl.oid = i.indexrelid
+		JOIN pg_namespace n ON n.oid = cl.relnamespace
+		WHERE n.nspname = $1 AND NOT i.indisvalid`, d.schema.Name)
+	if err != nil {
+		return nil, fmt.Errorf("listing the invalid indexes of schema %q: %w", d.schema.Name, err)
+	}
+	defer rows.Close()
+
+	invalid := map[string]bool{}
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("scanning an invalid index name: %w", err)
+		}
+		invalid[name] = true
+	}
+
+	return invalid, rows.Err()
 }
 
 // existingIndexes reads which indexes the schema carries. They live in pg_indexes rather
@@ -472,7 +524,7 @@ func (d *Database) existingIndexes(from rowQuerier) (map[constraintKey]bool, err
 }
 
 // indexTargetPattern pulls the name and the relation out of the dialect's own CREATE INDEX.
-var indexTargetPattern = regexp.MustCompile(`(?i)create\s+index\s+(?:if\s+not\s+exists\s+)?"?([a-z0-9_]+)"?\s+on\s+(\S+)`)
+var indexTargetPattern = regexp.MustCompile(`(?i)create\s+index\s+(?:concurrently\s+)?(?:if\s+not\s+exists\s+)?"?([a-z0-9_]+)"?\s+on\s+(\S+)`)
 
 func indexTarget(statement string) (constraintKey, bool) {
 	match := indexTargetPattern.FindStringSubmatch(statement)
@@ -564,16 +616,6 @@ func (d *Database) MissingConstraints() ([]string, error) {
 	collect(d.dialect.UniqueConstraintSql, d.constraints.SkipUnique)
 	collect(d.dialect.ForeignKeySql, d.constraints.SkipForeignKey)
 
-	indexes, err := d.pendingIndexes()
-	if err != nil {
-		return nil, err
-	}
-	for _, index := range indexes {
-		if key, ok := indexTarget(index.sql); ok {
-			missing = append(missing, key.relation+"."+key.name)
-		}
-	}
-
 	return missing, nil
 }
 
@@ -610,22 +652,6 @@ func (d *Database) DropConstraints() error {
 	collect("fk constraint", d.dialect.ForeignKeySql)
 	collect("unique constraint", d.dialect.UniqueConstraintSql)
 	collect("pk", d.dialect.PrimaryKeySql)
-
-	indexes, err := d.existingIndexes(d.querier())
-	if err != nil {
-		return err
-	}
-	for _, index := range d.dialect.IndexSql {
-		key, ok := indexTarget(index.Sql)
-		if !ok || !indexes[key] {
-			continue
-		}
-
-		pending = append(pending, statement{
-			kind: "index",
-			sql:  fmt.Sprintf("DROP INDEX IF EXISTS %s.%s", pq.QuoteIdentifier(d.schema.Name), pq.QuoteIdentifier(key.name)),
-		})
-	}
 
 	return d.runStatements(pending)
 }

@@ -354,6 +354,25 @@ substreams sink postgres constraints apply substreams.yaml --dsn $DSN \
   --disable-primary-keys=order_items
 ```
 
+### The block number index is not one of them
+
+Every table carries `_block_number_` and every reorg deletes from every table by it, and a
+foreign key indexes only its referenced side — so without an index each undo is a
+sequential scan per table.
+
+The sink creates that index itself, **when it starts**, and `--apply-constraints` does not
+govern it. The constraints describe the schema and are yours to schedule; this one the sink
+depends on, so waiting for a maintenance window would mean running without it for as long
+as you like. It is built `CONCURRENTLY`, so a restart onto an already-loaded table neither
+waits for a lock nor takes one, and it is why the index cannot be part of the constraint
+pass at all — that runs in transactions, which a concurrent build cannot.
+
+Measured over 10GiB of `erc20-balance-changes`-shaped rows (`TestBlockNumberIndexCost`):
+2.6s to build, 218MiB against 10GiB, and one table's undo goes from 1.3s to 15ms.
+
+`--disable-block-number-index` leaves it out, which only makes sense for a run that can
+never reorg, such as `--final-blocks-only`.
+
 ## Starting from a package with no annotations
 
 An output with no `schema.proto` annotations still sinks: the tables come from the message

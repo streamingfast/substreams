@@ -215,6 +215,12 @@ func (d *Database) ApplyConstraints() error {
 	return nil
 }
 
+// EnsureBlockNumberIndexes does nothing: a ClickHouse table's ORDER BY is its index, and
+// the sink has no separate one to create.
+func (d *Database) EnsureBlockNumberIndexes(context.Context) error {
+	return nil
+}
+
 // MissingConstraints reports none: ClickHouse has no constraints to be missing.
 func (d *Database) MissingConstraints() ([]string, error) {
 	return nil, nil

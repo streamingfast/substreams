@@ -54,6 +54,9 @@ type ConstraintPolicy struct {
 	// that column and the reorg path deletes by it on every table, so without the index
 	// each undo is a sequential scan per table. It is only dead weight on a run that can
 	// never reorg.
+	//
+	// Unlike the rest of this policy it is not about what the schema declares, and not
+	// governed by Timing: the index is created when the sink starts.
 	DisableBlockNumberIndex bool
 
 	// PerTransaction is how many constraints are created or dropped per transaction.
@@ -88,20 +91,12 @@ func (p ConstraintPolicy) SkipForeignKey(string) bool {
 	return p.DisableForeignKeys
 }
 
-// SkipsEverything reports a policy that leaves the schema with nothing to build, in which
-// case there is nothing to apply and nothing to wait for. The block number index counts:
-// a schema with no constraints at all still wants it.
+// SkipsEverything reports a policy that declares no constraints, in which case there is
+// nothing to apply and nothing to wait for. The block number index is not one of them: it
+// is created when the sink starts, whatever the constraints say.
 func (p ConstraintPolicy) SkipsEverything() bool {
-	return p.SkipsEveryConstraint() && p.DisableBlockNumberIndex
-}
-
-// SkipsEveryConstraint reports a policy that declares no constraints, index aside.
-func (p ConstraintPolicy) SkipsEveryConstraint() bool {
 	return p.DisableForeignKeys && matchesTable(p.DisablePrimaryKeys, AllTables) && matchesTable(p.DisableUniques, AllTables)
 }
-
-// SkipBlockNumberIndex reports whether the index on _block_number_ is left out.
-func (p ConstraintPolicy) SkipBlockNumberIndex(string) bool { return p.DisableBlockNumberIndex }
 
 // DisableAllConstraints returns the policy that declares none of them, which is what an
 // output with no schema annotations leaves the sink with. The block number index survives

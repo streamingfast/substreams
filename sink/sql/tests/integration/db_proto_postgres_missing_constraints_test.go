@@ -63,8 +63,8 @@ func TestDbProtoPostgresMissingConstraints(t *testing.T) {
 		require.Empty(t, missing)
 	})
 
-	t.Run("a schema with no constraints at all still wants the block number index", func(t *testing.T) {
-		database := setup(t, "missing_constraints_index_only", protosql.ConstraintPolicy{
+	t.Run("nothing the flags leave out is missing", func(t *testing.T) {
+		database := setup(t, "missing_constraints_disabled", protosql.ConstraintPolicy{
 			Timing:             protosql.ConstraintsManual,
 			DisableForeignKeys: true,
 			DisablePrimaryKeys: []string{protosql.AllTables},
@@ -73,24 +73,7 @@ func TestDbProtoPostgresMissingConstraints(t *testing.T) {
 
 		missing, err := database.MissingConstraints()
 		require.NoError(t, err)
-		require.NotEmpty(t, missing, "an output with no annotations declares no constraints, but the reorg path still deletes by _block_number_")
-		for _, name := range missing {
-			require.Contains(t, name, "_block_number_idx", "only the index is left to create")
-		}
-	})
-
-	t.Run("nothing the flags leave out is missing", func(t *testing.T) {
-		database := setup(t, "missing_constraints_disabled", protosql.ConstraintPolicy{
-			Timing:                  protosql.ConstraintsManual,
-			DisableForeignKeys:      true,
-			DisablePrimaryKeys:      []string{protosql.AllTables},
-			DisableUniques:          []string{protosql.AllTables},
-			DisableBlockNumberIndex: true,
-		})
-
-		missing, err := database.MissingConstraints()
-		require.NoError(t, err)
-		require.Empty(t, missing, "nothing the policy leaves out can be missing")
+		require.Empty(t, missing, "nothing the policy leaves out can be missing, and the block number index is not a constraint")
 	})
 }
 
@@ -144,8 +127,7 @@ func TestDbProtoConstraintsPerTransaction(t *testing.T) {
 			require.NoError(t, database.DropConstraints())
 			missing, err = database.MissingConstraints()
 			require.NoError(t, err)
-			require.NotEmpty(t, missing, "dropping has to actually remove them, indexes included")
-			require.Contains(t, missing, fmt.Sprintf("%s.customers.customers_block_number_idx", schemaName))
+			require.NotEmpty(t, missing, "dropping has to actually remove them")
 		})
 	}
 }

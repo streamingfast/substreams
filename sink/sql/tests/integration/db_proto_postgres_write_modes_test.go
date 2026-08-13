@@ -56,7 +56,9 @@ func TestDbProtoPostgresWriteModes(t *testing.T) {
 		responses := []interface{}{
 			relationsBlockData(t, "1a", "2025-01-01", entityCustomer("customer-1", "alpha")),
 			relationsBlockData(t, "2a", "2025-01-02", entityCustomer("customer-2", "beta"), entityCustomer("customer-3", "gamma")),
-			relationsBlockData(t, "3a", "2025-01-03", entityCustomer("customer-4", "delta")),
+			// A backslash and a quote: the rendered modes build SQL literals where COPY
+			// hands pgtype the string as it is, so this is where the two would disagree.
+			relationsBlockData(t, "3a", "2025-01-03", entityCustomer("customer-4", `delta\path 'quoted'`)),
 		}
 
 		substreamsClientConfig := setupFakeSubstreamsServer(t, responses...)
@@ -102,7 +104,7 @@ func TestDbProtoPostgresWriteModes(t *testing.T) {
 		{CustomerId: "customer-1", Name: "alpha"},
 		{CustomerId: "customer-2", Name: "beta"},
 		{CustomerId: "customer-3", Name: "gamma"},
-		{CustomerId: "customer-4", Name: "delta"},
+		{CustomerId: "customer-4", Name: `delta\path 'quoted'`},
 	}
 
 	for _, test := range []struct {

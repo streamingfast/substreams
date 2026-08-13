@@ -120,9 +120,12 @@ func NormalizeRowWithEncoding(cols []Column, values []any, encoding sqlbytes.Enc
 // the pgtype array codec can then encode against the array's element OID.
 func normalizeSlice(oid uint32, in []any, encoding sqlbytes.Encoding) (any, error) {
 	if len(in) == 0 {
-		// Element type does not matter for an empty array, but the slice must still be
-		// typed for the codec to find a plan.
-		return []string{}, nil
+		// An empty array carries no element to infer a type from, and pgtype resolves the
+		// encode plan from the Go type rather than from the column: []string reaches no
+		// plan at all on a numeric[], bigint[], bytea[], bool[] or timestamp[] column, and
+		// the row is refused. The walker's own []any encodes against every array OID, so
+		// the right thing to do with it is nothing.
+		return in, nil
 	}
 
 	switch in[0].(type) {

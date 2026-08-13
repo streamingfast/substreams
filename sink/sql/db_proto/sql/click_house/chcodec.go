@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
+	sql2 "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/spool"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -163,6 +165,10 @@ func appendValue(out []byte, value any) ([]byte, error) {
 		}
 		return append(out, tagBool, 0), nil
 	case int32:
+		return binary.BigEndian.AppendUint32(append(out, tagInt32), uint32(v)), nil
+	case sql2.EnumValue:
+		return binary.BigEndian.AppendUint32(append(out, tagInt32), uint32(v.Number)), nil
+	case protoreflect.EnumNumber:
 		return binary.BigEndian.AppendUint32(append(out, tagInt32), uint32(v)), nil
 	case int:
 		return binary.BigEndian.AppendUint64(append(out, tagInt64), uint64(int64(v))), nil

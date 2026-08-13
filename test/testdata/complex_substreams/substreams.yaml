@@ -35,6 +35,14 @@ modules:
     output:
       type: proto:sf.substreams.v1.test.Boolean
 
+  - name: assert_context_intrinsics_0
+    kind: map
+    initialBlock: 0
+    inputs:
+      - source: sf.substreams.v1.Clock
+    output:
+      type: proto:sf.substreams.v1.test.Boolean
+
   - name: map_hybrid_input_clock_70
     kind: map
     initialBlock: 70

@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Added
+
+- WASM: new `context` host module giving modules an intrinsic they can call at any point during execution: `context::clock(output_ptr)` writes the block clock as an encoded `sf.substreams.v1.Clock`. It writes a `{ptr, len}` pair at `output_ptr`, the same convention the `state` getters use, and is available on the `wasmtime` and `wazero` runtimes (not on the JavaScript/v8 one). Until now the clock was only reachable by declaring `source: sf.substreams.v1.Clock` as a module input. Ergonomic Rust bindings will follow in `substreams-rs`; until then a module declares the import itself with `#[link(wasm_import_module = "context")]`. `context` joins `env`, `state` and `logger` as a namespace WASM extensions cannot register into.
+
 ### Fixed
 
 - Server: `substreams-tier1` now restarts when its block hub can no longer link incoming live blocks, instead of hanging every request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be linked, and the head-block metrics keep tracking the live source, so the process looked healthy throughout.

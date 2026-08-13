@@ -515,6 +515,16 @@ func (d *Database) StoreCursor(cursor *sink.Cursor) error {
 		return nil
 	}
 
+	return d.storeCursorFile(cursor)
+}
+
+// storeCursorFile writes the cursor where the next run reads it back.
+//
+// It is what the applier calls once a segment has reached the server. Going through
+// StoreCursor would hand the cursor straight back to the spool it just came out of —
+// leaving the file untouched for the whole backfill, and stamping an already-applied
+// cursor over the newer one on the segment still being written.
+func (d *Database) storeCursorFile(cursor *sink.Cursor) error {
 	if d.cursorFilePath == "" {
 		return fmt.Errorf("cursor file path is not set")
 	}

@@ -162,7 +162,7 @@ func SetupDatabaseSchema(
 			rootMessageDescriptor,
 			options.Clickhouse.SinkInfoFolder,
 			options.Clickhouse.CursorFilePath,
-			true,
+			options.UseProtoOption,
 			options.Encoding,
 			logger,
 			tracer,
@@ -180,6 +180,16 @@ func SetupDatabaseSchema(
 	default:
 		panic(fmt.Sprintf("unsupported driver: %s", dsn.Driver()))
 
+	}
+
+	// Before anything is created or written: a database set up from a different revision
+	// of the same package can hold tables this run would keep using as they are.
+	if verifier, ok := database.(interface {
+		VerifySchemaCompatibility(ctx context.Context) error
+	}); ok {
+		if err := verifier.VerifySchemaCompatibility(ctx); err != nil {
+			return nil, err
+		}
 	}
 
 	sinkInfo, err := database.FetchSinkInfo(schema.Name)

@@ -125,8 +125,23 @@ type Parent struct {
 // bytes point into its arena — so an inserter that keeps a []any past the walk keeps the
 // message alive too. See decoder.arenas for where that lifetime is managed.
 func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm protoreflect.Message, blockNum uint64, blockTimestamp time.Time, parent *Parent, dialect Dialect, inserter Inserter) (time.Duration, error) {
+	// The row counters belong to this block alone. They cannot live on the database: the
+	// decoder walks several blocks at once, on its own goroutines.
+	return d.walkMessageDescriptorAndInsert(dm, blockNum, blockTimestamp, parent, dialect, inserter, map[string]uint32{})
+}
+
+func (d *BaseDatabase) walkMessageDescriptorAndInsert(dm protoreflect.Message, blockNum uint64, blockTimestamp time.Time, parent *Parent, dialect Dialect, inserter Inserter, rowIDs map[string]uint32) (time.Duration, error) {
 	if dm == nil {
 		return 0, fmt.Errorf("received a nil message")
+	}
+
+	md := dm.Descriptor()
+	tableInfo := proto.TableInfo(md)
+
+	if tableInfo == nil && !d.useProtoOptions {
+		tableInfo = &pbSchema.Table{
+			Name: string(md.Name()),
+		}
 	}
 
 	var fieldValues []any
@@ -144,13 +159,14 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm protoreflect
 		primaryKeyOffset += 1
 	}
 
-	md := dm.Descriptor()
-	tableInfo := proto.TableInfo(md)
-
-	if tableInfo == nil && !d.useProtoOptions {
-		tableInfo = &pbSchema.Table{
-			Name: string(md.Name()),
-		}
+	// The count of rows this block already wrote to this table. The walk is a
+	// deterministic function of the message — fields in descriptor order, children after
+	// their parent — so replaying the same block hands every row the same number, which is
+	// what makes the sorting key stable across a reprocess.
+	if tableInfo != nil && dialect.UseRowIDField(tableInfo.Name) {
+		fieldValues = append(fieldValues, rowIDs[tableInfo.Name])
+		rowIDs[tableInfo.Name] += 1
+		primaryKeyOffset += 1
 	}
 
 	// Guarded: this runs once per message, and zap.Any on the table info allocates
@@ -280,7 +296,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm protoreflect
 	}
 
 	for _, fm := range childs {
-		sqlDuration, err := d.WalkMessageDescriptorAndInsertWithDialect(fm, blockNum, blockTimestamp, p, dialect, inserter)
+		sqlDuration, err := d.walkMessageDescriptorAndInsert(fm, blockNum, blockTimestamp, p, dialect, inserter, rowIDs)
 		if err != nil {
 			return 0, fmt.Errorf("processing child %q: %w", string(fm.Descriptor().FullName()), err)
 		}

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ClickHouse/ch-go"
+	chproto "github.com/ClickHouse/ch-go/proto"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/logging/zapx"
 	sink "github.com/streamingfast/substreams/sink"
@@ -287,6 +288,83 @@ func (d *Database) CreateDatabase(useConstraints bool) error {
 	return nil
 }
 
+// VerifySchemaCompatibility rejects a database whose tables disagree with the schema the
+// current package would create, on the one point the sink cannot paper over: the presence
+// of _row_id_.
+//
+// That column is added exactly when the message carries no 'order_by_fields', so
+// annotating a message that had none — or dropping the annotation from one that had them —
+// changes the sorting key of a table that already holds rows. CREATE TABLE IF NOT EXISTS
+// leaves the old table in place, and the inserts that follow would silently write their
+// values into the wrong columns.
+func (d *Database) VerifySchemaCompatibility(ctx context.Context) error {
+	existing, err := d.rowIDColumnByTable(ctx)
+	if err != nil {
+		return fmt.Errorf("reading the columns of schema %q: %w", d.schema.Name, err)
+	}
+
+	for _, table := range d.dialect.GetTables() {
+		found, exists := existing[table.Name]
+		if !exists {
+			// A table the next CREATE TABLE will add.
+			continue
+		}
+
+		expected := d.dialect.UseRowIDField(table.Name)
+		if found == expected {
+			continue
+		}
+
+		if expected {
+			return fmt.Errorf("table %q in database %q was created from a schema declaring 'order_by_fields' for it, but the package now carries none, so the sink would sort it on (%s, %s) instead. Sink into a fresh database, or restore the annotation",
+				table.Name, d.schema.Name, sql.DialectFieldBlockNumber, sql.DialectFieldRowID)
+		}
+
+		return fmt.Errorf("table %q in database %q was created without 'order_by_fields' and carries the %s column the sink adds in that case, but the package now declares them. Sink into a fresh database, or drop the annotation",
+			table.Name, d.schema.Name, sql.DialectFieldRowID)
+	}
+
+	return nil
+}
+
+// rowIDColumnByTable reports, for every table of the schema that exists in ClickHouse,
+// whether it carries the _row_id_ column. An absent schema yields an empty map rather
+// than an error: nothing is set up yet, so there is nothing to disagree with.
+func (d *Database) rowIDColumnByTable(ctx context.Context) (map[string]bool, error) {
+	client, err := d.client()
+	if err != nil {
+		return nil, fmt.Errorf("getting clickhouse client: %w", err)
+	}
+
+	var (
+		tables  chproto.ColStr
+		hasRowD chproto.ColUInt64
+	)
+
+	out := map[string]bool{}
+	query := fmt.Sprintf("SELECT table, sum(name = '%s') AS has_row_id FROM system.columns WHERE database = '%s' GROUP BY table",
+		sql.DialectFieldRowID, d.schema.Name)
+
+	if err := client.Do(ctx, ch.Query{
+		Body: query,
+		Result: chproto.Results{
+			{Name: "table", Data: &tables},
+			{Name: "has_row_id", Data: &hasRowD},
+		},
+		OnResult: func(_ context.Context, _ chproto.Block) error {
+			for i := 0; i < tables.Rows(); i++ {
+				out[tables.Row(i)] = hasRowD[i] > 0
+			}
+
+			return nil
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("querying system.columns: %w", err)
+	}
+
+	return out, nil
+}
+
 func (d *Database) Insert(table string, values []any) error {
 	if d.spool == nil {
 		return d.inserter.insert(table, values)
@@ -533,6 +611,12 @@ func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) error {
 		start := time.Now()
 		tableFullName := d.dialect.FullTableName(table)
 		fields := ""
+
+		// The tombstone only collapses onto the row it deletes if it carries the same
+		// sorting key, and _row_id_ is part of it wherever the schema did not declare one.
+		if d.dialect.UseRowIDField(table.Name) {
+			fields += fmt.Sprintf(", %s", sql.DialectFieldRowID)
+		}
 
 		if table.ChildOf != nil {
 			parentTable, parentFound := d.dialect.TableRegistry[table.ChildOf.ParentTable]

@@ -19,6 +19,13 @@ const DialectFieldBlockTimestamp = "_block_timestamp_"
 const DialectFieldVersion = "_version_"
 const DialectFieldDeleted = "_deleted_"
 
+// DialectFieldRowID numbers the rows a single block writes to a single table, starting at
+// zero. It only exists where the sorting key would otherwise not be unique, which today
+// means a ClickHouse table whose message carries no 'order_by_fields' annotation: the
+// sink then sorts on (_block_number_, _row_id_), and without the second column the
+// ReplacingMergeTree would collapse every row of a block into one.
+const DialectFieldRowID = "_row_id_"
+
 type Dialect interface {
 	SchemaHash() string
 	FullTableName(table *schema.Table) string
@@ -26,6 +33,9 @@ type Dialect interface {
 	GetTables() []*schema.Table
 	UseVersionField() bool
 	UseDeletedField() bool
+	// UseRowIDField reports whether the given table carries the DialectFieldRowID column.
+	// It is per-table because a schema can annotate some of its messages and not others.
+	UseRowIDField(table string) bool
 	AppendInlineFieldValues(fieldValues []any, fd protoreflect.FieldDescriptor, fv protoreflect.Value, dm protoreflect.Message) ([]any, error)
 }
 
@@ -48,6 +58,12 @@ func NewBaseDialect(registry map[string]*schema.Table, logger *zap.Logger) *Base
 		TableRegistry:  registry,
 		Logger:         logger,
 	}
+}
+
+// UseRowIDField defaults to false: only the ClickHouse dialect needs a tie-breaker in its
+// sorting key.
+func (d *BaseDialect) UseRowIDField(table string) bool {
+	return false
 }
 
 func (d *BaseDialect) AddCreateTableSql(table string, sql string) {

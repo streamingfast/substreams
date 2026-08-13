@@ -287,11 +287,18 @@ func addFromProtoRunFlags(flags *pflag.FlagSet, driver string) {
 	flags.Duration("spool-max-idle", 10*time.Second, "Write the open segment to the database once no new row has reached it for this long, short of its size target. A stream that stalls would otherwise sit on those rows indefinitely, leaving the cursor where it was and the blocks to be streamed, and paid for, again on restart. Zero disables it. Backfill only.")
 
 	if driver == "clickhouse" {
-		flags.String("sink-info-folder", "", "Folder where to store the clickhouse sink info")
-		flags.String("cursor-file-path", "cursor.txt", "File name where to store the clickhouse cursor")
-		flags.Int("query-retry-count", 3, "Number of retries for ClickHouse queries when an error occurs")
-		flags.Duration("query-retry-sleep", time.Second, "Sleep duration between ClickHouse query retries (e.g. 1s, 500ms)")
+		addClickhouseStateFlags(flags)
 	}
+}
+
+// addClickhouseStateFlags registers where the ClickHouse sink keeps the state PostgreSQL
+// keeps in the database itself. `setup` needs them as much as the run does: it reads the
+// schema hash from that folder to decide whether the database is already set up.
+func addClickhouseStateFlags(flags *pflag.FlagSet) {
+	flags.String("sink-info-folder", "", "Folder where to store the clickhouse sink info")
+	flags.String("cursor-file-path", "cursor.txt", "File name where to store the clickhouse cursor")
+	flags.Int("query-retry-count", 3, "Number of retries for ClickHouse queries when an error occurs")
+	flags.Duration("query-retry-sleep", time.Second, "Sleep duration between ClickHouse query retries (e.g. 1s, 500ms)")
 }
 
 // addSinkRunFlags registers the full set of flags used by the sink process of an

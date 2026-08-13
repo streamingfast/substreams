@@ -105,7 +105,9 @@ Typical uses: token amounts exceeding the uint64 range, high-precision decimal a
 
 ## ClickHouse-Specific Options
 
-ClickHouse tables require the `clickhouse_table_options` annotation on each table: at minimum `order_by_fields`, optionally `partition_fields` and `index_fields`.
+ClickHouse tables accept a `clickhouse_table_options` annotation: `order_by_fields`, `partition_fields` and `index_fields`.
+
+A table that declares no `order_by_fields` is sorted on `(_block_number_, _row_id_)` and partitioned by `toYYYYMM(_block_timestamp_)`, which is what lets a package with no annotations at all be sinked as it is. `_row_id_` numbers the rows a block writes to a table, starting at zero; the tables are `ReplacingMergeTree`, so without it every row of a block would collapse into one. It is added only to the tables that need it, and a table created with it cannot later be annotated in place — the sink refuses to start on a database whose tables disagree with the package, since the sorting key of an existing table cannot be changed.
 
 ```proto
 message Transfer {

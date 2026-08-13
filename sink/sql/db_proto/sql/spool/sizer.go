@@ -33,7 +33,7 @@ type sizer struct {
 }
 
 func newSizer(target time.Duration, maxBytes int64) *sizer {
-	return &sizer{target: target, maxBytes: maxBytes, current: segmentFloorBytes}
+	return &sizer{target: target, maxBytes: maxBytes, current: min(segmentFloorBytes, maxBytes)}
 }
 
 // size reports how large a segment should grow before it is committed.

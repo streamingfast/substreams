@@ -1237,8 +1237,11 @@ func fromProtoSpoolOptions(cmd *cobra.Command) (*spool.Options, error) {
 		Dir:                 dir,
 		MaxBytes:            maxBytes,
 		WriteTargetDuration: sflags.MustGetDuration(cmd, "db-write-target-duration"),
-		SegmentMaxBytes:     segmentMaxBytes,
-		MaxIdle:             maxIdle,
+		// A segment is one indivisible database write, so keep its configured ceiling
+		// within the total spool budget rather than allowing an invalid combination to
+		// deadlock when the segment is sealed.
+		SegmentMaxBytes: min(segmentMaxBytes, maxBytes),
+		MaxIdle:         maxIdle,
 	}, nil
 }
 

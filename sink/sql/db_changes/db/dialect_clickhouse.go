@@ -137,42 +137,43 @@ func (d ClickhouseDialect) ExecuteSetupScript(ctx context.Context, l *Loader, sc
 
 		for _, stmt := range stmts {
 			if createDatabase, ok := stmt.(*clickhouse.CreateDatabase); ok {
-				l.logger.Debug("appending 'ON CLUSTER' clause to 'CREATE DATABASE'", zap.String("cluster", d.cluster), zap.Stringer("database", createDatabase.Name))
+				l.logger.Debug("appending 'ON CLUSTER' clause to 'CREATE DATABASE'", zap.String("cluster", d.cluster), zap.String("database", clickhouse.Format(createDatabase.Name)))
 				createDatabase.OnCluster = &clickhouse.ClusterClause{Expr: &clickhouse.StringLiteral{Literal: d.cluster}}
 			}
 			if createTable, ok := stmt.(*clickhouse.CreateTable); ok {
-				l.logger.Debug("appending 'ON CLUSTER' clause to 'CREATE TABLE'", zap.String("cluster", d.cluster), zap.String("table", createTable.Name.String()))
+				l.logger.Debug("appending 'ON CLUSTER' clause to 'CREATE TABLE'", zap.String("cluster", d.cluster), zap.String("table", clickhouse.Format(createTable.Name)))
 				createTable.OnCluster = &clickhouse.ClusterClause{Expr: &clickhouse.StringLiteral{Literal: d.cluster}}
 
 				if !strings.HasPrefix(createTable.Engine.Name, "Replicated") &&
 					strings.HasSuffix(createTable.Engine.Name, "MergeTree") {
 					newEngine := "Replicated" + createTable.Engine.Name
-					l.logger.Debug("replacing table engine with replicated one", zap.String("table", createTable.Name.String()), zap.String("engine", createTable.Engine.Name), zap.String("new_engine", newEngine))
+					l.logger.Debug("replacing table engine with replicated one", zap.String("table", clickhouse.Format(createTable.Name)), zap.String("engine", createTable.Engine.Name), zap.String("new_engine", newEngine))
 					createTable.Engine.Name = newEngine
 				}
 			}
 			if createMaterializedView, ok := stmt.(*clickhouse.CreateMaterializedView); ok {
-				l.logger.Debug("appending 'ON CLUSTER' clause to 'CREATE MATERIALIZED VIEW'", zap.String("cluster", d.cluster), zap.Stringer("materialized_view", createMaterializedView.Name))
+				l.logger.Debug("appending 'ON CLUSTER' clause to 'CREATE MATERIALIZED VIEW'", zap.String("cluster", d.cluster), zap.String("materialized_view", clickhouse.Format(createMaterializedView.Name)))
 				createMaterializedView.OnCluster = &clickhouse.ClusterClause{Expr: &clickhouse.StringLiteral{Literal: d.cluster}}
 
 				if createMaterializedView.Engine != nil && !strings.HasPrefix(createMaterializedView.Engine.Name, "Replicated") &&
 					strings.HasSuffix(createMaterializedView.Engine.Name, "MergeTree") {
 					newEngine := "Replicated" + createMaterializedView.Engine.Name
-					l.logger.Debug("replacing table engine with replicated one", zap.Stringer("materialized_view", createMaterializedView.Name), zap.String("engine", createMaterializedView.Engine.Name), zap.String("new_engine", newEngine))
+					l.logger.Debug("replacing table engine with replicated one", zap.String("materialized_view", clickhouse.Format(createMaterializedView.Name)), zap.String("engine", createMaterializedView.Engine.Name), zap.String("new_engine", newEngine))
 					createMaterializedView.Engine.Name = newEngine
 				}
 			}
 			if createView, ok := stmt.(*clickhouse.CreateView); ok {
-				l.logger.Debug("appending 'ON CLUSTER' clause to 'CREATE VIEW'", zap.String("cluster", d.cluster), zap.Stringer("view", createView.Name))
+				l.logger.Debug("appending 'ON CLUSTER' clause to 'CREATE VIEW'", zap.String("cluster", d.cluster), zap.String("view", clickhouse.Format(createView.Name)))
 				createView.OnCluster = &clickhouse.ClusterClause{Expr: &clickhouse.StringLiteral{Literal: d.cluster}}
 			}
 			if createFunction, ok := stmt.(*clickhouse.CreateFunction); ok {
-				l.logger.Debug("appending 'ON CLUSTER' clause to 'CREATE FUNCTION'", zap.String("cluster", d.cluster), zap.Stringer("function", createFunction.FunctionName))
+				l.logger.Debug("appending 'ON CLUSTER' clause to 'CREATE FUNCTION'", zap.String("cluster", d.cluster), zap.String("function", clickhouse.Format(createFunction.FunctionName)))
 				createFunction.OnCluster = &clickhouse.ClusterClause{Expr: &clickhouse.StringLiteral{Literal: d.cluster}}
 			}
 
-			if _, err := l.ExecContext(ctx, stmt.String()); err != nil {
-				l.logger.Error("failed to execute schema statement", zap.String("statement", stmt.String()), zap.Error(err))
+			query := clickhouse.Format(stmt)
+			if _, err := l.ExecContext(ctx, query); err != nil {
+				l.logger.Error("failed to execute schema statement", zap.String("statement", query), zap.Error(err))
 				return fmt.Errorf("exec clickhouse cluster statements: %w", err)
 			}
 		}

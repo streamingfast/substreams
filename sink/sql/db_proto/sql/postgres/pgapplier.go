@@ -254,3 +254,17 @@ func (a *pgApplier) appliedSegments(ctx context.Context) (map[uint64]uint64, err
 
 	return applied, rows.Err()
 }
+
+// clearSegments empties the bookkeeping table.
+//
+// It is only ever called once the spool has been drained and closed, which leaves no
+// segment on disk for a record to answer for: the records exist to tell recovery whether a
+// directory it found was already applied, and there are no directories left.
+func (a *pgApplier) clearSegments(ctx context.Context) error {
+	if _, err := a.pool.Exec(ctx, fmt.Sprintf(`DELETE FROM %s`, a.segmentsTable())); err != nil {
+		return fmt.Errorf("clearing the applied-segments table: %w", err)
+	}
+	a.applied = nil
+
+	return nil
+}

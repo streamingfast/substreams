@@ -19,7 +19,10 @@ import (
 // the stream stops waiting on PostgreSQL.
 type localBufferInserter struct {
 	buffer *spool.Spool
-	logger *zap.Logger
+	// applier is kept so the switch to direct inserts can clear the bookkeeping it owns
+	// once the spool it belongs to has been drained.
+	applier *pgApplier
+	logger  *zap.Logger
 }
 
 func newLocalBufferInserter(ctx context.Context, database *Database, format spool.Format, options spool.Options, logger *zap.Logger) (*localBufferInserter, error) {
@@ -51,7 +54,7 @@ func newLocalBufferInserter(ctx context.Context, database *Database, format spoo
 		return nil, err
 	}
 
-	return &localBufferInserter{buffer: buf, logger: logger.Named("spool_inserter")}, nil
+	return &localBufferInserter{buffer: buf, applier: applier, logger: logger.Named("spool_inserter")}, nil
 }
 
 // loadColumnLayouts resolves every table's column order and type OIDs from the live

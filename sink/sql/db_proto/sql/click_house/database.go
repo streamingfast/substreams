@@ -195,7 +195,7 @@ func (d *Database) clientNoCache(dsn *db.DSN) (*ch.Client, error) {
 // The spool trades freshness for throughput, which is what a backfill wants and the
 // opposite of what a sink at the chain head wants, where a block should be queryable when
 // it arrives rather than when the segment it lands in is full.
-func (d *Database) SwitchToDirectInserts(ctx context.Context, reason string) error {
+func (d *Database) SwitchToDirectInserts(ctx context.Context, reason string, _ bool) error {
 	if d.spool == nil {
 		return nil
 	}

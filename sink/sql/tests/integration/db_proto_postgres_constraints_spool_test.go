@@ -21,10 +21,10 @@ import (
 
 // TestDbProtoConstraintsAtEndOfRangeWithSpool covers the end of a bounded run that spooled.
 //
-// Constraints are created once the backfill is over, which for a bounded run is the stop
-// block. The rows still in the spool have to reach the database first: creating a foreign
-// key against a table the tail has not landed in yet is at best wasted work and at worst a
-// validation failure, and the spool owns the transactions while it is open.
+// The spool has to be drained — the rows it holds are part of the range — but the
+// constraints are deliberately left alone. A stop block ends the run without saying the
+// backfill is over: a range is routinely one chunk of several, and building them here would
+// leave every later chunk loading into a constrained schema, measured at 27.7x.
 func TestDbProtoConstraintsAtEndOfRangeWithSpool(t *testing.T) {
 	outputMessageDescriptor := (*pbrelations.Output)(nil).ProtoReflect().Descriptor()
 	postgresContainer := sharedDbChangesPostgresContainer
@@ -81,10 +81,10 @@ func TestDbProtoConstraintsAtEndOfRangeWithSpool(t *testing.T) {
 			FROM pg_constraint c
 			JOIN pg_namespace n ON n.oid = c.connamespace
 			WHERE n.nspname = $1 AND c.conname = $2`, testSchema, name))
-		require.Positive(t, count, "the sink must have created %q at the end of the run", name)
+		require.Zero(t, count, "reaching a stop block must leave %q to `constraints apply`", name)
 	}
 
 	var customers int
 	require.NoError(t, dbx.Get(&customers, fmt.Sprintf(`SELECT count(*) FROM "%s"."customers"`, testSchema)))
-	require.Equal(t, 2, customers, "every spooled row reached the database before the constraints went on")
+	require.Equal(t, 2, customers, "the spool is still drained at the end of the range, constraints or not")
 }

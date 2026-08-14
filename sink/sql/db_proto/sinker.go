@@ -232,17 +232,33 @@ func (s *Sinker) HandleBlockRangeCompletion(ctx context.Context, cursor *sink.Cu
 
 	// The spool still holds whatever has not reached its segment size, and it owns the
 	// transactions while it is open. Draining it first is what keeps those blocks from
-	// being streamed, and paid for, twice, and what leaves the constraints to be created
-	// against a database that already holds every row of the range.
+	// being streamed twice.
 	if err := s.db.SwitchToDirectInserts(ctx, "stream reached the end of the requested range", false); err != nil {
 		return fmt.Errorf("draining before the end of the range: %w", err)
 	}
 
-	if err := s.applyConstraintsOnce(); err != nil {
-		return err
-	}
+	// The constraints are deliberately left alone. A stop block says this run is over, not
+	// that the backfill is: a range is routinely one chunk of several, and building the
+	// constraints here would make every chunk after it load into a constrained schema,
+	// which is measured at 27.7x. Only reaching chain HEAD says there is nothing left.
+	s.reportConstraintsLeftToApply()
 
 	return s.db.Close(ctx)
+}
+
+// reportConstraintsLeftToApply says what the schema is still missing when a bounded run
+// ends short of the chain head.
+//
+// Saying nothing is the worse failure: a database with no primary keys and no foreign keys
+// answers queries, slowly and without rejecting anything, and looks exactly like a database
+// that is fine.
+func (s *Sinker) reportConstraintsLeftToApply() {
+	if s.constraintsApplied || s.constraints.SkipsEverything() || !s.constraints.ApplyAtHead() {
+		return
+	}
+
+	s.logger.Info("the run reached its stop block without reaching chain HEAD, so the schema's constraints are left alone: a stop block ends the run, it does not say the backfill is done. " +
+		"Run `substreams sink postgres constraints apply <manifest> --dsn ...` once there is nothing more to load")
 }
 
 // flushHolding applies every held block, stores the cursor and commits.
@@ -367,22 +383,24 @@ func (s *Sinker) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstr
 // is behind us, which is where they belong: measured through binary COPY, loading with
 // foreign keys in place costs 27.7x against 3.3x for building them afterwards.
 //
-// It runs when the stream reaches the chain head, and again at the end of a bounded run
-// that never got there. Both are idempotent — the constraints already in place are left
-// alone — so whichever comes first does the work.
+// It runs when the stream reaches the chain head, and only then. A stop block ends the
+// run, which is not the same thing as the backfill being over: a range is routinely one
+// chunk of several, and creating the constraints at the end of one would leave every chunk
+// after it loading into a constrained schema — the case this whole arrangement exists to
+// avoid. Reaching the head is the one signal that says there is nothing left to load.
 func (s *Sinker) applyConstraintsOnce() error {
 	if s.constraintsApplied || !s.constraints.ApplyAtHead() {
 		if !s.constraintsApplied && s.constraints.Timing == sql.ConstraintsManual && !s.constraints.SkipsEverything() {
 			s.constraintsApplied = true
 			s.logger.Info("the backfill is done and the schema has no constraints yet. Creating them locks every table while indexes are built and foreign keys validated, " +
-				"so it is left to you: run `substreams sink postgres apply-constraints <manifest> --dsn ...` when a maintenance window suits")
+				"so it is left to you: run `substreams sink postgres constraints apply <manifest> --dsn ...` when a maintenance window suits")
 		}
 
 		return nil
 	}
 	s.constraintsApplied = true
 
-	s.logger.Info("backfill is done, creating the schema's constraints as --apply-constraints=head asked. This locks every table while it runs")
+	s.logger.Info("the stream reached chain HEAD, creating the schema's constraints as --apply-constraints=auto asked. This locks every table while it runs")
 
 	startAt := time.Now()
 	if err := applyConstraints(s.db, s.logger); err != nil {

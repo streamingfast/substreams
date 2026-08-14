@@ -19,9 +19,9 @@ const AllTables = "all"
 type ConstraintTiming string
 
 const (
-	// ConstraintsAuto has the sink create them itself once the backfill is over: at the
-	// first live block, or at the end of a bounded run. It is the default, stop-the-world
-	// pass and all. A backfill that ends with no primary keys and no foreign keys has
+	// ConstraintsAuto has the sink create them itself at the first live block, and only
+	// there: a stop block ends a run without saying the backfill is over, and a range is
+	// routinely one chunk of several. It is the default, stop-the-world pass and all. A backfill that ends with no primary keys and no foreign keys has
 	// produced a database nobody should query, and leaving it that way until the operator
 	// remembers a second command is the worse failure — it is silent, and it looks like
 	// success.

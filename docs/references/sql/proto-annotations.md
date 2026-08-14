@@ -196,7 +196,7 @@ substreams sink postgres constraints apply substreams.yaml --dsn $DSN
 
 | value | when |
 |---|---|
-| `auto` *(default)* | the sink creates them once the backfill reaches chain HEAD, or at the end of a bounded run |
+| `auto` *(default)* | the sink creates them once the stream reaches chain HEAD. A `--stop-block` run leaves them alone: it ends the run without saying the backfill is done |
 | `manual` | left to `sink postgres constraints apply` |
 | `always` | created before the load, which is the 27.7x row above |
 
@@ -266,7 +266,7 @@ cost of one pause when it switches over.
 
 ```bash
 substreams sink postgres substreams.yaml --dsn $DSN \
-  --apply-constraints=head \
+  --apply-constraints=auto \
   -e mainnet.eth.streamingfast.io:443 -s 20000000
 ```
 

@@ -103,6 +103,12 @@ func TestDbProtoPostgresConstraintsBackfill(t *testing.T) {
 //
 // The default is deliberately not this — building them locks every table, which is the
 // operator's call to schedule — but when it is asked for it has to actually happen.
+// TestDbProtoConstraintsAtHead covers the one moment that says the backfill is over.
+//
+// The liveness checker is the cursor-based one the run command installs, so the first
+// STEP_NEW block turns the stream live — which is what closes the spool and puts the
+// constraints on. A stop block does not do this, deliberately: see the spooled
+// end-of-range test.
 func TestDbProtoConstraintsAtHead(t *testing.T) {
 	outputMessageDescriptor := (*pbrelations.Output)(nil).ProtoReflect().Descriptor()
 	postgresContainer := sharedDbChangesPostgresContainer
@@ -129,6 +135,9 @@ func TestDbProtoConstraintsAtHead(t *testing.T) {
 		sink.WithRetryBackOff(&backoff.StopBackOff{}),
 	)
 	require.NoError(t, err)
+
+	// What the run command installs, and what makes a STEP_NEW block read as live.
+	sink.WithLivenessChecker(sink.NewCursorBasedLivenessChecker())(baseSink)
 
 	options := db_proto.SinkerFactoryOptions{
 		UseProtoOption:  true,
@@ -158,7 +167,7 @@ func TestDbProtoConstraintsAtHead(t *testing.T) {
 			FROM pg_constraint c
 			JOIN pg_namespace n ON n.oid = c.connamespace
 			WHERE n.nspname = $1 AND c.conname = $2`, testSchema, name))
-		require.Positive(t, count, "the sink must have created %q at the end of the run", name)
+		require.Positive(t, count, "reaching chain HEAD must have created %q", name)
 	}
 
 	var customers int

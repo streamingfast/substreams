@@ -412,13 +412,10 @@ func (d *Database) Flush() (time.Duration, error) {
 
 	startFlush := time.Now()
 
-	// With a spool a flush only seals a segment once it is big enough; the write to
-	// ClickHouse happens later, on the applier's goroutine.
+	// With a spool the rows are already on disk and the write to ClickHouse happens later,
+	// on the applier's goroutine. The segment is sealed when the cursor covering it is
+	// recorded, which happens after this.
 	if d.spool != nil {
-		if err := d.spool.MaybeSeal(d.ctx); err != nil {
-			return 0, fmt.Errorf("sealing: %w", err)
-		}
-
 		return time.Since(startFlush), nil
 	}
 
@@ -528,7 +525,10 @@ func (d *Database) StoreCursor(cursor *sink.Cursor) error {
 	if d.spool != nil {
 		d.spool.RecordCursor(cursor.String())
 
-		return nil
+		// Sealed here rather than at flush, the cursor being the last thing a flush writes:
+		// sealing before it would close the segment on the cursor the previous flush stored,
+		// leaving it to claim a range its own cursor does not cover.
+		return d.spool.MaybeSeal(d.ctx)
 	}
 
 	return d.storeCursorFile(cursor)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	sink "github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/postgres/pgcopy"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/spool"
 	"go.uber.org/zap"
@@ -73,6 +74,46 @@ func (a *pgApplier) EnsureSchema(ctx context.Context) error {
 
 	if _, err := a.pool.Exec(ctx, statement); err != nil {
 		return fmt.Errorf("creating the applied-segments table: %w", err)
+	}
+
+	return a.dropSegmentsPastCursor(ctx)
+}
+
+// dropSegmentsPastCursor removes the segment records the stored cursor does not cover.
+//
+// The cursor is what a restart resumes from, and Run undoes every row above it before a
+// block arrives — so a record reaching past it describes rows that are no longer there.
+// Left in place it answers AlreadyApplied for the segment carrying exactly those rows,
+// which recovery then discards while replaying the segments behind it, moving the cursor
+// over a gap it just created.
+//
+// Segments sealed before the cursor covering them was recorded are how such a record came
+// about, which no longer happens; this also clears the ones a database synced by an earlier
+// build is still carrying.
+func (a *pgApplier) dropSegmentsPastCursor(ctx context.Context) error {
+	var stored string
+	err := a.pool.QueryRow(ctx, fmt.Sprintf(`SELECT cursor FROM %s WHERE name = 'cursor'`,
+		pgx.Identifier{a.schema, "_cursor_"}.Sanitize())).Scan(&stored)
+	if err != nil {
+		// No cursor yet means nothing has been applied, so there is nothing to contradict.
+		return nil
+	}
+
+	cursor, err := sink.NewCursor(stored)
+	if err != nil || cursor.IsBlank() {
+		//nolint:nilerr // an unreadable cursor is not this pass's to report
+		return nil
+	}
+
+	tag, err := a.pool.Exec(ctx, fmt.Sprintf(`DELETE FROM %s WHERE last_block > $1`, a.segmentsTable()),
+		cursor.Block().Num())
+	if err != nil {
+		return fmt.Errorf("dropping the segment records past the stored cursor: %w", err)
+	}
+
+	if tag.RowsAffected() > 0 {
+		a.logger.Info("dropped segment records the stored cursor does not cover",
+			zap.Int64("dropped", tag.RowsAffected()), zap.Uint64("cursor_block", cursor.Block().Num()))
 	}
 
 	return nil

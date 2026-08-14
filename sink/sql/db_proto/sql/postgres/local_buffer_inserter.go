@@ -88,7 +88,12 @@ func (i *localBufferInserter) insert(table string, values []any, database *Datab
 			return fmt.Errorf("expected a string cursor, got %T", values[1])
 		}
 		i.buffer.RecordCursor(cursor)
-		return nil
+
+		// Sealing happens here rather than at flush, because the cursor is the last thing a
+		// flush writes: sealing before it would close the segment on the cursor the previous
+		// flush stored, leaving it to claim a range its own cursor does not cover. A restart
+		// then resumes behind rows the segment record says are applied.
+		return i.buffer.MaybeSeal(context.Background())
 
 	case "_blocks_":
 		blockNum, ok := values[0].(uint64)
@@ -101,8 +106,10 @@ func (i *localBufferInserter) insert(table string, values []any, database *Datab
 	return i.buffer.Insert(table, values)
 }
 
+// flush has nothing to do: a spooled row is already on disk, and the segment is sealed
+// when the cursor covering it is recorded, which happens after this.
 func (i *localBufferInserter) flush(database *Database) error {
-	return i.buffer.MaybeSeal(context.Background())
+	return nil
 }
 
 func (i *localBufferInserter) close(ctx context.Context) error {

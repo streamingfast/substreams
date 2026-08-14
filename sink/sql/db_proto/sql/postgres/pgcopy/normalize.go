@@ -126,6 +126,10 @@ func normalizeSlice(oid uint32, in []any, encoding sqlbytes.Encoding) (any, erro
 		// plan at all on a numeric[], bigint[], bytea[], bool[] or timestamp[] column, and
 		// the row is refused. The walker's own []any encodes against every array OID, so
 		// the right thing to do with it is nothing.
+		//
+		// Nothing is rendered here, unlike the element cases below: with no element there
+		// is no value whose representation could drift from what the rendered write modes
+		// produce, only a plan that has to resolve.
 		return in, nil
 	}
 
@@ -185,15 +189,21 @@ func normalizeSlice(oid uint32, in []any, encoding sqlbytes.Encoding) (any, erro
 		return out, nil
 
 	case sql2.EnumValue:
-		// An enum column is declared TEXT, so pgtype renders each element through its
-		// String method — the name, which is exactly what the rendered write modes emit.
-		out := make([]sql2.EnumValue, len(in))
+		// The dialect declares an enum column TEXT, so a repeated enum is TEXT[].
+		//
+		// Handing the values over as they are would encode identically today — pgtype picks
+		// the Stringer, which is what ValueToString renders with too. What it would not do
+		// is keep the two agreeing: pgtype chooses between TextValuer, driver.Valuer and
+		// fmt.Stringer in that order, so the day EnumValue gains any of the earlier ones,
+		// binary COPY starts writing something the rendered write modes do not, and nothing
+		// fails. Rendering here is what keeps that choice ours.
+		out := make([]string, len(in))
 		for i, v := range in {
 			enum, ok := v.(sql2.EnumValue)
 			if !ok {
 				return nil, fmt.Errorf("mixed element types in array: %T and sql.EnumValue", v)
 			}
-			out[i] = enum
+			out[i] = enum.String()
 		}
 
 		return out, nil

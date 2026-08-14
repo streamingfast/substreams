@@ -18,8 +18,8 @@ func TestSinkUserAgent(t *testing.T) {
 	assert.Equal(t, "sink_from_proto", sinkUserAgent("sink_from_proto", "duckdb"))
 }
 
-// TestFromProtoConstraintPolicyDisableAll covers the shorthand and the deprecated flag it
-// replaces, both of which have to mean exactly what the three switches mean together.
+// TestFromProtoConstraintPolicyDisableAll covers the deprecated --no-constraints, which
+// has to keep meaning exactly what the three switches mean together.
 func TestFromProtoConstraintPolicyDisableAll(t *testing.T) {
 	newCmd := func() *cobra.Command {
 		cmd := &cobra.Command{}
@@ -35,15 +35,6 @@ func TestFromProtoConstraintPolicyDisableAll(t *testing.T) {
 		assert.False(t, policy.SkipsEverything())
 	})
 
-	t.Run("the shorthand disables all three", func(t *testing.T) {
-		cmd := newCmd()
-		require.NoError(t, cmd.Flags().Set("disable-all-constraints", "true"))
-
-		policy, err := fromProtoConstraintPolicy(cmd)
-		require.NoError(t, err)
-		assert.True(t, policy.SkipsEverything())
-	})
-
 	t.Run("the deprecated flag still means the same", func(t *testing.T) {
 		cmd := newCmd()
 		require.NoError(t, cmd.Flags().Set("no-constraints", "true"))
@@ -54,12 +45,27 @@ func TestFromProtoConstraintPolicyDisableAll(t *testing.T) {
 	})
 }
 
-// TestSetupCommandsCarryNoConstraintTiming pins that --apply-constraints stays off `setup`:
-// there the question is whether the schema comes out constrained, not when, and two of the
-// flag's three values would collapse onto the same answer.
-func TestSetupCommandsCarryNoConstraintTiming(t *testing.T) {
+// TestSetupCommandsCarryConstraintTiming pins that `setup` reads --apply-constraints: it
+// builds its policy from that flag, so leaving it unregistered had setup read the empty
+// string and create a bare schema whatever else was asked for.
+func TestSetupCommandsCarryConstraintTiming(t *testing.T) {
 	for _, cmd := range []*cobra.Command{sinkPostgresSetupCmd, sinkClickhouseSetupCmd} {
-		assert.Nil(t, cmd.Flags().Lookup("apply-constraints"), "%s must not carry --apply-constraints", cmd.Use)
-		assert.NotNil(t, cmd.Flags().Lookup("disable-all-constraints"), "%s must carry --disable-all-constraints", cmd.Use)
+		assert.NotNil(t, cmd.Flags().Lookup("apply-constraints"), "%s must carry --apply-constraints", cmd.Use)
+	}
+}
+
+// TestSetupOnlyCreatesConstraintsWhenAlways pins which of the three values `setup` acts on.
+// It creates the schema and exits, so 'auto' and 'manual' both leave the tables bare and
+// only 'always' puts the constraints on with them.
+func TestSetupOnlyCreatesConstraintsWhenAlways(t *testing.T) {
+	for value, wantUpfront := range map[string]bool{"auto": false, "manual": false, "always": true} {
+		cmd := &cobra.Command{}
+		addFromProtoSchemaFlags(cmd.Flags())
+		addConstraintTimingFlag(cmd.Flags())
+		require.NoError(t, cmd.Flags().Set("apply-constraints", value))
+
+		policy, err := fromProtoConstraintPolicy(cmd)
+		require.NoError(t, err)
+		assert.Equal(t, wantUpfront, policy.ApplyUpfront(), "--apply-constraints=%s", value)
 	}
 }

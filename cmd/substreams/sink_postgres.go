@@ -100,6 +100,7 @@ func init() {
 	setupFlags.Bool("ignore-duplicate-table-errors", false, "[Dev] Use this if you want to ignore duplicate table errors, take caution that this means the 'schema.sql' file will not have run fully!")
 	addBytesEncodingFlag(setupFlags)
 	addFromProtoSchemaFlags(setupFlags)
+	addConstraintTimingFlag(setupFlags)
 
 	applyFlags := sinkPostgresConstraintsApplyCmd.Flags()
 	addBytesEncodingFlag(applyFlags)

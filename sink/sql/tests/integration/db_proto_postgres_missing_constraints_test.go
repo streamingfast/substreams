@@ -77,25 +77,27 @@ func TestDbProtoPostgresMissingConstraints(t *testing.T) {
 	})
 }
 
-// TestDbProtoConstraintsPerTransaction covers the pass committing as it goes.
+// TestDbProtoConstraintsParallelism covers the pass at every width it can be run at.
 //
-// A single transaction around every index build and every foreign key validation is what
-// turns a large schema into an OOM that loses the whole pass. Committing in batches bounds
-// that, and what a killed run finished has to still be there — which is the same property
-// that lets the pass be re-run against a schema that is partly constrained already.
-func TestDbProtoConstraintsPerTransaction(t *testing.T) {
+// Each statement commits on its own whatever the parallelism, so what a killed run
+// finished has to still be there — the same property that lets the pass be re-run against
+// a schema that is partly constrained already. Running the keys and the foreign keys as
+// separate waves is what keeps a foreign key from reaching the server before the key it
+// references, which concurrency would otherwise make a race.
+func TestDbProtoConstraintsParallelism(t *testing.T) {
 	outputMessageDescriptor := (*pbrelations.Output)(nil).ProtoReflect().Descriptor()
 	postgresContainer := sharedDbChangesPostgresContainer
 	ctx := context.Background()
 
-	open := func(t *testing.T, schemaName string, perTransaction int) protosql.Database {
+	open := func(t *testing.T, schemaName string, parallelism int) protosql.Database {
 		t.Helper()
 
 		options := db_proto.SinkerFactoryOptions{
 			UseProtoOption: true,
 			Constraints: protosql.ConstraintPolicy{
-				Timing:         protosql.ConstraintsManual,
-				PerTransaction: perTransaction,
+				Timing:      protosql.ConstraintsManual,
+				Parallelism: parallelism,
+				WorkMem:     "64MB",
 			},
 			UseTransactions: true,
 			DecodeBatchSize: 1,
@@ -108,12 +110,12 @@ func TestDbProtoConstraintsPerTransaction(t *testing.T) {
 		return database
 	}
 
-	for _, perTransaction := range []int{1, 3} {
-		t.Run(fmt.Sprintf("%d per transaction", perTransaction), func(t *testing.T) {
-			schemaName := fmt.Sprintf("constraints_per_transaction_%d", perTransaction)
+	for _, parallelism := range []int{1, 3, 10} {
+		t.Run(fmt.Sprintf("parallelism %d", parallelism), func(t *testing.T) {
+			schemaName := fmt.Sprintf("constraints_parallelism_%d", parallelism)
 			createPostgresTestSchema(t, postgresContainer.ConnectionString, schemaName)
 
-			database := open(t, schemaName, perTransaction)
+			database := open(t, schemaName, parallelism)
 
 			require.NoError(t, database.ApplyConstraints())
 			missing, err := database.MissingConstraints()

@@ -59,21 +59,31 @@ type ConstraintPolicy struct {
 	// governed by Timing: the index is created when the sink starts.
 	DisableBlockNumberIndex bool
 
-	// PerTransaction is how many constraints are created or dropped per transaction.
-	// Zero means one, which is what keeps the pass restartable and its memory bounded:
-	// each index build and each foreign key validation is committed before the next
-	// starts, so a run that is killed keeps what it finished and the next one carries on.
-	// It is an execution knob rather than a property of the schema.
-	PerTransaction int
+	// Parallelism is how many constraints are created or dropped at once. Zero means one.
+	//
+	// They go on independent relations, so the only ordering that matters is between the
+	// waves — a foreign key needs the key it references to exist — and within a wave the
+	// server is free to build them side by side. Each statement still commits on its own,
+	// which is what keeps the pass restartable: a run that is killed keeps what it
+	// finished. It is an execution knob rather than a property of the schema.
+	Parallelism int
+
+	// WorkMem is what maintenance_work_mem is set to for the duration of each statement,
+	// empty leaving the server's own setting alone. The default is 64MB on most servers,
+	// at which an index build over a large table spills to an external merge sort; raising
+	// it for the pass alone is the cheapest thing that makes it faster.
+	//
+	// It multiplies with Parallelism, each concurrent build taking its own.
+	WorkMem string
 }
 
-// ConstraintsPerTransaction is how many statements the pass commits at a time.
-func (p ConstraintPolicy) ConstraintsPerTransaction() int {
-	if p.PerTransaction <= 0 {
+// ConstraintsParallelism is how many statements the pass runs at once.
+func (p ConstraintPolicy) ConstraintsParallelism() int {
+	if p.Parallelism <= 0 {
 		return 1
 	}
 
-	return p.PerTransaction
+	return p.Parallelism
 }
 
 // SkipPrimaryKey reports whether the given table is meant to go without its primary key.
@@ -113,7 +123,8 @@ func DisableAllConstraints() ConstraintPolicy {
 // the one thing that survives an output having no annotations to declare anything.
 func (p ConstraintPolicy) WithBlockNumberIndex(from ConstraintPolicy) ConstraintPolicy {
 	p.Timing = from.Timing
-	p.PerTransaction = from.PerTransaction
+	p.Parallelism = from.Parallelism
+	p.WorkMem = from.WorkMem
 	p.DisableBlockNumberIndex = from.DisableBlockNumberIndex
 
 	return p

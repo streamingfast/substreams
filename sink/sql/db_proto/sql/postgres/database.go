@@ -7,6 +7,7 @@ import (
 	"hash/fnv"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -414,13 +415,23 @@ func (d *Database) applyConstraints() error {
 
 	collect("pk", d.dialect.PrimaryKeySql, d.constraints.SkipPrimaryKey)
 	collect("unique", d.dialect.UniqueConstraintSql, d.constraints.SkipUnique)
-	collect("fk constraint", d.dialect.ForeignKeySql, d.constraints.SkipForeignKey)
+	keys := pending
 
-	if err := d.runStatements(pending); err != nil {
+	pending = nil
+	collect("fk constraint", d.dialect.ForeignKeySql, d.constraints.SkipForeignKey)
+	foreignKeys := pending
+
+	// Two waves: every key first, then the foreign keys, which need the key they point at
+	// to exist. Inside a wave the relations are independent.
+	if err := d.runStatements([][]statement{keys, foreignKeys}); err != nil {
 		return err
 	}
 
-	d.logger.Info("applying constraints", zap.Int("created", len(pending)), zapx.HumanDuration("duration", time.Since(startAt)))
+	d.logger.Info("applying constraints",
+		zap.Int("created", len(keys)+len(foreignKeys)),
+		zap.Int("parallelism", d.constraints.ConstraintsParallelism()),
+		zap.String("work_mem", d.constraints.WorkMem),
+		zapx.HumanDuration("duration", time.Since(startAt)))
 
 	return nil
 }
@@ -554,49 +565,136 @@ type statement struct {
 	sql  string
 }
 
-// runStatements executes the DDL, committing every ConstraintsPerTransaction of them.
+// workMemPattern is what a maintenance_work_mem value may look like. SET takes no bind
+// parameters, so the value is interpolated and has to be checked rather than escaped.
+var workMemPattern = regexp.MustCompile(`^[0-9]+(kB|MB|GB|TB)?$`)
+
+// runStatements executes the DDL one wave at a time.
+//
+// Statements inside a wave touch independent relations, so they are handed to the server
+// together: ten primary keys on ten tables have no reason to queue behind each other, and
+// the small ones would otherwise wait out the largest. What cannot overlap is a wave
+// boundary — a foreign key needs the key it references to be there — so the caller orders
+// the waves and this only spreads what is inside one.
+//
+// Each statement still commits on its own, which is what keeps the pass restartable: a run
+// that is killed keeps what it finished and the next one carries on.
 //
 // When the caller already has a transaction open — creating the schema does — the
-// statements join it instead: the tables they constrain are not committed yet, so
-// nothing else could see them.
-func (d *Database) runStatements(statements []statement) error {
+// statements join it instead, sequentially: the tables they constrain are not committed
+// yet, so nothing else could see them.
+func (d *Database) runStatements(waves [][]statement) error {
 	if d.tx != nil {
-		for _, s := range statements {
-			d.logger.Info("executing "+s.kind+" statement", zap.String("sql", s.sql))
-			if _, err := d.tx.Exec(s.sql); err != nil {
-				return fmt.Errorf("executing %s statement: %w %s", s.kind, err, s.sql)
+		for _, wave := range waves {
+			for _, s := range wave {
+				d.logger.Info("executing "+s.kind+" statement", zap.String("sql", s.sql))
+				if _, err := d.tx.Exec(s.sql); err != nil {
+					return fmt.Errorf("executing %s statement: %w %s", s.kind, err, s.sql)
+				}
 			}
 		}
 
 		return nil
 	}
 
-	perTransaction := d.constraints.ConstraintsPerTransaction()
+	parallelism := d.constraints.ConstraintsParallelism()
 
-	for start := 0; start < len(statements); start += perTransaction {
-		end := min(start+perTransaction, len(statements))
+	// The pool is sized for a sink that writes from one goroutine; the pass wants one
+	// connection per statement in flight, and gives them back when it is done.
+	if parallelism > maxOpenConnections {
+		d.db.SetMaxOpenConns(parallelism + 1)
+		defer d.db.SetMaxOpenConns(maxOpenConnections)
+	}
 
-		tx, err := d.db.Begin()
-		if err != nil {
-			return fmt.Errorf("beginning a constraint transaction: %w", err)
-		}
-
-		for _, s := range statements[start:end] {
-			startAt := time.Now()
-			d.logger.Info("executing "+s.kind+" statement", zap.String("sql", s.sql))
-
-			if _, err := tx.Exec(s.sql); err != nil {
-				tx.Rollback()
-				return fmt.Errorf("executing %s statement: %w %s", s.kind, err, s.sql)
-			}
-
-			d.logger.Debug("statement done", zap.String("sql", s.sql), zapx.HumanDuration("duration", time.Since(startAt)))
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("committing a constraint transaction: %w", err)
+	for _, wave := range waves {
+		if err := d.runStatementWave(wave, parallelism); err != nil {
+			return err
 		}
 	}
+
+	return nil
+}
+
+// runStatementWave runs one wave, at most parallelism statements at a time, and reports
+// the first failure once the wave has drained.
+func (d *Database) runStatementWave(statements []statement, parallelism int) error {
+	if len(statements) == 0 {
+		return nil
+	}
+
+	var (
+		waitGroup sync.WaitGroup
+		mutex     sync.Mutex
+		failure   error
+	)
+	slots := make(chan struct{}, parallelism)
+
+	for _, s := range statements {
+		waitGroup.Add(1)
+
+		go func(s statement) {
+			defer waitGroup.Done()
+
+			slots <- struct{}{}
+			defer func() { <-slots }()
+
+			// One statement failing does not stop the ones already running, but there is no
+			// point starting the rest: the pass reports the first failure and the operator
+			// runs it again, which skips whatever did land.
+			mutex.Lock()
+			stop := failure != nil
+			mutex.Unlock()
+			if stop {
+				return
+			}
+
+			if err := d.runStatement(s); err != nil {
+				mutex.Lock()
+				if failure == nil {
+					failure = err
+				}
+				mutex.Unlock()
+			}
+		}(s)
+	}
+
+	waitGroup.Wait()
+
+	return failure
+}
+
+// runStatement executes one piece of DDL in a transaction of its own.
+func (d *Database) runStatement(s statement) error {
+	startAt := time.Now()
+	d.logger.Info("executing "+s.kind+" statement", zap.String("sql", s.sql))
+
+	tx, err := d.db.Begin()
+	if err != nil {
+		return fmt.Errorf("beginning a constraint transaction: %w", err)
+	}
+
+	if mem := d.constraints.WorkMem; mem != "" {
+		if !workMemPattern.MatchString(mem) {
+			tx.Rollback()
+			return fmt.Errorf("invalid maintenance_work_mem %q, expected a size such as 512MB", mem)
+		}
+		// SET LOCAL, so it lasts exactly as long as this statement's transaction.
+		if _, err := tx.Exec(fmt.Sprintf("SET LOCAL maintenance_work_mem = '%s'", mem)); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("setting maintenance_work_mem: %w", err)
+		}
+	}
+
+	if _, err := tx.Exec(s.sql); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("executing %s statement: %w %s", s.kind, err, s.sql)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing a constraint transaction: %w", err)
+	}
+
+	d.logger.Debug("statement done", zap.String("sql", s.sql), zapx.HumanDuration("duration", time.Since(startAt)))
 
 	return nil
 }
@@ -661,12 +759,19 @@ func (d *Database) DropConstraints() error {
 	}
 
 	// Foreign keys first, then uniques, then primary keys: a primary key still referenced
-	// by a foreign key cannot be dropped.
+	// by a foreign key cannot be dropped, so each of the three is its own wave.
 	collect("fk constraint", d.dialect.ForeignKeySql)
-	collect("unique constraint", d.dialect.UniqueConstraintSql)
-	collect("pk", d.dialect.PrimaryKeySql)
+	foreignKeys := pending
 
-	return d.runStatements(pending)
+	pending = nil
+	collect("unique constraint", d.dialect.UniqueConstraintSql)
+	uniques := pending
+
+	pending = nil
+	collect("pk", d.dialect.PrimaryKeySql)
+	primaryKeys := pending
+
+	return d.runStatements([][]statement{foreignKeys, uniques, primaryKeys})
 }
 
 // existingConstraintRelations maps every constraint name in the schema to the relation it

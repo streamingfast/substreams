@@ -44,6 +44,9 @@ func (o Options) withDefaults() Options {
 	if o.SegmentMaxBytes <= 0 {
 		o.SegmentMaxBytes = 512 << 20
 	}
+	// A normal segment must fit within the total spool budget. A single row can still
+	// exceed it; that one segment is allowed through once the spool is otherwise empty.
+	o.SegmentMaxBytes = min(o.SegmentMaxBytes, o.MaxBytes)
 	if o.MaxIdle == 0 {
 		o.MaxIdle = 10 * time.Second
 	}
@@ -243,8 +246,10 @@ func (b *Spool) Seal(ctx context.Context) error {
 	b.mutex.Unlock()
 
 	// The quota is checked before the manifest is written rather than after, and against
-	// this segment's own bytes, so the spool never exceeds the budget it was given.
+	// this segment's own bytes. An individually oversized segment cannot be split without
+	// breaking row atomicity, so it is allowed once the spool is otherwise empty.
 	if err := b.awaitQuota(ctx, pending.writer.PendingBytes()); err != nil {
+		pending.writer.Discard()
 		return err
 	}
 
@@ -254,10 +259,7 @@ func (b *Spool) Seal(ctx context.Context) error {
 		return fmt.Errorf("sealing segment %s: %w", pending.dir, err)
 	}
 
-	var bytes int64
-	for _, table := range manifest.Tables {
-		bytes += table.Bytes
-	}
+	bytes := segmentBytes(manifest)
 
 	b.bytesOnDisk.Add(bytes)
 	b.blocksAhead.Add(manifest.BlockCount())
@@ -270,13 +272,28 @@ func (b *Spool) Seal(ctx context.Context) error {
 // awaitQuota blocks until the spool has room for the incoming segment.
 func (b *Spool) awaitQuota(ctx context.Context, incoming int64) error {
 	warned := false
-	for b.bytesOnDisk.Load()+incoming > b.options.MaxBytes {
+	for {
+		onDisk := b.bytesOnDisk.Load()
+		if onDisk+incoming <= b.options.MaxBytes {
+			return nil
+		}
+
+		// A single row or segment cannot be split without breaking row atomicity. Once
+		// previously queued data has drained, allow that one oversized segment through
+		// rather than waiting forever for room it can never fit into.
+		if onDisk == 0 && incoming > b.options.MaxBytes {
+			b.logger.Warn("local spool segment exceeds its disk budget, allowing it because the spool is empty",
+				zap.String("segment", humanBytes(incoming)),
+				zap.String("quota", humanBytes(b.options.MaxBytes)))
+			return nil
+		}
+
 		if err := b.pendingError(); err != nil {
 			return err
 		}
 		if !warned {
 			b.logger.Warn("local spool is full, holding the stream until the database catches up",
-				zap.String("on_disk", humanBytes(b.bytesOnDisk.Load())),
+				zap.String("on_disk", humanBytes(onDisk)),
 				zap.String("quota", humanBytes(b.options.MaxBytes)))
 			warned = true
 		}
@@ -287,8 +304,6 @@ func (b *Spool) awaitQuota(ctx context.Context, incoming int64) error {
 			return ctx.Err()
 		}
 	}
-
-	return nil
 }
 
 // startSegmentLocked opens a new segment. The caller holds mutex.
@@ -511,6 +526,15 @@ func (b *Spool) applyLoop(ctx context.Context) {
 			zap.String("bytes", humanBytes(pending.bytes)),
 			zap.Duration("elapsed", elapsed))
 	}
+}
+
+func segmentBytes(manifest *Manifest) int64 {
+	bytes := manifest.LogBytes
+	for _, table := range manifest.Tables {
+		bytes += table.Bytes
+	}
+
+	return bytes
 }
 
 func humanBytes(n int64) string {

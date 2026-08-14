@@ -80,7 +80,9 @@ func (a *chApplier) Apply(_ context.Context, dir string, manifest *spool.Manifes
 		return fmt.Errorf("parsing the cursor of a spooled segment: %w", err)
 	}
 
-	return a.database.StoreCursor(cursor)
+	// Straight to the file: StoreCursor would route it back into the spool, which is where
+	// this cursor came from.
+	return a.database.storeCursorFile(cursor)
 }
 
 func (a *chApplier) ordinal(table string) int {

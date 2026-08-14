@@ -282,7 +282,7 @@ func (d *Database) openDirectInserter() error {
 //
 // Everything spooled is applied before the switch, so no row is left behind, and the
 // spool is closed for good — a stream that has reached the head does not go back.
-func (d *Database) SwitchToDirectInserts(ctx context.Context, reason string) error {
+func (d *Database) SwitchToDirectInserts(ctx context.Context, reason string, atChainHead bool) error {
 	inserter, ok := d.inserter.(*localBufferInserter)
 	if !ok {
 		return nil
@@ -294,6 +294,18 @@ func (d *Database) SwitchToDirectInserts(ctx context.Context, reason string) err
 
 	if err := inserter.close(ctx); err != nil {
 		return fmt.Errorf("draining the spool: %w", err)
+	}
+
+	if atChainHead {
+		// The drain above applied every segment and removed its directory, so there is
+		// nothing left on disk for a record to answer for. Only a run that carries on past
+		// here bothers: it seals a segment or two on each restart before reaching the head
+		// again, and those records would otherwise pile up for the life of the sink.
+		if err := inserter.applier.clearSegments(ctx); err != nil {
+			// Bookkeeping, and the spool is already drained: the rows are safe either way,
+			// so this is not worth failing the switch over.
+			d.logger.Warn("could not clear the applied-segment records", zap.Error(err))
+		}
 	}
 
 	// The spool is what copy mode is; without it the direct path is the multi-row one.
@@ -968,7 +980,15 @@ func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) (err error) {
 	// parent-child keys and quietly get sibling references wrong.
 	ordered, err := d.dialect.TableApplyOrder()
 	if err != nil {
-		return err
+		// A cyclic foreign key graph has no such order, and refusing here would leave the
+		// sink unable to undo a reorg — or even to start, since Run undoes from the stored
+		// cursor — on exactly the schema row-insert mode exists to support. The deletes all
+		// run in one transaction and key on _block_number_ alone, so a stable arbitrary
+		// order is right wherever the references are absent, and where a cycle really is
+		// enforced no order would have worked either.
+		d.logger.Debug("the schema's tables cannot be ordered by their foreign keys, undoing in schema order",
+			zap.Error(err))
+		ordered = d.dialect.TableNames()
 	}
 
 	var rowsAffected int64

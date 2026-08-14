@@ -157,3 +157,18 @@ func TestTableApplyOrder(t *testing.T) {
 		}
 	})
 }
+
+// TestTableNamesCoversEverySchemaTable is what the reorg path falls back to when the
+// foreign keys cannot be ordered. It has to name every table, or an undo would leave rows
+// of the ones it skipped behind.
+func TestTableNamesCoversEverySchemaTable(t *testing.T) {
+	dialect := dialectWith(
+		[]string{"orders", "customers"},
+		map[string]string{"orders": "customers", "customers": "orders"},
+	)
+
+	_, err := dialect.TableApplyOrder()
+	require.Error(t, err, "the schema is cyclic on purpose")
+
+	assert.Equal(t, []string{DialectTableBlock, "customers", "orders"}, dialect.TableNames())
+}

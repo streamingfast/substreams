@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	sink "github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/postgres/pgcopy"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/spool"
 	"go.uber.org/zap"
@@ -30,8 +31,9 @@ type pgApplier struct {
 	// manifest so that segments written by an earlier build still apply correctly.
 	copyRanks map[string]int
 
-	// applied is the segments table read once, on the first recovery question.
-	applied map[uint64]bool
+	// applied is the segments table read once, on the first recovery question: first block
+	// to last block of every segment the database already holds.
+	applied map[uint64]uint64
 }
 
 func newPGApplier(pool *pgxpool.Pool, schema string, copyRanks map[string]int, logger *zap.Logger) *pgApplier {
@@ -72,6 +74,46 @@ func (a *pgApplier) EnsureSchema(ctx context.Context) error {
 
 	if _, err := a.pool.Exec(ctx, statement); err != nil {
 		return fmt.Errorf("creating the applied-segments table: %w", err)
+	}
+
+	return a.dropSegmentsPastCursor(ctx)
+}
+
+// dropSegmentsPastCursor removes the segment records the stored cursor does not cover.
+//
+// The cursor is what a restart resumes from, and Run undoes every row above it before a
+// block arrives — so a record reaching past it describes rows that are no longer there.
+// Left in place it answers AlreadyApplied for the segment carrying exactly those rows,
+// which recovery then discards while replaying the segments behind it, moving the cursor
+// over a gap it just created.
+//
+// Segments sealed before the cursor covering them was recorded are how such a record came
+// about, which no longer happens; this also clears the ones a database synced by an earlier
+// build is still carrying.
+func (a *pgApplier) dropSegmentsPastCursor(ctx context.Context) error {
+	var stored string
+	err := a.pool.QueryRow(ctx, fmt.Sprintf(`SELECT cursor FROM %s WHERE name = 'cursor'`,
+		pgx.Identifier{a.schema, "_cursor_"}.Sanitize())).Scan(&stored)
+	if err != nil {
+		// No cursor yet means nothing has been applied, so there is nothing to contradict.
+		return nil
+	}
+
+	cursor, err := sink.NewCursor(stored)
+	if err != nil || cursor.IsBlank() {
+		//nolint:nilerr // an unreadable cursor is not this pass's to report
+		return nil
+	}
+
+	tag, err := a.pool.Exec(ctx, fmt.Sprintf(`DELETE FROM %s WHERE last_block > $1`, a.segmentsTable()),
+		cursor.Block().Num())
+	if err != nil {
+		return fmt.Errorf("dropping the segment records past the stored cursor: %w", err)
+	}
+
+	if tag.RowsAffected() > 0 {
+		a.logger.Info("dropped segment records the stored cursor does not cover",
+			zap.Int64("dropped", tag.RowsAffected()), zap.Uint64("cursor_block", cursor.Block().Num()))
 	}
 
 	return nil
@@ -182,26 +224,47 @@ func (a *pgApplier) AlreadyApplied(ctx context.Context, manifest *spool.Manifest
 		a.applied = applied
 	}
 
-	return a.applied[manifest.FirstBlock], nil
+	// Both ends have to match. Segments are keyed by their first block, but the block a
+	// segment ends on is whatever the sizer settled on at the time, so a range re-streamed
+	// after its segment was discarded comes back starting at the same block and ending
+	// somewhere else. Answering from the first block alone would call that one applied and
+	// drop every row it carries.
+	lastBlock, found := a.applied[manifest.FirstBlock]
+
+	return found && lastBlock == manifest.LastBlock, nil
 }
 
-// appliedSegments returns the first_block of every segment already in the database, so
+// appliedSegments returns the block range of every segment already in the database, so
 // recovery can tell what still needs replaying.
-func (a *pgApplier) appliedSegments(ctx context.Context) (map[uint64]bool, error) {
-	rows, err := a.pool.Query(ctx, fmt.Sprintf(`SELECT first_block FROM %s`, a.segmentsTable()))
+func (a *pgApplier) appliedSegments(ctx context.Context) (map[uint64]uint64, error) {
+	rows, err := a.pool.Query(ctx, fmt.Sprintf(`SELECT first_block, last_block FROM %s`, a.segmentsTable()))
 	if err != nil {
 		return nil, fmt.Errorf("listing applied segments: %w", err)
 	}
 	defer rows.Close()
 
-	applied := map[uint64]bool{}
+	applied := map[uint64]uint64{}
 	for rows.Next() {
-		var firstBlock uint64
-		if err := rows.Scan(&firstBlock); err != nil {
+		var firstBlock, lastBlock uint64
+		if err := rows.Scan(&firstBlock, &lastBlock); err != nil {
 			return nil, fmt.Errorf("scanning an applied segment: %w", err)
 		}
-		applied[firstBlock] = true
+		applied[firstBlock] = lastBlock
 	}
 
 	return applied, rows.Err()
+}
+
+// clearSegments empties the bookkeeping table.
+//
+// It is only ever called once the spool has been drained and closed, which leaves no
+// segment on disk for a record to answer for: the records exist to tell recovery whether a
+// directory it found was already applied, and there are no directories left.
+func (a *pgApplier) clearSegments(ctx context.Context) error {
+	if _, err := a.pool.Exec(ctx, fmt.Sprintf(`DELETE FROM %s`, a.segmentsTable())); err != nil {
+		return fmt.Errorf("clearing the applied-segments table: %w", err)
+	}
+	a.applied = nil
+
+	return nil
 }

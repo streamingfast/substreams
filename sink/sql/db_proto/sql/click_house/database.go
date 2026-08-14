@@ -195,7 +195,7 @@ func (d *Database) clientNoCache(dsn *db.DSN) (*ch.Client, error) {
 // The spool trades freshness for throughput, which is what a backfill wants and the
 // opposite of what a sink at the chain head wants, where a block should be queryable when
 // it arrives rather than when the segment it lands in is full.
-func (d *Database) SwitchToDirectInserts(ctx context.Context, reason string) error {
+func (d *Database) SwitchToDirectInserts(ctx context.Context, reason string, _ bool) error {
 	if d.spool == nil {
 		return nil
 	}
@@ -330,11 +330,20 @@ func (d *Database) VerifySchemaCompatibility(ctx context.Context) error {
 // rowIDColumnByTable reports, for every table of the schema that exists in ClickHouse,
 // whether it carries the _row_id_ column. An absent schema yields an empty map rather
 // than an error: nothing is set up yet, so there is nothing to disagree with.
+//
+// It connects to 'default' rather than to the schema, for the same reason CreateDatabase
+// does: this runs before the database exists on a first run, and dialing one that is not
+// there never comes back — newClient retries a failed dial forever. system.columns is
+// global, so which database the connection names does not change the answer.
 func (d *Database) rowIDColumnByTable(ctx context.Context) (map[string]bool, error) {
-	client, err := d.client()
+	dsn := d.dsn.Clone()
+	dsn.Database = "default"
+
+	client, err := d.clientNoCache(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("getting clickhouse client: %w", err)
 	}
+	defer client.Close()
 
 	var (
 		tables  chproto.ColStr
@@ -403,13 +412,10 @@ func (d *Database) Flush() (time.Duration, error) {
 
 	startFlush := time.Now()
 
-	// With a spool a flush only seals a segment once it is big enough; the write to
-	// ClickHouse happens later, on the applier's goroutine.
+	// With a spool the rows are already on disk and the write to ClickHouse happens later,
+	// on the applier's goroutine. The segment is sealed when the cursor covering it is
+	// recorded, which happens after this.
 	if d.spool != nil {
-		if err := d.spool.MaybeSeal(d.ctx); err != nil {
-			return 0, fmt.Errorf("sealing: %w", err)
-		}
-
 		return time.Since(startFlush), nil
 	}
 
@@ -424,9 +430,16 @@ func (d *Database) GetDialect() sql.Dialect {
 	return d.dialect
 }
 
+// InsertBlock writes the block row through the same path as every other row.
+//
+// It must not reach the accumulator directly: with a spool open that instance belongs to
+// the applier's goroutine, so appending to it from here is an unsynchronised write to the
+// map the applier swaps out on every flush. Going through Insert is also what tells the
+// spool which block the rows now being written belong to, without which a segment records
+// no block range at all.
 func (d *Database) InsertBlock(blockNum uint64, hash string, timestamp time.Time) error {
 	d.logger.Debug("inserting _block_", zap.Uint64("block_num", blockNum), zap.String("block_hash", hash))
-	err := d.inserter.insert("_blocks_", []any{blockNum, hash, timestamp, time.Now().UnixNano(), false})
+	err := d.Insert(sql.DialectTableBlock, []any{blockNum, hash, timestamp, time.Now().UnixNano(), false})
 	if err != nil {
 		return fmt.Errorf("inserting block %d: %w", blockNum, err)
 	}
@@ -512,9 +525,22 @@ func (d *Database) StoreCursor(cursor *sink.Cursor) error {
 	if d.spool != nil {
 		d.spool.RecordCursor(cursor.String())
 
-		return nil
+		// Sealed here rather than at flush, the cursor being the last thing a flush writes:
+		// sealing before it would close the segment on the cursor the previous flush stored,
+		// leaving it to claim a range its own cursor does not cover.
+		return d.spool.MaybeSeal(d.ctx)
 	}
 
+	return d.storeCursorFile(cursor)
+}
+
+// storeCursorFile writes the cursor where the next run reads it back.
+//
+// It is what the applier calls once a segment has reached the server. Going through
+// StoreCursor would hand the cursor straight back to the spool it just came out of —
+// leaving the file untouched for the whole backfill, and stamping an already-applied
+// cursor over the newer one on the segment still being written.
+func (d *Database) storeCursorFile(cursor *sink.Cursor) error {
 	if d.cursorFilePath == "" {
 		return fmt.Errorf("cursor file path is not set")
 	}

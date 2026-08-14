@@ -159,7 +159,7 @@ func TestDbProtoPostgresSwitchToDirectInserts(t *testing.T) {
 	write(1, "customer-1")
 	require.Zero(t, countCustomers(), "a buffered write must not have reached the database yet")
 
-	require.NoError(t, database.SwitchToDirectInserts(ctx, "stream reached the chain head"))
+	require.NoError(t, database.SwitchToDirectInserts(ctx, "stream reached the chain head", true))
 	require.Equal(t, 1, countCustomers(), "the switch drains what the buffer was holding")
 
 	write(2, "customer-2")
@@ -168,4 +168,75 @@ func TestDbProtoPostgresSwitchToDirectInserts(t *testing.T) {
 	segments, err := filepath.Glob(filepath.Join(bufferDir, testSchema, "seg-*"))
 	require.NoError(t, err)
 	require.Empty(t, segments, "the buffer is closed for good, nothing accumulates in it")
+}
+
+// TestDbProtoPostgresClearsSegmentRecordsAtTheChainHead covers the bookkeeping a sink that
+// stays live would otherwise accumulate forever.
+//
+// Every segment applied records a row, and nothing was ever removing them. Reaching the
+// head drains the spool and closes it for good, which leaves no directory on disk for a
+// record to answer for — so that is where they go. A run that ends instead keeps them,
+// having no next restart to grow them.
+func TestDbProtoPostgresClearsSegmentRecordsAtTheChainHead(t *testing.T) {
+	outputMessageDescriptor := (*pbrelations.Output)(nil).ProtoReflect().Descriptor()
+	postgresContainer := sharedDbChangesPostgresContainer
+	ctx := context.Background()
+
+	testSchema := "segment_records_at_head"
+	createPostgresTestSchema(t, postgresContainer.ConnectionString, testSchema)
+
+	options := db_proto.SinkerFactoryOptions{
+		UseProtoOption:  true,
+		Constraints:     protosql.DisableAllConstraints(),
+		UseTransactions: true,
+		DecodeBatchSize: 1,
+		// One byte of segment, so every write seals and records one.
+		Spool: &spool.Options{Dir: t.TempDir(), SegmentMaxBytes: 1},
+	}.Defaults()
+
+	database, err := db_proto.SetupDatabaseSchema(ctx, postgresContainer.ConnectionString, testSchema, defaultOutputModuleName, outputMessageDescriptor, options, logger, tracer)
+	require.NoError(t, err)
+	require.NoError(t, database.Open())
+	defer database.Close(ctx)
+
+	db, err := sql.Open("postgres", postgresContainer.ConnectionString)
+	require.NoError(t, err)
+	dbx := sqlx.NewDb(db, "postgres").Unsafe()
+	defer dbx.Close()
+
+	countIn := func(table string) int {
+		var out int
+		require.NoError(t, dbx.Get(&out, fmt.Sprintf(`SELECT count(*) FROM "%s"."%s"`, testSchema, table)))
+
+		return out
+	}
+
+	write := func(blockNum uint64, customerID string) {
+		t.Helper()
+
+		require.NoError(t, database.BeginTransaction())
+		require.NoError(t, database.InsertBlock(blockNum, fmt.Sprintf("%da", blockNum), fixedBaseTime))
+		require.NoError(t, database.Insert("customers", []any{blockNum, fixedBaseTime, customerID, "name"}))
+		cursor := bstream.Cursor{
+			Step:      bstream.StepNewIrreversible,
+			Block:     bstream.NewBlockRef(fmt.Sprintf("%da", blockNum), blockNum),
+			HeadBlock: bstream.NewBlockRef(fmt.Sprintf("%da", blockNum), blockNum),
+			LIB:       bstream.NewBlockRef(fmt.Sprintf("%da", blockNum), blockNum),
+		}
+		sinkCursor, err := sink.NewCursor(cursor.ToOpaque())
+		require.NoError(t, err)
+		require.NoError(t, database.StoreCursor(sinkCursor))
+		_, err = database.Flush()
+		require.NoError(t, err)
+		require.NoError(t, database.CommitTransaction())
+	}
+
+	write(1, "customer-1")
+	write(2, "customer-2")
+	require.Positive(t, countIn("_segments_"), "a spooled backfill has to be recording the segments it applies")
+
+	require.NoError(t, database.SwitchToDirectInserts(ctx, "stream reached the chain head", true))
+
+	require.Zero(t, countIn("_segments_"), "reaching the head clears what the spool recorded")
+	require.Equal(t, 2, countIn("customers"), "clearing the bookkeeping must not touch the rows")
 }

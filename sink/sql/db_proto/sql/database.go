@@ -51,7 +51,11 @@ type Database interface {
 	// that never buffered. The reason is what the caller knows and the database does not
 	// — reaching the chain head, or reaching the end of a bounded range — and it is what
 	// the switch reports, so the log does not claim a head the stream never saw.
-	SwitchToDirectInserts(ctx context.Context, reason string) error
+	// atChainHead says the sink carries on from here rather than exiting, which is what
+	// makes the spool's own bookkeeping worth clearing: a run that stays live seals a
+	// segment or two on every restart and would otherwise accumulate their records for as
+	// long as it lives.
+	SwitchToDirectInserts(ctx context.Context, reason string, atChainHead bool) error
 	// WalkMessageDescriptorAndInsert reads the message through protoreflect only, so it
 	// does not care which dynamic implementation produced it — dynamicpb and hyperpb are
 	// both accepted, and the decoder picks.

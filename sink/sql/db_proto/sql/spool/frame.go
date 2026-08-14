@@ -5,12 +5,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"os"
 )
-
-// recordSize bounds a single framed record, so a corrupt length cannot make recovery
-// allocate an arbitrary amount before the length check has a chance to reject the file.
-const recordSize = 64 << 20
 
 // FrameWriter writes length-prefixed records.
 //
@@ -33,6 +30,12 @@ func NewFrameWriter(file *os.File) *FrameWriter {
 // WriteRecord appends one record made of the given fields, each length-prefixed.
 func (w *FrameWriter) WriteRecord(fields ...string) error {
 	for _, field := range fields {
+		// The prefix is four bytes, so a longer field would be written with a truncated
+		// length and read back as a shorter one — a segment that looks intact and is not.
+		if int64(len(field)) > math.MaxUint32 {
+			return fmt.Errorf("a field of %d bytes cannot be framed, the length prefix holds at most %d", len(field), int64(math.MaxUint32))
+		}
+
 		binary.BigEndian.PutUint32(w.header[:], uint32(len(field)))
 		if _, err := w.writer.Write(w.header[:]); err != nil {
 			return err
@@ -63,6 +66,12 @@ type FrameReader struct {
 	file   *os.File
 	reader *bufio.Reader
 	header [4]byte
+
+	// remaining is what is left of the file, and is what bounds a record's declared
+	// length. A fixed ceiling here used to reject rows the writer had accepted, which no
+	// restart could get past: the segment verified, failed to apply, and was replayed
+	// again on the next start.
+	remaining int64
 }
 
 func OpenFrameReader(path string) (*FrameReader, error) {
@@ -71,7 +80,13 @@ func OpenFrameReader(path string) (*FrameReader, error) {
 		return nil, err
 	}
 
-	return &FrameReader{file: file, reader: bufio.NewReaderSize(file, 1<<20)}, nil
+	info, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return nil, fmt.Errorf("sizing %s: %w", path, err)
+	}
+
+	return &FrameReader{file: file, reader: bufio.NewReaderSize(file, 1<<20), remaining: info.Size()}, nil
 }
 
 func (r *FrameReader) Close() error { return r.file.Close() }
@@ -82,15 +97,22 @@ func (r *FrameReader) ReadField() (string, error) {
 		return "", err
 	}
 
+	r.remaining -= int64(len(r.header))
+
+	// A record cannot be longer than what is left of the file holding it. That is what
+	// catches a corrupt length before it allocates, and it is the whole of the bound: a
+	// record the writer produced always fits, and the row it came from was already held
+	// whole in memory to be written.
 	size := binary.BigEndian.Uint32(r.header[:])
-	if size > recordSize {
-		return "", fmt.Errorf("record of %d bytes exceeds the %d byte limit", size, recordSize)
+	if int64(size) > r.remaining {
+		return "", fmt.Errorf("a record of %d bytes does not fit in the %d bytes left of the file", size, r.remaining)
 	}
 
 	field := make([]byte, size)
 	if _, err := io.ReadFull(r.reader, field); err != nil {
 		return "", fmt.Errorf("reading a %d byte record: %w", size, err)
 	}
+	r.remaining -= int64(size)
 
 	return string(field), nil
 }

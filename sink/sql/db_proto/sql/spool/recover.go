@@ -88,7 +88,13 @@ func (b *Spool) recover(ctx context.Context) error {
 		}
 
 		if err := b.applier.Apply(ctx, dir, manifest); err != nil {
-			return fmt.Errorf("replaying segment %s: %w", dir, err)
+			// Left to fail, because a segment the database refuses says something is wrong
+			// with the rows or the schema, and dropping it quietly would hide that. It
+			// does mean the sink cannot start until the cause is dealt with, so the way
+			// out has to be said out loud rather than worked out from a stack trace.
+			return fmt.Errorf("replaying segment %s: %w. The sink cannot start while it is there. "+
+				"Deleting that directory drops the %d block(s) it holds, which are then streamed again from the stored cursor",
+				dir, err, manifest.BlockCount())
 		}
 		os.RemoveAll(dir)
 		replayed++

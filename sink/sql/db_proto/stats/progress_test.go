@@ -103,3 +103,41 @@ func TestProgressResumeBlockAvoidsStartupBacklog(t *testing.T) {
 	require.Equal(t, 1, logs.Len())
 	assert.Equal(t, zapcore.InfoLevel, logs.All()[0].Level, "resuming mid-chain is not a backlog")
 }
+
+// TestFallingBehindMeasuresTheSpoolAgainstItsQuota covers the warning that fired through
+// the whole sparse start of every large backfill.
+//
+// A block count cannot say whether a spool is coping: the early blocks of a chain carry
+// almost no rows, so the spool spans millions of them holding a few hundred kilobytes of
+// an eight gigabyte budget. What says it is how full the spool is against what it was
+// given.
+func TestFallingBehindMeasuresTheSpoolAgainstItsQuota(t *testing.T) {
+	t.Run("a huge block span holding almost nothing is not behind", func(t *testing.T) {
+		progress := NewProgress(10)
+		progress.SetBufferQuota(8 << 30)
+		progress.RecordApplied(1)
+		progress.RecordDownloaded(5_000_000)
+		progress.RecordBuffered(4_999_999, 150<<10)
+
+		require.False(t, progress.fallingBehind(progress.BlocksAhead()))
+	})
+
+	t.Run("past half the quota is behind", func(t *testing.T) {
+		progress := NewProgress(10)
+		progress.SetBufferQuota(8 << 30)
+		progress.RecordApplied(1)
+		progress.RecordDownloaded(1000)
+		progress.RecordBuffered(999, 5<<30)
+
+		require.True(t, progress.fallingBehind(progress.BlocksAhead()))
+	})
+
+	t.Run("without a spool the block count still decides", func(t *testing.T) {
+		progress := NewProgress(10)
+		progress.RecordApplied(1)
+		progress.RecordDownloaded(5000)
+		progress.RecordBuffered(4999, 0)
+
+		require.True(t, progress.fallingBehind(progress.BlocksAhead()))
+	})
+}

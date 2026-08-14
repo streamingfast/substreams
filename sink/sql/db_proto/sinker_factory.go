@@ -42,6 +42,10 @@ type SinkerFactoryOptions struct {
 	Clickhouse SinkerFactoryClickhouse
 }
 
+// defaultSpoolMaxBytes mirrors the spool's own default, for the one place that has to know
+// the quota before the spool is built.
+const defaultSpoolMaxBytes int64 = 8 << 30
+
 type SinkerFactoryClickhouse struct {
 	SinkInfoFolder  string
 	CursorFilePath  string
@@ -91,6 +95,18 @@ func SinkerFactory(
 
 		warnAboutMissingConstraints(database, options.Constraints, logger)
 
+		stats := stats2.NewStats(logger, options.DecodeBatchSize)
+		if options.Spool != nil {
+			// What "falling behind" is measured against once rows go to disk. A block count
+			// cannot say it: a sparse backfill spans millions of blocks holding almost
+			// nothing, and would report itself as behind from the first minute.
+			quota := options.Spool.MaxBytes
+			if quota <= 0 {
+				quota = defaultSpoolMaxBytes
+			}
+			stats.Progress.SetBufferQuota(quota)
+		}
+
 		return NewSinker(
 			rootMessageDescriptor,
 			baseSink,
@@ -99,7 +115,7 @@ func SinkerFactory(
 			options.Constraints,
 			options.DecodeBatchSize,
 			options.DecodeWorkers,
-			stats2.NewStats(logger, options.DecodeBatchSize),
+			stats,
 			logger,
 		), nil
 	}
@@ -331,7 +347,9 @@ func warnAboutMissingConstraints(database protosql.Database, constraints protosq
 
 	next := "run `sink postgres constraints apply <manifest>` when a maintenance window suits"
 	if constraints.ApplyAtHead() {
-		next = "they will be created once the backfill reaches chain HEAD"
+		// Only reaching the head creates them, and a run given a stop block may well never
+		// get there — saying they "will be created" would then be a promise nothing keeps.
+		next = "they are created once the stream reaches chain HEAD; a run that stops before that leaves them to `sink postgres constraints apply <manifest>`"
 	}
 
 	logger.Warn("the schema is missing constraints it is meant to have, so its tables have no indexes to match and reject nothing. "+next,

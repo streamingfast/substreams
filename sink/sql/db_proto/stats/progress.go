@@ -26,8 +26,15 @@ type Progress struct {
 	peakBlocksAhead atomic.Uint64
 
 	// warnAboveBlocks is the gap past which the buffer is reported as a problem rather
-	// than as the normal working set.
+	// than as the normal working set. It only decides anything while nothing spools: a
+	// block count says how much memory is held when the blocks are held in memory.
 	warnAboveBlocks uint64
+
+	// bufferQuota is the spool's disk budget, zero when nothing spools. Once rows go to
+	// disk the block count stops meaning anything — a sparse backfill spans millions of
+	// blocks holding a few hundred kilobytes — and how full the spool is against what it
+	// was given is the thing that says whether the database is keeping up.
+	bufferQuota int64
 }
 
 // NewProgress returns a tracker whose "falling behind" threshold is derived from the
@@ -39,6 +46,23 @@ func NewProgress(blockBatchSize int) *Progress {
 	}
 
 	return &Progress{warnAboveBlocks: warnAbove}
+}
+
+// SetBufferQuota records the spool's disk budget, which is what "falling behind" is
+// measured against once rows are buffered on disk.
+func (p *Progress) SetBufferQuota(bytes int64) { p.bufferQuota = bytes }
+
+// fallingBehind reports a buffer that has stopped looking like a working set.
+//
+// With a spool that is a share of the disk budget it was given, not a number of blocks:
+// the budget is the whole point of the spool, and the operator set it. Without one, the
+// blocks are held in memory and their count is what matters.
+func (p *Progress) fallingBehind(ahead uint64) bool {
+	if p.bufferQuota > 0 {
+		return p.bufferedBytes.Load()*2 >= p.bufferQuota
+	}
+
+	return ahead > p.warnAboveBlocks
 }
 
 // RecordDownloaded notes a block received from the stream.
@@ -118,8 +142,8 @@ func (p *Progress) Log(logger *zap.Logger) {
 		fields = append(fields, zap.String("buffered_on_disk", humanBytes(buffered)))
 	}
 
-	if ahead > p.warnAboveBlocks {
-		logger.Warn("database is falling behind the stream, blocks are piling up in the buffer", fields...)
+	if p.fallingBehind(ahead) {
+		logger.Warn("database is falling behind the stream, the buffer is over half of what it was given", fields...)
 		return
 	}
 

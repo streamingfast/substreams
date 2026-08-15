@@ -181,6 +181,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Added Ethereum Hoodi testnet (`hoodi`) StreamingFast endpoints (`hoodi.eth.streamingfast.io:443`).
 
+- A packed `.spkg` now records the initial block of *every* module under *every* network it declares, along with the
+  effective params of every module accepting them, instead of only the values explicitly written in the manifest's
+  `networks:` section. A consumer such as substreams.dev can describe what the package does on each of its networks
+  without reimplementing the module-graph derivation. For a 20-module package supporting 10 networks this adds roughly
+  3 KB.
+
+- Fixed: switching networks on a packed `.spkg` no longer leaves modules that inherit their initial block pinned to the
+  network that was active when the package was packed. Only modules named explicitly under `networks:` were being
+  overridden, and the derivation that would have updated the others had already been baked in at pack time, so a package
+  packed on `mainnet` and run with `--network sepolia` silently kept `mainnet` start blocks for every derived module.
+  Packages published before this release need to be repacked from source: the information needed to correct them is not
+  recoverable from the artifact.
+
+- `substreams pack`, `substreams registry publish` and `substreams registry verify` warn when a network name is not a
+  known Firehose network registry ID or alias, or when it is an alias resolving to several networks — consumers cannot
+  map such a name onto a real chain. It stays a warning, never an error, so private and unlisted chains keep publishing.
+
+- `substreams info` gained `--network`, to inspect a package as any of the networks it declares rather than only its
+  default one, and `--expand-networks`, to list the initial block and params of every module under every network. The
+  `Networks` section is summarized to one line per network by default, since a package supporting many networks now
+  carries an entry per module per network.
+
 ### Server
 
 - `substreams-tier1` restarts when its block hub can no longer link incoming live blocks, instead of hanging every

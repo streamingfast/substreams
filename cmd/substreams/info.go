@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/streamingfast/cli"
@@ -20,9 +22,65 @@ func init() {
 	infoCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
 	infoCmd.Flags().Bool("used-modules-only", false, "When set, only modules that are used by the output module will be displayed (requires the output_module arg to be set)")
 	infoCmd.Flags().Bool("summarize-hash-types", false, "When set, will also print the hash of the modules, grouped by type and their dependencies on stores")
+	infoCmd.Flags().Bool("expand-networks", false, "When set, lists the initial block and params of every module under every network instead of a summary")
+	infoCmd.Flags().String("network", "", "Specify the network to use for params and initialBlocks, overriding the 'network' field in the substreams package")
 
 	infoCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 
+}
+
+// renderNetworks renders the 'Networks' section of 'substreams info'. Because a packaged Substreams
+// carries the initial block and params of every module under every network, the expanded form grows
+// with the product of the two, so it is summarized unless explicitly asked for.
+func renderNetworks(defaultNetwork string, networks map[string]*manifest.NetworkParams, expand bool) string {
+	out := &strings.Builder{}
+	out.WriteString("Networks:\n")
+
+	for _, network := range slices.Sorted(maps.Keys(networks)) {
+		params := networks[network]
+
+		label := network
+		if network == defaultNetwork {
+			label += " (default)"
+		}
+
+		if !expand {
+			fmt.Fprintf(out, "  %s: %s, %s\n", label,
+				pluralize(len(params.InitialBlocks), "initial block"),
+				pluralize(len(params.Params), "param"),
+			)
+			continue
+		}
+
+		fmt.Fprintf(out, "  %s:\n", label)
+		if len(params.InitialBlocks) > 0 {
+			out.WriteString("    Initial Blocks:\n")
+			for _, mod := range slices.Sorted(maps.Keys(params.InitialBlocks)) {
+				fmt.Fprintf(out, "      - %s: %d\n", mod, params.InitialBlocks[mod])
+			}
+		}
+		if len(params.Params) > 0 {
+			out.WriteString("    Params:\n")
+			for _, mod := range slices.Sorted(maps.Keys(params.Params)) {
+				fmt.Fprintf(out, "      - %s: %q\n", mod, params.Params[mod])
+			}
+		}
+		out.WriteString("\n")
+	}
+
+	if !expand {
+		out.WriteString("\n  Use --expand-networks to see the per-module values.\n")
+	}
+
+	return out.String()
+}
+
+func pluralize(count int, singular string) string {
+	if count == 1 {
+		return fmt.Sprintf("%d %s", count, singular)
+	}
+
+	return fmt.Sprintf("%d %ss", count, singular)
 }
 
 var infoCmd = &cobra.Command{
@@ -60,6 +118,8 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	skipPackageValidation := sflags.MustGetBool(cmd, "skip-package-validation")
 	onlyShowUsedModules := sflags.MustGetBool(cmd, "used-modules-only")
 	summarizeHashTypes := sflags.MustGetBool(cmd, "summarize-hash-types")
+	expandNetworks := sflags.MustGetBool(cmd, "expand-networks")
+	overrideNetwork := sflags.MustGetString(cmd, "network")
 
 	if onlyShowUsedModules && outputModule == "" {
 		return fmt.Errorf("used-modules-only flag requires the output_module arg to be set")
@@ -70,6 +130,9 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	}
 	if skipPackageValidation {
 		opts = append(opts, manifest.SkipPackageValidationReader())
+	}
+	if overrideNetwork != "" {
+		opts = append(opts, manifest.WithOverrideNetwork(overrideNetwork))
 	}
 
 	requestParams := sflags.MustGetStringArray(cmd, "params")
@@ -170,23 +233,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	if pkgInfo.Networks != nil {
-		fmt.Println("Networks:")
-		for network, params := range pkgInfo.Networks {
-			fmt.Printf("  %s:\n", network)
-			if params.InitialBlocks != nil {
-				fmt.Println("    Initial Blocks:")
-			}
-			for mod, start := range params.InitialBlocks {
-				fmt.Printf("      - %s: %d\n", mod, start)
-			}
-			if params.Params != nil {
-				fmt.Println("    Params:")
-			}
-			for mod, p := range params.Params {
-				fmt.Printf("      - %s: %q\n", mod, p)
-			}
-			fmt.Println("")
-		}
+		fmt.Print(renderNetworks(pkgInfo.Network, pkgInfo.Networks, expandNetworks))
 	}
 
 	var mappersDependingOnStores []string

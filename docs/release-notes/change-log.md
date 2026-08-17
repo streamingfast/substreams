@@ -180,7 +180,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be
   linked, and the head-block metrics keep tracking the live source, so the process looked healthy throughout.
 
-- `substreams-tier1` no longer leaves a request silent when its cursor names a block the hub declines. The hub declines a cursor whose block ID it has never seen, and the cursor resolver then fell back to a file source that cannot start until the merged-blocks bundle covering that block number is written — about twenty minutes on a chain bundling 100 blocks, and a failure once it got there anyway. Such a cursor now resolves immediately to the undo-to-LIB the file source would have led to, so the client gets its `BlockUndoSignal` and keeps streaming. A cursor above the hub's head is left apart: the block exists and this instance has not reached it (a client reconnecting to an instance behind the one that served it), so it is waited out briefly and then reported with `Unavailable`, which is retryable, rather than reverting a sink that is ahead of us.
+- `substreams-tier1` no longer hangs when a request has a cursor that the hub declines (unknown hash). Instead of failing
+  back to a file source that waits for merged-blocks to cover that number, it now immediately sends an undo-to-LIB. 
 
 ### Library
 

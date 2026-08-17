@@ -20,6 +20,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   there and every query against those columns matched nothing. Databases populated by an affected version need the
   affected range re-synced, and anything downstream built against the corrupted form breaks.
 
+- Fixed: **BREAKING** `substreams sink postgres` in Relational Mappings Mode no longer doubles backslashes when
+  rendering string literals. With `standard_conforming_strings` on — the server default since PostgreSQL 9.1 — the
+  INSERT paths stored two backslashes where the value had one, affecting `string` columns, enum names and every
+  JSON-rendered message column (protojson output is backslash-heavy). New rows store the value verbatim, so a database
+  populated by an affected version holds the doubled form below the resume point and the correct form above it, and a
+  consumer written to un-escape the old form breaks at that boundary. Re-sync the affected range to converge on one
+  form.
+
+- **BREAKING** Timestamp columns written through binary COPY — the default write mode on PostgreSQL — keep their full
+  microsecond precision. Previous versions rendered timestamps as RFC3339 and truncated them to the whole second, and
+  the rendered `batch-insert` / `row-insert` modes still do. Rows written before the upgrade (or through a rendered
+  mode) are second-precision while COPY-written rows are not, so equality joins or comparisons against pre-existing
+  rows on a `TIMESTAMP` column can stop matching on sub-second values.
+
+- **automatic postgres index**: **BREAKING** Added an automatic index on `_block_number_` for every postgres table
+  (Relational Mappings Mode) for undo performance. It is built when the sink starts — `CREATE INDEX CONCURRENTLY`, one
+  table at a time — including on a pre-existing database populated by an earlier version, so the first start after the
+  upgrade builds the indexes over the existing data before streaming, and a failed build stops the sink. Pass
+  `--disable-block-number-index` to keep the previous behavior of not having these indexes.
+  **Running this new version on a db populated by an earlier version will create the indexes on startup**
+
 - **spool**: Major speed improvement (+10x) for Relational Mappings Mode (`substreams sink postgres` and `substreams sink clickhouse`):
   rows are now written to disk (spool) first and loaded them from a background goroutine, one segment at a time. 
   The stream no longer waits on the database (up to the size of the spool directory).
@@ -52,8 +73,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   Manual creation is done with : `substreams sink postgres constraints apply <manifest>`, which can be tweaked with:
   `--constraints-parallelism`, `--constraints-work-mem`.
   Both automatic and manual creation can be controlled with `--disable-foreign-keys`, `--disable-primary-keys=<tables|all>`, `--disable-unique-constraints=<tables|all>`.
-
-- **automatic postgres index**: Added an automatic index on _block_number_ for every postgres table (Relational Mappings Mode) for undo performance, unless `--disable-block-number-index` is set to true.
 
 - **automatic clickhouse schema**: `substreams sink clickhouse` now accepts a package whose output proto carries no schema annotations.
   Both `setup` and the run refused it outright ("clickhouse table options for table X don't have any 'order_by_fields'"), they now default to:
@@ -192,6 +211,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Bumped notably `github.com/ClickHouse/clickhouse-go/v2` to v2.48.0, `github.com/AfterShip/clickhouse-sql-parser` to
   v0.5.5, `google.golang.org/grpc` to v1.83.0 and the OpenTelemetry SDK to v1.45.0.
+
+### Summary of changed flags and subcommands
+
+#### ADDED (relational-mappings `run` unless noted)
+--write-mode                  auto|copy|batch-insert|row-insert; auto = copy on PG, batch-insert on CH
+--decode-workers              0 = auto (min(8, cores-1))
+--decode-batch-size           0 = auto (4x workers); successor of --block-batch-size
+--db-write-target-duration    3s; sizes each DB commit by measured duration
+--db-write-max-size           512MiB; segment size ceiling
+--spool-dir                   ./localdata/spool; spool ON by default, "" rejected
+--spool-max-size              8GiB; local-disk budget, backpressures stream
+--spool-max-idle              10s; idle seal, 0 disables
+--apply-constraints           auto|manual|always (run, setup, constraints apply); auto = build at HEAD
+--disable-foreign-keys        per-table list or 'all'
+--disable-primary-keys        per-table list or 'all'
+--disable-unique-constraints  per-table list or 'all'
+--disable-block-number-index  default false: _block_number_ index built at every startup
+--constraints-parallelism     1 (constraints apply|drop)
+--constraints-work-mem        "" = server default (constraints apply|drop)
+(new subcommands: constraints apply / constraints drop; setup gains optional [module] arg)
+
+#### DEPRECATED (warn, still honored)
+--no-constraints              -> the three --disable-* flags; hard error on DatabaseChanges module
+--block-batch-size            -> --decode-batch-size; removed from setup entirely = unknown flag
+--constraints-per-transaction -> --constraints-parallelism (born deprecated)
+
+#### REMOVED (hard 'unknown flag')
+--live-block-time-delta       both engines; hits DatabaseChanges users too
+
+#### CHANGED BEHAVIOR (same names)
+setup                         no longer creates constraints by default; needs --apply-constraints=always
+cross-mode flags              wrong-mode flags now hard-error at startup (develop warned/ignored)
+clickhouse state flags        --cursor-file-path etc. now also on setup; defaults unchanged
+
 
 ## v1.21.0
 

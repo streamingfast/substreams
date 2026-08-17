@@ -6,17 +6,17 @@ This document describes how the SQL sink (`substreams sink postgres` / `substrea
 
 Blockchain networks can experience reorganizations where previously accepted blocks are replaced by a different chain. When this happens, database changes that were based on the replaced blocks must be reverted to maintain consistency with the canonical chain.
 
-The sink implements different re-org handling strategies depending on the data processing model used:
+The sink implements different re-org handling strategies depending on the mode the sink runs in:
 
-- **DatabaseChanges Model** (`db_out` modules) - Tracks individual operations in a history table
-- **Relational Mappings** (from Protobuf directly) - _Documentation to come soon_
+- **Database Changes Mode** (`db_out` modules) - Tracks individual operations in a history table
+- **Relational Mappings Mode** (from Protobuf directly) - _Documentation to come soon_
 - **Delayed block signalling** (`undo-buffer` flags) - _Documentation to come soon_
 
-This document currently focuses on the **DatabaseChanges model** implementation.
+This document currently focuses on the **Database Changes Mode** implementation.
 
-## DatabaseChanges Model Re-org Handling
+## Database Changes Mode Re-org Handling
 
-The DatabaseChanges model (used by `db_out` modules) handles re-orgs through a four-phase process:
+Database Changes Mode (used by `db_out` modules) handles re-orgs through a four-phase process:
 
 1. **Tracking changes** - Storing a record of all database operations in a history table, only in the reversible segment of the chain, this means there are no operations happening when backfilling historical segments.
 2. **Detecting re-orgs** - Receiving undo signals when reorganizations occur
@@ -40,7 +40,7 @@ CREATE TABLE substreams_history (
 
 ### Example Walkthrough
 
-Let's trace through a complete re-org scenario using a simple `transfer` table with the DatabaseChanges model:
+Let's trace through a complete re-org scenario using a simple `transfer` table in Database Changes Mode:
 
 ```sql
 CREATE TABLE transfer (

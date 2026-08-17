@@ -15,6 +15,7 @@ import (
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	sink "github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/sink/sql/db_proto"
+	protosql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	pbrelations "github.com/streamingfast/substreams/sink/sql/tests/relations"
 	"github.com/stretchr/testify/require"
 )
@@ -92,9 +93,9 @@ func TestDbProtoPostgresIntegration(t *testing.T) {
 
 			options := db_proto.SinkerFactoryOptions{
 				UseProtoOption:  true,
-				UseConstraints:  false,
+				Constraints:     protosql.DisableAllConstraints(),
 				UseTransactions: true,
-				BlockBatchSize:  1,
+				DecodeBatchSize: 1,
 			}.Defaults()
 
 			sinkerFactory := db_proto.SinkerFactory(

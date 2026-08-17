@@ -116,7 +116,7 @@ func (d *DialectPostgres) createTable(table *schema.Table) error {
 					ForeignField: parentField.Name,
 				}
 
-				d.AddForeignKeySql(table.Name, foreignKey.String())
+				d.AddForeignKeyReferencing(table.Name, parentTable.Name, foreignKey.String())
 
 				fieldFound = true
 				break
@@ -155,7 +155,7 @@ func (d *DialectPostgres) createTable(table *schema.Table) error {
 				ForeignTable: d.FullTableName(childTable),
 				ForeignField: childTable.PrimaryKey.Name,
 			}
-			d.AddForeignKeySql(table.Name, foreignKey.String())
+			d.AddForeignKeyReferencing(table.Name, childTable.Name, foreignKey.String())
 
 		case f.ForeignKey != nil:
 			foreignTable, found := d.TableRegistry[f.ForeignKey.Table]
@@ -181,7 +181,7 @@ func (d *DialectPostgres) createTable(table *schema.Table) error {
 				ForeignTable: d.FullTableName(foreignTable),
 				ForeignField: foreignField.Name,
 			}
-			d.AddForeignKeySql(table.Name, foreignKey.String())
+			d.AddForeignKeyReferencing(table.Name, foreignTable.Name, foreignKey.String())
 		}
 		fieldType := MapFieldType(f.FieldDescriptor, d.bytesEncoding, f)
 		if f.IsUnique {
@@ -200,7 +200,18 @@ func (d *DialectPostgres) createTable(table *schema.Table) error {
 
 	sb.WriteString(");\n")
 
-	d.AddForeignKeySql(tableName, fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT fk_block FOREIGN KEY (%s) REFERENCES %s.%s(number) ON DELETE CASCADE", tableName, sql2.DialectFieldBlockNumber, d.schemaName, sql2.DialectTableBlock))
+	d.AddForeignKeyReferencing(table.Name, sql2.DialectTableBlock, fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT fk_block FOREIGN KEY (%s) REFERENCES %s.%s(number) ON DELETE CASCADE", tableName, sql2.DialectFieldBlockNumber, d.schemaName, sql2.DialectTableBlock))
+
+	// A foreign key indexes its referenced side only, so _block_number_ would carry none.
+	// Every undo deletes from every table by that column, which without this is a
+	// sequential scan per table, and a cascade would be worse still: PostgreSQL looks the
+	// child rows up once per deleted parent row.
+	//
+	// CONCURRENTLY because this is built when the sink starts rather than when the load is
+	// over: a restart onto an already-loaded table must not lock out the writers. It is
+	// also why the index cannot be part of the constraint pass, which runs in transactions
+	// and a concurrent build cannot.
+	d.AddIndexSql(table.Name, fmt.Sprintf("CREATE INDEX CONCURRENTLY IF NOT EXISTS %s_block_number_idx ON %s (%s)", table.Name, tableName, sql2.DialectFieldBlockNumber))
 	d.AddCreateTableSql(table.Name, sb.String())
 
 	return nil

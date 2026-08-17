@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/spf13/cobra"
@@ -24,6 +25,8 @@ import (
 	"github.com/streamingfast/substreams/sink/sql/db_changes/sinker"
 	"github.com/streamingfast/substreams/sink/sql/db_proto"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/proto"
+	protosql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
+	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/spool"
 	"github.com/streamingfast/substreams/sink/sql/services"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -125,6 +128,63 @@ func boolFlag(cmd *cobra.Command, name string) bool {
 	return false
 }
 
+// stringSliceFlag mirrors boolFlag for the per-table constraint switches, which are only
+// registered for the from-proto commands.
+func stringFlag(cmd *cobra.Command, name string) string {
+	if sflags.FlagDefined(cmd, name) {
+		return sflags.MustGetString(cmd, name)
+	}
+
+	return ""
+}
+
+// intFlag returns the value of an int flag, or zero when the flag is not registered on
+// the command.
+func intFlag(cmd *cobra.Command, name string) int {
+	if sflags.FlagDefined(cmd, name) {
+		return sflags.MustGetInt(cmd, name)
+	}
+
+	return 0
+}
+
+func stringSliceFlag(cmd *cobra.Command, name string) []string {
+	if sflags.FlagDefined(cmd, name) {
+		return sflags.MustGetStringSlice(cmd, name)
+	}
+
+	return nil
+}
+
+// sinkManifestAndModule reads the positional arguments the schema-side commands take.
+//
+// The module is optional and inferred from the package when it is left out, exactly as the
+// run command does — but a package with more than one candidate has to be told which, or
+// `setup` and `constraints` would derive a schema from a different module than the run
+// they are meant to accompany.
+func sinkManifestAndModule(args []string) (manifestPath string, outputModule string) {
+	if len(args) > 1 && args[1] != "" {
+		return args[0], args[1]
+	}
+
+	return args[0], sink.InferOutputModuleFromPackage
+}
+
+// sinkUserAgent is what the server sees as the gRPC User-Agent of a sink run. It names the
+// mode, which decides how rows are written, and the engine they are written to: both
+// engines share every command here, so the mode alone said nothing about where the data
+// went.
+func sinkUserAgent(mode, driver string) string {
+	switch driver {
+	case sinkClickhouseDriver:
+		return mode + "_ch"
+	case sinkPostgresDriver:
+		return mode + "_pg"
+	default:
+		return mode
+	}
+}
+
 func isDatabaseChangesType(outputType string) bool {
 	unprefixed := strings.TrimPrefix(outputType, "proto:")
 	for _, t := range strings.Split(supportedOutputTypes, ",") {
@@ -138,43 +198,115 @@ func isDatabaseChangesType(outputType string) bool {
 // addDatabaseChangesModeRunFlags registers the run flags that only apply when the
 // selected module outputs DatabaseChanges.
 func addDatabaseChangesModeRunFlags(flags *pflag.FlagSet) {
-	flags.Int("undo-buffer-size", 0, "[DatabaseChanges mode] If non-zero, handling of reorgs in the database is disabled. Instead, a buffer is introduced to only process blocks once they have been confirmed by that many blocks, introducing a latency but slightly reducing the load on the database when close to head. Set to 0 to enable reorg handling in the database (required for some databases like Postgres).")
-	flags.Int("batch-block-flush-interval", 1_000, "[DatabaseChanges mode] When in catch up mode, flush every N blocks or after batch-row-flush-interval, whichever comes first. Set to 0 to disable and only use batch-row-flush-interval. Ineffective if the sink is now in the live portion of the chain where only 'live-block-flush-interval' applies.")
-	flags.Int("batch-row-flush-interval", 100_000, "[DatabaseChanges mode] When in catch up mode, flush every N rows or after batch-block-flush-interval, whichever comes first. Set to 0 to disable and only use batch-block-flush-interval. Ineffective if the sink is now in the live portion of the chain where only 'live-block-flush-interval' applies.")
-	flags.Int("live-block-flush-interval", 1, "[DatabaseChanges mode] When processing in live mode, flush every N blocks.")
-	flags.Int("flush-retry-count", 3, "[DatabaseChanges mode] Number of retry attempts for flush operations")
-	flags.Duration("flush-retry-delay", 1*time.Second, "[DatabaseChanges mode] Base delay for incremental retry backoff on flush failures")
-	flags.String("cursors-table", "cursors", "[DatabaseChanges mode] Name of the table to use for storing cursors")
-	flags.String("history-table", "substreams_history", "[DatabaseChanges mode] Name of the table to use for storing block history, used to handle reorgs")
-	flags.String(onModuleHashMismatchFlag, "error", "[DatabaseChanges mode] What to do when the module hash in the manifest does not match the one in the database, can be 'error', 'warn' or 'ignore'")
+	flags.Int("undo-buffer-size", 0, "If non-zero, handling of reorgs in the database is disabled. Instead, a buffer is introduced to only process blocks once they have been confirmed by that many blocks, introducing a latency but slightly reducing the load on the database when close to head. Set to 0 to enable reorg handling in the database (required for some databases like Postgres).")
+	flags.Int("batch-block-flush-interval", 1_000, "When in catch up mode, flush every N blocks or after batch-row-flush-interval, whichever comes first. Set to 0 to disable and only use batch-row-flush-interval. Ineffective if the sink is now in the live portion of the chain where only 'live-block-flush-interval' applies.")
+	flags.Int("batch-row-flush-interval", 100_000, "When in catch up mode, flush every N rows or after batch-block-flush-interval, whichever comes first. Set to 0 to disable and only use batch-block-flush-interval. Ineffective if the sink is now in the live portion of the chain where only 'live-block-flush-interval' applies.")
+	flags.Int("live-block-flush-interval", 1, "When processing in live mode, flush every N blocks.")
+	flags.Int("flush-retry-count", 3, "Number of retry attempts for flush operations")
+	flags.Duration("flush-retry-delay", 1*time.Second, "Base delay for incremental retry backoff on flush failures")
+	flags.String("cursors-table", "cursors", "Name of the table to use for storing cursors")
+	flags.String("history-table", "substreams_history", "Name of the table to use for storing block history, used to handle reorgs")
+	flags.String(onModuleHashMismatchFlag, "error", "What to do when the module hash in the manifest does not match the one in the database, can be 'error', 'warn' or 'ignore'")
 }
 
-// addFromProtoModeRunFlags registers the run flags that only apply when the selected
-// module outputs an arbitrary protobuf message (relational mappings). The ClickHouse
-// specific flags are only registered for the clickhouse engine.
-func addFromProtoModeRunFlags(flags *pflag.FlagSet, driver string) {
-	flags.Bool("no-constraints", false, "[from-proto mode] Do not add any constraints to the database. This is useful to speed up the initial import of a large dataset.")
-	flags.Int("block-batch-size", 25, "[from-proto mode] number of blocks to process at a time")
-	flags.String("proto-file-override", "", "[from-proto mode] Override protobuf file to use instead of extracting from substreams package")
+// defaultSpoolDir is where the from-proto sink spools rows when nothing else is asked
+// for: a data folder under the working directory, as the other sink commands use for
+// their own local state.
+const defaultSpoolDir = "./localdata/spool"
+
+// fromProtoRunFlagNames are the from-proto flags that only mean something while the sink
+// is running. Registering them anywhere else puts knobs on commands that never decode a
+// block or write a row.
+var fromProtoRunFlagNames = []string{
+	"apply-constraints",
+	"write-mode",
+	"decode-workers",
+	"decode-batch-size",
+	"db-write-target-duration",
+	"db-write-max-size",
+	"spool-dir",
+	"spool-max-size",
+	"spool-max-idle",
+	"block-batch-size",
+	"sink-info-folder",
+	"cursor-file-path",
+	"query-retry-count",
+	"query-retry-sleep",
+}
+
+// databaseChangesFlagNames are the run flags that only mean something when the module
+// outputs DatabaseChanges.
+var databaseChangesFlagNames = []string{
+	"undo-buffer-size",
+	"batch-block-flush-interval",
+	"batch-row-flush-interval",
+	"live-block-flush-interval",
+	"flush-retry-count",
+	"flush-retry-delay",
+	"cursors-table",
+	"history-table",
+}
+
+// addFromProtoSchemaFlags registers the from-proto flags that describe the schema. They
+// go on the run command, on `setup` and on `constraints`, which all have to agree on
+// which constraints the schema is meant to have. See sink_sql_constraints.go.
+
+// addFromProtoRunFlags registers the from-proto flags that only apply while the sink is
+// running. The ClickHouse specific ones are only registered for the clickhouse engine.
+func addFromProtoRunFlags(flags *pflag.FlagSet, driver string) {
+	addConstraintTimingFlag(flags)
+
+	flags.String("write-mode", string(protosql.WriteModeAuto), "How a sealed spool segment reaches the database: 'copy' loads each table file with binary COPY, 'batch-insert' builds one multi-row INSERT per table, 'row-insert' issues one prepared INSERT per row. 'auto' picks copy on PostgreSQL, batch-insert on ClickHouse, and row-insert for a schema whose foreign keys cannot be ordered. An explicit mode the driver or the schema cannot support is an error rather than a downgrade. Ignored once the stream reaches chain HEAD, where the sink always inserts directly.")
+
+	flags.Int("decode-workers", 0, "How many blocks are unmarshalled and walked concurrently. Zero takes one per core less one for the goroutine draining the stream, capped at 8: measured at 4.13x on eight workers and only 4.24x on fifteen, the work being allocator-bound well before it runs out of cores. This is CPU work only and does not change what the database sees.")
+	flags.Int("decode-batch-size", 0, "How many blocks are held in memory and decoded together. Zero takes four per decode worker. Larger batches keep the workers fed; smaller ones cost less memory, since every held block keeps its payload and its decoded rows. This sizes the CPU stage, not the database write — see --db-write-target-duration for that.")
+
+	flags.Duration("db-write-target-duration", 3*time.Second, "How long one commit to the database should take. A commit is one spooled segment, whichever write mode applies it; each is measured and the next segment sized toward this. Raise it for fewer, larger commits; lower it to keep the sink from occupying a database that is shared with something else. Sizing by measured duration rather than by a block count is what keeps this stable across chains, where block payloads differ by orders of magnitude. Backfill only.")
+	flags.String("db-write-max-size", "512MiB", "Ceiling for the segment size the sizer may choose, whatever the target duration would allow. Backfill only.")
+
+	flags.Int("block-batch-size", 25, "Deprecated, use --decode-batch-size.")
+	_ = flags.MarkDeprecated("block-batch-size", "use --decode-batch-size")
+
+	flags.String("spool-dir", defaultSpoolDir, "Directory the pending segments are written to. Rows land here first and a background goroutine loads them, so the stream never waits on the database and blocks already downloaded survive a restart instead of being streamed, and paid for, twice. Backfill only.")
+	flags.String("spool-max-size", "8GiB", "Disk budget for --spool-dir, and the only bound on how far ahead of the database the stream may run. The stream is held once pending segments reach it, which is what turns a slow database into backpressure rather than a full disk. Backfill only.")
+	flags.Duration("spool-max-idle", 10*time.Second, "Write the open segment to the database once no new row has reached it for this long, short of its size target. A stream that stalls would otherwise sit on those rows indefinitely, leaving the cursor where it was and the blocks to be streamed, and paid for, again on restart. Zero disables it. Backfill only.")
 
 	if driver == "clickhouse" {
-		flags.String("sink-info-folder", "", "[from-proto mode] folder where to store the clickhouse sink info")
-		flags.String("cursor-file-path", "cursor.txt", "[from-proto mode] file name where to store the clickhouse cursor")
-		flags.Int("query-retry-count", 3, "[from-proto mode] Number of retries for ClickHouse queries when an error occurs")
-		flags.Duration("query-retry-sleep", time.Second, "[from-proto mode] Sleep duration between ClickHouse query retries (e.g. 1s, 500ms)")
+		addClickhouseStateFlags(flags)
 	}
+}
+
+// addClickhouseStateFlags registers where the ClickHouse sink keeps the state PostgreSQL
+// keeps in the database itself. `setup` needs them as much as the run does: it reads the
+// schema hash from that folder to decide whether the database is already set up.
+func addClickhouseStateFlags(flags *pflag.FlagSet) {
+	flags.String("sink-info-folder", "", "Folder where to store the clickhouse sink info")
+	flags.String("cursor-file-path", "cursor.txt", "File name where to store the clickhouse cursor")
+	flags.Int("query-retry-count", 3, "Number of retries for ClickHouse queries when an error occurs")
+	flags.Duration("query-retry-sleep", time.Second, "Sleep duration between ClickHouse query retries (e.g. 1s, 500ms)")
 }
 
 // addSinkRunFlags registers the full set of flags used by the sink process of an
 // engine command.
+//
+// Both mode vocabularies land on the same command, and that is not fixable: the mode is
+// read from the module's output type at run time, long after init() has registered
+// everything. What the run command can do is say which half applies — see
+// setModeGroupedUsage — and fail on a flag typed for the other one.
 func addSinkRunFlags(flags *pflag.FlagSet, driver string) {
-	sink.AddFlagsToSet(flags, sink.FlagExcludeDefault(sink.FlagUndoBufferSize))
+	// --live-block-time-delta is excluded because this sink overrides the liveness checker
+	// with the cursor-based one (see runFromProtoSink): the flag would be accepted and then
+	// silently ignored. It is also what the spool's safety rests on — liveness has to turn
+	// on the first undo-able block, not on a wall-clock guess. The database-changes sink
+	// does not look at liveness at all.
+	sink.AddFlagsToSet(flags, sink.FlagExcludeDefault(sink.FlagUndoBufferSize, sink.FlagLiveBlockTimeDelta))
 	addBytesEncodingFlag(flags)
 	if driver == "clickhouse" {
 		addClusterFlag(flags)
 	}
 	addDatabaseChangesModeRunFlags(flags)
-	addFromProtoModeRunFlags(flags, driver)
+	addFromProtoSchemaFlags(flags)
+	addFromProtoRunFlags(flags, driver)
 }
 
 // sinkBytesEncoding resolves the --bytes-encoding flag into a concrete encoding.
@@ -240,14 +372,22 @@ func newSinkRunE(driver string) func(*cobra.Command, []string) error {
 		}
 
 		if isDatabaseChangesType(module.Output.Type) {
-			return runDatabaseChangesSink(cmd, manifestPath, outputModule, dsnString)
+			if err := rejectFromProtoFlags(cmd); err != nil {
+				return err
+			}
+
+			return runDatabaseChangesSink(cmd, driver, manifestPath, outputModule, dsnString)
+		}
+
+		if err := rejectDatabaseChangesFlags(cmd); err != nil {
+			return err
 		}
 
 		return runFromProtoSink(cmd, driver, manifestPath, dsnString, spkg, module.Name)
 	}
 }
 
-func runDatabaseChangesSink(cmd *cobra.Command, manifestPath, outputModule, dsnString string) error {
+func runDatabaseChangesSink(cmd *cobra.Command, driver, manifestPath, outputModule, dsnString string) error {
 	sinkDBPreStart(cmd)
 
 	app := cli.NewApplication(cmd.Context())
@@ -259,7 +399,7 @@ func runDatabaseChangesSink(cmd *cobra.Command, manifestPath, outputModule, dsnS
 		supportedOutputTypes,
 		manifestPath,
 		outputModule,
-		"sink_database_changes",
+		sinkUserAgent("sink_dbchanges", driver),
 		zlog,
 		tracer,
 	)
@@ -291,8 +431,15 @@ func runDatabaseChangesSink(cmd *cobra.Command, manifestPath, outputModule, dsnS
 }
 
 func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string, spkg *pbsubstreams.Package, outputModuleName string) error {
-	useConstraints := !sflags.MustGetBool(cmd, "no-constraints")
-	blockBatchSize := sflags.MustGetInt(cmd, "block-batch-size")
+	constraints, err := fromProtoConstraintPolicy(cmd)
+	if err != nil {
+		return err
+	}
+
+	writeMode, err := protosql.ParseWriteMode(sflags.MustGetString(cmd, "write-mode"))
+	if err != nil {
+		return err
+	}
 
 	encoding, err := sinkBytesEncoding(cmd)
 	if err != nil {
@@ -320,15 +467,22 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 		return err
 	}
 	if !useProtoOption {
-		useConstraints = false
+		// Without the schema annotations there are no relations to constrain. The index on
+		// _block_number_ is not declared by them either, so it stays.
+		constraints = protosql.DisableAllConstraints().WithBlockNumberIndex(constraints)
+
+		zlog.Warn("the module's output carries no schema.proto annotations, so its tables get no primary keys, no unique constraints and no foreign keys. " +
+			"Queries against them are sequential scans and duplicate ids are not rejected. " +
+			"`substreams tools extract-proto --sql` writes the annotated proto to start from, and --proto-file-override points the sink at it")
 	}
+	warnAboutConstraints(constraints)
 
 	baseSink, err := sink.NewFromViper(
 		cmd,
 		outputType,
 		manifestPath,
 		outputModuleName,
-		"sink_from_proto",
+		sinkUserAgent("sink_relational", driver),
 		zlog,
 		tracer,
 	)
@@ -336,14 +490,32 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 		return fmt.Errorf("new base sinker: %w", err)
 	}
 
-	factory := db_proto.SinkerFactory(baseSink, outputModuleName, rootMessageDescriptor.UnwrapMessage(), db_proto.SinkerFactoryOptions{
+	// Nothing told the sinker when the stream reached the chain head, so nothing could
+	// act on it — the local buffer kept holding blocks that a live sink wants in the
+	// database as they arrive. The cursor-based checker turns live as soon as an
+	// undo-able block shows up, which is exactly that moment.
+	sink.WithLivenessChecker(sink.NewCursorBasedLivenessChecker())(baseSink)
+
+	spool, err := fromProtoSpoolOptions(cmd)
+	if err != nil {
+		return err
+	}
+
+	options := db_proto.SinkerFactoryOptions{
+		Spool:           spool,
 		UseProtoOption:  useProtoOption,
-		UseConstraints:  useConstraints,
+		Constraints:     constraints,
 		UseTransactions: true,
-		BlockBatchSize:  blockBatchSize,
+		WriteMode:       writeMode,
+		DecodeWorkers:   sflags.MustGetInt(cmd, "decode-workers"),
+		DecodeBatchSize: fromProtoDecodeBatchSize(cmd),
 		Encoding:        encoding,
 		Clickhouse:      fromProtoClickhouseOptions(cmd, driver),
-	})
+	}.Defaults()
+
+	logFromProtoSettings(cmd, driver, options, constraints)
+
+	factory := db_proto.SinkerFactory(baseSink, outputModuleName, rootMessageDescriptor.UnwrapMessage(), options)
 
 	sqlSinker, err := factory(cmd.Context(), dsnString, dsn.Schema(), zlog, tracer)
 	if err != nil {
@@ -453,23 +625,77 @@ func newSinkSetupE(driver string) func(*cobra.Command, []string) error {
 			return err
 		}
 
-		manifestPath := args[0]
+		manifestPath, outputModule := sinkManifestAndModule(args)
 
 		sinkDBPreStart(cmd)
 
 		sink.LoadSubstreamsAuthEnvFile(manifestPath)
 
-		spkg, module, _, err := sink.ReadManifestAndModule(manifestPath, "", nil, sink.InferOutputModuleFromPackage, sink.IgnoreOutputModuleType, false, nil, zlog)
+		spkg, module, _, err := sink.ReadManifestAndModule(manifestPath, "", nil, outputModule, sink.IgnoreOutputModuleType, false, nil, zlog)
 		if err != nil {
 			return fmt.Errorf("reading manifest: %w", err)
 		}
 
 		if isDatabaseChangesType(module.Output.Type) {
+			names := append(append([]string{}, fromProtoSchemaFlagNames...), "apply-constraints")
+			if err := rejectFlags(cmd, names, "Relational Mappings Mode",
+				"This one runs in Database Changes Mode, where the SQL schema is yours: it is created from the "+
+					"'schema.sql' bundled in the manifest, and the sink neither derives it nor manages its constraints"); err != nil {
+				return err
+			}
+
 			return runDatabaseChangesSetup(cmd, dsnString, spkg)
+		}
+
+		if err := rejectDatabaseChangesSetupFlags(cmd); err != nil {
+			return err
 		}
 
 		return runFromProtoSetup(cmd, driver, dsnString, spkg, module.Name)
 	}
+}
+
+// newSinkApplyConstraintsE creates the schema's constraints on a database the sink has
+// already loaded, which is deliberately a separate command. See sink_sql_constraints.go
+// for newSinkConstraintsE, the constraintsAction type and its apply/drop constants.
+
+// rejectFromProtoFlags fails on a from-proto flag typed for a Substreams that outputs
+// DatabaseChanges.
+//
+// The mode is read from the module, not chosen by a flag, so both vocabularies are
+// registered on the same command and half of them are inert for any given run. They used
+// to be inert silently; a flag typed here means the operator expects the sink to be doing
+// something it will not do, and a warning in a log that scrolls past is not how they
+// should find that out.
+func rejectFromProtoFlags(cmd *cobra.Command) error {
+	names := append(append([]string{}, fromProtoSchemaFlagNames...), fromProtoRunFlagNames...)
+
+	return rejectFlags(cmd, names, "Relational Mappings Mode",
+		"This one runs in Database Changes Mode, where rows are written from the module's own database changes "+
+			"and the schema is the 'schema.sql' bundled in the manifest")
+}
+
+// rejectDatabaseChangesFlags is the same guard in the other direction.
+func rejectDatabaseChangesFlags(cmd *cobra.Command) error {
+	return rejectFlags(cmd, databaseChangesFlagNames, "Database Changes Mode",
+		"This one outputs an arbitrary protobuf message, which the sink maps to relational tables of its own")
+}
+
+func rejectFlags(cmd *cobra.Command, names []string, appliesTo string, because string) error {
+	for _, name := range names {
+		if flagChanged(cmd, name) {
+			return fmt.Errorf("--%s only applies to %s. %s", name, appliesTo, because)
+		}
+	}
+
+	return nil
+}
+
+// errDatabaseChangesOwnsSchema is what every from-proto-only entry point says when the
+// module turns out to output DatabaseChanges.
+func errDatabaseChangesOwnsSchema(what string) error {
+	return fmt.Errorf("%s only applies to Relational Mappings Mode. This one runs in Database Changes Mode, where the SQL schema is yours: "+
+		"it is created from the 'schema.sql' bundled in the manifest, and the sink neither derives it nor manages its constraints", what)
 }
 
 func runDatabaseChangesSetup(cmd *cobra.Command, dsnString string, spkg *pbsubstreams.Package) error {
@@ -491,9 +717,10 @@ func runDatabaseChangesSetup(cmd *cobra.Command, dsnString string, spkg *pbsubst
 // schema exists via db_proto.SetupDatabaseSchema, then exits without starting a sinker. It
 // is idempotent thanks to the sink-info guard inside SetupDatabaseSchema.
 func runFromProtoSetup(cmd *cobra.Command, driver, dsnString string, spkg *pbsubstreams.Package, outputModuleName string) error {
-	warnIgnoredDatabaseChangesSetupFlags(cmd)
-
-	useConstraints := !boolFlag(cmd, "no-constraints")
+	constraints, err := fromProtoConstraintPolicy(cmd)
+	if err != nil {
+		return err
+	}
 
 	encoding, err := sinkBytesEncoding(cmd)
 	if err != nil {
@@ -511,32 +738,43 @@ func runFromProtoSetup(cmd *cobra.Command, driver, dsnString string, spkg *pbsub
 		return err
 	}
 	if !useProtoOption {
-		useConstraints = false
+		// Without the schema annotations there are no relations to constrain. The index on
+		// _block_number_ is not declared by them either, so it stays.
+		constraints = protosql.DisableAllConstraints().WithBlockNumberIndex(constraints)
+
+		zlog.Warn("the module's output carries no schema.proto annotations, so its tables get no primary keys, no unique constraints and no foreign keys. " +
+			"Queries against them are sequential scans and duplicate ids are not rejected. " +
+			"`substreams tools extract-proto --sql` writes the annotated proto to start from, and --proto-file-override points the sink at it")
 	}
+	warnAboutConstraints(constraints)
 
 	options := db_proto.SinkerFactoryOptions{
 		UseProtoOption: useProtoOption,
-		UseConstraints: useConstraints,
+		Constraints:    constraints,
 		Encoding:       encoding,
 		Clickhouse:     fromProtoClickhouseOptions(cmd, driver),
 	}
 
-	if _, err := db_proto.SetupDatabaseSchema(cmd.Context(), dsnString, dsn.Schema(), outputModuleName, rootMessageDescriptor.UnwrapMessage(), options, zlog, tracer); err != nil {
+	database, err := db_proto.SetupDatabaseSchema(cmd.Context(), dsnString, dsn.Schema(), outputModuleName, rootMessageDescriptor.UnwrapMessage(), options, zlog, tracer)
+	if err != nil {
 		return fmt.Errorf("setting up database schema: %w", err)
 	}
+	defer database.Close(cmd.Context())
 
-	zlog.Info("database schema setup completed", zap.String("schema", dsn.Schema()), zap.Bool("constraints", useConstraints))
+	zlog.Info("database schema setup completed", zap.String("schema", dsn.Schema()), zap.String("constraints", constraints.Describe()))
 	return nil
 }
 
 // warnIgnoredDatabaseChangesSetupFlags logs a warning for each DatabaseChanges-only setup
 // flag that the user explicitly set, since those flags have no effect in from-proto mode.
-func warnIgnoredDatabaseChangesSetupFlags(cmd *cobra.Command) {
-	for _, name := range []string{"postgraphile", "system-tables-only", "ignore-duplicate-table-errors"} {
-		if flag := cmd.Flags().Lookup(name); flag != nil && flag.Changed {
-			zlog.Warn("flag has no effect in from-proto setup mode and is ignored", zap.String("flag", name))
-		}
-	}
+// rejectDatabaseChangesSetupFlags fails on a DatabaseChanges-only setup flag typed for a
+// from-proto setup. It used to warn; the two directions now agree, because a flag typed
+// for the wrong mode means the operator expects something that will not happen.
+func rejectDatabaseChangesSetupFlags(cmd *cobra.Command) error {
+	names := append([]string{"postgraphile", "system-tables-only", "ignore-duplicate-table-errors"}, databaseChangesFlagNames...)
+
+	return rejectFlags(cmd, names, "Database Changes Mode",
+		"This one outputs an arbitrary protobuf message, whose schema the sink derives from the module's own descriptors")
 }
 
 // newSinkToolsCmd builds the `tools` command subtree for the given engine. The
@@ -766,4 +1004,99 @@ func cursorToShortString(in *sink.Cursor) string {
 	}
 
 	return cursor
+}
+
+// fromProtoDecodeBatchSize resolves how many blocks are decoded together, honouring the
+// flag --block-batch-size shipped under before it named the database write it no longer
+// sizes.
+func fromProtoDecodeBatchSize(cmd *cobra.Command) int {
+	if flagChanged(cmd, "decode-batch-size") {
+		return sflags.MustGetInt(cmd, "decode-batch-size")
+	}
+	if flagChanged(cmd, "block-batch-size") {
+		return sflags.MustGetInt(cmd, "block-batch-size")
+	}
+
+	return 0
+}
+
+// fromProtoSpoolOptions resolves the --spool-* and --db-write-* flags.
+func fromProtoSpoolOptions(cmd *cobra.Command) (*spool.Options, error) {
+	dir := sflags.MustGetString(cmd, "spool-dir")
+	if dir == "" {
+		return nil, fmt.Errorf("--spool-dir cannot be empty; the spool is what makes a restart resume rather than re-stream")
+	}
+
+	maxBytes, err := parseByteSize(cmd, "spool-max-size")
+	if err != nil {
+		return nil, err
+	}
+
+	segmentMaxBytes, err := parseByteSize(cmd, "db-write-max-size")
+	if err != nil {
+		return nil, err
+	}
+
+	maxIdle := sflags.MustGetDuration(cmd, "spool-max-idle")
+	if maxIdle == 0 {
+		// Zero disables it, which the Options zero value cannot say on its own.
+		maxIdle = -1
+	}
+
+	return &spool.Options{
+		Dir:                 dir,
+		MaxBytes:            maxBytes,
+		WriteTargetDuration: sflags.MustGetDuration(cmd, "db-write-target-duration"),
+		// A segment is one indivisible database write, so keep its configured ceiling
+		// within the total spool budget rather than allowing an invalid combination to
+		// deadlock when the segment is sealed.
+		SegmentMaxBytes: min(segmentMaxBytes, maxBytes),
+		MaxIdle:         maxIdle,
+	}, nil
+}
+
+func parseByteSize(cmd *cobra.Command, name string) (int64, error) {
+	raw := sflags.MustGetString(cmd, name)
+	parsed, err := humanize.ParseBytes(raw)
+	if err != nil {
+		return 0, fmt.Errorf("invalid --%s %q: %w", name, raw, err)
+	}
+
+	return int64(parsed), nil
+}
+
+// flagChanged reports whether the operator actually typed the flag, as opposed to it
+// carrying its default. Every mode and deprecation check keys off this: a default value
+// must never be read as an instruction.
+func flagChanged(cmd *cobra.Command, name string) bool {
+	flag := cmd.Flags().Lookup(name)
+
+	return flag != nil && flag.Changed
+}
+
+// logFromProtoSettings states, in one line, every knob that applies to this run.
+//
+// The alternative is an operator reading a help screen that lists both mode vocabularies
+// and guessing which half took effect. The write mode here is what was asked for; the
+// database logs what it resolved to, and why, once it has seen the schema.
+func logFromProtoSettings(cmd *cobra.Command, driver string, options db_proto.SinkerFactoryOptions, constraints protosql.ConstraintPolicy) {
+	fields := []zap.Field{
+		zap.String("driver", driver),
+		zap.String("write_mode_requested", string(options.WriteMode)),
+		zap.Int("decode_workers", options.DecodeWorkers),
+		zap.Int("decode_batch_size", options.DecodeBatchSize),
+		zap.String("constraints", constraints.Describe()),
+	}
+
+	if options.Spool != nil {
+		fields = append(fields,
+			zap.String("spool_dir", options.Spool.Dir),
+			zap.String("spool_max_size", humanize.IBytes(uint64(options.Spool.MaxBytes))),
+			zap.Duration("spool_max_idle", options.Spool.MaxIdle),
+			zap.Duration("db_write_target_duration", options.Spool.WriteTargetDuration),
+			zap.String("db_write_max_size", humanize.IBytes(uint64(options.Spool.SegmentMaxBytes))),
+		)
+	}
+
+	zlog.Info("Relational Mappings Mode sink settings", fields...)
 }

@@ -2,7 +2,7 @@
 
 If you require more control over the tables and the data that you want to store into the database, then creating a `db_out` module would be the best option.
 
-You will create a new module, `db_out`, which maps the output of your Substreams to the [DatabaseChanges data model](https://docs.rs/substreams-database-change/latest/substreams_database_change/pb/database/struct.DatabaseChanges.html), which is a format that the SQL sink understands.
+You will create a new module, `db_out`, which maps the output of your Substreams to the [DatabaseChanges data model](https://docs.rs/substreams-database-change/latest/substreams_database_change/pb/database/struct.DatabaseChanges.html) — the format the SQL sink consumes in Database Changes Mode.
 
 ## Running the Sink
 

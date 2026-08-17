@@ -104,7 +104,7 @@ func sinkPostgresGenerateCSVE(cmd *cobra.Command, args []string) error {
 		supportedOutputTypes,
 		manifestPath,
 		outputModule,
-		"sink_database_changes",
+		sinkUserAgent("sink_database_changes", sinkPostgresDriver),
 		zlog,
 		tracer,
 	)

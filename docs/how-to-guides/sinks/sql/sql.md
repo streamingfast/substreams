@@ -12,26 +12,25 @@ Before you begin, make sure you have:
 
 The core function of the SQL sink is to translate your Substreams output (Protobuf data) into SQL tables. Choose one of the following methods depending on your needs:
 
-- [Using Relational Mappings "from-proto"](./relational-mappings.md)
+- [Using Relational Mappings Mode](./relational-mappings.md)
     * Enables foreign key relationships in your SQL schema.
     * Requires adding annotations to your Protobuf messages (e.g., primary and foreign keys).
     * Currently insert-only.
-- [Using Database Changes](./db_out.md)
+- [Using Database Changes Mode](./db_out.md)
     * Gives you full control over the output.
     * Supports insert, update, and upsert operations.
     * Ideal for advanced use cases with evolving or mutable data.
     * **NOTE:** In ClickHouse, reorgs are currently supported with delay.
 
-|                               | Relational Mappings | `db_out` module |
-|-------------------------------|---------------------|-----------------|
-| SQL relationships             | Yes                 | No              |
-| Direct Protobuf<>SQL mappings | Yes                 | No              |
-| `INSERT` supported            | Yes                 | Yes             |
-| `UPDATE` supported            | No                  | Yes             |
-| `UPSERT` supported            | No                  | Yes             |
+|                               | Relational Mappings Mode | Database Changes Mode (`db_out`) |
+|-------------------------------|--------------------------|----------------------------------|
+| SQL relationships             | Yes                      | No                               |
+| Direct Protobuf<>SQL mappings | Yes                      | No                               |
+| `INSERT` supported            | Yes                      | Yes                              |
+| `UPDATE` supported            | No                       | Yes                              |
+| `UPSERT` supported            | No                       | Yes                              |
 
 
 ## Installation
 
 The SQL sink is included in the [Substreams CLI](../../cli/installing-the-cli.md) — there is no separate binary to install. Once `substreams` is installed, the `substreams sink postgres` and `substreams sink clickhouse` commands are available.
-

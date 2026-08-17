@@ -17,8 +17,13 @@ type accumulator struct {
 
 type AccumulatorInserter struct {
 	accumulators map[string]*accumulator
-	cursorStmt   *sql.Stmt
-	logger       *zap.Logger
+	// flushOrder lists the tables in the order their statements must reach the server:
+	// a referenced table before the tables referencing it. Flushing groups rows by table,
+	// which loses the order the walk produced them in, so a foreign key would otherwise
+	// see a child before its parent.
+	flushOrder []string
+	cursorStmt *sql.Stmt
+	logger     *zap.Logger
 }
 
 func NewAccumulatorInserter(logger *zap.Logger) (*AccumulatorInserter, error) {
@@ -46,6 +51,11 @@ func (i *AccumulatorInserter) init(database *Database) error {
 		query: fmt.Sprintf("INSERT INTO %s (number, hash, timestamp) VALUES ", tableName(database.schema.Name, "_blocks_")),
 	}
 
+	flushOrder, err := database.dialect.TableApplyOrder()
+	if err != nil {
+		return err
+	}
+
 	cursorQuery := fmt.Sprintf("INSERT INTO %s (name, cursor) VALUES ($1, $2) ON CONFLICT (name) DO UPDATE SET cursor = $2", tableName(database.schema.Name, "_cursor_"))
 	cs, err := database.db.Prepare(cursorQuery)
 	if err != nil {
@@ -53,6 +63,7 @@ func (i *AccumulatorInserter) init(database *Database) error {
 	}
 
 	i.accumulators = accumulators
+	i.flushOrder = flushOrder
 	i.cursorStmt = cs
 
 	return nil
@@ -122,8 +133,9 @@ func (i *AccumulatorInserter) insert(table string, values []any, database *Datab
 }
 
 func (i *AccumulatorInserter) flush(database *Database) error {
-	for _, acc := range i.accumulators {
-		if len(acc.rowValues) == 0 {
+	for _, table := range i.flushOrder {
+		acc, found := i.accumulators[table]
+		if !found || len(acc.rowValues) == 0 {
 			continue
 		}
 		var b strings.Builder

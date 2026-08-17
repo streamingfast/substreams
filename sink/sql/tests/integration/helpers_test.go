@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	protosql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	"net"
 	"os"
 	"strconv"
@@ -10,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/moby/moby/api/types/network"
 	"github.com/jmoiron/sqlx"
+	"github.com/moby/moby/api/types/network"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/logging/zapx"
@@ -487,4 +488,15 @@ func readDbChangesRows[T any](t *testing.T, db *sqlx.DB, schema string, table st
 	t.Helper()
 
 	return readRowsBy[T](t, db, fmt.Sprintf(`"%s"."%s"`, schema, table), "id")
+}
+
+// constraintPolicy maps a test's "with constraints" boolean onto a policy: created before
+// the load when asked for, none at all otherwise. The sink's own default — everything,
+// created once the backfill is done — is exercised separately.
+func constraintPolicy(useConstraints bool) protosql.ConstraintPolicy {
+	if !useConstraints {
+		return protosql.DisableAllConstraints()
+	}
+
+	return protosql.ConstraintPolicy{Timing: protosql.ConstraintsAlways}
 }

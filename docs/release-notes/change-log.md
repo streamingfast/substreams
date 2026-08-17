@@ -240,6 +240,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Bumped notably `github.com/ClickHouse/clickhouse-go/v2` to v2.48.0, `github.com/AfterShip/clickhouse-sql-parser` to
   v0.5.5, `google.golang.org/grpc` to v1.83.0 and the OpenTelemetry SDK to v1.45.0.
 
+- `golang.org/x/mod` is at v0.40.0, which clears CVE-2026-56864 and CVE-2026-56865, both reported as HIGH against the
+  published `ghcr.io/streamingfast/substreams` image.
+
 ### Summary of changed flags and subcommands
 
 #### ADDED (relational-mappings `run` unless noted)
@@ -272,7 +275,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 setup                         no longer creates constraints by default; needs --apply-constraints=always
 cross-mode flags              wrong-mode flags now hard-error at startup (develop warned/ignored)
 clickhouse state flags        --cursor-file-path etc. now also on setup; defaults unchanged
-
 
 ## v1.21.0
 

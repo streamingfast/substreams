@@ -18,7 +18,7 @@ The engine is now part of the command name and must match your DSN scheme. There
 
 For ClickHouse targets, replace `postgres` with `clickhouse` in every command. `generate-csv` and `inject-csv` are PostgreSQL-only.
 
-There is no separate `from-proto` command anymore: the engine command (and `setup`) detects the mode from the output module's type. A module producing `sf.substreams.sink.database.v1.DatabaseChanges` uses your `schema.sql`; any other output type uses relational mappings derived from the protobuf definition.
+There is no separate `from-proto` command anymore: the engine command (and `setup`) detects the mode from the output module's type. A module producing `sf.substreams.sink.database.v1.DatabaseChanges` runs in Database Changes Mode and uses your `schema.sql`; any other output type runs in Relational Mappings Mode, whose schema is derived from the protobuf definition.
 
 ## Flag changes
 
@@ -52,7 +52,7 @@ There is no separate `from-proto` command anymore: the engine command (and `setu
 
 ## Cursor compatibility
 
-- DatabaseChanges mode stores its cursor in the same `cursors` table, keyed by module hash. Point the new CLI at the same database and it resumes from the stored cursor.
+- Database Changes Mode stores its cursor in the same `cursors` table, keyed by module hash. Point the new CLI at the same database and it resumes from the stored cursor.
 - Relational-mappings mode is also unchanged: `_cursor_` table on PostgreSQL, cursor file on ClickHouse (`--cursor-file-path`, previously `--clickhouse-cursor-file-path`, same `cursor.txt` default).
 
 ## Environment variables

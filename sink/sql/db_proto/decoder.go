@@ -107,14 +107,22 @@ type decoded struct {
 	walkDuration      time.Duration
 }
 
-func newDecoder(rootMessageDescriptor protoreflect.MessageDescriptor, workers int) *decoder {
-	if workers <= 0 {
-		// One per core, less one for the goroutine draining the gRPC stream, capped at
-		// 8: TestClientDecodeScaling measures 4.52x at eight workers and 5.06x at
-		// fifteen, so the seven extra cores together buy 11%. Taking them would cost the
-		// rest of the machine for almost nothing.
-		workers = min(8, max(1, runtime.NumCPU()-1))
+// ResolveDecodeWorkers turns a requested worker count into the one that will be used.
+//
+// One per core, less one for the goroutine draining the gRPC stream, capped at 8:
+// TestClientDecodeScaling measures 4.52x at eight workers and 5.06x at fifteen, so the
+// seven extra cores together buy 11%. Taking them would cost the rest of the machine for
+// almost nothing.
+func ResolveDecodeWorkers(workers int) int {
+	if workers > 0 {
+		return workers
 	}
+
+	return min(8, max(1, runtime.NumCPU()-1))
+}
+
+func newDecoder(rootMessageDescriptor protoreflect.MessageDescriptor, workers int) *decoder {
+	workers = ResolveDecodeWorkers(workers)
 
 	return &decoder{
 		messageType: hyperpb.CompileMessageDescriptor(rootMessageDescriptor),

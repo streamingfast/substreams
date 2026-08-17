@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -24,6 +25,37 @@ type Database interface {
 	StoreSinkInfo(schemaName string, schemaHash string) error
 
 	CreateDatabase(useConstraints bool) error
+	// ApplyConstraints adds the schema's constraints to a database that already exists,
+	// skipping the ones already in place. A schema first synced without constraints has
+	// none of them, and only this puts them there.
+	ApplyConstraints() error
+
+	// EnsureBlockNumberIndexes creates the index the sink needs for its own reorg path,
+	// when it starts. It is not part of the constraint pass: --apply-constraints describes
+	// the schema and is the operator's to schedule, where this one the sink depends on to
+	// undo a reorg without sequentially scanning every table.
+	EnsureBlockNumberIndexes(ctx context.Context) error
+
+	// MissingConstraints names the constraints the policy says the schema should carry and
+	// the database does not have. It is what turns "this schema has no indexes" from
+	// something you find out by querying it into something the sink says on every start.
+	MissingConstraints() ([]string, error)
+
+	// DropConstraints removes the constraints this schema's DDL would create, leaving
+	// anything the sink did not put there alone. It is the escape hatch after
+	// --apply-constraints=always, and what makes a stalled backfill fast again without a
+	// second setup.
+	DropConstraints() error
+	// SwitchToDirectInserts leaves any buffered write path behind and inserts straight
+	// into the database from now on. It is a one-way switch, and a no-op for a backend
+	// that never buffered. The reason is what the caller knows and the database does not
+	// — reaching the chain head, or reaching the end of a bounded range — and it is what
+	// the switch reports, so the log does not claim a head the stream never saw.
+	// atChainHead says the sink carries on from here rather than exiting, which is what
+	// makes the spool's own bookkeeping worth clearing: a run that stays live seals a
+	// segment or two on every restart and would otherwise accumulate their records for as
+	// long as it lives.
+	SwitchToDirectInserts(ctx context.Context, reason string, atChainHead bool) error
 	// WalkMessageDescriptorAndInsert reads the message through protoreflect only, so it
 	// does not care which dynamic implementation produced it — dynamicpb and hyperpb are
 	// both accepted, and the decoder picks.
@@ -49,6 +81,16 @@ type Database interface {
 	GetDialect() Dialect
 
 	Open() error
+
+	// Close releases anything the database buffered locally, so blocks held at shutdown
+	// reach the server rather than being streamed again.
+	Close(ctx context.Context) error
+
+	// BufferStats reports what is buffered between the stream and the server: how many
+	// blocks, how many bytes on disk, and the last block actually committed. enabled is
+	// false when nothing buffers locally, in which case the caller knows a flush means
+	// the rows are stored.
+	BufferStats() (blocks int64, bytes int64, appliedBlock uint64, enabled bool)
 }
 
 type BaseDatabase struct {
@@ -87,8 +129,23 @@ type Parent struct {
 // bytes point into its arena — so an inserter that keeps a []any past the walk keeps the
 // message alive too. See decoder.arenas for where that lifetime is managed.
 func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm protoreflect.Message, blockNum uint64, blockTimestamp time.Time, parent *Parent, dialect Dialect, inserter Inserter) (time.Duration, error) {
+	// The row counters belong to this block alone. They cannot live on the database: the
+	// decoder walks several blocks at once, on its own goroutines.
+	return d.walkMessageDescriptorAndInsert(dm, blockNum, blockTimestamp, parent, dialect, inserter, map[string]uint32{})
+}
+
+func (d *BaseDatabase) walkMessageDescriptorAndInsert(dm protoreflect.Message, blockNum uint64, blockTimestamp time.Time, parent *Parent, dialect Dialect, inserter Inserter, rowIDs map[string]uint32) (time.Duration, error) {
 	if dm == nil {
 		return 0, fmt.Errorf("received a nil message")
+	}
+
+	md := dm.Descriptor()
+	tableInfo := proto.TableInfo(md)
+
+	if tableInfo == nil && !d.useProtoOptions {
+		tableInfo = &pbSchema.Table{
+			Name: string(md.Name()),
+		}
 	}
 
 	var fieldValues []any
@@ -106,13 +163,14 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm protoreflect
 		primaryKeyOffset += 1
 	}
 
-	md := dm.Descriptor()
-	tableInfo := proto.TableInfo(md)
-
-	if tableInfo == nil && !d.useProtoOptions {
-		tableInfo = &pbSchema.Table{
-			Name: string(md.Name()),
-		}
+	// The count of rows this block already wrote to this table. The walk is a
+	// deterministic function of the message — fields in descriptor order, children after
+	// their parent — so replaying the same block hands every row the same number, which is
+	// what makes the sorting key stable across a reprocess.
+	if tableInfo != nil && dialect.UseRowIDField(tableInfo.Name) {
+		fieldValues = append(fieldValues, rowIDs[tableInfo.Name])
+		rowIDs[tableInfo.Name] += 1
+		primaryKeyOffset += 1
 	}
 
 	// Guarded: this runs once per message, and zap.Any on the table info allocates
@@ -175,7 +233,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm protoreflect
 				// Array of native values - add as a single field value (the array itself)
 				var values []interface{}
 				for j := 0; j < list.Len(); j++ {
-					values = append(values, ScalarFieldValue(fd,list.Get(j)))
+					values = append(values, ScalarFieldValue(fd, list.Get(j)))
 				}
 				fieldValues = append(fieldValues, values)
 			} else {
@@ -208,7 +266,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm protoreflect
 				childs = append(childs, fm) //need to be handled after current message inserted
 			}
 		} else {
-			fieldValues = append(fieldValues, ScalarFieldValue(fd,fv))
+			fieldValues = append(fieldValues, ScalarFieldValue(fd, fv))
 		}
 	}
 
@@ -242,7 +300,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm protoreflect
 	}
 
 	for _, fm := range childs {
-		sqlDuration, err := d.WalkMessageDescriptorAndInsertWithDialect(fm, blockNum, blockTimestamp, p, dialect, inserter)
+		sqlDuration, err := d.walkMessageDescriptorAndInsert(fm, blockNum, blockTimestamp, p, dialect, inserter, rowIDs)
 		if err != nil {
 			return 0, fmt.Errorf("processing child %q: %w", string(fm.Descriptor().FullName()), err)
 		}

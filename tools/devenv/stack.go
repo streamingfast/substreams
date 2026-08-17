@@ -45,6 +45,10 @@ const BlockType = "sf.acme.type.v1.Block"
 // DefaultImage is the dummy blockchain image the end-to-end tests are pinned to.
 const DefaultImage = "ghcr.io/streamingfast/dummy-blockchain:1cea671"
 
+// relayerPort is the firehose-core convention for the relayer's block stream server, which is
+// the only port of the container this stack talks to.
+const relayerPort = "10014"
+
 // ChainConfig describes the dummy blockchain to run.
 type ChainConfig struct {
 	// Image defaults to DefaultImage.
@@ -118,14 +122,21 @@ func StartDummyBlockchain(ctx context.Context, config ChainConfig) (testcontaine
 		Env: map[string]string{
 			"DLOG": ".*=debug",
 		},
-		ExposedPorts: []string{"10014/tcp"},
+		ExposedPorts: []string{relayerPort + "/tcp"},
 		Mounts: testcontainers.Mounts(
 			testcontainers.BindMount(config.TmpDir, "/app/firehose-data/storage/"),
 		),
 		// Deliberately not wait.ForListeningPort: that one execs a probe inside the container,
 		// and the exec itself times out while the node is busy writing a large genesis burst.
-		// The log line plus a dial from the host says the same thing without the exec.
-		WaitingFor: wait.ForLog("serving gRPC").WithStartupTimeout(config.startupTimeout()),
+		//
+		// The line has to name the relayer's own port. A bare "serving gRPC" matches the reader
+		// node announcing :10010, which it does before the relayer has finished bootstrapping its
+		// hub — and the dial below proves nothing either, since Docker binds the mapped host port
+		// when the container starts and accepts connections whether or not anything inside is
+		// listening. A tier1 started on that gap connects to a relayer that is not serving yet and
+		// ends up with a live stream carrying no partial blocks at all, which looks like a healthy
+		// run until something asserts on flash blocks.
+		WaitingFor: wait.ForLog(`serving gRPC.*`+relayerPort).AsRegexp().WithStartupTimeout(config.startupTimeout()),
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -406,7 +417,7 @@ func highestMergedBlock(dir string) uint64 {
 
 // RelayerEndpoint resolves the host-side address of the container's relayer.
 func RelayerEndpoint(ctx context.Context, container testcontainers.Container) (string, error) {
-	port, err := container.MappedPort(ctx, "10014/tcp")
+	port, err := container.MappedPort(ctx, relayerPort+"/tcp")
 	if err != nil {
 		return "", fmt.Errorf("mapped relayer port: %w", err)
 	}

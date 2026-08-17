@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -156,7 +157,7 @@ func (ui *TUI) jsonBlockScopedData(
 
 			wrappedCnt, err := ui.decoder.WrapMessage(msgType, clock.Number, out.Name, dataContent, partialIndex, lastPartial)
 			if err != nil {
-				fmt.Printf("Error wrapping message: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Error wrapping message: %v\n", err)
 			} else {
 				cnt := ui.prettyFormat(wrappedCnt, true)
 				fmt.Println(string(cnt))

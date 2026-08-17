@@ -173,6 +173,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   block, stage count and cached-blocks summary the non-TTY output has always shown — the line was guarded on a field
   nothing ever set and rendered as blank lines.
 
+- Fixed: `substreams run` wrote human-readable messages to standard output, so its output could not be piped into `jq`
+  or any other consumer without filtering. The `Completed successfully` line, the signal-received notice, the
+  `cursor`/`clock` output mode banners, the message-wrapping error and the `.substreams.env` loader messages now go to
+  standard error, leaving only the module data on standard output. Scripts detecting success by grepping stdout for
+  `Completed successfully` must check the exit code instead.
+
 - Added Ethereum Hoodi testnet (`hoodi`) StreamingFast endpoints (`hoodi.eth.streamingfast.io:443`).
 
 ### Server

@@ -13,9 +13,85 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- CLI: Ethereum Hoodi testnet (`hoodi`) StreamingFast endpoints (`hoodi.eth.streamingfast.io:443`).
+- RPC: `ModulesProgress.stages` entries now expose per-stage squash visibility, so a client can tell "segment produced" apart from "segment actually usable".
+
+  `Stage` gained two additive fields: `ready_up_to_exclusive` (field 3), the chain block number, exclusive, up to which the stage is immediately usable, and `squash_wait_segment_count` (field 4), the number of segments whose store partial exists but has not been squashed into the store yet.
+
+  `completed_ranges` counts a store segment as soon as its partial has been produced, before tier1 has merged it, whereas `ready_up_to_exclusive` stops at the last squashed segment. A stage could therefore render as 100% covered while a substantial part of the work was still outstanding, and since squashing runs on tier1 rather than on a worker it schedules no job and advances no `processed_blocks` — the request looked frozen at 100% with a rate of zero. A non-zero `squash_wait_segment_count` now names that state explicitly.
+
+  For a stage that executes no store module the two notions coincide, as mapper and index output is read straight from the partial files, and `squash_wait_segment_count` stays 0. A stage that has not started reports the block its modules begin at, floored at the chain's first streamable block, so 0 is a valid value meaning "nothing usable yet" and not a sentinel for "unknown".
+- RPC: `SessionInit` gained `segment_block_count` (field 11), the width in blocks of one parallel processing segment, constant for the whole session.
+
+  The segment width was previously not exchanged at all, so a client had no way to turn a segment count such as `Stage.squash_wait_segment_count` into a number of blocks. It could only be inferred from `Job.stop_block - Job.start_block`, which is unavailable exactly when it is needed, since no job runs while tier1 squashes.
+
+  It is an upper bound rather than an exact multiplier: the first and last segment of a run are narrower when a module's initial block or the request's stop block falls inside a segment.
+- Server: tier1 request logs now explain how many parallel workers a request actually got, and why. A client asking for 300 workers and getting 15 previously left no trace of the negotiation anywhere in the logs.
+
+  The `incoming Substreams Blocks request` entry gained a `parallelism` object (`requested_workers` as asked by the client, `granted_workers` as allowed by the authentication layer, the effective `workers`, `workers_source` telling which of the two applied, plus `plan_tier` and `stage_layer_executors`), along with `parallel_segment_count` and `stage_count` — a request with fewer segments than workers can never use them all.
+
+  The `substreams request stats` entry gained a `workers` object (`requested`, `granted`, `effective`, `peak`, `pool_exhausted_count`, `pool_rampup_deferred_count`), reported on tier1 only. A high `pool_exhausted_count` with a `peak` well below `effective` means the shared worker pool ran dry, a case that was previously only visible at debug level.
+
+  The periodic `substreams request progress` entry gained its own `workers` object (`requested`, `granted`, `effective`, `running`, `idle`, and `pool_exhausted_5m` when jobs failed to get a worker over the window), so the same question can be answered while the request is still running rather than only once it ends. When jobs repeatedly find no free worker while the request still has idle capacity, a hint now says so and names the three ceilings that can cause it — the tier2 fleet being full, the organization's worker quota, or the server's per-session worker cap — since the pool reports a single error for all three.
+
+- CLI: `substreams tools devenv` boots a complete local stack — a dummy blockchain in a container plus a tier1 and a tier2 built from the current source tree — prints the endpoint and stays up until interrupted. Requires Docker. `--burst` sets how many blocks exist at genesis and `--bundle-size` the segment size, which together decide how much parallel work a request has to do; the state store lives under `--data-dir`, so deleting it is what gives a cold backprocess again. The command waits for the merger to catch up with the burst before starting tier1, since tier1 bootstraps its block hub from merged blocks and cannot become ready until they exist. The end-to-end tests now share this same setup code, so what a developer watches locally is the path CI exercises.
+
+  Running the tiers in-process pulls in the wasmtime runtime, whose bindings are cgo-only, so the command is built only when cgo is enabled — that is, in a local `go build` or `go install`, but not in the released Docker image, which is deliberately static. That image could not run it anyway, having no Docker daemon of its own.
+
 - WASM: new `context` host module giving modules an intrinsic they can call at any point during execution: `context::clock(output_ptr)` writes the block clock as an encoded `sf.substreams.v1.Clock`. It writes a `{ptr, len}` pair at `output_ptr`, the same convention the `state` getters use, and is available on the `wasmtime` and `wazero` runtimes (not on the JavaScript/v8 one). Until now the clock was only reachable by declaring `source: sf.substreams.v1.Clock` as a module input. Ergonomic Rust bindings will follow in `substreams-rs`; until then a module declares the import itself with `#[link(wasm_import_module = "context")]`. `context` joins `env`, `state` and `logger` as a namespace WASM extensions cannot register into.
 
+### Changed
+
+- Dependencies: bumped the `all` group, notably `github.com/ClickHouse/clickhouse-go/v2` to v2.48.0, `github.com/AfterShip/clickhouse-sql-parser` to v0.5.5, `google.golang.org/grpc` to v1.83.0 and the OpenTelemetry SDK to v1.45.0.
+
+  `clickhouse-sql-parser` v0.5.x replaced the `String()` method on AST nodes with a `Formatter`; the ClickHouse `ON CLUSTER` schema rewriting path was updated to `parser.Format()`, which emits the same single-line SQL as before.
+
+- Sink: `substreams sink postgres` and `substreams sink clickhouse` in from-proto mode now unmarshal and walk blocks on a worker pool instead of one at a time at flush. Decoding a block was where the sink spent its time — around 7.8µs of the 9.3µs a wide entity cost — while PostgreSQL sat on roughly eight times that in headroom, so the sink itself was the throughput limit. Measured at 4.1x on a wide entity. Workers only fill a per-block buffer; the inserts are still replayed in block order, in the same transaction as before, so the resulting database is unchanged.
+
+  The pool defaults to one worker per core less one, capped at eight, since the work is allocator-bound before it runs out of cores. `SinkerFactoryOptions.DecodeWorkers` overrides it.
+
+- Sink: **Breaking** `db_proto.NewSinker` takes a `decodeWorkers int` parameter, and `SinkerFactoryOptions.Parallel` is gone along with `sql.Database.Clone()`. The parallel flush path they served was unreachable — `Parallel` was hardcoded to false at every call site — and unsound had it run: `Clone()` returned the receiver, so every goroutine shared one `*sql.Tx`.
+
+- CLI: `substreams run` now reports backprocessing as progress and rates instead of a list of block ranges. A four-line session header (trace ID, module, chain, work to do, including how much was already cached) is printed once and stays in the scrollback, followed by a compact live block: overall percentage, blocks per second, ETA, running jobs against the worker limit, then one bar per stage with its job count and oldest job age, and an `out` row tracking the output frontier towards the requested start block.
+
+  Percentages come from the work counts the server already reported in `SessionInit` and were never displayed, and the in-flight job progress is added to the completed-job count so the bar advances continuously rather than in steps. A run whose stores are fully cached now says so in one line instead of rendering an empty progress skeleton.
+
+  `Slowest modules` is kept as its own section, ranked across all stages, now showing both a recent (30s window) and a lifetime per-block cost, tagged with the stage each module belongs to. Modules under 10ms per block no longer earn a line.
+
+  Stage progress is measured from `Stage.ready_up_to_exclusive` rather than from `completed_ranges`. The latter counts a store segment as soon as its partial has been produced, so a stage rendered as 100% while tier1 was still squashing — and since squashing schedules no job and advances no `processed_blocks`, the request looked frozen at 100% with a rate of zero. That state is now named on the stage row as `squashing N segments`. Reading the squashed frontier also fixes the bar's low end: it is the lowest *contiguous* block across the stage's modules, so a stage with a gap in its produced ranges no longer counts the ranges beyond that gap, and a stage that has not started reports where it begins instead of being invisible.
+
+  The `Longest-running jobs` section is gone: it fired on a fixed 5 second threshold, which flickered in and out on healthy runs where jobs normally take 5 to 8 seconds. Job age is now always visible on the stage rows instead. Also removed: the `Progress messages received` counter, which only tracked the server's deliberately decreasing progress interval, and the `m` key toggling between bar and block-range rendering, which no longer has two modes to switch between.
+
+- CLI: `substreams run` output on failure is no longer one undivided wall of text. The session header, the progress block, the usage report and the error are separated, the progress block is closed with `Backprocessing  aborted` rather than trailing off at `starting…`, and a request refused for exceeding `--limit-processed-blocks` now reports the figures it was given at session init and names the fix:
+
+  ```
+  Error: --limit-processed-blocks is set to 10,000, but this request needs to process 3,394,913 blocks (3,394,000 of them to prepare the stores): raise it with --limit-processed-blocks 3400000, or remove the guard entirely with --limit-processed-blocks 0
+  ```
+
+- Sink: `Sinker.PrintStats` collapses to a single `📊 Usage Report: no data received` line when a request produced nothing, instead of a header followed by three zeroed counters. Affects `substreams run`, `substreams sink webhook` and `substreams sink noop`.
+
+- Sink: `substreams sink postgres` and `substreams sink clickhouse` in from-proto mode now parse block payloads with [hyperpb](https://buf.build/go/hyperpb) instead of protobuf-go's `dynamicpb`. Both are driven only by the module's descriptor, which is all the sink has at runtime, and both are read through `protoreflect` by the descriptor walk, so the rows are identical — but hyperpb compiles the descriptor into a parser once and parses into an arena, at 18x the speed and one allocation per block instead of thousands.
+
+  End to end that is 1.9x on the full decode path for a wide entity (88k to 168k rows/s on one core) and 2.7x across the decoder's worker pool (517k to 1.40M rows/s on eight). The parse is no longer the expensive half of decoding: the descriptor walk is now around 90% of it. For wide entities the sink is no longer the throughput limit either — eight workers now produce more rows per second than binary COPY absorbs.
+
+  hyperpb builds on amd64 and arm64 only. Every release target already qualifies, and 32-bit was unbuildable for unrelated reasons well before this.
+
+- Sink: **Breaking** `sql.Database.WalkMessageDescriptorAndInsert`, `WalkMessageDescriptorAndInsertInto`, `BaseDatabase.WalkMessageDescriptorAndInsertWithDialect` and `sql.Dialect.AppendInlineFieldValues` take a `protoreflect.Message` where they took a `*dynamicpb.Message`. The walk only ever read the message, so this is what lets the parser be chosen by the caller.
+
 ### Fixed
+
+- Sink: `substreams sink postgres` and `substreams sink clickhouse` in from-proto mode now write the blocks still held when a bounded run reaches its stop block. Blocks accumulate until `--block-batch-size` of them have gone by, and nothing drained that buffer at the end of the range, so a run ending mid-batch silently dropped its last blocks along with the cursor covering them — and still reported success. With a batch size larger than the requested range, nothing was written at all.
+
+- Sink: `substreams sink postgres` and `substreams sink clickhouse` in from-proto mode no longer crash on a module whose output carries an `enum` field. protoreflect hands an enum out as a `protoreflect.EnumNumber`, a named `int32` that neither dialect's type switch matched: PostgreSQL panicked with `unsupported type: protoreflect.EnumNumber` and ClickHouse on a failed `value.(int32)` assertion. Since the two disagree on the column type — PostgreSQL declares it `TEXT`, ClickHouse `Int32` — the walk now carries both renderings and each dialect takes the one matching the column it created, so PostgreSQL stores the enum's name and ClickHouse its number. A value absent from the descriptor falls back to its number. This covers an enum wherever it appears: as a plain field, as a `repeated` one, inside an `inline` nested message, and as a table's primary key.
+
+- Sink: **BREAKING** — `substreams sink postgres` in from-proto mode now stores `bytes` fields as binary in their `BYTEA` columns. Under the default `--bytes-encoding=raw` both inserters corrupted them, each differently: without `--no-constraints` a 7-byte value was stored as the 14 characters of its base64 form including the surrounding quotes, and with it as the 14 characters of its hex form. The same confusion also broke repeated scalar fields without `--no-constraints`, where each array element was stored with SQL quotes as part of its value (`'alpha'` rather than `alpha`).
+
+  Nothing failed loudly for any of these: the rows were all there, and every query against those columns simply matched nothing. Databases already populated by an affected version hold corrupted values in those columns and need the affected block range re-synced.
+  This changes what lands in those columns, so it breaks anything downstream built against the corrupted form. A consumer reading a `bytes` column as base64 or hex text now gets the binary value instead. A query written to work around the array corruption — matching the element `'alpha'`, quote characters and all, because that is what was stored — now has to match `alpha`. Re-syncing an existing database leaves both forms in the same table until the affected range is rewritten.
+
+- CLI: `substreams run` needed two Ctrl-C to stop while the progress view was on screen. The view puts the terminal in raw mode, so the first Ctrl-C arrived as a key press rather than as SIGINT: the UI quit but the request kept streaming, and only the second one — delivered because the first had released the terminal — actually stopped it. The key press now cancels the request directly.
+
+- CLI: `substreams run` was never printing the `Backprocessing history up to requested target block` line, nor the head block, stage count and cached-blocks summary the non-TTY output has always shown. The line was guarded on a field that nothing in the codebase ever set, and rendered as blank lines instead.
 
 - Server: `substreams-tier1` now restarts when its block hub can no longer link incoming live blocks, instead of hanging every request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be linked, and the head-block metrics keep tracking the live source, so the process looked healthy throughout.
 

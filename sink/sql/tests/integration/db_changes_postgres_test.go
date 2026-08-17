@@ -29,13 +29,9 @@ var sharedDbChangesPostgresContainer *PostgresContainerExt
 var sharedDbChangesClickhouseContainer *ClickhouseContainerExt
 
 func TestMain(m *testing.M) {
-	// These tests spin up Postgres and ClickHouse containers, opt-in only so
-	// plain `go test ./...` works on machines without Docker (e.g. macOS CI)
-	if os.Getenv("SF_SINK_SQL_INTEGRATION_TESTS") == "" {
-		fmt.Println("skipping sink/sql integration tests, set SF_SINK_SQL_INTEGRATION_TESTS=true to run them")
-		os.Exit(0)
-	}
-
+	// These tests spin up Postgres and ClickHouse containers and always run: the suite
+	// needs a container runtime anyway, and an environment variable that skips them
+	// quietly only hides a broken environment behind a green run.
 	var pgCleanup, chCleanup func()
 
 	// Setup both containers in parallel

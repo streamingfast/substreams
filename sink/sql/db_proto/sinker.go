@@ -3,46 +3,49 @@ package db_proto
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/streamingfast/logging/zapx"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	sink "github.com/streamingfast/substreams/sink"
 	sql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/stats"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"go.uber.org/zap"
-	"google.golang.org/appengine"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 type Sinker struct {
 	*sink.Sinker
 	db                    sql.Database
 	useTransaction        bool
-	parallel              bool
 	blockBatchSize        uint64
 	stats                 *stats.Stats
 	logger                *zap.Logger
 	rootMessageDescriptor protoreflect.MessageDescriptor
 	useConstraints        bool
-	flushLock             sync.Mutex
 	lastAppliedBlockNum   uint64
 	lastAppliedBlockTime  time.Time
+
+	// holding buffers the blocks received since the last flush. It is only ever touched
+	// from the sinker's callbacks, which are called sequentially.
+	holding []*Holder
+
+	decoder *decoder
 }
 
-func NewSinker(rootMessageDescriptor protoreflect.MessageDescriptor, sink *sink.Sinker, db sql.Database, useTransaction bool, useConstraints bool, blockBatchSize int, parallel bool, stats *stats.Stats, logger *zap.Logger) *Sinker {
+// NewSinker builds the from-proto sinker. decodeWorkers bounds how many blocks are
+// unmarshalled and walked concurrently at flush time; zero picks one per core, less one,
+// capped at eight.
+func NewSinker(rootMessageDescriptor protoreflect.MessageDescriptor, sink *sink.Sinker, db sql.Database, useTransaction bool, useConstraints bool, blockBatchSize int, decodeWorkers int, stats *stats.Stats, logger *zap.Logger) *Sinker {
 	return &Sinker{
 		db:                    db,
 		rootMessageDescriptor: rootMessageDescriptor,
 		useTransaction:        useTransaction,
-		parallel:              parallel,
 		blockBatchSize:        uint64(blockBatchSize),
 		stats:                 stats,
 		Sinker:                sink,
 		logger:                logger,
+		decoder:               newDecoder(rootMessageDescriptor, decodeWorkers),
 	}
 }
 
@@ -82,8 +85,6 @@ type Holder struct {
 	cursor *sink.Cursor
 }
 
-var holding []*Holder
-
 func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *sink.Cursor) (err error) {
 	output := data.Output
 
@@ -118,132 +119,106 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 		isLive: isLive,
 		cursor: cursor,
 	}
-	holding = append(holding, holder)
+	s.holding = append(s.holding, holder)
 	if data.Clock.Number > (s.lastAppliedBlockNum+s.blockBatchSize) || s.blockBatchSize == 1 || (isLive != nil && *isLive) {
 		if isLive != nil && *isLive && s.stats.FlushDuration.Average() > data.Clock.Timestamp.AsTime().Sub(s.lastAppliedBlockTime) {
 			s.logger.Debug("skipping a flush because we are LIVE and flush average duration is above time between blocks", zapx.HumanDuration("flush_duration_average", s.stats.FlushDuration.Average()), zap.Time("last_block_time", s.lastAppliedBlockTime), zap.Time("block_time", data.Clock.Timestamp.AsTime()))
 			return nil
 		}
 
-		if s.useTransaction && !s.parallel {
-			if err := s.db.BeginTransaction(); err != nil {
-				return fmt.Errorf("begin tx: %w", err)
-			}
-		}
-		errs := appengine.MultiError{}
-		if s.parallel {
-			wg := sync.WaitGroup{}
-			wg.Add(len(holding))
-
-			for _, h := range holding {
-				go func() {
-					db := s.db.Clone()
-					err := db.BeginTransaction()
-					if err != nil {
-						errs = append(errs, err)
-					}
-
-					err = s.processHolder(h, s.stats)
-					if err != nil {
-						db.RollbackTransaction()
-						errs = append(errs, err)
-						//return fmt.Errorf("process holder: %w", err)
-					}
-					err = db.CommitTransaction()
-					if err != nil {
-						errs = append(errs, err)
-					}
-					wg.Done()
-				}()
-			}
-			wg.Wait()
-			if len(errs) > 0 {
-				return fmt.Errorf("errors: %w", errs)
-			}
-
-		} else {
-			for _, h := range holding {
-				err = s.processHolder(h, s.stats)
-				if err != nil {
-					if s.useTransaction {
-						s.logger.Error("rolling back transaction", zap.Error(err))
-						s.db.RollbackTransaction()
-					}
-					return fmt.Errorf("process holder: %w", err)
-				}
-			}
-		}
-
-		flushDuration, err := s.db.Flush()
-		if err != nil {
-			return fmt.Errorf("flushing: %w", err)
-		}
-
-		var flushDurationPerBlock time.Duration
-		if len(holding) > 0 {
-			flushDurationPerBlock = flushDuration / time.Duration(len(holding))
-		}
-		s.stats.FlushDuration.Add(flushDurationPerBlock)
-
-		s.lastAppliedBlockNum = data.Clock.Number
-		s.lastAppliedBlockTime = data.Clock.Timestamp.AsTime()
-		err = s.db.StoreCursor(cursor)
-		if err != nil {
-			return fmt.Errorf("inserting cursor: %w", err)
-		}
-
-		if s.useTransaction && !s.parallel {
-			if err := s.db.CommitTransaction(); err != nil {
-				return fmt.Errorf("commit tx: %w", err)
-			}
-		}
-		holding = []*Holder{}
+		return s.flushHolding(cursor)
 	}
 
 	return nil
 }
 
-func (s *Sinker) processHolder(h *Holder, stats *stats.Stats) (err error) {
-	if len(h.output.GetMapOutput().GetValue()) == 0 {
+// HandleBlockRangeCompletion flushes whatever is still held when a bounded run reaches
+// its stop block.
+//
+// Blocks accumulate until the batch is full, so a run that ends mid-batch left its last
+// blocks in memory and never wrote them, nor the cursor covering them. With
+// --block-batch-size larger than the range, that meant an empty database and a run that
+// looked successful.
+func (s *Sinker) HandleBlockRangeCompletion(ctx context.Context, cursor *sink.Cursor) error {
+	if len(s.holding) == 0 {
 		return nil
 	}
 
-	unmarshalStartAt := time.Now()
-	md := s.rootMessageDescriptor
-	dm := dynamicpb.NewMessage(md)
-	err = proto.Unmarshal(h.data.Output.GetMapOutput().GetValue(), dm)
-	if err != nil {
-		return fmt.Errorf("unmarshaling message: %w", err)
+	s.logger.Info("flushing blocks held at the end of the requested range", zap.Int("block_count", len(s.holding)))
+
+	return s.flushHolding(cursor)
+}
+
+// flushHolding applies every held block, stores the cursor and commits.
+func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
+	if len(s.holding) == 0 {
+		return nil
 	}
 
-	//protoscopeOutput := protoscope.Write(h.data.Output.GetMapOutput().GetValue(), protoscope.WriterOptions{})
-	//fmt.Printf("Proto Scope: %s\n", protoscopeOutput)
+	lastClock := s.holding[len(s.holding)-1].data.Clock
 
-	stats.UnmarshallingDuration.Add(time.Since(unmarshalStartAt))
-
-	err = processMessage(dm, s.db, h.data.Clock.Number, h.data.Clock.Id, h.data.Clock.Timestamp.AsTime(), stats)
+	// Decode before opening the transaction: it touches no database state, and holding
+	// one open across the CPU-bound work would pin a connection for nothing.
+	decodedBlocks, err := s.decoder.decodeAll(s.holding, s.db)
 	if err != nil {
-		return fmt.Errorf("process entity: %w", err)
+		return fmt.Errorf("decoding blocks: %w", err)
 	}
+
+	if s.useTransaction {
+		if err := s.db.BeginTransaction(); err != nil {
+			return fmt.Errorf("begin tx: %w", err)
+		}
+	}
+
+	insertDuration, err := s.decoder.apply(decodedBlocks, s.db)
+	if err != nil {
+		if s.useTransaction {
+			s.logger.Error("rolling back transaction", zap.Error(err))
+			s.db.RollbackTransaction()
+		}
+		return fmt.Errorf("applying blocks: %w", err)
+	}
+	s.recordDecodeStats(decodedBlocks, insertDuration)
+
+	flushDuration, err := s.db.Flush()
+	if err != nil {
+		return fmt.Errorf("flushing: %w", err)
+	}
+
+	var flushDurationPerBlock time.Duration
+	if len(s.holding) > 0 {
+		flushDurationPerBlock = flushDuration / time.Duration(len(s.holding))
+	}
+	s.stats.FlushDuration.Add(flushDurationPerBlock)
+
+	s.lastAppliedBlockNum = lastClock.Number
+	s.lastAppliedBlockTime = lastClock.Timestamp.AsTime()
+	err = s.db.StoreCursor(cursor)
+	if err != nil {
+		return fmt.Errorf("inserting cursor: %w", err)
+	}
+
+	if s.useTransaction {
+		if err := s.db.CommitTransaction(); err != nil {
+			return fmt.Errorf("commit tx: %w", err)
+		}
+	}
+	s.holding = s.holding[:0]
 
 	return nil
 }
-func processMessage(dm *dynamicpb.Message, database sql.Database, blockNum uint64, blockHash string, blockTimestamp time.Time, stats *stats.Stats) error {
-	startInsertBlock := time.Now()
-	err := database.InsertBlock(blockNum, blockHash, blockTimestamp)
-	if err != nil {
-		return fmt.Errorf("inserting block: %w", err)
+
+// recordDecodeStats folds the per-block timings the workers measured back into the
+// shared stats, on this goroutine: Average.Add is not safe for concurrent use.
+func (s *Sinker) recordDecodeStats(results []*decoded, insertDuration time.Duration) {
+	for _, result := range results {
+		if result.empty {
+			continue
+		}
+		s.stats.UnmarshallingDuration.Add(result.unmarshalDuration)
+		s.stats.EntitiesInsertDuration.Add(result.walkDuration)
 	}
-	stats.BlockInsertDuration.Add(time.Since(startInsertBlock))
-
-	sqlDuration, err := database.WalkMessageDescriptorAndInsert(dm, blockNum, blockTimestamp, nil)
-	if err != nil {
-		return fmt.Errorf("processing message %q: %w", string(dm.Descriptor().FullName()), err)
-	}
-
-	stats.EntitiesInsertDuration.Add(sqlDuration)
-
-	return nil
+	s.stats.BlockInsertDuration.Add(insertDuration)
 }
 
 func (s *Sinker) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *sink.Cursor) (err error) {

@@ -11,11 +11,12 @@ import (
 	"github.com/ClickHouse/ch-go/proto"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/logging/zapx"
+	v1 "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/schema/v1"
 	"github.com/streamingfast/substreams/sink/sql/bytes"
 	sql2 "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
-	v1 "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/schema/v1"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -193,7 +194,9 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 	if accumulator == nil {
 		return fmt.Errorf("accumulator not found for table %q", table)
 	}
-	i.logger.Debug("inserting", zap.String("table", table), zap.Int("values", len(values)))
+	if ce := i.logger.Check(zap.DebugLevel, "inserting"); ce != nil {
+		ce.Write(zap.String("table", table), zap.Int("values", len(values)))
+	}
 
 	for idx, value := range values {
 		column, found := accumulator.columns[idx]
@@ -221,7 +224,7 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 				panic(fmt.Sprintf("unknown time base input type %T for column %s of table %s", input, column.Name, table))
 			}
 		case *proto.ColInt32:
-			input.Append(value.(int32))
+			input.Append(int32Value(value))
 		case *proto.ColInt64:
 			input.Append(value.(int64))
 		case *proto.ColUInt32:
@@ -326,7 +329,7 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 			if arr, ok := value.([]interface{}); ok {
 				int32Arr := make([]int32, len(arr))
 				for i, v := range arr {
-					int32Arr[i] = v.(int32)
+					int32Arr[i] = int32Value(v)
 				}
 				input.Append(int32Arr)
 			} else {
@@ -538,6 +541,22 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 	}
 
 	return nil
+}
+
+// int32Value narrows a value bound for an Int32 column, scalar or array element.
+//
+// An enum column is declared Int32 by MapFieldType, so the walk's EnumValue has to be
+// reduced to its number here; a plain protoreflect.EnumNumber can still reach us from a
+// path that did not go through sql.ScalarFieldValue.
+func int32Value(value any) int32 {
+	switch v := value.(type) {
+	case sql2.EnumValue:
+		return v.Number
+	case protoreflect.EnumNumber:
+		return int32(v)
+	default:
+		return value.(int32)
+	}
 }
 
 func (i *AccumulatorInserter) flush(database *Database) error {

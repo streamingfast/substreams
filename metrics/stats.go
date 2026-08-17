@@ -63,6 +63,8 @@ type Stats struct {
 	// counter is used to get the next jobIdx
 	counter uint64
 
+	workers workerStats
+
 	clientReadTime *dmetrics.AvgDurationCounter
 	error          error
 	logger         *zap.Logger
@@ -98,9 +100,10 @@ type Stats struct {
 	// above is a momentary state that flips on every scheduling attempt, so it says nothing on
 	// its own about whether the throttle cost anything.
 	windowThrottled windowedDuration
-	// maxParallelJobs is what the request is allowed to run at once, so an idle worker count
-	// can be derived: a throttle only costs something when it leaves workers with nothing to do.
-	maxParallelJobs uint64
+	// windowPoolExhausted counts the borrow failures of workers.poolExhaustedCount over the
+	// window. The cumulative count says the pool ran dry at some point in the request; only the
+	// windowed one says it is dry now.
+	windowPoolExhausted windowedCounter
 	// stageJobs holds job accounting per stage, indexed by stage number.
 	stageJobs []*stageJobStats
 	// lastJobError keeps the most recent tier2 job error of the request. Failure counts tell
@@ -230,6 +233,77 @@ func NewReqStats(config *Config, stores []*pbsubstreams.Module, moduleHashes map
 
 func (s *Stats) SetError(err error) {
 	s.error = err
+}
+
+// workerStats gathers what is known about the tier2 workers of a tier1 request: how many the
+// client asked for, how many it was granted, and how many it managed to use at runtime. Only
+// tier1 schedules jobs, so this stays zeroed on tier2.
+//
+// Its fields are atomic rather than guarded by the Stats mutex: they are written from the
+// scheduler loop, which must not contend with the block-processing path for a counter bump.
+type workerStats struct {
+	// requested is the worker count the client asked for through the untrusted header, 0 when
+	// it asked for nothing.
+	requested atomic.Uint64
+
+	// granted is the worker count the authentication layer allowed for this request.
+	granted atomic.Uint64
+
+	// effective is the worker count this request may actually use, the min of the two above.
+	// It is also what an idle worker count is derived from, since a throttle only costs
+	// something when it leaves workers with nothing to do.
+	effective atomic.Uint64
+
+	// peak is the highest number of jobs that ran concurrently during this request. Well below
+	// effective means something else than the negotiated limit was in the way.
+	peak atomic.Uint64
+
+	// poolExhaustedCount counts how many times a job was ready to be scheduled but the worker
+	// pool, shared with the other requests of the session, had no worker left to give.
+	poolExhaustedCount atomic.Uint64
+
+	// poolRampUpDeferredCount counts how many times a job was held back by the worker pool
+	// ramp-up period, which only spans the first seconds of a request.
+	poolRampUpDeferredCount atomic.Uint64
+}
+
+func (w *workerStats) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
+	encoder.AddUint64("requested", w.requested.Load())
+	encoder.AddUint64("granted", w.granted.Load())
+	encoder.AddUint64("effective", w.effective.Load())
+	encoder.AddUint64("peak", w.peak.Load())
+	encoder.AddUint64("pool_exhausted_count", w.poolExhaustedCount.Load())
+	encoder.AddUint64("pool_rampup_deferred_count", w.poolRampUpDeferredCount.Load())
+	return nil
+}
+
+// SetWorkerCounts records the outcome of the worker count negotiation for this request, and is
+// the only place these counts are set. It is called once the trusted and client headers have
+// been resolved, which happens after the stats object is created but before either the periodic
+// progress log or the final stats log can read them.
+func (s *Stats) SetWorkerCounts(requested, granted, effective uint64) {
+	s.workers.requested.Store(requested)
+	s.workers.granted.Store(granted)
+	s.workers.effective.Store(effective)
+}
+
+// RecordWorkerPoolExhausted should be called when a job was ready to run but the worker pool
+// had no worker left to give, which happens when the pool is shared with other requests.
+func (s *Stats) RecordWorkerPoolExhausted() {
+	s.workers.poolExhaustedCount.Inc()
+
+	// The windowed count is what the periodic progress log reports, so it has to go through the
+	// mutex the rest of that machinery uses. The scheduler backs off for seconds after a failed
+	// borrow, so this cannot turn into a hot lock.
+	s.Lock()
+	defer s.Unlock()
+	s.windowPoolExhausted.add(time.Now(), 1)
+}
+
+// RecordWorkerPoolRampUpDeferred should be called when a job was held back because the worker
+// pool is still ramping up, which only happens in the first seconds of a request.
+func (s *Stats) RecordWorkerPoolRampUpDeferred() {
+	s.workers.poolRampUpDeferredCount.Inc()
 }
 
 type extendedStats struct {
@@ -405,6 +479,9 @@ func (s *Stats) RecordNewSubrequest(stage uint32, startBlock, stopBlock uint64) 
 
 	s.stageJobStats(int(stage)).scheduled++
 
+	if running := uint64(len(s.runningJobs)); running > s.workers.peak.Load() {
+		s.workers.peak.Store(running)
+	}
 	s.Unlock()
 	return id
 }
@@ -983,6 +1060,13 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 	byModule := s.wasmExtensionCallMetricsByModule()
 	out = append(out, zap.Objects("wasm_ext_call_metrics", aggregateWasmExtensionCallMetricsByExtension(byModule)))
 	out = append(out, zap.Objects("wasm_ext_call_metrics_by_module", byModule))
+
+	// Additive only: the worker count is negotiated and capped in several different places, so a
+	// client asking for 300 workers and seeing 15 needs all of these together to tell which one
+	// applied. Only tier1 schedules jobs, so tier2 has nothing to say here.
+	if !s.config.Tier2 {
+		out = append(out, zap.Object("workers", &s.workers))
+	}
 
 	return out
 }

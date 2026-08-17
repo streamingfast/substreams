@@ -5,7 +5,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 const DialectTableBlock = "_blocks_"
@@ -23,7 +22,7 @@ type Dialect interface {
 	GetTables() []*schema.Table
 	UseVersionField() bool
 	UseDeletedField() bool
-	AppendInlineFieldValues(fieldValues []any, fd protoreflect.FieldDescriptor, fv protoreflect.Value, dm *dynamicpb.Message) ([]any, error)
+	AppendInlineFieldValues(fieldValues []any, fd protoreflect.FieldDescriptor, fv protoreflect.Value, dm protoreflect.Message) ([]any, error)
 }
 
 type BaseDialect struct {

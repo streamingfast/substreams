@@ -43,10 +43,19 @@ jobs:
       - name: Validate GitBook
         run: go run ./docs/.gitbook/validate.go
 
+      # The suite needs a container runtime, which only the ubuntu runners have. macOS
+      # keeps the build step below, so a compile break still shows up on both.
       - name: Run Tests
+        if: matrix.os == 'ubuntu-latest'
         env:
-          # Docker-backed sink/sql integration tests, only ubuntu runners have Docker
-          SF_SINK_SQL_INTEGRATION_TESTS: ${{ matrix.os == 'ubuntu-latest' && 'true' || '' }}
+          # `go test ./...` builds several packages that each start their own containers
+          # and runs them in parallel, so more than one test binary is connected to the
+          # shared Ryuk reaper at a time. Runs have failed with every container in one
+          # package going unreachable part-way through the suite — tests that had already
+          # passed, then `connection refused` on both the Postgres and the ClickHouse
+          # mapped port — right as a different package's binary exited. Ryuk buys nothing
+          # here in any case: the runner is destroyed when the job ends.
+          TESTCONTAINERS_RYUK_DISABLED: "true"
         run: ./bin/test.sh
 
       - name: Build

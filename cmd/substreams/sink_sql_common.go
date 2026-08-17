@@ -341,7 +341,6 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 		UseConstraints:  useConstraints,
 		UseTransactions: true,
 		BlockBatchSize:  blockBatchSize,
-		Parallel:        false,
 		Encoding:        encoding,
 		Clickhouse:      fromProtoClickhouseOptions(cmd, driver),
 	})

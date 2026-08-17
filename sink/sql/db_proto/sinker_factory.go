@@ -25,9 +25,11 @@ type SinkerFactoryOptions struct {
 	UseConstraints  bool
 	UseTransactions bool
 	BlockBatchSize  int
-	Parallel        bool
-	Encoding        bytes.Encoding
-	Clickhouse      SinkerFactoryClickhouse
+	// DecodeWorkers bounds how many blocks are unmarshalled and walked concurrently at
+	// flush time. Zero picks one per core, less one.
+	DecodeWorkers int
+	Encoding      bytes.Encoding
+	Clickhouse    SinkerFactoryClickhouse
 }
 
 type SinkerFactoryClickhouse struct {
@@ -72,7 +74,7 @@ func SinkerFactory(
 			options.UseTransactions,
 			options.UseConstraints,
 			options.BlockBatchSize,
-			options.Parallel,
+			options.DecodeWorkers,
 			stats2.NewStats(logger),
 			logger,
 		), nil

@@ -102,6 +102,14 @@ func ReqStats(ctx context.Context) *metrics.Stats {
 	return ctx.Value(reqStatsKey).(*metrics.Stats)
 }
 
+// ReqStatsOrNil returns the request stats attached to the context, or nil when there is none.
+// Use it instead of [ReqStats] from code paths that also run without a request stats object
+// installed, typically tests, since [ReqStats] panics in that case.
+func ReqStatsOrNil(ctx context.Context) *metrics.Stats {
+	stats, _ := ctx.Value(reqStatsKey).(*metrics.Stats)
+	return stats
+}
+
 func WithReqStats(ctx context.Context, stats *metrics.Stats) context.Context {
 	return context.WithValue(ctx, reqStatsKey, stats)
 }

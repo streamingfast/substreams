@@ -15,7 +15,6 @@ import (
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 type Database struct {
@@ -188,8 +187,12 @@ func (d *Database) Insert(table string, values []any) error {
 	return d.inserter.insert(table, values, d)
 }
 
-func (d *Database) WalkMessageDescriptorAndInsert(dm *dynamicpb.Message, blockNum uint64, blockTimestamp time.Time, parent *sql.Parent) (time.Duration, error) {
+func (d *Database) WalkMessageDescriptorAndInsert(dm protoreflect.Message, blockNum uint64, blockTimestamp time.Time, parent *sql.Parent) (time.Duration, error) {
 	return d.WalkMessageDescriptorAndInsertWithDialect(dm, blockNum, blockTimestamp, parent, d.dialect, d)
+}
+
+func (d *Database) WalkMessageDescriptorAndInsertInto(dm protoreflect.Message, blockNum uint64, blockTimestamp time.Time, parent *sql.Parent, inserter sql.Inserter) (time.Duration, error) {
+	return d.WalkMessageDescriptorAndInsertWithDialect(dm, blockNum, blockTimestamp, parent, d.dialect, inserter)
 }
 
 func (d *Database) InsertBlock(blockNum uint64, hash string, timestamp time.Time) error {
@@ -307,12 +310,6 @@ func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) (err error) {
 	d.logger.Info("undo completed", zap.Int64("row_affected", rowsAffected))
 
 	return nil
-}
-
-func (d *Database) Clone() sql.Database {
-	base := d.BaseClone()
-	d.BaseDatabase = base
-	return d
 }
 
 func (d *Database) DatabaseHash(schemaName string) (uint64, error) {

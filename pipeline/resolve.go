@@ -113,7 +113,7 @@ func BuildRequestDetailsFromSubrequest(ctx context.Context, request *pbssinterna
 	}
 
 	// note: we don't touch the maxParallelJobs here
-	_, req.MaxStageLayerParallelExecutor = reqctx.GetEffectiveHeaderValues(ctx, nil, 0, reqctx.DefaultMaxStageLayerParallelExecutorCount)
+	req.MaxStageLayerParallelExecutor = reqctx.GetEffectiveHeaderValues(ctx, nil, 0, reqctx.DefaultMaxStageLayerParallelExecutorCount).StageLayerExecutors
 
 	return req
 }

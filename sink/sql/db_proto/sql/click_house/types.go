@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/ClickHouse/ch-go/proto"
+	v1 "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/schema/v1"
 	"github.com/streamingfast/substreams/sink/sql/bytes"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
-	v1 "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/schema/v1"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 

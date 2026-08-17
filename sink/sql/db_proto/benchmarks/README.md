@@ -1,4 +1,4 @@
-# from-proto Postgres sink: ingestion benchmarks
+# Relational Mappings Mode Postgres sink: ingestion benchmarks
 
 Two suites, answering the two questions that decide the design in
 `plans/2026-08-07-fast-local-buffer-copy.md`:

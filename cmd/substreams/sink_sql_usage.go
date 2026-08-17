@@ -19,11 +19,11 @@ import (
 func setModeGroupedUsage(cmd *cobra.Command) {
 	groups := []flagGroup{
 		{
-			title: "From-proto mode flags (module outputs an arbitrary protobuf message)",
+			title: "Relational Mappings Mode flags (module outputs an arbitrary protobuf message)",
 			names: append(append([]string{}, fromProtoSchemaFlagNames...), fromProtoRunFlagNames...),
 		},
 		{
-			title: "DatabaseChanges mode flags (module outputs DatabaseChanges)",
+			title: "Database Changes Mode flags (module outputs 'DatabaseChanges')",
 			names: append(databaseChangesFlagNames, onModuleHashMismatchFlag),
 		},
 	}

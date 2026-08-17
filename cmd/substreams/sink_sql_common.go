@@ -638,8 +638,8 @@ func newSinkSetupE(driver string) func(*cobra.Command, []string) error {
 
 		if isDatabaseChangesType(module.Output.Type) {
 			names := append(append([]string{}, fromProtoSchemaFlagNames...), "apply-constraints")
-			if err := rejectFlags(cmd, names, "from-proto",
-				"This one outputs DatabaseChanges, where the SQL schema is yours: it is created from the "+
+			if err := rejectFlags(cmd, names, "Relational Mappings Mode",
+				"This one runs in Database Changes Mode, where the SQL schema is yours: it is created from the "+
 					"'schema.sql' bundled in the manifest, and the sink neither derives it nor manages its constraints"); err != nil {
 				return err
 			}
@@ -670,21 +670,21 @@ func newSinkSetupE(driver string) func(*cobra.Command, []string) error {
 func rejectFromProtoFlags(cmd *cobra.Command) error {
 	names := append(append([]string{}, fromProtoSchemaFlagNames...), fromProtoRunFlagNames...)
 
-	return rejectFlags(cmd, names, "from-proto",
-		"This one outputs DatabaseChanges, where rows are written from the module's own database changes "+
+	return rejectFlags(cmd, names, "Relational Mappings Mode",
+		"This one runs in Database Changes Mode, where rows are written from the module's own database changes "+
 			"and the schema is the 'schema.sql' bundled in the manifest")
 }
 
 // rejectDatabaseChangesFlags is the same guard in the other direction.
 func rejectDatabaseChangesFlags(cmd *cobra.Command) error {
-	return rejectFlags(cmd, databaseChangesFlagNames, "DatabaseChanges",
+	return rejectFlags(cmd, databaseChangesFlagNames, "Database Changes Mode",
 		"This one outputs an arbitrary protobuf message, which the sink maps to relational tables of its own")
 }
 
 func rejectFlags(cmd *cobra.Command, names []string, appliesTo string, because string) error {
 	for _, name := range names {
 		if flagChanged(cmd, name) {
-			return fmt.Errorf("--%s only applies to %s Substreams. %s", name, appliesTo, because)
+			return fmt.Errorf("--%s only applies to %s. %s", name, appliesTo, because)
 		}
 	}
 
@@ -694,7 +694,7 @@ func rejectFlags(cmd *cobra.Command, names []string, appliesTo string, because s
 // errDatabaseChangesOwnsSchema is what every from-proto-only entry point says when the
 // module turns out to output DatabaseChanges.
 func errDatabaseChangesOwnsSchema(what string) error {
-	return fmt.Errorf("%s only applies to from-proto Substreams. This one outputs DatabaseChanges, where the SQL schema is yours: "+
+	return fmt.Errorf("%s only applies to Relational Mappings Mode. This one runs in Database Changes Mode, where the SQL schema is yours: "+
 		"it is created from the 'schema.sql' bundled in the manifest, and the sink neither derives it nor manages its constraints", what)
 }
 
@@ -773,7 +773,7 @@ func runFromProtoSetup(cmd *cobra.Command, driver, dsnString string, spkg *pbsub
 func rejectDatabaseChangesSetupFlags(cmd *cobra.Command) error {
 	names := append([]string{"postgraphile", "system-tables-only", "ignore-duplicate-table-errors"}, databaseChangesFlagNames...)
 
-	return rejectFlags(cmd, names, "DatabaseChanges",
+	return rejectFlags(cmd, names, "Database Changes Mode",
 		"This one outputs an arbitrary protobuf message, whose schema the sink derives from the module's own descriptors")
 }
 
@@ -1098,5 +1098,5 @@ func logFromProtoSettings(cmd *cobra.Command, driver string, options db_proto.Si
 		)
 	}
 
-	zlog.Info("from-proto sink settings", fields...)
+	zlog.Info("Relational Mappings Mode sink settings", fields...)
 }

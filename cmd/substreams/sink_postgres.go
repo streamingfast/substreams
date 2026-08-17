@@ -23,11 +23,12 @@ var sinkPostgresSetupCmd = &cobra.Command{
 		Setup the database for the Substreams SQL sink, auto-detecting the mode from the
 		output module type, exactly like the run action:
 
-		- DatabaseChanges output: creates the system tables (cursors, history) and applies
-		  the 'schema.sql' bundled in the manifest sink config.
-		- Any other output type (from-proto): resolves the schema from the module's output
-		  proto and creates the database schema and tables, then exits. This step is
-		  idempotent and can be run again safely.
+		- Database Changes Mode ('DatabaseChanges' output): creates the system tables
+		  (cursors, history) and applies the 'schema.sql' bundled in the manifest sink
+		  config.
+		- Relational Mappings Mode (any other output type): resolves the schema from the
+		  module's output proto and creates the database schema and tables, then exits.
+		  This step is idempotent and can be run again safely.
 	`),
 	Args: cobra.RangeArgs(1, 2),
 	RunE: newSinkSetupE(sinkPostgresDriver),
@@ -42,8 +43,9 @@ var sinkPostgresConstraintsApplyCmd = &cobra.Command{
 	Use:   "apply <manifest> [<module>]",
 	Short: "Create the schema's constraints on an already loaded database",
 	Long: cli.Dedent(`
-		Create the primary keys, unique and foreign key constraints of a from-proto schema
-		on a database the sink has already loaded, skipping the ones already in place.
+		Create the primary keys, unique and foreign key constraints of a Relational
+		Mappings schema on a database the sink has already loaded, skipping the ones
+		already in place.
 
 		The sink loads without them on purpose: measured through binary COPY, loading with
 		foreign keys in place runs 27x slower than loading without, where building the very
@@ -70,8 +72,8 @@ var sinkPostgresConstraintsDropCmd = &cobra.Command{
 	Use:   "drop <manifest> [<module>]",
 	Short: "Drop the schema's constraints",
 	Long: cli.Dedent(`
-		Drop the primary keys, unique and foreign key constraints of a from-proto schema,
-		leaving anything the sink did not create alone — the index on _block_number_
+		Drop the primary keys, unique and foreign key constraints of a Relational Mappings
+		schema, leaving anything the sink did not create alone — the index on _block_number_
 		included, that one being the sink's own and recreated when it next starts.
 
 		This is the escape hatch after --apply-constraints=always, and what makes a

@@ -32,8 +32,8 @@ var extractProtoCmd = &cobra.Command{
 		Write the protobuf file defining a module's output message, as the package bundles
 		it, so it can be edited and fed back to a sink.
 
-		With --sql, the file comes annotated for 'substreams sink postgres' in from-proto
-		mode: the schema annotations are imported, every message carries a commented-out
+		With --sql, the file comes annotated for 'substreams sink postgres' in Relational
+		Mappings Mode: the schema annotations are imported, every message carries a commented-out
 		table option, every field a commented-out copy of itself per column option, and the
 		annotations file itself is written next to it so the result parses as-is. Uncomment
 		the table option; for a field, a column option lives inside the field's own
@@ -44,7 +44,7 @@ var extractProtoCmd = &cobra.Command{
 		    substreams tools extract-proto --sql substreams.yaml map_events
 		    substreams sink postgres setup <manifest> --proto-file-override=./map_events.proto --dsn=...
 
-		Without annotations a from-proto sink derives tables from the message structure
+		Without annotations Relational Mappings Mode derives tables from the message structure
 		alone: no primary keys, no unique constraints, no foreign keys. Only the index on
 		_block_number_ is created, that one being the sink's own rather than the schema's.
 	`),

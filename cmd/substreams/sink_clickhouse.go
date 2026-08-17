@@ -23,11 +23,12 @@ var sinkClickhouseSetupCmd = &cobra.Command{
 		Setup the database for the Substreams SQL sink, auto-detecting the mode from the
 		output module type, exactly like the run action:
 
-		- DatabaseChanges output: creates the system tables (cursors, history) and applies
-		  the 'schema.sql' bundled in the manifest sink config.
-		- Any other output type (from-proto): resolves the schema from the module's output
-		  proto and creates the database schema and tables, then exits. This step is
-		  idempotent and can be run again safely.
+		- Database Changes Mode ('DatabaseChanges' output): creates the system tables
+		  (cursors, history) and applies the 'schema.sql' bundled in the manifest sink
+		  config.
+		- Relational Mappings Mode (any other output type): resolves the schema from the
+		  module's output proto and creates the database schema and tables, then exits.
+		  This step is idempotent and can be run again safely.
 	`),
 	Args: cobra.RangeArgs(1, 2),
 	RunE: newSinkSetupE(sinkClickhouseDriver),

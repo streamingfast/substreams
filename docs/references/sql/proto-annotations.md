@@ -1,6 +1,6 @@
 # Proto Annotations Reference
 
-When the output module of a SQL sink does not produce `DatabaseChanges`, the sink derives the database schema from the module's protobuf definition (relational mappings). This page is the reference for the annotations and type mappings driving that schema generation. For a guided walkthrough, see [Using Relational Mappings](../../how-to-guides/sinks/sql/relational-mappings.md).
+When the output module of a SQL sink does not produce `DatabaseChanges`, the sink runs in Relational Mappings Mode and derives the database schema from the module's protobuf definition. This page is the reference for the annotations and type mappings driving that schema generation. For a guided walkthrough, see [Using Relational Mappings Mode](../../how-to-guides/sinks/sql/relational-mappings.md).
 
 Annotations come from `sf/substreams/sink/sql/schema/v1/schema.proto`:
 

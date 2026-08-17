@@ -181,11 +181,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be
   linked, and the head-block metrics keep tracking the live source, so the process looked healthy throughout.
 
-### Library
+- `substreams-tier1` no longer hangs when a request has a cursor that the hub declines (unknown hash). Instead of failing
+  back to a file source that waits for merged-blocks to cover that number, it now immediately sends an undo-to-LIB. 
 
-- **Breaking** `db_proto.NewSinker` takes a `decodeWorkers int` parameter, and `SinkerFactoryOptions.Parallel` is gone
-  along with `sql.Database.Clone()`. The parallel flush path they served was unreachable (`Parallel` hardcoded to false
-  at every call site) and unsound had it run: `Clone()` returned the receiver, so every goroutine shared one `*sql.Tx`.
+### Library
 
 - **Breaking** `sql.Database.WalkMessageDescriptorAndInsert`, `WalkMessageDescriptorAndInsertInto`,
   `BaseDatabase.WalkMessageDescriptorAndInsertWithDialect` and `sql.Dialect.AppendInlineFieldValues` take a

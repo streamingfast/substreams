@@ -160,7 +160,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	ctx, cancelCause := context.WithCancelCause(ctx)
 	go func() {
 		s := <-derr.SetupSignalHandler(0)
-		fmt.Println("received", s.String())
+		fmt.Fprintln(os.Stderr, "received", s.String())
 		cancelCause(fmt.Errorf("received signal %q", s.String()))
 	}()
 
@@ -188,7 +188,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
-		fmt.Println("Completed successfully")
+		fmt.Fprintln(os.Stderr, "Completed successfully")
 		return nil
 	}
 

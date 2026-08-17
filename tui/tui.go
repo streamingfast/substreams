@@ -153,9 +153,9 @@ func (ui *TUI) configureOutputMode(outputMode string) error {
 		ui.prettyPrintOutput = true
 	case OutputModeJSONL:
 	case OutputModeCURSOR:
-		fmt.Println("printing cursor only, no data")
+		fmt.Fprintln(os.Stderr, "printing cursor only, no data")
 	case OutputModeCLOCK:
-		fmt.Println("Writing clock information only (no data)")
+		fmt.Fprintln(os.Stderr, "Writing clock information only (no data)")
 	case OutputModeJSON:
 		ui.prettyPrintOutput = true
 	default:

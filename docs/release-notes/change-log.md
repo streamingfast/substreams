@@ -11,140 +11,187 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-### Added
+### Sink
 
-- CLI: Ethereum Hoodi testnet (`hoodi`) StreamingFast endpoints (`hoodi.eth.streamingfast.io:443`).
-- RPC: `ModulesProgress.stages` entries now expose per-stage squash visibility, so a client can tell "segment produced" apart from "segment actually usable".
+- Fixed: **BREAKING** `substreams sink postgres` in Relational Mappings Mode stores `bytes` fields as binary in their
+  `BYTEA` columns. Under the default `--bytes-encoding=raw` they were corrupted: a 7-byte value became the 14
+  characters of its base64 form including quotes, or of its hex form with `--no-constraints`. The same confusion stored
+  repeated scalar elements with their SQL quotes (`'alpha'` rather than `alpha`). Nothing failed loudly — the rows were
+  there and every query against those columns matched nothing. Databases populated by an affected version need the
+  affected range re-synced, and anything downstream built against the corrupted form breaks.
 
-  `Stage` gained two additive fields: `ready_up_to_exclusive` (field 3), the chain block number, exclusive, up to which the stage is immediately usable, and `squash_wait_segment_count` (field 4), the number of segments whose store partial exists but has not been squashed into the store yet.
+- **spool**: Major speed improvement (+10x) for Relational Mappings Mode (`substreams sink postgres` and `substreams sink clickhouse`):
+  rows are now written to disk (spool) first and loaded them from a background goroutine, one segment at a time. 
+  The stream no longer waits on the database (up to the size of the spool directory).
+  Each write mode spools directly in the format it sends: binary COPY files, rendered SQL tuples per table, an interleaved
+  log replayed in walk order for `row-insert`, typed values on ClickHouse. 
+    - `--spool-dir` (default `./localdata/spool`) is where they land
+    - `--spool-max-size` (8GiB) limits the size on disk (pushing back to the stream)
+    - `--spool-max-idle` (10s) commits the open segment when the stream goes quiet for that duration
+    - `--db-write-target-duration` (3s) says how long one commit to DB should take, adjusted so segment size adjusted dynamically
+    - `--db-write-max-size` (512MiB) limits the size of each commit to DB
 
-  `completed_ranges` counts a store segment as soon as its partial has been produced, before tier1 has merged it, whereas `ready_up_to_exclusive` stops at the last squashed segment. A stage could therefore render as 100% covered while a substantial part of the work was still outstanding, and since squashing runs on tier1 rather than on a worker it schedules no job and advances no `processed_blocks` — the request looked frozen at 100% with a rate of zero. A non-zero `squash_wait_segment_count` now names that state explicitly.
+- **write-mode**: (postgres) in Relational Mappings Mode new flag 
+   - `--write-mode`: 
+     - `copy`: binary COPY)
+     - `batch-insert`: one multi-row INSERT per table
+     - `row-insert`: one prepared INSERT per row
+     - `auto`: try to use `copy` if available, otherwise `batch-insert` or `row-insert` depending on the schema
+   
+- **hyperpb**: Relational Mappings Mode now parses block payloads with [hyperpb](https://buf.build/go/hyperpb) instead of
+  `dynamicpb`. Both are driven by the module descriptor and read through `protoreflect`, so rows are identical, but
+  hyperpb compiles the descriptor once and parses into an arena: 18x on the parse, one allocation per block instead of
+  thousands.  Unmarshalling is now done on a worker pool instead of one at a time at flush.  Defaults to one worker per core less one,
+  capped at 8; `SinkerFactoryOptions.DecodeWorkers` overrides.
 
-  For a stage that executes no store module the two notions coincide, as mapper and index output is read straight from the partial files, and `squash_wait_segment_count` stays 0. A stage that has not started reports the block its modules begin at, floored at the chain's first streamable block, so 0 is a valid value meaning "nothing usable yet" and not a sentinel for "unknown".
-- RPC: `SessionInit` gained `segment_block_count` (field 11), the width in blocks of one parallel processing segment, constant for the whole session.
+- **constraints**: Relational Mappings Mode now loads without database constraints and creates them afterwards:
+-   - `--apply-constraints`: 
+      - `auto` (default) creates them when the stream reaches chain HEAD
+      - `manual` never creates them
+      - `always` creates them before the load (inducing 27x slower load time on postgres)
+  Manual creation is done with : `substreams sink postgres constraints apply <manifest>`, which can be tweaked with:
+  `--constraints-parallelism`, `--constraints-work-mem`.
+  Both automatic and manual creation can be controlled with `--disable-foreign-keys`, `--disable-primary-keys=<tables|all>`, `--disable-unique-constraints=<tables|all>`.
 
-  The segment width was previously not exchanged at all, so a client had no way to turn a segment count such as `Stage.squash_wait_segment_count` into a number of blocks. It could only be inferred from `Job.stop_block - Job.start_block`, which is unavailable exactly when it is needed, since no job runs while tier1 squashes.
+- **automatic postgres index**: Added an automatic index on _block_number_ for every postgres table (Relational Mappings Mode) for undo performance, unless `--disable-block-number-index` is set to true.
 
-  It is an upper bound rather than an exact multiplier: the first and last segment of a run are narrower when a module's initial block or the request's stop block falls inside a segment.
-- Server: tier1 request logs now explain how many parallel workers a request actually got, and why. A client asking for 300 workers and getting 15 previously left no trace of the negotiation anywhere in the logs.
+- **automatic clickhouse schema**: `substreams sink clickhouse` now accepts a package whose output proto carries no schema annotations.
+  Both `setup` and the run refused it outright ("clickhouse table options for table X don't have any 'order_by_fields'"), they now default to:
+  `ORDER BY (_block_number_, _row_id_)`, `PRIMARY KEY (_block_number_)`, `PARTITION BY (toYYYYMM(_block_timestamp_))`.
+  `_row_id_` is a column automatically generated with the row number for a given block.
+  A database whose tables disagree with the package is now refused at start rather than
+  written into, since `CREATE TABLE IF NOT EXISTS` would have kept the old table and written into the wrong columns.
 
-  The `incoming Substreams Blocks request` entry gained a `parallelism` object (`requested_workers` as asked by the client, `granted_workers` as allowed by the authentication layer, the effective `workers`, `workers_source` telling which of the two applied, plus `plan_tier` and `stage_layer_executors`), along with `parallel_segment_count` and `stage_count` — a request with fewer segments than workers can never use them all.
+- Flags are grouped in "Relational Mappings Mode" VS "Database Changes Mode" in `--help` and invalid flags for one mode are now rejected by the other.
+  A Database Changes Mode Substreams owns its SQL schema, so `sink postgres constraints` refuses it.
 
-  The `substreams request stats` entry gained a `workers` object (`requested`, `granted`, `effective`, `peak`, `pool_exhausted_count`, `pool_rampup_deferred_count`), reported on tier1 only. A high `pool_exhausted_count` with a `peak` well below `effective` means the shared worker pool ran dry, a case that was previously only visible at debug level.
+- Removed flag `--live-block-time-delta` is no longer accepted by `substreams sink postgres` and `substreams sink clickhouse`. The
+  SQL sink installs the cursor-based liveness checker itself, based on the type of message received from the stream.
 
-  The periodic `substreams request progress` entry gained its own `workers` object (`requested`, `granted`, `effective`, `running`, `idle`, and `pool_exhausted_5m` when jobs failed to get a worker over the window), so the same question can be answered while the request is still running rather than only once it ends. When jobs repeatedly find no free worker while the request still has idle capacity, a hint now says so and names the three ceilings that can cause it — the tier2 fleet being full, the organization's worker quota, or the server's per-session worker cap — since the pool reports a single error for all three.
+- Fixed: Relational Mappings Mode now writes the blocks up to the stop block (previously, last segment was left out.) 
+- `substreams sink postgres` in Relational Mappings Mode now performs UNDO on a reorg even without database constraints.
+- Fixed: Relational Mappings Mode no longer crashes on a module whose output carries an `enum` field. Covers plain, `repeated`, `inline` and key fields.
 
-- CLI: `substreams tools devenv` boots a complete local stack — a dummy blockchain in a container plus a tier1 and a tier2 built from the current source tree — prints the endpoint and stays up until interrupted. Requires Docker. `--burst` sets how many blocks exist at genesis and `--bundle-size` the segment size, which together decide how much parallel work a request has to do; the state store lives under `--data-dir`, so deleting it is what gives a cold backprocess again. The command waits for the merger to catch up with the burst before starting tier1, since tier1 bootstraps its block hub from merged blocks and cannot become ready until they exist. The end-to-end tests now share this same setup code, so what a developer watches locally is the path CI exercises.
+### Observability
 
-  Running the tiers in-process pulls in the wasmtime runtime, whose bindings are cgo-only, so the command is built only when cgo is enabled — that is, in a local `go build` or `go install`, but not in the released Docker image, which is deliberately static. That image could not run it anyway, having no Docker daemon of its own.
+- RPC: `ModulesProgress.stages` entries now expose per-stage squash visibility, so a client can tell "segment produced"
+  apart from "segment actually usable". `Stage` gained `ready_up_to_exclusive` (field 3), the chain block number,
+  exclusive, up to which the stage is immediately usable, and `squash_wait_segment_count` (field 4), the number of
+  segments whose partial exists but has not been squashed in yet. `completed_ranges` counts a segment as soon as its
+  partial is produced, so a stage could render 100% covered with substantial work outstanding — and since squashing
+  runs on tier1 it schedules no job and advances no `processed_blocks`, leaving the request looking frozen at 100% with
+  a rate of zero. For a stage with no store module the two notions coincide and the count stays 0. A stage that has not
+  started reports where its modules begin, floored at the chain's first streamable block, so 0 means "nothing usable
+  yet" and is not a sentinel for "unknown".
 
-- Sink: `substreams sink postgres` and `substreams sink clickhouse` in Relational Mappings Mode spool rows on local disk in PostgreSQL's binary COPY wire format and loads them from a background goroutine, one segment at a time. The stream no longer waits on the database, and blocks already downloaded survive a restart instead of being streamed — and paid for — twice. Each write mode spools in the format it can send unchanged: binary COPY files, rendered SQL tuples per table, an interleaved log replayed in walk order for `row-insert`, and typed values on ClickHouse, whose inserts are columnar. ClickHouse keeps the guarantees it already had — it has no transactions and its cursor lives in a file, so applying a segment is the same inserts followed by the same cursor write, in the same order. `--spool-dir` (default `./localdata/spool`) is where they land and `--spool-max-size` (default 8GiB) bounds it; the stream is held once it fills. `--spool-max-idle` (default 10s) commits the open segment when the stream goes quiet, so a stall cannot leave the cursor where it was and have those blocks streamed, and paid for, again on restart. How large each commit gets is not a setting: `--db-write-target-duration` (default 3s) says how long one should take and the sink sizes the next segment from what the last one measured, bounded by `--db-write-max-size` (default 512MiB).
+- RPC: `SessionInit` gained `segment_block_count` (field 11), the width in blocks of one parallel segment, constant for
+  the session. Without it a client could not turn `Stage.squash_wait_segment_count` into blocks: it could only be
+  inferred from `Job.stop_block - Job.start_block`, unavailable exactly when needed since no job runs while tier1
+  squashes. It is an upper bound — the first and last segment of a run are narrower.
 
-  Against `erc20-balance-changes` over 50,000 Ethereum mainnet blocks (17M rows) into a containerised PostgreSQL 17, this took the run from 190.9s to 70.9s and the stream from 262 to 673 messages per second, with an identical resulting table.
+- Server: tier1 request logs now explain how many parallel workers a request got, and why; asking for 300 and getting
+  15 previously left no trace. `incoming Substreams Blocks request` gained a `parallelism` object
+  (`requested_workers`, `granted_workers`, effective `workers`, `workers_source`, `plan_tier`, `stage_layer_executors`)
+  plus `parallel_segment_count` and `stage_count`. `substreams request stats` gained a tier1-only `workers` object
+  (`requested`, `granted`, `effective`, `peak`, `pool_exhausted_count`, `pool_rampup_deferred_count`): a high
+  `pool_exhausted_count` with `peak` well below `effective` means the shared pool ran dry, previously visible only at
+  debug level. The periodic `substreams request progress` gained its own `workers` object (`requested`, `granted`,
+  `effective`, `running`, `idle`, `pool_exhausted_5m`) so the question can be answered while the request still runs,
+  with a hint naming the three ceilings that cause it — tier2 fleet full, organization quota, per-session cap — since
+  the pool reports a single error for all three.
 
-- Sink: `substreams sink postgres` in Relational Mappings Mode creates an index on `_block_number_` on every table when it starts, concurrently. Every table carries that column and every reorg deletes from every table by it, and a foreign key indexes only its referenced side — so each undo was a sequential scan per table, and a cascade would have been worse still, PostgreSQL looking the child rows up once per deleted parent row. Measured over 10GiB of `erc20-balance-changes`-shaped rows, it costs 2.6s on a 44s load and 218MiB against 10GiB, and takes one table's undo from 1.296s to 15ms — 86x, for one of the tables a reorg has to clear. `--disable-block-number-index` leaves it out for a run that can never reorg. It is deliberately not part of the constraint pass and not governed by `--apply-constraints`: those describe the schema and are the operator's to schedule, where this one the sink depends on to undo a reorg — and a concurrent build cannot run in a transaction, which that pass does. `constraints apply` on an output with no schema annotations now warns rather than refusing.
+- Sink: the Relational Mappings Mode periodic stats report how far the download is ahead of the database:
+  `downloaded_through`, `applied_through`, `blocks_ahead`, `blocks_buffered`, `peak_blocks_ahead`. Substreams
+  throughput is paid for, so a run should be limited by the stream and not by the database. Once the buffer stops
+  looking like a working set the line is logged at warning level: `database is falling behind the stream, the buffer is
+  over half of what it was given`. With a spool that threshold is a share of `--spool-max-size`, since a block count
+  says nothing once rows are on disk — the sparse start of a large backfill used to warn continuously; without a spool
+  the blocks are in memory and their count is what is reported.
 
-- Tools: `substreams tools extract-proto [<manifest> [<module>]]` writes a module's output protobuf definition back out. With `--sql` it comes annotated for the SQL sink's Relational Mappings Mode — every message and field carrying its option commented out — and the annotations file is written beside it so the result parses as-is, which is what `--proto-file-override` then needs. Starting from a package whose author never annotated it was otherwise a matter of finding the right proto and the right extension names by hand.
+- `Sinker.PrintStats` collapses to a single `📊 Usage Report: no data received` line when a request produced nothing.
+  Affects `substreams run`, `substreams sink webhook` and `substreams sink noop`.
 
-- Sink: `substreams sink postgres` in Relational Mappings Mode says on every start whether the schema carries the constraints the flags describe, naming the ones it does not. A run interrupted before the backfill ended, or whose constraint pass was killed part-way, leaves a database with no primary keys and no foreign keys — which answers queries, slowly and rejecting nothing, and looks exactly like a database that is fine. The check is one indexed catalog query. It only reports: under `--apply-constraints=auto` the missing ones are created when the stream reaches chain HEAD, and a run that stops before that leaves them — like `manual` — to `constraints apply`, which the warning names.
+- The gRPC User-Agent of a SQL sink run now names the engine as well as the mode: `sink_from_proto_pg`,
+  `sink_from_proto_ch`, `sink_database_changes_pg`, `sink_database_changes_ch`.
 
-- Sink: the Relational Mappings Mode sink's periodic stats now report how far the download is ahead of the database: `downloaded_through`, `applied_through`, `blocks_ahead`, `blocks_buffered` and `peak_blocks_ahead`. Substreams throughput is paid for, so a run should be limited by the stream and not by the database; the gap between the two marks is where the opposite shows. Once the buffer stops looking like a working set the line is logged at warning level instead of info, as `database is falling behind the stream, the buffer is over half of what it was given`.
 
-  What counts as behind depends on where the rows are. With a spool it is a share of the disk budget `--spool-max-size` set, because a block count says nothing once rows are on disk: the sparse start of a large backfill spans millions of blocks holding a few hundred kilobytes of an eight gigabyte budget, and used to warn continuously through it. Without a spool the blocks are held in memory and their count is what is reported on.
+### CLI
 
-- Sink: `substreams sink postgres` in Relational Mappings Mode gained `--write-mode`, which says how a spooled segment reaches the database: `copy` (binary COPY), `batch-insert` (one multi-row INSERT per table), `row-insert` (one prepared INSERT per row), or `auto`. Which path ran used to be derived from whether a directory flag was set and whether the schema's foreign keys happened to form a cycle, and a schema that could not be ordered was silently downgraded to row-at-a-time inserts — an order of magnitude slower, announced only in a log line. An explicit mode the driver or the schema cannot support is now an error that names the fix.
+- `substreams run` reports backprocessing as progress and rates instead of a list of block ranges. A four-line session
+  header (trace ID, module, chain, work to do including what was already cached) is printed once and stays in the
+  scrollback, followed by a compact live block: overall percentage, blocks per second, ETA, running jobs against the
+  worker limit, one bar per stage with its job count and oldest job age, and an `out` row tracking the output frontier
+  towards the requested start block. Percentages come from work counts the server already reported in `SessionInit` and
+  never displayed, with in-flight job progress added so bars advance continuously. A run whose stores are fully cached
+  says so in one line instead of rendering an empty skeleton.
 
-- Sink: the Relational Mappings Mode flags are grouped by what they spend, and `substreams sink postgres --help` prints them under headings rather than tagging each line with the mode it belongs to. `--decode-workers` and `--decode-batch-size` size the CPU stage, `--db-write-*` size one commit to the database, `--spool-*` bound how far ahead of the database the stream may run. `--block-batch-size` is deprecated in favour of `--decode-batch-size`: it named the database transaction it stopped sizing when the spool took that job. `--no-constraints` is deprecated in favour of `--disable-foreign-keys --disable-primary-keys=all --disable-unique-constraints=all`.
+  Stage progress is measured from `Stage.ready_up_to_exclusive` rather than `completed_ranges`, so a stage no longer
+  renders 100% while tier1 is still squashing — that state is now named on the row as `squashing N segments`. The
+  squashed frontier also fixes the bar's low end: it is the lowest *contiguous* block across the stage's modules, so
+  ranges beyond a gap no longer count and a stage that has not started reports where it begins instead of being
+  invisible.
 
-- Sink: a Relational Mappings Mode flag typed for a Database Changes Mode Substreams is now an error, and so is the reverse. Both vocabularies are registered on the same command because the mode is read from the module at run time, so half of them are inert for any given run; they used to be inert silently. A Database Changes Mode Substreams owns its SQL schema — it comes from the `schema.sql` in the manifest — so `sink postgres constraints` refuses it outright.
+  `Slowest modules` is kept as its own section, ranked across all stages, showing a recent (30s) and a lifetime
+  per-block cost tagged with the stage; modules under 10ms per block no longer earn a line. Removed: `Longest-running
+  jobs` (a fixed 5s threshold that flickered on healthy runs where jobs take 5 to 8 seconds — job age is now always on
+  the stage rows), the `Progress messages received` counter, and the `m` key toggling bar vs block-range rendering.
 
-### Changed
-
-- Sink: `substreams sink postgres` and `substreams sink clickhouse` no longer accept `--live-block-time-delta`. The SQL sink installs the cursor-based liveness checker itself, so the flag was parsed and then ignored. It is also what the spool relies on: liveness has to turn on the first undo-able block, not on a wall-clock guess. It remains available to other sinks built on the `sink` package.
-- Sink: the gRPC User-Agent of a SQL sink run now names the engine as well as the mode: `sink_from_proto_pg`, `sink_from_proto_ch`, `sink_database_changes_pg`, `sink_database_changes_ch`. Both engines run the same commands, so `sink_from_proto` alone said nothing about where the rows were going.
-- Sink: `substreams sink postgres` in Relational Mappings Mode leaves the spool behind once the stream reaches the chain head. The spool holds rows on disk until a segment fills, which is what a backfill wants and the opposite of what a live sink wants: at the head a block should be queryable when it arrives, not when the segment it happens to land in is full. On the first live block — a cursor at `STEP_NEW` rather than `STEP_NEW_IRREVERSIBLE` — whatever is spooled is applied, the spool is closed and inserts go straight to the database from there on. It is one-way: a stream that reached the head does not go back to buffering.
-
-  This also required wiring a liveness checker for the Relational Mappings Mode sink, which nothing did before, so `isLive` was always nil there. Blocks are now also flushed per block once live, rather than per batch, which is the existing behaviour that the missing checker had made unreachable.
-
-  The connection pools are bounded while at it — 8 connections for the sink's own pool and 2 for binary COPY, where the pgx default was four per core for an applier that COPYs one segment at a time — and `Close` now releases them instead of holding the slots until the process exits.
-
-- Sink: Relational Mappings Mode now loads without database constraints and creates them afterwards. The timing is `--apply-constraints`: `auto` by default, which has the sink create them once the stream reaches chain HEAD — and only there, a stop block ending the run without saying the backfill is done; `manual`, which leaves it to the new `substreams sink postgres constraints apply <manifest>`; or `always`, which creates them before the load. `constraints drop` is the inverse, and the escape hatch after `always` or before resuming a backfill. Both take the output module as an optional second argument, as `setup` now does too: it is inferred from the package when left out, but a package with more than one candidate has to be told which, or the schema they derive is not the one the run created. Both take the same `--disable-*` switches as the run, so they create exactly the constraints the schema is meant to have. `setup` reads `--apply-constraints` too, where only `always` acts on it: it creates the schema and exits, so `auto` and `manual` both leave the tables bare.
-
-  The pass no longer runs as one transaction. Every index build and foreign key validation used to be held open at once, so a schema large enough to exhaust memory lost the entire pass and started from nothing on the next run. Each statement now commits on its own, so a killed run keeps what it finished and the next one carries on.
-
-  `--constraints-parallelism` on the `constraints` commands runs them side by side. Constraints sit on independent relations, so the only ordering that matters is that a foreign key needs the key it references to exist — the pass builds every key first, then the foreign keys, and spreads what is inside each of those. `--constraints-work-mem` sets `maintenance_work_mem` for the duration of each statement: most servers default to 64MB, at which an index build over a large table spills to an external merge sort. Measured over 370M rows on Base, the serial pass at the server default took as long as loading every one of those rows. `--constraints-per-transaction` is deprecated in its favour — it read as an execution knob and only ever bundled statements into one transaction.
-
-  Constraints are also matched by relation and not only by name. Names are unique per table rather than per schema, and every table carries a foreign key called `fk_block`, so a constraint present on one table counted as present on all of them: the rest were never created, and `constraints drop` removed one of them and then failed on the primary key the others still referenced.
-
-  Measured through binary COPY over 500,000 rows, loading with foreign keys in place runs 27.7x slower than loading bare, where building the very same constraints afterwards costs 3.3x — 8.5x cheaper for an identical schema. Which constraints are wanted at all is now separate from when: `--disable-foreign-keys`, `--disable-primary-keys=<tables|all>` and `--disable-unique-constraints=<tables|all>`.
-
-  Creating them is a stop-the-world operation: every index built, every foreign key validated, tables locked throughout. `auto` is the default anyway, because a backfill that ends with no primary keys and no foreign keys is a silent wrong result that looks like success, where a stall is at least a visible one. `--apply-constraints=manual` is how that pass goes into a maintenance window instead. Either way it is idempotent, so it also back-fills a schema an earlier run created without constraints.
-
-  Constraints no longer disable the local buffer or multi-row inserts. That restriction existed because both group rows by table, which loses the order the walk produced them in, and an immediate foreign key then rejects a child that arrives before its parent. Tables are now ordered by a topological sort over the foreign keys themselves — nesting depth is not enough, since a table can reference a sibling it has no ancestry with — so the fast paths work with constraints in place. A schema whose references form a cycle cannot be ordered at all, and `--write-mode=auto` resolves to row-at-a-time inserts there, with the cycle named in the log.
-- Dependencies: bumped notably `github.com/ClickHouse/clickhouse-go/v2` to v2.48.0, `github.com/AfterShip/clickhouse-sql-parser` to v0.5.5, `google.golang.org/grpc` to v1.83.0 and the OpenTelemetry SDK to v1.45.0.
-
-- Sink: `substreams sink postgres` and `substreams sink clickhouse` in Relational Mappings Mode now unmarshal and walk blocks on a worker pool instead of one at a time at flush. Decoding a block was where the sink spent its time — around 7.8µs of the 9.3µs a wide entity cost — while PostgreSQL sat on roughly eight times that in headroom, so the sink itself was the throughput limit. Measured at 4.1x on a wide entity. Workers only fill a per-block buffer; the inserts are still replayed in block order, in the same transaction as before, so the resulting database is unchanged.
-
-  The pool defaults to one worker per core less one, capped at eight, since the work is allocator-bound before it runs out of cores. `SinkerFactoryOptions.DecodeWorkers` overrides it.
-
-- Sink: **Breaking** `db_proto.NewSinker` takes a `decodeWorkers int` parameter, and `SinkerFactoryOptions.Parallel` is gone along with `sql.Database.Clone()`. The parallel flush path they served was unreachable — `Parallel` was hardcoded to false at every call site — and unsound had it run: `Clone()` returned the receiver, so every goroutine shared one `*sql.Tx`.
-
-- CLI: `substreams run` now reports backprocessing as progress and rates instead of a list of block ranges. A four-line session header (trace ID, module, chain, work to do, including how much was already cached) is printed once and stays in the scrollback, followed by a compact live block: overall percentage, blocks per second, ETA, running jobs against the worker limit, then one bar per stage with its job count and oldest job age, and an `out` row tracking the output frontier towards the requested start block.
-
-  Percentages come from the work counts the server already reported in `SessionInit` and were never displayed, and the in-flight job progress is added to the completed-job count so the bar advances continuously rather than in steps. A run whose stores are fully cached now says so in one line instead of rendering an empty progress skeleton.
-
-  `Slowest modules` is kept as its own section, ranked across all stages, now showing both a recent (30s window) and a lifetime per-block cost, tagged with the stage each module belongs to. Modules under 10ms per block no longer earn a line.
-
-  Stage progress is measured from `Stage.ready_up_to_exclusive` rather than from `completed_ranges`. The latter counts a store segment as soon as its partial has been produced, so a stage rendered as 100% while tier1 was still squashing — and since squashing schedules no job and advances no `processed_blocks`, the request looked frozen at 100% with a rate of zero. That state is now named on the stage row as `squashing N segments`. Reading the squashed frontier also fixes the bar's low end: it is the lowest *contiguous* block across the stage's modules, so a stage with a gap in its produced ranges no longer counts the ranges beyond that gap, and a stage that has not started reports where it begins instead of being invisible.
-
-  The `Longest-running jobs` section is gone: it fired on a fixed 5 second threshold, which flickered in and out on healthy runs where jobs normally take 5 to 8 seconds. Job age is now always visible on the stage rows instead. Also removed: the `Progress messages received` counter, which only tracked the server's deliberately decreasing progress interval, and the `m` key toggling between bar and block-range rendering, which no longer has two modes to switch between.
-
-- CLI: `substreams run` output on failure is no longer one undivided wall of text. The session header, the progress block, the usage report and the error are separated, the progress block is closed with `Backprocessing  aborted` rather than trailing off at `starting…`, and a request refused for exceeding `--limit-processed-blocks` now reports the figures it was given at session init and names the fix:
+- `substreams run` output on failure is no longer one undivided wall of text: session header, progress block, usage
+  report and error are separated, the progress block is closed with `Backprocessing  aborted` rather than trailing off
+  at `starting…`, and a request refused for exceeding `--limit-processed-blocks` reports the figures from session init
+  and names the fix:
 
   ```
   Error: --limit-processed-blocks is set to 10,000, but this request needs to process 3,394,913 blocks (3,394,000 of them to prepare the stores): raise it with --limit-processed-blocks 3400000, or remove the guard entirely with --limit-processed-blocks 0
   ```
 
-- Sink: `Sinker.PrintStats` collapses to a single `📊 Usage Report: no data received` line when a request produced nothing, instead of a header followed by three zeroed counters. Affects `substreams run`, `substreams sink webhook` and `substreams sink noop`.
+- Fixed: `substreams run` needed two Ctrl-C to stop while the progress view was on screen. The view puts the terminal
+  in raw mode, so the first Ctrl-C arrived as a key press: the UI quit but the request kept streaming. The key press
+  now cancels the request directly.
 
-- Sink: `substreams sink postgres` and `substreams sink clickhouse` in Relational Mappings Mode now parse block payloads with [hyperpb](https://buf.build/go/hyperpb) instead of protobuf-go's `dynamicpb`. Both are driven only by the module's descriptor, which is all the sink has at runtime, and both are read through `protoreflect` by the descriptor walk, so the rows are identical — but hyperpb compiles the descriptor into a parser once and parses into an arena, at 18x the speed and one allocation per block instead of thousands.
+- Fixed: `substreams run` never printed the `Backprocessing history up to requested target block` line, nor the head
+  block, stage count and cached-blocks summary the non-TTY output has always shown — the line was guarded on a field
+  nothing ever set and rendered as blank lines.
 
-  End to end that is 1.9x on the full decode path for a wide entity (88k to 168k rows/s on one core) and 2.7x across the decoder's worker pool (517k to 1.40M rows/s on eight). The parse is no longer the expensive half of decoding: the descriptor walk is now around 90% of it. For wide entities the sink is no longer the throughput limit either — eight workers now produce more rows per second than binary COPY absorbs.
+- Added Ethereum Hoodi testnet (`hoodi`) StreamingFast endpoints (`hoodi.eth.streamingfast.io:443`).
 
-  hyperpb builds on amd64 and arm64 only. Every release target already qualifies, and 32-bit was unbuildable for unrelated reasons well before this.
+### Server
 
-- Sink: **Breaking** `sql.Database.WalkMessageDescriptorAndInsert`, `WalkMessageDescriptorAndInsertInto`, `BaseDatabase.WalkMessageDescriptorAndInsertWithDialect` and `sql.Dialect.AppendInlineFieldValues` take a `protoreflect.Message` where they took a `*dynamicpb.Message`. The walk only ever read the message, so this is what lets the parser be chosen by the caller.
+- `substreams-tier1` restarts when its block hub can no longer link incoming live blocks, instead of hanging every
+  request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be
+  linked, and the head-block metrics keep tracking the live source, so the process looked healthy throughout.
 
-### Fixed
+### Library
 
-- Dev: `substreams tools devenv` waited on the wrong line before handing the relayer endpoint to tier1. `serving gRPC` is announced by the reader node for its own port well before the relayer serves, and the host-side dial that followed said nothing either, Docker binding the mapped port when the container starts whether or not anything inside listens. A tier1 connecting in that window ends up with a live stream carrying no partial blocks at all, which looks like a healthy run: the end-to-end tests share this setup, and `TestPartialBlocksWithStores` saw every block as a full one, with no undos.
+- **Breaking** `db_proto.NewSinker` takes a `decodeWorkers int` parameter, and `SinkerFactoryOptions.Parallel` is gone
+  along with `sql.Database.Clone()`. The parallel flush path they served was unreachable (`Parallel` hardcoded to false
+  at every call site) and unsound had it run: `Clone()` returned the receiver, so every goroutine shared one `*sql.Tx`.
 
-- Sink: `substreams sink clickhouse` now accepts a package whose output proto carries no schema annotations, which is what any Substreams not written with the sink in mind looks like. Both `setup` and the run refused it outright — "clickhouse table options for table X don't have any 'order_by_fields'" — and the ClickHouse tables now default to `ORDER BY (_block_number_, _row_id_)`, `PRIMARY KEY (_block_number_)` and `PARTITION BY (toYYYYMM(_block_timestamp_))`. `_row_id_` numbers the rows one block writes to one table: the tables are `ReplacingMergeTree`, so a sorting key that cannot tell those rows apart collapses them into one at merge time. It is added only to the tables that declare no `order_by_fields`, and PostgreSQL is unaffected.
+- **Breaking** `sql.Database.WalkMessageDescriptorAndInsert`, `WalkMessageDescriptorAndInsertInto`,
+  `BaseDatabase.WalkMessageDescriptorAndInsertWithDialect` and `sql.Dialect.AppendInlineFieldValues` take a
+  `protoreflect.Message` where they took a `*dynamicpb.Message`, which is what lets the caller choose the parser.
 
-- Sink: `substreams sink postgres` and `substreams sink clickhouse` in from-proto mode now write the blocks still held when a bounded run reaches its stop block. Blocks accumulate until `--block-batch-size` of them have gone by, and nothing drained that buffer at the end of the range, so a run ending mid-batch silently dropped its last blocks along with the cursor covering them — and still reported success. With a batch size larger than the requested range, nothing was written at all.
-  Three things had to go with it. The rows of an unannotated package were dropped silently — the ClickHouse database was built with the "use proto options" flag hardcoded to true, so the walk found no table info and inserted nothing. `substreams sink clickhouse setup` exited with `Flag "sink-info-folder" does not exist`, those flags being registered on the run command only. And an undo now carries `_row_id_` into the tombstone it writes, without which the tombstone lands on a different sorting key and removes nothing.
+### Tools
 
-  A database whose tables disagree with the package is refused when the sink starts, rather than written into: annotating a message that had no `order_by_fields`, or dropping the annotation from one that had them, changes the sorting key of a table that already holds rows, and `CREATE TABLE IF NOT EXISTS` would have kept the old table and written the values into the wrong columns.
-- Sink: `substreams sink postgres` in Relational Mappings Mode now undoes a reorg correctly without database constraints. The undo was a single `DELETE FROM _blocks_`, relying on `fk_block ... ON DELETE CASCADE` to take the entity rows with it — and that foreign key only exists when constraints are on. Without them the block rows went and every entity row of the undone blocks stayed behind, orphaned, to be duplicated when the replayed blocks arrived. Rows are now deleted from every table explicitly, children first, which works with or without constraints.
+- `substreams tools devenv` boots a complete local stack — a dummy blockchain in a container plus a tier1 and a tier2
+  built from the current source tree — prints the endpoint and stays up until interrupted. Requires Docker. `--burst`
+  sets how many blocks exist at genesis and `--bundle-size` the segment size, which together decide how much parallel
+  work a request has; the state store lives under `--data-dir`, so deleting it is what gives a cold backprocess again.
+  The command waits for the merger to catch up with the burst before starting tier1, which bootstraps its block hub
+  from merged blocks. The end-to-end tests share this setup code. Running the tiers in-process pulls in wasmtime, whose
+  bindings are cgo-only, so the command is built only with cgo enabled — a local `go build` or `go install`, not the
+  released static Docker image, which has no Docker daemon of its own anyway.
 
-  Two related holes went with it: blocks still held in memory for the current batch are flushed before the delete rather than after it, and a local buffer is drained first, so rows in flight can no longer land after the delete that was meant to remove them.
+- `substreams tools extract-proto [<manifest> [<module>]]` writes a module's output protobuf definition back out. With
+  `--sql` it comes annotated for the SQL sink's Relational Mappings Mode — every message and field carrying its option
+  commented out — and the annotations file is written beside it so the result parses as-is, which is what
+  `--proto-file-override` needs. Starting from an unannotated package was otherwise a matter of finding the right proto
+  and extension names by hand.
 
-  A guard claiming "live mode is not supported without constraints" was dead code — `NewSinker` took the flag and never stored it, so the check never ran — and is gone, along with the field.
+### Dependencies
 
-- Sink: `substreams sink postgres` and `substreams sink clickhouse` in Relational Mappings Mode now write the blocks still held when a bounded run reaches its stop block. Blocks accumulate until `--block-batch-size` of them have gone by, and nothing drained that buffer at the end of the range, so a run ending mid-batch silently dropped its last blocks along with the cursor covering them — and still reported success. With a batch size larger than the requested range, nothing was written at all.
-
-- Sink: `substreams sink postgres` and `substreams sink clickhouse` in Relational Mappings Mode no longer crash on a module whose output carries an `enum` field. protoreflect hands an enum out as a `protoreflect.EnumNumber`, a named `int32` that neither dialect's type switch matched: PostgreSQL panicked with `unsupported type: protoreflect.EnumNumber` and ClickHouse on a failed `value.(int32)` assertion. Since the two disagree on the column type — PostgreSQL declares it `TEXT`, ClickHouse `Int32` — the walk now carries both renderings and each dialect takes the one matching the column it created, so PostgreSQL stores the enum's name and ClickHouse its number. A value absent from the descriptor falls back to its number. This covers an enum wherever it appears: as a plain field, as a `repeated` one, inside an `inline` nested message, and as a table's primary key.
-
-- Sink: **BREAKING** — `substreams sink postgres` in Relational Mappings Mode now stores `bytes` fields as binary in their `BYTEA` columns. Under the default `--bytes-encoding=raw` both inserters corrupted them, each differently: without `--no-constraints` a 7-byte value was stored as the 14 characters of its base64 form including the surrounding quotes, and with it as the 14 characters of its hex form. The same confusion also broke repeated scalar fields without `--no-constraints`, where each array element was stored with SQL quotes as part of its value (`'alpha'` rather than `alpha`).
-
-  Nothing failed loudly for any of these: the rows were all there, and every query against those columns simply matched nothing. Databases already populated by an affected version hold corrupted values in those columns and need the affected block range re-synced.
-  This changes what lands in those columns, so it breaks anything downstream built against the corrupted form. A consumer reading a `bytes` column as base64 or hex text now gets the binary value instead. A query written to work around the array corruption — matching the element `'alpha'`, quote characters and all, because that is what was stored — now has to match `alpha`. Re-syncing an existing database leaves both forms in the same table until the affected range is rewritten.
-
-- CLI: `substreams run` needed two Ctrl-C to stop while the progress view was on screen. The view puts the terminal in raw mode, so the first Ctrl-C arrived as a key press rather than as SIGINT: the UI quit but the request kept streaming, and only the second one — delivered because the first had released the terminal — actually stopped it. The key press now cancels the request directly.
-
-- CLI: `substreams run` was never printing the `Backprocessing history up to requested target block` line, nor the head block, stage count and cached-blocks summary the non-TTY output has always shown. The line was guarded on a field that nothing in the codebase ever set, and rendered as blank lines instead.
-
-- Server: `substreams-tier1` now restarts when its block hub can no longer link incoming live blocks, instead of hanging every request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be linked, and the head-block metrics keep tracking the live source, so the process looked healthy throughout.
+- Bumped notably `github.com/ClickHouse/clickhouse-go/v2` to v2.48.0, `github.com/AfterShip/clickhouse-sql-parser` to
+  v0.5.5, `google.golang.org/grpc` to v1.83.0 and the OpenTelemetry SDK to v1.45.0.
 
 ## v1.21.0
 

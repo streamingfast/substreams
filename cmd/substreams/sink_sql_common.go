@@ -399,7 +399,7 @@ func runDatabaseChangesSink(cmd *cobra.Command, driver, manifestPath, outputModu
 		supportedOutputTypes,
 		manifestPath,
 		outputModule,
-		sinkUserAgent("sink_database_changes", driver),
+		sinkUserAgent("sink_dbchanges", driver),
 		zlog,
 		tracer,
 	)
@@ -482,7 +482,7 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 		outputType,
 		manifestPath,
 		outputModuleName,
-		sinkUserAgent("sink_from_proto", driver),
+		sinkUserAgent("sink_relational", driver),
 		zlog,
 		tracer,
 	)

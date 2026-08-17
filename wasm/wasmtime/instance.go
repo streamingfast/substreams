@@ -89,6 +89,10 @@ func (i *instance) newImports() error {
 	if err != nil {
 		return fmt.Errorf("registering state imports: %w", err)
 	}
+	err = i.registerContextImports(linker)
+	if err != nil {
+		return fmt.Errorf("registering context imports: %w", err)
+	}
 
 	if err = linker.FuncWrap("env", "register_panic",
 		func(msgPtr, msgLength int32, filenamePtr, filenameLength int32, lineNumber, columnNumber int32, caller *wasmtime.Caller) {

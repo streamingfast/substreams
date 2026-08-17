@@ -93,13 +93,18 @@ func createAccumulators(dialect *DialectClickHouse) (map[string]*accumulator, er
 		input[sql2.DialectFieldDeleted] = &proto.ColBool{}
 		columns[3] = &schema.Column{Name: sql2.DialectFieldDeleted}
 
+		if dialect.UseRowIDField(table.Name) {
+			input[sql2.DialectFieldRowID] = &proto.ColUInt32{}
+			columns[len(columns)] = &schema.Column{Name: sql2.DialectFieldRowID}
+		}
+
 		primaryName := ""
 		if table.PrimaryKey != nil {
 			pk := table.PrimaryKey
 			primaryName = pk.Name
 
 			input[pk.Name] = ColInputForColumn(pk.FieldDescriptor, dialect.bytesEncoding, table.Columns[pk.Index])
-			columns[4] = &schema.Column{Name: pk.Name}
+			columns[len(columns)] = &schema.Column{Name: pk.Name}
 		}
 
 		offset := len(columns)

@@ -1,7 +1,7 @@
 Once you find a package that fits your needs, you can choose how you want to consume the data. Sinks are integrations that allow you to send the extracted data to different destinations, such as a SQL database, or a file.
 
 {% hint style="info" %}
-**Tip**: Building a SQL sink? The [substreams-sql agent skill](../develop-your-own-substreams/generic/agent-skills.md) gives your AI coding assistant expert knowledge on database change (CDC) patterns, relational mappings, PostgreSQL, and ClickHouse schema design.
+**Tip**: Building a SQL sink? The [substreams-sql agent skill](../develop-your-own-substreams/generic/agent-skills.md) gives your AI coding assistant expert knowledge on Database Changes Mode (CDC) patterns, Relational Mappings Mode, PostgreSQL, and ClickHouse schema design.
 {% endhint %}
 
 {% hint style="info" %}

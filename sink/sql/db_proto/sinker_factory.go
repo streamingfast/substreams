@@ -13,6 +13,7 @@ import (
 	clickhouse "github.com/streamingfast/substreams/sink/sql/db_proto/sql/click_house"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/postgres"
 	schema2 "github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
+	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/spool"
 	stats2 "github.com/streamingfast/substreams/sink/sql/db_proto/stats"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -21,16 +22,29 @@ import (
 type SinkerFactoryFunc func(ctx context.Context, dsnString, schemaName string, logger *zap.Logger, tracer logging.Tracer) (*Sinker, error)
 
 type SinkerFactoryOptions struct {
-	UseProtoOption  bool
-	UseConstraints  bool
+	UseProtoOption bool
+	// Constraints says which constraints the schema gets and when; the zero value means
+	// all of them, created once the backfill is done.
+	Constraints     protosql.ConstraintPolicy
 	UseTransactions bool
-	BlockBatchSize  int
+	// WriteMode says how a sealed spool segment reaches the database. The zero value
+	// resolves per driver and schema.
+	WriteMode protosql.WriteMode
 	// DecodeWorkers bounds how many blocks are unmarshalled and walked concurrently at
-	// flush time. Zero picks one per core, less one.
+	// flush time. Zero picks one per core, less one, capped at 8.
 	DecodeWorkers int
-	Encoding      bytes.Encoding
-	Clickhouse    SinkerFactoryClickhouse
+	// DecodeBatchSize is how many blocks are held in memory and decoded together. Zero
+	// picks four per decode worker. It sizes the CPU stage, not the database write.
+	DecodeBatchSize int
+	Encoding        bytes.Encoding
+	// Spool, when set, holds rows on disk and applies them from a background goroutine.
+	Spool      *spool.Options
+	Clickhouse SinkerFactoryClickhouse
 }
+
+// defaultSpoolMaxBytes mirrors the spool's own default, for the one place that has to know
+// the quota before the spool is built.
+const defaultSpoolMaxBytes int64 = 8 << 30
 
 type SinkerFactoryClickhouse struct {
 	SinkInfoFolder  string
@@ -40,8 +54,12 @@ type SinkerFactoryClickhouse struct {
 }
 
 func (o SinkerFactoryOptions) Defaults() SinkerFactoryOptions {
-	if o.BlockBatchSize <= 0 {
-		o.BlockBatchSize = 25
+	o.DecodeWorkers = ResolveDecodeWorkers(o.DecodeWorkers)
+	if o.DecodeBatchSize <= 0 {
+		// Four per worker: enough that the slowest block in a batch does not leave the
+		// others idle, small enough that the held payloads and their decoded rows stay a
+		// bounded amount of memory.
+		o.DecodeBatchSize = 4 * o.DecodeWorkers
 	}
 	o.UseTransactions = true
 	if o.Encoding == 0 {
@@ -56,6 +74,8 @@ func SinkerFactory(
 	rootMessageDescriptor protoreflect.MessageDescriptor,
 	options SinkerFactoryOptions,
 ) SinkerFactoryFunc {
+	options = options.Defaults()
+
 	return func(ctx context.Context, dsnString string, schemaName string, logger *zap.Logger, tracer logging.Tracer) (*Sinker, error) {
 		database, err := SetupDatabaseSchema(ctx, dsnString, schemaName, outputModuleName, rootMessageDescriptor, options, logger, tracer)
 		if err != nil {
@@ -67,15 +87,35 @@ func SinkerFactory(
 			return nil, fmt.Errorf("opening database: %w", err)
 		}
 
+		// Before anything is streamed, and concurrently, so a restart onto a loaded table
+		// neither waits for a lock nor takes one.
+		if err := database.EnsureBlockNumberIndexes(ctx); err != nil {
+			return nil, fmt.Errorf("creating the block number indexes: %w", err)
+		}
+
+		warnAboutMissingConstraints(database, options.Constraints, logger)
+
+		stats := stats2.NewStats(logger, options.DecodeBatchSize)
+		if options.Spool != nil {
+			// What "falling behind" is measured against once rows go to disk. A block count
+			// cannot say it: a sparse backfill spans millions of blocks holding almost
+			// nothing, and would report itself as behind from the first minute.
+			quota := options.Spool.MaxBytes
+			if quota <= 0 {
+				quota = defaultSpoolMaxBytes
+			}
+			stats.Progress.SetBufferQuota(quota)
+		}
+
 		return NewSinker(
 			rootMessageDescriptor,
 			baseSink,
 			database,
 			options.UseTransactions,
-			options.UseConstraints,
-			options.BlockBatchSize,
+			options.Constraints,
+			options.DecodeBatchSize,
 			options.DecodeWorkers,
-			stats2.NewStats(logger),
+			stats,
 			logger,
 		), nil
 	}
@@ -112,13 +152,25 @@ func SetupDatabaseSchema(
 
 	switch dsn.Driver() {
 	case "postgres":
-		database, err = postgres.NewDatabase(schema, dsn, outputModuleName, rootMessageDescriptor, options.UseProtoOption, options.UseConstraints, options.Encoding, logger)
-		if err != nil {
-			return nil, fmt.Errorf("creating postgres database: %w", err)
+		pgDatabase, pgErr := postgres.NewDatabase(schema, dsn, outputModuleName, rootMessageDescriptor, options.UseProtoOption, options.Constraints, options.Encoding, logger)
+		if pgErr != nil {
+			return nil, fmt.Errorf("creating postgres database: %w", pgErr)
 		}
+		if options.Spool != nil {
+			pgDatabase.WithSpool(*options.Spool)
+		}
+		if err := pgDatabase.WithWriteMode(options.WriteMode); err != nil {
+			return nil, err
+		}
+		database = pgDatabase
 
 	case "clickhouse":
-		database, err = clickhouse.NewDatabase(
+		if options.WriteMode != "" && options.WriteMode != protosql.WriteModeAuto && options.WriteMode != protosql.WriteModeBatchInsert {
+			return nil, fmt.Errorf("--write-mode=%s is not available on ClickHouse, whose inserts are columnar and typed rather than SQL text; use %q or %q",
+				options.WriteMode, protosql.WriteModeAuto, protosql.WriteModeBatchInsert)
+		}
+
+		chDatabase, err := clickhouse.NewDatabase(
 			ctx,
 			schema,
 			dsn,
@@ -126,7 +178,7 @@ func SetupDatabaseSchema(
 			rootMessageDescriptor,
 			options.Clickhouse.SinkInfoFolder,
 			options.Clickhouse.CursorFilePath,
-			true,
+			options.UseProtoOption,
 			options.Encoding,
 			logger,
 			tracer,
@@ -136,10 +188,24 @@ func SetupDatabaseSchema(
 		if err != nil {
 			return nil, fmt.Errorf("creating clickhouse database: %w", err)
 		}
+		if options.Spool != nil {
+			chDatabase.WithSpool(*options.Spool)
+		}
+		database = chDatabase
 
 	default:
 		panic(fmt.Sprintf("unsupported driver: %s", dsn.Driver()))
 
+	}
+
+	// Before anything is created or written: a database set up from a different revision
+	// of the same package can hold tables this run would keep using as they are.
+	if verifier, ok := database.(interface {
+		VerifySchemaCompatibility(ctx context.Context) error
+	}); ok {
+		if err := verifier.VerifySchemaCompatibility(ctx); err != nil {
+			return nil, err
+		}
 	}
 
 	sinkInfo, err := database.FetchSinkInfo(schema.Name)
@@ -153,7 +219,7 @@ func SetupDatabaseSchema(
 		if err != nil {
 			return nil, fmt.Errorf("begin transaction: %w", err)
 		}
-		err = database.CreateDatabase(options.UseConstraints)
+		err = database.CreateDatabase(options.Constraints.ApplyUpfront())
 		if err != nil {
 			database.RollbackTransaction()
 			return nil, fmt.Errorf("creating database: %w", err)
@@ -171,6 +237,17 @@ func SetupDatabaseSchema(
 		}
 
 	} else {
+		if options.Constraints.ApplyUpfront() {
+			// The schema exists, but nothing says it carries constraints: a run without
+			// them creates the very same tables, and the sink info hash is computed over
+			// the DDL the dialect would emit either way. Adding the missing ones is the
+			// only way to get there, and doing it here means constraints on a
+			// database synced without them behaves the same as one created with them.
+			if err := applyConstraints(database, logger); err != nil {
+				return nil, err
+			}
+		}
+
 		migrationNeeded := sinkInfo.SchemaHash != database.GetDialect().SchemaHash()
 		if migrationNeeded {
 
@@ -220,4 +297,62 @@ func SetupDatabaseSchema(
 	}
 
 	return database, nil
+}
+
+// applyConstraints adds the constraints an earlier run left out, in one transaction.
+//
+// On a populated database this can run for a long time: every index has to be built and
+// every foreign key validated, with the table locked while it happens. Hence the warning
+// rather than a silent wait.
+func applyConstraints(database protosql.Database, logger *zap.Logger) error {
+	logger.Warn("adding the SQL constraints to the existing schema, this can take a long time and locks the tables while it runs")
+
+	startAt := time.Now()
+
+	// The pass owns its own transactions, committing as it goes so that a run killed
+	// part-way keeps what it finished.
+	if err := database.ApplyConstraints(); err != nil {
+		return fmt.Errorf("applying constraints: %w", err)
+	}
+
+	logger.Info("constraints applied", zap.Duration("duration", time.Since(startAt)))
+
+	return nil
+}
+
+// warnAboutMissingConstraints says on every start whether the schema carries the
+// constraints the flags describe.
+//
+// A run that was interrupted before the backfill ended, or whose constraint pass was
+// killed part-way, leaves a database with no primary keys and no foreign keys — which
+// answers queries, slowly and without rejecting anything, and looks exactly like a
+// database that is fine. The check is one indexed catalog query, so it costs nothing next
+// to what it reports on.
+//
+// It only reports. Creating them is still the constraint timing's business: auto does it
+// when the backfill ends, manual leaves it to `sink postgres constraints apply`.
+func warnAboutMissingConstraints(database protosql.Database, constraints protosql.ConstraintPolicy, logger *zap.Logger) {
+	if constraints.SkipsEverything() {
+		return
+	}
+
+	missing, err := database.MissingConstraints()
+	if err != nil {
+		logger.Debug("could not check which constraints the schema carries", zap.Error(err))
+		return
+	}
+	if len(missing) == 0 {
+		return
+	}
+
+	next := "run `sink postgres constraints apply <manifest>` when a maintenance window suits"
+	if constraints.ApplyAtHead() {
+		// Only reaching the head creates them, and a run given a stop block may well never
+		// get there — saying they "will be created" would then be a promise nothing keeps.
+		next = "they are created once the stream reaches chain HEAD; a run that stops before that leaves them to `sink postgres constraints apply <manifest>`"
+	}
+
+	logger.Warn("the schema is missing constraints it is meant to have, so its tables have no indexes to match and reject nothing. "+next,
+		zap.Int("missing_count", len(missing)),
+		zap.Strings("missing", missing))
 }

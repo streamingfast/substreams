@@ -35,8 +35,6 @@ const staticSqlCreateBlock = `
 	    allow_experimental_replacing_merge_with_cleanup = 1;
 `
 
-const clickhouseTableOptionsErrorMsg = "schema annotation 'clickhouse_table_options' is required in table annotation 'option (schema.table) = { name: %q, ... }' , see: https://github.com/streamingfast/substreams/blob/develop/docs/references/sql/proto-annotations.md#clickhouse-specific-options for configuration details"
-
 type DialectClickHouse struct {
 	*sql2.BaseDialect
 	schemaName    string
@@ -73,6 +71,15 @@ func (d *DialectClickHouse) UseDeletedField() bool {
 	return true
 }
 
+func (d *DialectClickHouse) UseRowIDField(tableName string) bool {
+	table := d.GetTable(tableName)
+	if table == nil {
+		return false
+	}
+
+	return hasDefaultOrderBy(table)
+}
+
 func (d *DialectClickHouse) init() error {
 	return nil
 }
@@ -88,6 +95,10 @@ func (d *DialectClickHouse) createTable(table *schema.Table) error {
 	sb.WriteString(fmt.Sprintf(" %s timestamp NOT NULL,", sql2.DialectFieldBlockTimestamp))
 	sb.WriteString(fmt.Sprintf(" %s Int64 NOT NULL,", sql2.DialectFieldVersion))
 	sb.WriteString(fmt.Sprintf(" %s bool NOT NULL,", sql2.DialectFieldDeleted))
+
+	if hasDefaultOrderBy(table) {
+		sb.WriteString(fmt.Sprintf(" %s UInt32 NOT NULL,", sql2.DialectFieldRowID))
+	}
 
 	var primaryKeyFieldName string
 	if table.PrimaryKey != nil {
@@ -165,6 +176,11 @@ func (d *DialectClickHouse) createTable(table *schema.Table) error {
 	primaryKey := ""
 	if primaryKeyFieldName != "" {
 		primaryKey = fmt.Sprintf("PRIMARY KEY (%s)", primaryKeyFieldName)
+	} else if hasDefaultOrderBy(table) {
+		// ClickHouse takes the whole sorting key as the primary key when none is given.
+		// _row_id_ is only there to keep rows apart, never to look them up, so it is left
+		// out of the sparse index rather than doubling its size for nothing.
+		primaryKey = fmt.Sprintf("PRIMARY KEY (%s)", sql2.DialectFieldBlockNumber)
 	}
 
 	orderBy, err := orderByString(table)
@@ -301,15 +317,40 @@ func tableName(schemaName string, tableName string) string {
 	return fmt.Sprintf("%s.%s", schemaName, tableName)
 }
 
-func orderByString(table *schema.Table) (string, error) {
-	info := table.PbTableInfo.ClickhouseTableOptions
-	if info == nil {
-		return "", fmt.Errorf(clickhouseTableOptionsErrorMsg, table.Name)
+// hasDefaultOrderBy reports whether the table's sorting key is the one the sink picks on
+// its own, which is the case for any message that does not declare 'order_by_fields'.
+// Those tables get the extra _row_id_ column; annotated ones are left exactly as they
+// were.
+func hasDefaultOrderBy(table *schema.Table) bool {
+	if table.PbTableInfo == nil {
+		return true
 	}
 
-	if len(info.OrderByFields) == 0 {
-		return "", fmt.Errorf("clickhouse table options for table %q don't have any 'order_by_fields'. Require at least 1", table.Name)
+	info := table.PbTableInfo.ClickhouseTableOptions
+
+	return info == nil || len(info.OrderByFields) == 0
+}
+
+// defaultOrderByFields is the sorting key used when the message carries no
+// 'order_by_fields': the block number and the per-block row counter that keeps the key
+// unique. A declared primary key leads, because ClickHouse requires the primary key to be
+// a prefix of the sorting key.
+func defaultOrderByFields(table *schema.Table) []string {
+	var fields []string
+	if table.PrimaryKey != nil {
+		fields = append(fields, table.PrimaryKey.Name)
 	}
+	fields = append(fields, sql2.DialectFieldBlockNumber)
+
+	return append(fields, sql2.DialectFieldRowID)
+}
+
+func orderByString(table *schema.Table) (string, error) {
+	if hasDefaultOrderBy(table) {
+		return fmt.Sprintf("ORDER BY (%s)", strings.Join(defaultOrderByFields(table), ", ")), nil
+	}
+
+	info := table.PbTableInfo.ClickhouseTableOptions
 
 	out := ""
 	for i, field := range info.OrderByFields {
@@ -327,9 +368,13 @@ func orderByString(table *schema.Table) (string, error) {
 }
 
 func partitionByString(table *schema.Table) (string, error) {
-	info := table.PbTableInfo.ClickhouseTableOptions
+	var info *pbSchmema.ClickhouseTableOptions
+	if table.PbTableInfo != nil {
+		info = table.PbTableInfo.ClickhouseTableOptions
+	}
 	if info == nil {
-		return "", fmt.Errorf(clickhouseTableOptionsErrorMsg, table.Name)
+		// Same partitioning an annotated table gets when it declares no partition field.
+		return fmt.Sprintf("PARTITION BY (%s)", wrapWithClickhouseFunction(sql2.DialectFieldBlockTimestamp, pbSchmema.Function_toYYYYMM)), nil
 	}
 
 	var parts []string

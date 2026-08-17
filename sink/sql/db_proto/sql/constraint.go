@@ -13,6 +13,11 @@ type ForeignKey struct {
 type Constraint struct {
 	Table string
 	Sql   string
+
+	// ReferencedTable is the logical name of the table a foreign key points at, empty for
+	// any other kind of constraint. It is what the apply order is computed from: the
+	// SQL carries schema-qualified names, which is not what the registry is keyed by.
+	ReferencedTable string
 }
 
 func (f *ForeignKey) String() string {

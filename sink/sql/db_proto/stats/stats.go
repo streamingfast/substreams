@@ -72,11 +72,15 @@ type Stats struct {
 	LastBlockProcessAt        time.Time
 	TotalProcessingDuration   time.Duration
 	TotalDurationBetween      time.Duration
+
+	// Progress is how far the download is ahead of the database.
+	Progress *Progress
 }
 
-func NewStats(logger *zap.Logger) *Stats {
+func NewStats(logger *zap.Logger, blockBatchSize int) *Stats {
 	s := &Stats{
 		logger:                    logger,
+		Progress:                  NewProgress(blockBatchSize),
 		WaitDurationBetweenBlocks: NewAverage("   Wait Duration Between Blocks", 250_000, 1000),
 		BlockProcessingDuration:   NewAverage("      Block Processing Duration", 250_000, 1000),
 		UnmarshallingDuration:     NewAverage("         Unmarshalling Duration", 250_000, 1000),
@@ -115,6 +119,7 @@ func (s *Stats) Log() {
 		s.BlockInsertDuration.Log(s.logger)
 		s.EntitiesInsertDuration.Log(s.logger)
 		s.FlushDuration.Log(s.logger)
+		s.Progress.Log(s.logger)
 	}
 
 	s.logger.Info("-----------------------------------")

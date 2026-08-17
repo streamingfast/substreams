@@ -122,8 +122,15 @@ func MapFieldType(fd protoreflect.FieldDescriptor, bytesEncoding bytes.Encoding,
 	return baseType
 }
 
+// quoteLiteral renders a Go string as a PostgreSQL string literal.
+//
+// Only the quote is doubled. A backslash carries no meaning inside a standard string
+// literal, and standard_conforming_strings has been on by default since PostgreSQL 9.1, so
+// escaping it stored two backslashes where the value had one. That also made the write
+// mode visible in the data: the COPY path hands pgtype the string as it is, and only the
+// rendered paths came through here.
 func quoteLiteral(v string) string {
-	return "'" + strings.ReplaceAll(strings.ReplaceAll(v, "'", "''"), `\`, `\\`) + "'"
+	return "'" + strings.ReplaceAll(v, "'", "''") + "'"
 }
 
 func ValueToString(value any, bytesEncoding bytes.Encoding) (s string) {
@@ -182,7 +189,7 @@ func ValueToString(value any, bytesEncoding bytes.Encoding) (s string) {
 		if err != nil {
 			panic(fmt.Sprintf("failed to marshal protobuf message to JSON: %v", err))
 		}
-		s = "'" + strings.ReplaceAll(strings.ReplaceAll(string(jsonBytes), "'", "''"), "\\", "\\\\") + "'"
+		s = quoteLiteral(string(jsonBytes))
 		return
 	default:
 		if msg, ok := v.(protoreflect.ProtoMessage); ok {
@@ -190,7 +197,7 @@ func ValueToString(value any, bytesEncoding bytes.Encoding) (s string) {
 			if err != nil {
 				panic(fmt.Sprintf("failed to marshal protobuf message to JSON: %v", err))
 			}
-			s = "'" + strings.ReplaceAll(strings.ReplaceAll(string(jsonBytes), "'", "''"), "\\", "\\\\") + "'"
+			s = quoteLiteral(string(jsonBytes))
 			return
 		}
 		panic(fmt.Sprintf("unsupported type: %T", v))

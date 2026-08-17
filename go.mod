@@ -17,7 +17,7 @@ require (
 	github.com/streamingfast/dstore v0.2.4-0.20260709193311-122163592902
 	github.com/streamingfast/logging v1.2.2
 	github.com/streamingfast/pbgo v0.0.6-0.20251125204657-0a9c67563b19
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.0
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.28.0
 	google.golang.org/protobuf v1.36.12
@@ -29,7 +29,7 @@ require (
 	buf.build/gen/go/bufbuild/reflect/protocolbuffers/go v1.36.12-20240117202343-bf8f65e8876c.1
 	buf.build/go/hyperpb v0.1.3
 	connectrpc.com/connect v1.20.0
-	github.com/AfterShip/clickhouse-sql-parser v0.5.5
+	github.com/AfterShip/clickhouse-sql-parser v0.5.6
 	github.com/ClickHouse/ch-go v0.74.0
 	github.com/ClickHouse/clickhouse-go/v2 v2.48.0
 	github.com/KimMachineGun/automemlimit v0.7.5
@@ -48,7 +48,7 @@ require (
 	github.com/charmbracelet/huh v1.0.0
 	github.com/charmbracelet/huh/spinner v0.0.0-20240806005253-b7436a76999a
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
-	github.com/charmbracelet/x/ansi v0.11.7
+	github.com/charmbracelet/x/ansi v0.11.8
 	github.com/drone/envsubst v1.0.3
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.19.0
@@ -146,7 +146,7 @@ require (
 	github.com/aws/smithy-go v1.25.1 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
-	github.com/bits-and-blooms/bitset v1.24.4 // indirect
+	github.com/bits-and-blooms/bitset v1.24.6 // indirect
 	github.com/bobg/go-generics/v3 v3.5.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/catppuccin/go v0.3.0 // indirect

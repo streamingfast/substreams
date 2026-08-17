@@ -82,7 +82,11 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 	if err != nil {
 		return nil, err
 	}
-	hostModules = append(hostModules, envModule, stateModule, loggerModule)
+	contextModule, err := AddHostFunctions(ctx, runtime, "context", ContextFuncs)
+	if err != nil {
+		return nil, err
+	}
+	hostModules = append(hostModules, envModule, stateModule, loggerModule, contextModule)
 
 	// TODO: where to `Close()` the `runtime` here?
 	// One runtime per request?

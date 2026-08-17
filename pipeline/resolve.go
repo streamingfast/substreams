@@ -248,6 +248,13 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 
 	reorgJunctionBlock, head, err := resolveCursor(resolveCtx, cursor)
 	if err != nil {
+		if errors.Is(err, bstream.ErrCursorAboveHead) {
+			// Not a bad cursor: this instance has not reached that block yet, where the
+			// one that served the client had. An invalid argument would have the client
+			// discard a cursor it should keep, so this is retryable.
+			return 0, "", nil, connect.NewError(connect.CodeUnavailable, fmt.Errorf("cannot resolve StartCursor %q yet: %s", cursor, err.Error()))
+		}
+
 		return 0, "", nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("cannot resolve StartCursor %q: %s", cursor, err.Error()))
 	}
 	resolvedCursor := cursor
@@ -312,6 +319,31 @@ func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStor
 		var isFromFile bool
 		src := hub.SourceFromCursor(cursor, jctBlkGetter)
 		if src == nil { // block is out of reversible segment
+			// ...unless it is not: the hub also declines a cursor whose block number it
+			// covers and whose ID it has never seen. Resolving that one from files means
+			// waiting for the merged bundle holding that block number to be written, which
+			// on a chain bundling 100 blocks leaves the stream silent for some twenty
+			// minutes — and the files cannot resolve it when it gets there either. Revert
+			// to the cursor's LIB right away instead, which is what the file source would
+			// have led to.
+			forkedBlocks := bstream.NewFileSourceFactory(mergedBlocksStore, forkedBlocksStore, zap.NewNop())
+			if err := bstream.CheckCursorResolvable(ctx, cursor, hub, forkedBlocks, reqctx.Logger(ctx)); err != nil {
+				// A cursor above the hub's head is the one case that is not the client's
+				// fault: this instance runs behind the one that served it, and the blocks
+				// it names do exist. Surfaced as-is so the request fails retryably rather
+				// than reverting a sink that is ahead of us.
+				if errors.Is(err, bstream.ErrCursorAboveHead) {
+					return nil, nil, err
+				}
+
+				headBlock := cursor.HeadBlock
+				if headNum, headID, _, _, err := hub.HeadInfo(); err == nil {
+					headBlock = bstream.NewBlockRef(headID, headNum)
+				}
+				reqctx.Logger(ctx).Warn("cursor cannot be resolved, reverting to its LIB", zap.Stringer("cursor", cursor), zap.Error(err))
+				return cursor.LIB, headBlock, nil
+			}
+
 			src = bstream.NewFileSourceFromCursor(mergedBlocksStore, forkedBlocksStore, cursor, jctBlkGetter, zap.NewNop(), fileSourceOptions...)
 			isFromFile = true
 		}

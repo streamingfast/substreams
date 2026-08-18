@@ -174,6 +174,7 @@ Comprehensive API documentation is available in the proto files:
 
 ## Related Resources
 
+- [Remote Feed Hosted Store Guide](../how-to-guides/composing-substreams/foundational-stores/hosted-store-guide.md) - Write to and read from a StreamingFast-managed hosted store over gRPC, without running your own server
 - [Hosting a Foundational Store](foundational-stores/hosting-foundational-stores.md) - Complete guide for setting up and running a Foundational Store server
 - [Consuming a Foundational Store](../tutorials/consuming-foundational-store.md) - Guide for querying Foundational Stores in Substreams modules
 - [Foundational Store Examples](../how-to-guides/composing-substreams/foundational-stores/foundational-stores.md) - Chain-specific foundational store implementations

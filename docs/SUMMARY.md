@@ -57,6 +57,7 @@
 * [Composing Substreams](how-to-guides/composing-substreams/composing-substreams.md)
   * [Foundational Modules](how-to-guides/composing-substreams/foundational-modules.md)
   * [Foundational Stores](how-to-guides/composing-substreams/foundational-stores/foundational-stores.md)
+    * [Remote Feed Hosted Store Guide](how-to-guides/composing-substreams/foundational-stores/hosted-store-guide.md)
     * [Ethereum - ERC20 Token Metadata](how-to-guides/composing-substreams/foundational-stores/ethereum/erc20-token-metadata.md)
     * [Solana - SPL Initialized Account](how-to-guides/composing-substreams/foundational-stores/solana/spl-initialized-account.md)
   * [Published Packages](how-to-guides/composing-substreams/published-packages.md)

@@ -9,7 +9,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/dustin/go-humanize"
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -103,10 +105,15 @@ func NewStages(
 
 	modulesInitBlocks := execGraph.ModulesInitBlocks()
 	for idx, stageLayers := range execGraph.StagedUsedModules() {
-		var allModules []string
+		var allModules, storeModules, mapperModules []string
 		for _, layer := range stageLayers {
 			for _, mod := range layer {
 				allModules = append(allModules, mod.Name)
+				if mod.GetKindStore() != nil {
+					storeModules = append(storeModules, mod.Name)
+				} else {
+					mapperModules = append(mapperModules, mod.Name)
+				}
 			}
 		}
 		layer := stageLayers.LastLayer()
@@ -138,7 +145,7 @@ func NewStages(
 		}
 
 		stageSegmenter := segmenter.WithInitialBlock(stageLowestInitBlock)
-		stage := NewStage(idx, kind, stageSegmenter, moduleStates, allModules)
+		stage := NewStage(idx, kind, stageSegmenter, moduleStates, allModules, storeModules, mapperModules)
 		out.stages = append(out.stages, stage)
 	}
 
@@ -146,6 +153,14 @@ func NewStages(
 	out.nextJobCursor = out.globalSegmenter.FirstIndex()
 
 	return out
+}
+
+func (s *Stages) Close() {
+	for _, stage := range s.stages {
+		for _, modState := range stage.storeModuleStates {
+			modState.Close()
+		}
+	}
 }
 
 func layerKind(layer exec.LayerModules) Kind {
@@ -237,39 +252,143 @@ func (s *Stages) UpdateStats() {
 	s.lastStatUpdate = time.Now()
 	out := make([]*pbsubstreamsrpc.Stage, len(s.stages))
 
-	rangesByStage := s.statsRangesByStage()
+	// The progress view is computed once and feeds both the RPC message and the progress log,
+	// so the segment matrix is still walked a single time per update.
+	stats := s.computeStageStats()
+	progress := s.stagesProgress(stats)
 	for stgIdx := range s.stages {
 		mods := make([]string, len(s.stages[stgIdx].allExecutedModules))
 		_ = copy(mods, s.stages[stgIdx].allExecutedModules)
 
 		out[stgIdx] = &pbsubstreamsrpc.Stage{
-			Modules:         mods,
-			CompletedRanges: toProtoRanges(rangesByStage[stgIdx].Merged()),
+			Modules: mods,
+			// CompletedRanges counts a store segment as soon as its partial exists, while
+			// ReadyUpToExclusive stops at the last squashed one. The gap between the two is
+			// what SquashWaitSegmentCount measures.
+			CompletedRanges:        toProtoRanges(stats.ranges[stgIdx].Merged()),
+			ReadyUpToExclusive:     progress[stgIdx].HighestContiguousBlock,
+			SquashWaitSegmentCount: progress[stgIdx].SegmentsReadyForSquashing,
 		}
 	}
 
-	reqctx.ReqStats(s.ctx).RecordStages(out)
+	reqStats := reqctx.ReqStats(s.ctx)
+	reqStats.RecordStages(out)
+	reqStats.RecordStagesProgress(progress)
 }
 
-// statsRangesByStage collects, per stage, the ranges of segments that are in
-// progress or done (Completed/PartialPresent/Merging), in a single pass over the
-// segment matrix. Because segments are visited in ascending order the ranges come
-// out already sorted and de-duplicated (one range per segment), so callers can
-// Merged() them directly — no per-stage map allocation and no sort.
-func (s *Stages) statsRangesByStage() []block.Ranges {
-	rangesByStage := make([]block.Ranges, len(s.stages))
+// stageStats is what a single pass over the segment matrix yields, per stage.
+type stageStats struct {
+	// ranges are the segments that are in progress or done (Completed/PartialPresent/Merging).
+	ranges []block.Ranges
+	// contiguousSegment is the highest segment of the uninterrupted prefix of usable
+	// segments. "Usable" excludes store partials: a partial that was not squashed yet is
+	// not readable as part of the store.
+	contiguousSegment []int
+	// partialSegments counts the store partials sitting above the contiguous prefix, i.e.
+	// work that is done but still waiting for the squasher.
+	partialSegments []uint64
+}
+
+// computeStageStats walks the segment matrix once. Because segments are visited in
+// ascending order the ranges come out already sorted and de-duplicated (one range per
+// segment), so callers can Merged() them directly — no per-stage map allocation and no sort.
+// The contiguous prefix and the pending-partials count are folded into the same pass to keep
+// this O(segments × stages) overall, called at most once per second.
+func (s *Stages) computeStageStats() stageStats {
+	out := stageStats{
+		ranges:            make([]block.Ranges, len(s.stages)),
+		contiguousSegment: make([]int, len(s.stages)),
+		partialSegments:   make([]uint64, len(s.stages)),
+	}
+	// Everything below segmentOffset is assumed to have completed, so the contiguous
+	// prefix starts there.
+	for stgIdx := range s.stages {
+		out.contiguousSegment[stgIdx] = s.segmentOffset - 1
+	}
+	prefixBroken := make([]bool, len(s.stages))
+
 	for segmentIdx, segment := range s.segmentStates {
+		absoluteSegment := segmentIdx + s.segmentOffset
 		for stgIdx := range s.stages {
-			switch segment[stgIdx] {
+			state := segment[stgIdx]
+			isStore := s.stages[stgIdx].kind == KindStore
+			segmenter := s.stages[stgIdx].storeModuleStates[0].segmenter
+
+			switch state {
 			case UnitCompleted, UnitPartialPresent, UnitMerging:
-				segmenter := s.stages[stgIdx].storeModuleStates[0].segmenter
-				if rng := segmenter.Range(segmentIdx + s.segmentOffset); rng != nil {
-					rangesByStage[stgIdx] = append(rangesByStage[stgIdx], rng)
+				if rng := segmenter.Range(absoluteSegment); rng != nil {
+					out.ranges[stgIdx] = append(out.ranges[stgIdx], rng)
+				}
+			}
+
+			// A map segment is usable as soon as its partial exec-out file exists (maps are
+			// never squashed); a store segment is only usable once it has been merged.
+			usable := state == UnitCompleted || state == UnitNoOp || (!isStore && state == UnitPartialPresent)
+			if usable && !prefixBroken[stgIdx] {
+				out.contiguousSegment[stgIdx] = absoluteSegment
+				continue
+			}
+			prefixBroken[stgIdx] = true
+
+			if isStore && (state == UnitPartialPresent || state == UnitMerging) {
+				// Bounds-checked rather than asking for the Range: only the segment's existence
+				// matters here, and Range allocates one per call in a loop that already runs
+				// once per second over every segment of the run.
+				if absoluteSegment >= segmenter.FirstIndex() && absoluteSegment <= segmenter.LastIndex() {
+					out.partialSegments[stgIdx]++
 				}
 			}
 		}
 	}
-	return rangesByStage
+	return out
+}
+
+// stagesProgress reports, per stage, the whole range of work it is planned to cover for
+// this request, and per module, up to which block it is contiguously ready. Stores stop at
+// the last squashed segment and report their unsquashed partials separately; mappers and
+// indexes count their partial exec-out files as ready, since that is exactly what the
+// output stream reads from.
+func (s *Stages) stagesProgress(stats stageStats) []metrics.StageProgress {
+	firstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
+
+	out := make([]metrics.StageProgress, 0, len(s.stages))
+	for stgIdx, stage := range s.stages {
+		progress := metrics.StageProgress{
+			Stage:   stgIdx,
+			Stores:  stage.executedStores,
+			Mappers: stage.executedMappers,
+		}
+		// The stage segmenter comes straight from the request plan, so this is the span of
+		// jobs the stage is expected to run over the session, regardless of what the
+		// scheduler has picked up so far. Both ranges are nil on an empty stage.
+		if first := stage.segmenter.Range(stage.segmenter.FirstIndex()); first != nil {
+			if last := stage.segmenter.Range(stage.segmenter.LastIndex()); last != nil {
+				progress.PlannedFirstJobStartBlock = first.StartBlock
+				progress.PlannedLastJobStopBlock = last.ExclusiveEndBlock
+			}
+		}
+
+		// A stage is only as advanced as its least advanced module, so report the lowest
+		// contiguous block across them rather than a per-module breakdown.
+		for _, modState := range stage.storeModuleStates {
+			// Base value when nothing was processed yet: where this module starts from.
+			highest := max(modState.segmenter.InitialBlock(), firstStreamableBlock)
+			if seg := stats.contiguousSegment[stgIdx]; seg >= modState.segmenter.FirstIndex() {
+				if rng := modState.segmenter.Range(seg); rng != nil && rng.ExclusiveEndBlock > highest {
+					highest = rng.ExclusiveEndBlock
+				}
+			}
+			if progress.HighestContiguousBlock == 0 || highest < progress.HighestContiguousBlock {
+				progress.HighestContiguousBlock = highest
+			}
+		}
+		if stage.kind == KindStore {
+			progress.SegmentsReadyForSquashing = stats.partialSegments[stgIdx]
+		}
+
+		out = append(out, progress)
+	}
+	return out
 }
 
 func toProtoRanges(in block.Ranges) []*pbsubstreamsrpc.BlockRange {
@@ -685,12 +804,10 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 				if met["datasize"] == "" {
 					met["datasize"] = fmt.Sprintf("%d", fullKV.SizeBytes())
 				}
-				go func() {
-					err := fullKV.Store().SetMetadata(s.ctx, fullKV.Filename(), met)
-					if err != nil {
-						s.logger.Warn("failed to set metadata on store", zap.String("store_name", modState.name), zap.String("filename", fullKV.Filename()), zap.Error(err))
-					}
-				}()
+				// Detached metadata write: does not retain fullKV or ride the
+				// request ctx (see store.SetMetadataDetached). Tier1 twin of the
+				// tier2 fix in pipeline.setupSubrequestStores.
+				store.SetMetadataDetached(fullKV.Store(), fullKV.Filename(), modState.name, met, s.logger)
 			}
 		}()
 	}
@@ -715,6 +832,14 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 	if reqHandler := reqctx.ActiveRequestsHandler(s.ctx); reqHandler != nil {
 		s.logger.Info("adjusting to stores size", zap.Uint64("actual_store_size", actualRequestStoresSize/1024/1024))
 		reqHandler.AdjustFullKVSize(actualRequestStoresSize)
+	}
+
+	// Ownership of the loaded stores transfers to the returned map: the linear
+	// pipeline keeps writing to them and closes them at request end. Detach
+	// them from the module states so Stages.Close() does not close stores
+	// still in use.
+	for _, modState := range storeModuleStates {
+		modState.cachedStore = nil
 	}
 
 	return out, nil

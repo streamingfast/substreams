@@ -151,10 +151,12 @@ func ListenTier2(
 			grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider))),
 			grpc.MaxRecvMsgSize(1024*1024*1024),
 		),
-		// we get these errors when the tier1's dns loadbalancer selector checks availability, we want to ignore them.
+		// Health probes / LB selectors often open TCP and speak plain HTTP (or drop mid-handshake)
+		// against a TLS port; Go's http.Server logs those as ERROR. Suppress the known-benign ones.
 		dgrpcserver.WithSuppressHTTPError(
 			regexp.MustCompile(`TLS handshake error.*EOF`),
 			regexp.MustCompile(`TLS handshake error.*connection reset by peer`),
+			regexp.MustCompile(`TLS handshake error.*first record does not look like a TLS handshake`),
 		),
 	}
 	if enforceCompression {

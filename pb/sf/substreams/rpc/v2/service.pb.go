@@ -24,6 +24,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Operation describes the type of mutation applied to the store key.
 type StoreDelta_Operation int32
 
 const (
@@ -76,11 +77,24 @@ func (StoreDelta_Operation) EnumDescriptor() ([]byte, []int) {
 	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{17, 0}
 }
 
+// Request is the input message for the `Stream.Blocks` RPC. It specifies which blocks to
+// stream, which Substreams modules to execute, and various options that control the
+// execution mode and output.
 type Request struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	StartBlockNum int64                  `protobuf:"varint,1,opt,name=start_block_num,json=startBlockNum,proto3" json:"start_block_num,omitempty"`
-	StartCursor   string                 `protobuf:"bytes,2,opt,name=start_cursor,json=startCursor,proto3" json:"start_cursor,omitempty"`
-	StopBlockNum  uint64                 `protobuf:"varint,3,opt,name=stop_block_num,json=stopBlockNum,proto3" json:"stop_block_num,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// If positive, the absolute block number at which to start streaming (inclusive).
+	// If 0, streaming starts at the first streamable block of the chain.
+	// If negative, the start block is resolved relative to the chain HEAD at the time of
+	// the request (e.g., -10 starts 10 blocks before the current HEAD).
+	StartBlockNum int64 `protobuf:"varint,1,opt,name=start_block_num,json=startBlockNum,proto3" json:"start_block_num,omitempty"`
+	// Cursor returned by a previous `BlockScopedData.cursor` or
+	// `BlockUndoSignal.last_valid_cursor`. When provided, streaming resumes from the exact
+	// position the cursor points to, taking precedence over `start_block_num`. Use this to
+	// implement reliable exactly-once resumption after disconnections or forks.
+	StartCursor string `protobuf:"bytes,2,opt,name=start_cursor,json=startCursor,proto3" json:"start_cursor,omitempty"`
+	// If non-zero, streaming stops *before* reaching this block number (exclusive upper bound).
+	// If zero, the stream continues indefinitely, following the chain HEAD in real-time.
+	StopBlockNum uint64 `protobuf:"varint,3,opt,name=stop_block_num,json=stopBlockNum,proto3" json:"stop_block_num,omitempty"`
 	// With final_block_only, you only receive blocks that are irreversible:
 	// 'final_block_height' will be equal to current block and no 'undo_signal' will ever be sent
 	FinalBlocksOnly bool `protobuf:"varint,4,opt,name=final_blocks_only,json=finalBlocksOnly,proto3" json:"final_blocks_only,omitempty"`
@@ -103,12 +117,20 @@ type Request struct {
 	//
 	// With production mode`, however, you trade off functionality for high speed enabling forward
 	// parallel execution of module ahead of time.
-	ProductionMode bool        `protobuf:"varint,5,opt,name=production_mode,json=productionMode,proto3" json:"production_mode,omitempty"`
-	OutputModule   string      `protobuf:"bytes,6,opt,name=output_module,json=outputModule,proto3" json:"output_module,omitempty"`
-	Modules        *v1.Modules `protobuf:"bytes,7,opt,name=modules,proto3" json:"modules,omitempty"`
+	ProductionMode bool `protobuf:"varint,5,opt,name=production_mode,json=productionMode,proto3" json:"production_mode,omitempty"`
+	// Name of the module whose output should be streamed back to the client. Must be a
+	// `map` module. Only one output module is supported per request.
+	OutputModule string `protobuf:"bytes,6,opt,name=output_module,json=outputModule,proto3" json:"output_module,omitempty"`
+	// Substreams module definitions to execute. At minimum this must contain the module
+	// named by `output_module` and all of its transitive dependencies.
+	Modules *v1.Modules `protobuf:"bytes,7,opt,name=modules,proto3" json:"modules,omitempty"`
 	// Available only in developer mode
 	DebugInitialStoreSnapshotForModules []string `protobuf:"bytes,10,rep,name=debug_initial_store_snapshot_for_modules,json=debugInitialStoreSnapshotForModules,proto3" json:"debug_initial_store_snapshot_for_modules,omitempty"`
-	NoopMode                            bool     `protobuf:"varint,11,opt,name=noop_mode,json=noopMode,proto3" json:"noop_mode,omitempty"`
+	// When true, prepares the stores and caches on the server without sending any module
+	// output. Only progress messages and minimal clock/cursor data are returned. Useful for
+	// pre-warming caches (e.g., to reduce latency for a subsequent real request) without
+	// incurring the cost of transmitting full block data.
+	NoopMode bool `protobuf:"varint,11,opt,name=noop_mode,json=noopMode,proto3" json:"noop_mode,omitempty"`
 	// If set, the engine will reject a request if the number of blocks to process (including preparing the stores) is above this limit.
 	// Useful as a safeguard for managing costs
 	LimitProcessedBlocks uint64 `protobuf:"varint,12,opt,name=limit_processed_blocks,json=limitProcessedBlocks,proto3" json:"limit_processed_blocks,omitempty"`
@@ -248,6 +270,8 @@ func (x *Request) GetPartialBlocks() bool {
 	return false
 }
 
+// Response is the output message streamed back by the `Stream.Blocks` RPC.
+// Each response contains exactly one of the possible message types.
 type Response struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Message:
@@ -369,11 +393,13 @@ type isResponse_Message interface {
 }
 
 type Response_Session struct {
-	Session *SessionInit `protobuf:"bytes,1,opt,name=session,proto3,oneof"` // Always sent first
+	// Always sent first when the stream opens.
+	Session *SessionInit `protobuf:"bytes,1,opt,name=session,proto3,oneof"`
 }
 
 type Response_Progress struct {
-	Progress *ModulesProgress `protobuf:"bytes,2,opt,name=progress,proto3,oneof"` // Progress of data preparation, before sending in the stream of `data` events.
+	// Progress of data preparation, before sending in the stream of `data` events.
+	Progress *ModulesProgress `protobuf:"bytes,2,opt,name=progress,proto3,oneof"`
 }
 
 type Response_BlockScopedData struct {
@@ -412,13 +438,35 @@ func (*Response_DebugSnapshotData) isResponse_Message() {}
 
 func (*Response_DebugSnapshotComplete) isResponse_Message() {}
 
-// BlockUndoSignal informs you that every bit of data
-// with a block number above 'last_valid_block' has been reverted
-// on-chain. Delete that data and restart from 'last_valid_cursor'
+// BlockUndoSignal is sent when a chain reorganization (fork) has occurred, indicating that
+// some previously streamed block data is no longer part of the canonical chain and must be
+// invalidated. Upon receiving this signal, delete all stored data for blocks whose number
+// is strictly greater than `last_valid_block.number`, then resume the stream using
+// `last_valid_cursor`.
+//
+// A single BlockUndoSignal may revert multiple consecutive blocks. For example, suppose
+// your sink has processed blocks 100, 101, 102, and 103. If the chain reorganizes and the
+// new canonical chain diverges starting after block 98, you will receive a single
+// BlockUndoSignal with `last_valid_block.number = 98`. You must then delete all reversible
+// data you stored for blocks 99, 100, 101, 102, and 103.
+//
+// "Reversible" data refers to data stored for blocks whose number is greater than the
+// most recently received `BlockScopedData.final_block_height`. Once a block's number is
+// at or below `final_block_height`, that data is considered final (irreversible) and will
+// never be the subject of a future undo signal.
+//
+// Best practice: atomically delete reversible data AND persist `last_valid_cursor`
+// together in the same transaction. This guarantees that on reconnection (using the
+// persisted cursor), the stream resumes exactly at the last valid block, even if a
+// disconnection occurred in the middle of a fork resolution.
 type BlockUndoSignal struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	LastValidBlock  *v1.BlockRef           `protobuf:"bytes,1,opt,name=last_valid_block,json=lastValidBlock,proto3" json:"last_valid_block,omitempty"`
-	LastValidCursor string                 `protobuf:"bytes,2,opt,name=last_valid_cursor,json=lastValidCursor,proto3" json:"last_valid_cursor,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The highest block that is still valid in the canonical chain after the reorganization.
+	// Delete all stored data for blocks with a number strictly greater than this block's number.
+	LastValidBlock *v1.BlockRef `protobuf:"bytes,1,opt,name=last_valid_block,json=lastValidBlock,proto3" json:"last_valid_block,omitempty"`
+	// The cursor corresponding to `last_valid_block`. Persist this cursor atomically with
+	// your data deletions so that on reconnection the stream resumes from exactly this point.
+	LastValidCursor string `protobuf:"bytes,2,opt,name=last_valid_cursor,json=lastValidCursor,proto3" json:"last_valid_cursor,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -467,12 +515,35 @@ func (x *BlockUndoSignal) GetLastValidCursor() string {
 	return ""
 }
 
+// BlockScopedData contains the processed output for a single block and is the primary
+// data-bearing message in the stream.
+//
+// Cursor handling and resumption:
+// Persist `cursor` atomically together with your processed data (ideally in the same
+// transaction) after every block. On reconnection, pass the persisted cursor as
+// `Request.start_cursor` to resume the stream from exactly where you left off, with no
+// duplicates and no gaps — even if a disconnection happened mid-fork.
+//
+// If your storage backend does not support transactions, a practical alternative is:
+// on startup, delete all stored data for blocks whose number is >= the last persisted
+// block number before resuming. This removes any half-written data from a previous
+// interrupted run and ensures a clean state before the stream continues.
 type BlockScopedData struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	Output *MapModuleOutput       `protobuf:"bytes,1,opt,name=output,proto3" json:"output,omitempty"`
-	Clock  *v1.Clock              `protobuf:"bytes,2,opt,name=clock,proto3" json:"clock,omitempty"`
-	Cursor string                 `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
-	// Non-deterministic, allows substreams-sink to let go of their undo data.
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The output produced by the `output_module` for this block. The `map_output` field
+	// within contains the module's Protobuf-encoded result.
+	Output *MapModuleOutput `protobuf:"bytes,1,opt,name=output,proto3" json:"output,omitempty"`
+	// Clock information for this block: its hash (`id`), height (`number`), and timestamp.
+	Clock *v1.Clock `protobuf:"bytes,2,opt,name=clock,proto3" json:"clock,omitempty"`
+	// Opaque cursor identifying the exact stream position at this block. Persist this
+	// value and pass it as `Request.start_cursor` to resume the stream after a
+	// disconnection. This cursor is safe to persist even when `final_block_height` has
+	// not yet reached this block's number.
+	Cursor string `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	// The block number of the highest block that has reached finality (irreversibility) at
+	// the time this message was produced. Data for blocks at or below this number will
+	// never be undone and can be treated as permanent. Non-deterministic: may advance
+	// in larger steps as the chain progresses.
 	FinalBlockHeight  uint64               `protobuf:"varint,4,opt,name=final_block_height,json=finalBlockHeight,proto3" json:"final_block_height,omitempty"`
 	DebugMapOutputs   []*MapModuleOutput   `protobuf:"bytes,10,rep,name=debug_map_outputs,json=debugMapOutputs,proto3" json:"debug_map_outputs,omitempty"`
 	DebugStoreOutputs []*StoreModuleOutput `protobuf:"bytes,11,rep,name=debug_store_outputs,json=debugStoreOutputs,proto3" json:"debug_store_outputs,omitempty"`
@@ -484,7 +555,13 @@ type BlockScopedData struct {
 	// Only present if is_partial==true
 	PartialIndex *uint32 `protobuf:"varint,14,opt,name=partial_index,json=partialIndex,proto3,oneof" json:"partial_index,omitempty"`
 	// Only present if is_partial==true
-	// true if this is the last partial of a given block, this will be the correct hash of the block (unless there are reorgs)
+	// True if this is the last partial payload for this block number. The `clock.id` (block
+	// hash) carried in this message is the final, definitive hash for the block. Prior
+	// partials for the same block number will have had a tentative or empty hash.
+	//
+	// Partial block support is currently implemented for Flashblocks, the pre-confirmation
+	// block stream used on Base and Optimism. A single canonical block is typically split
+	// into multiple incremental partials; the last one carries the block's true hash.
 	IsLastPartial *bool `protobuf:"varint,15,opt,name=is_last_partial,json=isLastPartial,proto3,oneof" json:"is_last_partial,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -590,15 +667,27 @@ func (x *BlockScopedData) GetIsLastPartial() bool {
 	return false
 }
 
+// SessionInit is the first message sent in the stream. It provides metadata about the
+// server-side execution session such as the resolved start block and parallelism settings.
 type SessionInit struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	TraceId            string                 `protobuf:"bytes,1,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
-	ResolvedStartBlock uint64                 `protobuf:"varint,2,opt,name=resolved_start_block,json=resolvedStartBlock,proto3" json:"resolved_start_block,omitempty"`
-	LinearHandoffBlock uint64                 `protobuf:"varint,3,opt,name=linear_handoff_block,json=linearHandoffBlock,proto3" json:"linear_handoff_block,omitempty"`
-	MaxParallelWorkers uint64                 `protobuf:"varint,4,opt,name=max_parallel_workers,json=maxParallelWorkers,proto3" json:"max_parallel_workers,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Unique trace identifier for this stream session. Useful for correlating logs and
+	// debugging issues with the provider.
+	TraceId string `protobuf:"bytes,1,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	// The actual block number at which streaming will start, after resolving a relative
+	// `start_block_num` or a cursor. Use this to verify that the stream begins where expected.
+	ResolvedStartBlock uint64 `protobuf:"varint,2,opt,name=resolved_start_block,json=resolvedStartBlock,proto3" json:"resolved_start_block,omitempty"`
+	// The block number at which the server transitions from parallel (historical) processing
+	// to linear (real-time) processing. Blocks before this number are produced by
+	// parallel workers; blocks at and after this number are produced sequentially.
+	LinearHandoffBlock uint64 `protobuf:"varint,3,opt,name=linear_handoff_block,json=linearHandoffBlock,proto3" json:"linear_handoff_block,omitempty"`
+	// The maximum number of parallel workers the server may use to process historical blocks
+	// for this request.
+	MaxParallelWorkers uint64 `protobuf:"varint,4,opt,name=max_parallel_workers,json=maxParallelWorkers,proto3" json:"max_parallel_workers,omitempty"`
 	// Operator's attestation public_key or address, enabling economic security as per GIP-0083.
 	AttestationPublicKey string `protobuf:"bytes,5,opt,name=attestation_public_key,json=attestationPublicKey,proto3" json:"attestation_public_key,omitempty"`
-	ChainHead            uint64 `protobuf:"varint,6,opt,name=chain_head,json=chainHead,proto3" json:"chain_head,omitempty"`
+	// The current HEAD block number of the chain at the time the session was initialized.
+	ChainHead uint64 `protobuf:"varint,6,opt,name=chain_head,json=chainHead,proto3" json:"chain_head,omitempty"`
 	// theoretical number of blocks that need to be processed __before any data is sent__, without consideration for current cached states
 	// Because of parallel work, 1000 blocks with 2 "store stages" will result in 2000 blocks to process
 	BlocksToProcessBeforeStartBlock uint64 `protobuf:"varint,7,opt,name=blocks_to_process_before_start_block,json=blocksToProcessBeforeStartBlock,proto3" json:"blocks_to_process_before_start_block,omitempty"`
@@ -610,8 +699,16 @@ type SessionInit struct {
 	BlocksToProcessAfterStartBlock uint64 `protobuf:"varint,9,opt,name=blocks_to_process_after_start_block,json=blocksToProcessAfterStartBlock,proto3" json:"blocks_to_process_after_start_block,omitempty"`
 	// same as `blocks_to_process_after_start_block`, but excluding the current cached outputs
 	EffectiveBlocksToProcessAfterStartBlock uint64 `protobuf:"varint,10,opt,name=effective_blocks_to_process_after_start_block,json=effectiveBlocksToProcessAfterStartBlock,proto3" json:"effective_blocks_to_process_after_start_block,omitempty"`
-	unknownFields                           protoimpl.UnknownFields
-	sizeCache                               protoimpl.SizeCache
+	// The width in blocks of one parallel processing segment, constant for the whole session.
+	// Segments are the unit the parallel phase schedules, caches and squashes in, so this is
+	// what turns a segment count such as `Stage.squash_wait_segment_count` into a number of blocks.
+	//
+	// Careful, it is an upper bound rather than an exact multiplier: the first and last segment
+	// of a run are genuinely narrower when a module's initial block or the request's stop block
+	// falls inside a segment. Good enough to size a progress bar, not to reconcile a total.
+	SegmentBlockCount uint64 `protobuf:"varint,11,opt,name=segment_block_count,json=segmentBlockCount,proto3" json:"segment_block_count,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *SessionInit) Reset() {
@@ -714,9 +811,21 @@ func (x *SessionInit) GetEffectiveBlocksToProcessAfterStartBlock() uint64 {
 	return 0
 }
 
+func (x *SessionInit) GetSegmentBlockCount() uint64 {
+	if x != nil {
+		return x.SegmentBlockCount
+	}
+	return 0
+}
+
+// InitialSnapshotComplete is sent in developer mode after all InitialSnapshotData
+// messages for a module have been delivered, signaling that the full initial store
+// snapshot has been transmitted.
 type InitialSnapshotComplete struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Cursor        string                 `protobuf:"bytes,1,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The cursor at the point the snapshot was taken. Use this as `start_cursor` if you
+	// want to resume the stream from exactly after the snapshot.
+	Cursor        string `protobuf:"bytes,1,opt,name=cursor,proto3" json:"cursor,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -758,12 +867,19 @@ func (x *InitialSnapshotComplete) GetCursor() string {
 	return ""
 }
 
+// InitialSnapshotData carries a batch of key-value deltas from a store module's initial
+// state snapshot. Only available in developer mode when
+// `debug_initial_store_snapshot_for_modules` is set.
 type InitialSnapshotData struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ModuleName    string                 `protobuf:"bytes,1,opt,name=module_name,json=moduleName,proto3" json:"module_name,omitempty"`
-	Deltas        []*StoreDelta          `protobuf:"bytes,2,rep,name=deltas,proto3" json:"deltas,omitempty"`
-	SentKeys      uint64                 `protobuf:"varint,4,opt,name=sent_keys,json=sentKeys,proto3" json:"sent_keys,omitempty"`
-	TotalKeys     uint64                 `protobuf:"varint,3,opt,name=total_keys,json=totalKeys,proto3" json:"total_keys,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Name of the store module whose initial snapshot is being sent.
+	ModuleName string `protobuf:"bytes,1,opt,name=module_name,json=moduleName,proto3" json:"module_name,omitempty"`
+	// A batch of store deltas representing part of the module's full key-value state.
+	Deltas []*StoreDelta `protobuf:"bytes,2,rep,name=deltas,proto3" json:"deltas,omitempty"`
+	// The number of keys sent so far across all batches for this module.
+	SentKeys uint64 `protobuf:"varint,4,opt,name=sent_keys,json=sentKeys,proto3" json:"sent_keys,omitempty"`
+	// The total number of keys in the store module's full initial snapshot.
+	TotalKeys     uint64 `protobuf:"varint,3,opt,name=total_keys,json=totalKeys,proto3" json:"total_keys,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -826,10 +942,14 @@ func (x *InitialSnapshotData) GetTotalKeys() uint64 {
 	return 0
 }
 
+// MapModuleOutput holds the Protobuf-encoded output of a single `map` module for a block.
 type MapModuleOutput struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	Name      string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	MapOutput *anypb.Any             `protobuf:"bytes,2,opt,name=map_output,json=mapOutput,proto3" json:"map_output,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The name of the map module that produced this output.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// The Protobuf-encoded output value. The concrete message type is determined by the
+	// module's `output.type` declaration in the Substreams manifest.
+	MapOutput *anypb.Any `protobuf:"bytes,2,opt,name=map_output,json=mapOutput,proto3" json:"map_output,omitempty"`
 	// DebugOutputInfo is available in non-production mode only
 	DebugInfo     *OutputDebugInfo `protobuf:"bytes,10,opt,name=debug_info,json=debugInfo,proto3" json:"debug_info,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1093,10 +1213,14 @@ func (x *ModulesProgress) GetProcessedBlocks() uint64 {
 	return 0
 }
 
+// ProcessedBytes reports the total volume of data read and written during parallel
+// processing. These are cumulative counters reset per session.
 type ProcessedBytes struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	TotalBytesRead    uint64                 `protobuf:"varint,1,opt,name=total_bytes_read,json=totalBytesRead,proto3" json:"total_bytes_read,omitempty"`
-	TotalBytesWritten uint64                 `protobuf:"varint,2,opt,name=total_bytes_written,json=totalBytesWritten,proto3" json:"total_bytes_written,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Total number of bytes read from the block store during processing.
+	TotalBytesRead uint64 `protobuf:"varint,1,opt,name=total_bytes_read,json=totalBytesRead,proto3" json:"total_bytes_read,omitempty"`
+	// Total number of bytes written to intermediate stores during processing.
+	TotalBytesWritten uint64 `protobuf:"varint,2,opt,name=total_bytes_written,json=totalBytesWritten,proto3" json:"total_bytes_written,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -1145,11 +1269,16 @@ func (x *ProcessedBytes) GetTotalBytesWritten() uint64 {
 	return 0
 }
 
+// Error represents a fatal module execution error. When received, the stream will be
+// terminated by the server immediately after this message.
 type Error struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	Module string                 `protobuf:"bytes,1,opt,name=module,proto3" json:"module,omitempty"`
-	Reason string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
-	Logs   []string               `protobuf:"bytes,3,rep,name=logs,proto3" json:"logs,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The name of the module that caused the fatal error.
+	Module string `protobuf:"bytes,1,opt,name=module,proto3" json:"module,omitempty"`
+	// A human-readable description of why the module failed.
+	Reason string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	// Log lines emitted by the failing module up to the point of failure.
+	Logs []string `protobuf:"bytes,3,rep,name=logs,proto3" json:"logs,omitempty"`
 	// FailureLogsTruncated is a flag that tells you if you received all the logs or if they
 	// were truncated because you logged too much (fixed limit currently is set to 128 KiB).
 	LogsTruncated bool `protobuf:"varint,4,opt,name=logs_truncated,json=logsTruncated,proto3" json:"logs_truncated,omitempty"`
@@ -1215,15 +1344,22 @@ func (x *Error) GetLogsTruncated() bool {
 	return false
 }
 
+// Job represents a single parallel processing unit running on a tier2 worker. Jobs process
+// a contiguous block range for a specific execution stage.
 type Job struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Stage          uint32                 `protobuf:"varint,1,opt,name=stage,proto3" json:"stage,omitempty"`
-	StartBlock     uint64                 `protobuf:"varint,2,opt,name=start_block,json=startBlock,proto3" json:"start_block,omitempty"`
-	StopBlock      uint64                 `protobuf:"varint,3,opt,name=stop_block,json=stopBlock,proto3" json:"stop_block,omitempty"`
-	ProgressBlocks uint64                 `protobuf:"varint,4,opt,name=progress_blocks,json=progressBlocks,proto3" json:"progress_blocks,omitempty"`
-	DurationMs     uint64                 `protobuf:"varint,5,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The index of the execution stage this job belongs to (0-based).
+	Stage uint32 `protobuf:"varint,1,opt,name=stage,proto3" json:"stage,omitempty"`
+	// The first block number in the range processed by this job (inclusive).
+	StartBlock uint64 `protobuf:"varint,2,opt,name=start_block,json=startBlock,proto3" json:"start_block,omitempty"`
+	// The last block number in the range processed by this job (exclusive).
+	StopBlock uint64 `protobuf:"varint,3,opt,name=stop_block,json=stopBlock,proto3" json:"stop_block,omitempty"`
+	// The number of blocks processed so far by this job within its range.
+	ProgressBlocks uint64 `protobuf:"varint,4,opt,name=progress_blocks,json=progressBlocks,proto3" json:"progress_blocks,omitempty"`
+	// The wall-clock time in milliseconds this job has been running.
+	DurationMs    uint64 `protobuf:"varint,5,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Job) Reset() {
@@ -1291,12 +1427,41 @@ func (x *Job) GetDurationMs() uint64 {
 	return 0
 }
 
+// Stage represents one layer of the module execution DAG. Modules are grouped into stages
+// based on their dependencies; all modules in a stage can be executed independently of
+// each other but depend on modules in earlier stages.
 type Stage struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Modules         []string               `protobuf:"bytes,1,rep,name=modules,proto3" json:"modules,omitempty"`
-	CompletedRanges []*BlockRange          `protobuf:"bytes,2,rep,name=completed_ranges,json=completedRanges,proto3" json:"completed_ranges,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The names of the modules that belong to this execution stage.
+	Modules []string `protobuf:"bytes,1,rep,name=modules,proto3" json:"modules,omitempty"`
+	// The block ranges that have been fully processed and cached for this stage.
+	//
+	// Careful: a store segment appears here as soon as its *partial* has been produced, which
+	// happens before tier1 has squashed that partial into the store. Full coverage here does
+	// therefore not mean the stage is usable end to end. Use ready_up_to_exclusive for that.
+	CompletedRanges []*BlockRange `protobuf:"bytes,2,rep,name=completed_ranges,json=completedRanges,proto3" json:"completed_ranges,omitempty"`
+	// The chain block number, exclusive, up to which this stage is immediately usable. It is
+	// the lowest such block across the stage's modules, since a stage is only as advanced as
+	// its least advanced module.
+	//
+	// For stores this stops at the last *squashed* segment: unlike completed_ranges, segments
+	// that were produced but not merged yet are deliberately excluded. Mappers and indexes
+	// count their partial files as ready, since that is exactly what the output stream reads
+	// from, so for them the two notions coincide.
+	//
+	// A stage that has not started yet reports where its modules begin (their initial block,
+	// floored at the chain's first streamable block), not a sentinel. 0 is a valid value
+	// meaning "nothing usable yet, starting from block 0" and must not be read as "unknown".
+	ReadyUpToExclusive uint64 `protobuf:"varint,3,opt,name=ready_up_to_exclusive,json=readyUpToExclusive,proto3" json:"ready_up_to_exclusive,omitempty"`
+	// The number of *segments* — not blocks — whose store partial exists but is still waiting
+	// to be squashed into the store. Always 0 for a stage that executes no store module.
+	//
+	// A stage showing complete completed_ranges together with a non-zero value here is not
+	// stuck: tier1 is squashing. Squashing runs no job and advances no processed_blocks
+	// counter, so such a request otherwise looks frozen at 100% with a rate of zero.
+	SquashWaitSegmentCount uint64 `protobuf:"varint,4,opt,name=squash_wait_segment_count,json=squashWaitSegmentCount,proto3" json:"squash_wait_segment_count,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *Stage) Reset() {
@@ -1341,6 +1506,20 @@ func (x *Stage) GetCompletedRanges() []*BlockRange {
 		return x.CompletedRanges
 	}
 	return nil
+}
+
+func (x *Stage) GetReadyUpToExclusive() uint64 {
+	if x != nil {
+		return x.ReadyUpToExclusive
+	}
+	return 0
+}
+
+func (x *Stage) GetSquashWaitSegmentCount() uint64 {
+	if x != nil {
+		return x.SquashWaitSegmentCount
+	}
+	return 0
 }
 
 // ModuleStats gathers metrics and statistics from each module, running on tier1 or tier2
@@ -1490,11 +1669,16 @@ func (x *ModuleStats) GetHighestContiguousBlock() uint64 {
 	return 0
 }
 
+// ExternalCallMetric tracks usage of a chain-specific external call type (e.g., Ethereum
+// RPC calls) made by a module during processing.
 type ExternalCallMetric struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Count         uint64                 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
-	TimeMs        uint64                 `protobuf:"varint,3,opt,name=time_ms,json=timeMs,proto3" json:"time_ms,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The name identifying the type of external call (e.g., "eth_call").
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// The total number of external calls of this type made.
+	Count uint64 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	// The total wall-clock time in milliseconds spent waiting for external calls of this type.
+	TimeMs        uint64 `protobuf:"varint,3,opt,name=time_ms,json=timeMs,proto3" json:"time_ms,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1550,13 +1734,22 @@ func (x *ExternalCallMetric) GetTimeMs() uint64 {
 	return 0
 }
 
+// StoreDelta represents a single key-value mutation in a `store` module's state for a
+// given block. Used in debug store output and initial snapshot data.
 type StoreDelta struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Operation     StoreDelta_Operation   `protobuf:"varint,1,opt,name=operation,proto3,enum=sf.substreams.rpc.v2.StoreDelta_Operation" json:"operation,omitempty"`
-	Ordinal       uint64                 `protobuf:"varint,2,opt,name=ordinal,proto3" json:"ordinal,omitempty"`
-	Key           string                 `protobuf:"bytes,3,opt,name=key,proto3" json:"key,omitempty"`
-	OldValue      []byte                 `protobuf:"bytes,4,opt,name=old_value,json=oldValue,proto3" json:"old_value,omitempty"`
-	NewValue      []byte                 `protobuf:"bytes,5,opt,name=new_value,json=newValue,proto3" json:"new_value,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The type of operation applied to this key.
+	Operation StoreDelta_Operation `protobuf:"varint,1,opt,name=operation,proto3,enum=sf.substreams.rpc.v2.StoreDelta_Operation" json:"operation,omitempty"`
+	// The ordinal within the block at which this mutation occurred. Ordinals are
+	// monotonically increasing within a block and allow ordering mutations within
+	// the same block.
+	Ordinal uint64 `protobuf:"varint,2,opt,name=ordinal,proto3" json:"ordinal,omitempty"`
+	// The store key that was mutated.
+	Key string `protobuf:"bytes,3,opt,name=key,proto3" json:"key,omitempty"`
+	// The previous value of the key before this mutation (empty for CREATE operations).
+	OldValue []byte `protobuf:"bytes,4,opt,name=old_value,json=oldValue,proto3" json:"old_value,omitempty"`
+	// The new value of the key after this mutation (empty for DELETE operations).
+	NewValue      []byte `protobuf:"bytes,5,opt,name=new_value,json=newValue,proto3" json:"new_value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1626,10 +1819,13 @@ func (x *StoreDelta) GetNewValue() []byte {
 	return nil
 }
 
+// BlockRange represents a contiguous range of blocks [start_block, end_block).
 type BlockRange struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	StartBlock    uint64                 `protobuf:"varint,2,opt,name=start_block,json=startBlock,proto3" json:"start_block,omitempty"`
-	EndBlock      uint64                 `protobuf:"varint,3,opt,name=end_block,json=endBlock,proto3" json:"end_block,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The first block number in the range (inclusive).
+	StartBlock uint64 `protobuf:"varint,2,opt,name=start_block,json=startBlock,proto3" json:"start_block,omitempty"`
+	// The last block number in the range (exclusive).
+	EndBlock      uint64 `protobuf:"varint,3,opt,name=end_block,json=endBlock,proto3" json:"end_block,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1726,7 +1922,7 @@ const file_sf_substreams_rpc_v2_service_proto_rawDesc = "" +
 	"\rpartial_index\x18\x0e \x01(\rH\x00R\fpartialIndex\x88\x01\x01\x12+\n" +
 	"\x0fis_last_partial\x18\x0f \x01(\bH\x01R\risLastPartial\x88\x01\x01B\x10\n" +
 	"\x0e_partial_indexB\x12\n" +
-	"\x10_is_last_partial\"\xf1\x04\n" +
+	"\x10_is_last_partial\"\xa1\x05\n" +
 	"\vSessionInit\x12\x19\n" +
 	"\btrace_id\x18\x01 \x01(\tR\atraceId\x120\n" +
 	"\x14resolved_start_block\x18\x02 \x01(\x04R\x12resolvedStartBlock\x120\n" +
@@ -1739,7 +1935,8 @@ const file_sf_substreams_rpc_v2_service_proto_rawDesc = "" +
 	".effective_blocks_to_process_before_start_block\x18\b \x01(\x04R(effectiveBlocksToProcessBeforeStartBlock\x12K\n" +
 	"#blocks_to_process_after_start_block\x18\t \x01(\x04R\x1eblocksToProcessAfterStartBlock\x12^\n" +
 	"-effective_blocks_to_process_after_start_block\x18\n" +
-	" \x01(\x04R'effectiveBlocksToProcessAfterStartBlock\"1\n" +
+	" \x01(\x04R'effectiveBlocksToProcessAfterStartBlock\x12.\n" +
+	"\x13segment_block_count\x18\v \x01(\x04R\x11segmentBlockCount\"1\n" +
 	"\x17InitialSnapshotComplete\x12\x16\n" +
 	"\x06cursor\x18\x01 \x01(\tR\x06cursor\"\xac\x01\n" +
 	"\x13InitialSnapshotData\x12\x1f\n" +
@@ -1788,10 +1985,12 @@ const file_sf_substreams_rpc_v2_service_proto_rawDesc = "" +
 	"stop_block\x18\x03 \x01(\x04R\tstopBlock\x12'\n" +
 	"\x0fprogress_blocks\x18\x04 \x01(\x04R\x0eprogressBlocks\x12\x1f\n" +
 	"\vduration_ms\x18\x05 \x01(\x04R\n" +
-	"durationMs\"n\n" +
+	"durationMs\"\xdc\x01\n" +
 	"\x05Stage\x12\x18\n" +
 	"\amodules\x18\x01 \x03(\tR\amodules\x12K\n" +
-	"\x10completed_ranges\x18\x02 \x03(\v2 .sf.substreams.rpc.v2.BlockRangeR\x0fcompletedRanges\"\xc4\x05\n" +
+	"\x10completed_ranges\x18\x02 \x03(\v2 .sf.substreams.rpc.v2.BlockRangeR\x0fcompletedRanges\x121\n" +
+	"\x15ready_up_to_exclusive\x18\x03 \x01(\x04R\x12readyUpToExclusive\x129\n" +
+	"\x19squash_wait_segment_count\x18\x04 \x01(\x04R\x16squashWaitSegmentCount\"\xc4\x05\n" +
 	"\vModuleStats\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12=\n" +
 	"\x1btotal_processed_block_count\x18\x02 \x01(\x04R\x18totalProcessedBlockCount\x127\n" +

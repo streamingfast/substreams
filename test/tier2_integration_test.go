@@ -56,6 +56,7 @@ func TestTier2Call(t *testing.T) {
 	mapHybridInputClock70 := hex.EncodeToString([]byte("map_hybrid_input_clock_70"))
 	mapHybridInputBlock70 := hex.EncodeToString([]byte("map_hybrid_input_block_70"))
 	setSumStoreInit0 := hex.EncodeToString([]byte("set_sum_store_init_0"))
+	assertContextIntrinsics0 := hex.EncodeToString([]byte("assert_context_intrinsics_0"))
 
 	randomIndicesRange := roaring64.New()
 	randomIndicesRange.AddInt(70)
@@ -357,6 +358,37 @@ func TestTier2Call(t *testing.T) {
 			mapOutputFileToCheck:  mapUsingIndexInit70 + "/outputs/0000000070-0000000080.output",
 			expectedSkippedBlocks: map[uint64]struct{}{75: {}, 77: {}, 78: {}, 79: {}, 80: {}}, // faked with the randomIndicesRange above
 		},
+		// The module asserts, inside the WASM, that `context::clock` matches the Clock it
+		// received as a module input. A mismatch panics in the module, so a `true` output
+		// for every block is the proof that the intrinsic is wired correctly.
+		{
+			name:            "context intrinsics expose the clock",
+			startBlock:      0,
+			stage:           0,
+			moduleName:      "assert_context_intrinsics_0",
+			stateBundleSize: 10,
+			manifestPath:    "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg",
+
+			expectRemainingFiles: []string{
+				assertContextIntrinsics0 + "/outputs/0000000000-0000000010.output",
+			},
+
+			mapOutputFilesToDeepInspectForKeys: map[string]map[uint64]any{
+				assertContextIntrinsics0 + "/outputs/0000000000-0000000010.output": {
+					0: &pbsubstreamstest.Boolean{Result: true},
+					1: &pbsubstreamstest.Boolean{Result: true},
+					2: &pbsubstreamstest.Boolean{Result: true},
+					3: &pbsubstreamstest.Boolean{Result: true},
+					4: &pbsubstreamstest.Boolean{Result: true},
+					5: &pbsubstreamstest.Boolean{Result: true},
+					6: &pbsubstreamstest.Boolean{Result: true},
+					7: &pbsubstreamstest.Boolean{Result: true},
+					8: &pbsubstreamstest.Boolean{Result: true},
+					9: &pbsubstreamstest.Boolean{Result: true},
+				},
+			},
+		},
+
 		// This test checks that a module receiving data from both a filtered map and a Clock
 		// does not trigger on every block, even when the index is being created in the same run
 		{

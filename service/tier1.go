@@ -61,8 +61,17 @@ import (
 var errShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 var fallbackDuration time.Duration
 var useBlockNumberDuration time.Duration
+var deterministicErrorMaxAge = time.Hour
 
 func init() {
+	if v := os.Getenv(EnvDeterministicErrorMaxAge); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			panic(fmt.Errorf("invalid value for env var %s: %w", EnvDeterministicErrorMaxAge, err))
+		}
+		deterministicErrorMaxAge = d
+	}
+
 	envEthCallFallbackToLatestDuration := os.Getenv(EnvEthCallFallbackToLatestDuration)
 	if envEthCallFallbackToLatestDuration != "" {
 		d, err := time.ParseDuration(envEthCallFallbackToLatestDuration)
@@ -209,12 +218,11 @@ func NewTier1(
 	)
 
 	sf := &StreamFactory{
-		mergedBlocksStore: mergedBlocksStore,
-		forkedBlocksStore: forkedBlocksStore,
-		hub:               hub,
+		mergedBlocksStore:      mergedBlocksStore,
+		forkedBlocksStore:      forkedBlocksStore,
+		hub:                    hub,
+		mergedBlocksBundleSize: tier2RequestParameters.MergedBlocksBundleSize,
 	}
-
-	setSubstreamsStoreSizeLimitFromEnv(logger)
 
 	var err error
 	if blockType == "" {
@@ -227,14 +235,19 @@ func NewTier1(
 	tier2RequestParameters.BlockType = blockType
 	tier2RequestParameters.StateBundleSize = runtimeConfig.SegmentSize
 
-	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
+	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil), zap.Uint64("merged_blocks_bundle_size", tier2RequestParameters.MergedBlocksBundleSize))
+
+	var cursorResolverOptions []bstream.FileSourceOption
+	if tier2RequestParameters.MergedBlocksBundleSize != 0 {
+		cursorResolverOptions = append(cursorResolverOptions, bstream.FileSourceWithBundleSize(tier2RequestParameters.MergedBlocksBundleSize))
+	}
 
 	s := &Tier1Service{
 		Shutter:                    shutter.New(),
 		runtimeConfig:              runtimeConfig,
 		blockType:                  blockType,
 		tracer:                     tracing.GetTracer(),
-		resolveCursor:              pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
+		resolveCursor:              pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore, cursorResolverOptions...),
 		logger:                     logger,
 		appSetIsReadyState:         appSetIsReadyState,
 		tier2RequestParameters:     tier2RequestParameters,
@@ -640,6 +653,18 @@ func (s *Tier1Service) blocks(
 
 	if request.StopBlockNum != 0 {
 		if requestDetails.ResolvedStartBlockNum == request.StopBlockNum {
+			// The stop block is exclusive, so a resolved start block equal to it means the
+			// requested range is empty. When the start was resolved from a cursor, the stream
+			// has already reached its stop block: complete cleanly (client receives EOF) instead
+			// of surfacing a fatal InvalidArgument for what is really a finished stream. This
+			// typically happens when a transient disconnect makes the client reconnect with a
+			// cursor sitting on the last block of the range.
+			if request.StartCursor != "" {
+				logger.Info("stream already complete: cursor resolved at the stop block, nothing left to stream",
+					append(logFields, zap.Uint64("stop_block", request.StopBlockNum), zap.Uint64("resolved_start_block", requestDetails.ResolvedStartBlockNum))...)
+				return nil
+			}
+
 			err := bsstream.NewErrInvalidArg("start block and stop block are the same: %d and %d", requestDetails.ResolvedStartBlockNum, request.StopBlockNum)
 			logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
 			return err
@@ -665,9 +690,11 @@ func (s *Tier1Service) blocks(
 		}
 	}
 
-	parallelJobs, parallelExecutors := reqctx.GetEffectiveHeaderValues(ctx, header, s.runtimeConfig.DefaultParallelSubrequests, reqctx.DefaultMaxStageLayerParallelExecutorCount)
-	requestDetails.MaxParallelJobs = parallelJobs
-	requestDetails.MaxStageLayerParallelExecutor = parallelExecutors
+	parallelism := reqctx.GetEffectiveHeaderValues(ctx, header, s.runtimeConfig.DefaultParallelSubrequests, reqctx.DefaultMaxStageLayerParallelExecutorCount)
+	requestDetails.MaxParallelJobs = parallelism.Workers
+	requestDetails.MaxStageLayerParallelExecutor = parallelism.StageLayerExecutors
+	reqStats.SetWorkerCounts(parallelism.RequestedWorkers, parallelism.GrantedWorkers, parallelism.Workers)
+	logFields = append(logFields, zap.Object("parallelism", parallelism))
 
 	ctx = reqctx.WithRequest(ctx, requestDetails)
 	if s.runtimeConfig.ModuleExecutionTracing {
@@ -738,12 +765,13 @@ func (s *Tier1Service) blocks(
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, quickSaveStore, execGraph.Stores(), execGraph.ModuleHashes(), chainFirstStreamableBlock, 0)
+	storeConfigs, err := store.NewConfigMap(cacheStore, quickSaveStore, execGraph.Stores(), execGraph.ModuleHashes(), chainFirstStreamableBlock, s.runtimeConfig.StoreSizeLimit, s.runtimeConfig.StoresScratchSpace, s.runtimeConfig.StoresBackend)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
 	stores := pipeline.NewStores(ctx, storeConfigs, segmentSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false, nil)
+	defer stores.Close() // releases mmap-backed store files once the request ends
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, nil, s.blockType, nil, nil) // we don't read or write ExecOuts on tier1
 	if err != nil {
@@ -820,6 +848,18 @@ func (s *Tier1Service) blocks(
 		return stream.NewErrInvalidArg("%s", err.Error())
 	}
 
+	// The number of segments to backprocess bounds how many workers can ever be busy at
+	// once: asking for 300 workers on a request that only has 12 segments of work left
+	// will never use more than 12 of them.
+	var parallelSegmentCount int
+	if segmenter := reqPlan.BackprocessSegmenter(); segmenter != nil {
+		parallelSegmentCount = segmenter.Count()
+	}
+	logFields = append(logFields,
+		zap.Int("parallel_segment_count", parallelSegmentCount),
+		zap.Int("stage_count", len(execGraph.StagedUsedModules())),
+	)
+
 	if s.sessionPool != nil {
 		auth := dauth.FromContext(ctx)
 		organizationID := auth.OrganizationID()
@@ -884,6 +924,13 @@ func (s *Tier1Service) blocks(
 
 	logger.Info("incoming Substreams Blocks request", logFields...)
 
+	// Periodic snapshot of what this request is doing, so a slow substreams can be
+	// diagnosed from the logs alone, without waiting for the final stats line.
+	reqStats.RecordResolvedStartBlock(requestDetails.ResolvedStartBlockNum)
+	progressCtx, cancelProgressLog := context.WithCancel(ctx)
+	defer cancelProgressLog()
+	go metrics.NewProgressLogger(reqStats, logger).Run(progressCtx)
+
 	defer func() {
 		switch {
 		case errors.Is(err, context.Canceled):
@@ -935,18 +982,22 @@ func (s *Tier1Service) blocks(
 
 	var wrappedPipe bstream.Handler
 	if requestDetails.ProductionMode {
-		liveBackFiller := NewLiveBackFiller(ctx, pipe, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
-		if s.liveBackFillerFinalBlockDelay != 0 {
-			liveBackFiller.finalBlockDelay = s.liveBackFillerFinalBlockDelay
+		finalBlockDelay := s.liveBackFillerFinalBlockDelay
+		if finalBlockDelay == 0 {
+			// the merged file containing a segment end is only written once the
+			// chain has moved a full bundle past its base, so the default delay
+			// must scale with the merged-blocks bundle size
+			finalBlockDelay = max(defaultFinalBlockDelay, s.tier2RequestParameters.MergedBlocksBundleSize+20)
 		}
+
+		liveBackFiller := NewLiveBackFiller(ctx, pipe, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
+		liveBackFiller.finalBlockDelay = finalBlockDelay
 
 		// In noop mode, the pipe handler is overwritten by a NoopHandler which produces no outputs.
 		if request.NoopMode {
 			noopHandler := NewNoopHandler(respFunc)
 			liveBackFiller = NewLiveBackFiller(ctx, noopHandler, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
-			if s.liveBackFillerFinalBlockDelay != 0 {
-				liveBackFiller.finalBlockDelay = s.liveBackFillerFinalBlockDelay
-			}
+			liveBackFiller.finalBlockDelay = finalBlockDelay
 		}
 
 		if requestDetails.FromQuickload {
@@ -1093,6 +1144,7 @@ func tier1ResponseHandler(
 		}
 
 		isData := false
+		blockCount := 0
 		var lastSentClock *pbsubstreams.Clock
 
 		switch r := respAny.(type) {
@@ -1100,6 +1152,7 @@ func tier1ResponseHandler(
 			d := r.GetBlockScopedData()
 			if d != nil {
 				isData = true
+				blockCount = 1
 				lastSentClock = d.Clock
 				filterData(d, noop, debugOutputs)
 				if supportBuffering {
@@ -1113,6 +1166,7 @@ func tier1ResponseHandler(
 			for _, d := range r.GetBlockScopedDatas().Items {
 				if d != nil {
 					isData = true
+					blockCount++
 					lastSentClock = d.Clock
 					filterData(d, noop, debugOutputs)
 				}
@@ -1128,6 +1182,10 @@ func tier1ResponseHandler(
 		stats.RecordReadTime(begin)
 
 		if isData {
+			// Only data messages are timed for the progress log: this isolates how long the
+			// consumer takes to accept one payload, which is what tells a slow client apart
+			// from a slow pipeline.
+			stats.RecordBlockSent(time.Since(begin), blockCount)
 			stats.RecordDataSent()
 			stats.RecordLastBlockSent(lastSentClock)
 		}
@@ -1184,23 +1242,36 @@ func (s *Tier1Service) containsDeterministicError(ctx context.Context, startBloc
 	return nil
 }
 
-func parseFilename(in string) (blockNum uint64, moduleExtendedHash string, err error) {
+// parseFilename parses an error filename of the form:
+//
+//	errors.<blockNum:10>.<moduleExtendedHash>.<unixTimestamp>
+//
+// Older formats without a timestamp (or without an extended hash) are still parsed; a
+// zero timestamp signals a legacy error that the caller should discard.
+func parseFilename(in string) (blockNum uint64, moduleExtendedHash string, timestamp time.Time, err error) {
 	in = strings.TrimPrefix(in, "errors.")
 
 	if len(in) < 10 {
-		return 0, "", err
+		return 0, "", time.Time{}, err
 	}
 
 	blockNumStr := in[:10]
 	blockNum, err = strconv.ParseUint(blockNumStr, 10, 64)
 	if err != nil {
-		return 0, "", err
+		return 0, "", time.Time{}, err
 	}
 
 	if len(in) > 10 {
-		moduleExtendedHash = in[11:] // ignore the '.' between blocknum and moduleExtendedHash
+		rest := in[11:] // ignore the '.' between blocknum and the rest
+		parts := strings.Split(rest, ".")
+		moduleExtendedHash = parts[0]
+		if len(parts) > 1 {
+			if sec, parseErr := strconv.ParseInt(parts[1], 10, 64); parseErr == nil {
+				timestamp = time.Unix(sec, 0)
+			}
+		}
 	}
-	return blockNum, moduleExtendedHash, nil
+	return blockNum, moduleExtendedHash, timestamp, nil
 }
 
 func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, moduleName, extendedHash string, startBlock, endBlock uint64, isStore bool, logger *zap.Logger) error {
@@ -1213,7 +1284,7 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 
 	moduleStore.WalkFrom(ctx, "errors.", startFile, func(filename string) (err error) {
 
-		blockNum, parsedExtendedHash, err := parseFilename(filename)
+		blockNum, parsedExtendedHash, timestamp, err := parseFilename(filename)
 		if err != nil {
 			logger.Warn("checking for errors: invalid filename", zap.String("filename", filename), zap.Error(err))
 			return nil
@@ -1227,6 +1298,19 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 
 		if parsedExtendedHash != extendedHash {
 			logger.Info("ignoring error on another version of the same module", zap.String("filename", filename), zap.String("parsedExtendedHash", parsedExtendedHash), zap.String("extendedHash", extendedHash))
+			return nil
+		}
+
+		// Errors without a timestamp (legacy format) or older than the configured max age
+		// are discarded so execution is retried.
+		if timestamp.IsZero() {
+			logger.Info("deleting old deterministic error without timestamp", zap.String("filename", filename))
+			moduleStore.DeleteObject(ctx, filename)
+			return nil
+		}
+		if age := time.Since(timestamp); age > deterministicErrorMaxAge {
+			logger.Info("deleting expired deterministic error", zap.String("filename", filename), zap.Duration("age", age), zap.Duration("max_age", deterministicErrorMaxAge))
+			moduleStore.DeleteObject(ctx, filename)
 			return nil
 		}
 
@@ -1246,7 +1330,7 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 			return nil
 		}
 
-		lastError = fmt.Errorf("error from block %d in module %s: %s", blockNum, moduleName, string(cnt))
+		lastError = fmt.Errorf("error from block %d in module %s (deterministic error, cached for %d seconds): %s", blockNum, moduleName, int(time.Since(timestamp).Seconds()), string(cnt))
 		return nil
 	})
 

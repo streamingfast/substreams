@@ -47,13 +47,6 @@ This document lists all environment variables used by the Substreams project, or
 
 ### Performance tuning
 
-#### `SUBSTREAMS_STORE_SIZE_LIMIT`
-**Store size limit**
-- **Purpose**: Set maximum size limit for Substreams stores in bytes
-- **Usage**: Set as unsigned integer (bytes) to limit store memory usage
-- **Default**: 1073741824 (1GiB)
-- **Location**: `service/utils.go`
-
 #### SUBSTREAMS_LOG_TOTAL_STORE_SIZE
 **Log total store size**
 - **Purpose**: Log total store size in bytes
@@ -117,6 +110,20 @@ This document lists all environment variables used by the Substreams project, or
 - **Location**: `wasm/registry.go`
 
 ### Debugging and Logging
+
+#### `SUBSTREAMS_PROGRESS_LOG_FIRST_DELAY`
+**Delay before the first request progress log**
+- **Purpose**: Override how long tier1 waits before emitting the first `substreams request progress` log of a request
+- **Usage**: Set to any Go duration (ex: `30s`, `2m`). Must be greater than 0; an invalid or non-positive value panics at startup
+- **Default**: `1m`
+- **Location**: `metrics/progress_log.go`
+
+#### `SUBSTREAMS_PROGRESS_LOG_INTERVAL`
+**Interval between request progress logs**
+- **Purpose**: Override the interval between subsequent `substreams request progress` logs, after the first one. This only changes how often the line is printed: the `_5m` values on it always cover a fixed trailing 5 minutes
+- **Usage**: Set to any Go duration (ex: `1m`, `10m`). Must be greater than 0; an invalid or non-positive value panics at startup
+- **Default**: `5m`
+- **Location**: `metrics/progress_log.go`
 
 #### `SUBSTREAMS_PRINT_STACK`
 **Debug stack traces**

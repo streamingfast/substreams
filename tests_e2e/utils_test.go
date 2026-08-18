@@ -5,22 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/moby/moby/api/types/container"
 	"github.com/streamingfast/bstream/stream"
-	"github.com/streamingfast/dauth"
-	dauthnull "github.com/streamingfast/dauth/null"
-	dauthsecret "github.com/streamingfast/dauth/secret"
-	dauthtrust "github.com/streamingfast/dauth/trust"
 	"github.com/streamingfast/dmetering/logger"
-	"github.com/streamingfast/dmetrics"
-	"github.com/streamingfast/dsession"
 	_ "github.com/streamingfast/dsession/local"
 	"github.com/streamingfast/substreams/app"
 	"github.com/streamingfast/substreams/client"
@@ -28,9 +17,9 @@ import (
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	pbsubstreamsrpcv4 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4"
 	pbtest "github.com/streamingfast/substreams/tests_e2e/partial_blocks_store/pb"
+	"github.com/streamingfast/substreams/tools/devenv"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 	"go.uber.org/zap"
 )
 
@@ -133,152 +122,51 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv3.Request, endpoint string) (
 }
 
 func startTier1App(t *testing.T, ctx context.Context, tmpDir string, container testcontainers.Container, t2Endpoint string, zlog *zap.Logger) (*app.Tier1App, string) {
-
-	os.Setenv("SUBSTREAMS_WORKERS_RAMPUP_TIME", "0")
-
-	relayerPort, err := container.MappedPort(ctx, "10014/tcp")
-	require.NoError(t, err)
-
-	relayerEndpoint := fmt.Sprintf("localhost:%d", relayerPort.Num())
-	t.Logf("Tier1App relayer endpoint: %s", relayerEndpoint)
-
-	listenPort := findFreePort(t)
-	substreamsEndpoint := fmt.Sprintf("localhost:%d", listenPort)
-	t1conf := &app.Tier1Config{
-		GRPCListenAddr:               substreamsEndpoint,
-		OneBlocksStoreURL:            filepath.Join(tmpDir, "one-blocks"),
-		MergedBlocksStoreURL:         filepath.Join(tmpDir, "merged-blocks"),
-		BlockStreamAddr:              relayerEndpoint,
-		MeteringConfig:               "logger://",
-		FoundationalStoresConfigPath: "",
-		ForkedBlocksStoreURL:         "",
-		GRPCShutdownGracePeriod:      0,
-		ServiceDiscoveryURL:          nil,
-		BlockExecutionTimeout:        5 * time.Second,
-		TmpDir:                       filepath.Join(tmpDir, "tmp"),
-		StateStoreURL:                filepath.Join(tmpDir, "states"),
-		QuickSaveStoreURL:            "",
-		StateStoreDefaultTag:         "",
-		BlockType:                    "sf.acme.type.v1.Block",
-		StateBundleSize:              100,
-		SubrequestsEndpoint:          t2Endpoint,
-		SubrequestsPlaintext:         true,
-		MaxSubrequests:               10,
-	}
-
-	// unused components, but required for the tier1 to start
-	dauthnull.Register()
-	auth, err := dauth.New("null://", zlog)
-	require.NoError(t, err)
-	metricset := dmetrics.NewSet()
-	headBlockNumMetric := metricset.NewHeadBlockNumber("test-firehose")
-	headTimeDriftmetric := metricset.NewHeadTimeDrift("test-firehose")
-
-	sessionPool, err := dsession.New("local://localhost?max_workers=10&max_workers_per_session=5", zlog)
-	require.NoError(t, err)
-	t1app := app.NewTier1(zlog, t1conf, &app.Tier1Modules{
-		HeadTimeDriftMetric:   headTimeDriftmetric,
-		HeadBlockNumberMetric: headBlockNumMetric,
-		Authenticator:         auth,
-		SessionPool:           sessionPool,
-	})
-	go func() {
-		err := t1app.Run()
-		require.NoError(t, err)
-	}()
-
-	// Wait for t1app to be ready with polling
-	timeout := time.After(20 * time.Second)
-	ticker := time.NewTicker(20 * time.Millisecond)
-	defer ticker.Stop()
-
-waitReady:
-	for {
-		select {
-		case <-timeout:
-			t.Fatal("timeout waiting for t1app to be ready")
-		case <-ticker.C:
-			if t1app.IsReady(ctx) {
-				t.Logf("t1app is ready")
-				break waitReady
-			}
-		}
-	}
-
-	return t1app, substreamsEndpoint
+	return startTier1(t, ctx, devenv.Tier1Config{
+		TmpDir:               tmpDir,
+		RelayerEndpoint:      relayerEndpoint(t, ctx, container),
+		Tier2Endpoint:        t2Endpoint,
+		MaxWorkersPerSession: 5,
+		MetricsPrefix:        "test-firehose",
+	}, zlog)
 }
 
-func startTier2App(t *testing.T, ctx context.Context, tmpDir string, zlog *zap.Logger) (out *app.Tier2App, endpoint string) {
+func startTier1(t *testing.T, ctx context.Context, config devenv.Tier1Config, zlog *zap.Logger) (*app.Tier1App, string) {
+	t1app, endpoint, err := devenv.StartTier1(ctx, config, zlog)
+	require.NoError(t, err)
+	t.Logf("t1app is ready on %s", endpoint)
 
-	port := findFreePort(t)
-	endpoint = fmt.Sprintf("localhost:%d", port)
-	dauthtrust.Register()
+	return t1app, endpoint
+}
 
-	t2conf := &app.Tier2Config{
-		GRPCListenAddr:        endpoint,
-		ServiceDiscoveryURL:   nil,
-		BlockExecutionTimeout: 5 * time.Second,
-		TmpDir:                filepath.Join(tmpDir, "tmp"),
+func relayerEndpoint(t *testing.T, ctx context.Context, container testcontainers.Container) string {
+	endpoint, err := devenv.RelayerEndpoint(ctx, container)
+	require.NoError(t, err)
+	t.Logf("Tier1App relayer endpoint: %s", endpoint)
+
+	return endpoint
+}
+
+func startTier2App(t *testing.T, ctx context.Context, tmpDir string, zlog *zap.Logger, scratchSpace ...string) (out *app.Tier2App, endpoint string) {
+	config := devenv.Tier2Config{TmpDir: tmpDir}
+	if len(scratchSpace) > 0 {
+		config.ScratchSpace = scratchSpace[0]
 	}
 
-	t2app := app.NewTier2(zlog, t2conf, &app.Tier2Modules{
-		CheckPendingShutDown: func() bool {
-			return false
-		},
-	})
-
-	return startTier2AppInternal(t, ctx, t2app, endpoint)
+	return startTier2(t, ctx, config, zlog)
 }
 
 // startTier2AppWithSecret starts a tier2 that requires requests to carry
 // "Authorization: Bearer <secret>" — mimicking a real deployment where tier1
 // must authenticate its subrequests to tier2.
 func startTier2AppWithSecret(t *testing.T, ctx context.Context, tmpDir string, secret string, zlog *zap.Logger) (out *app.Tier2App, endpoint string) {
-	port := findFreePort(t)
-	endpoint = fmt.Sprintf("localhost:%d", port)
-
-	dauthsecret.Register()
-	auth, err := dauth.New(fmt.Sprintf("secret://%s", secret), zlog)
-	require.NoError(t, err)
-
-	t2conf := &app.Tier2Config{
-		GRPCListenAddr:        endpoint,
-		ServiceDiscoveryURL:   nil,
-		BlockExecutionTimeout: 5 * time.Second,
-		TmpDir:                filepath.Join(tmpDir, "tmp"),
-	}
-
-	t2app := app.NewTier2(zlog, t2conf, &app.Tier2Modules{
-		CheckPendingShutDown: func() bool { return false },
-		Authenticator:        auth,
-	})
-
-	return startTier2AppInternal(t, ctx, t2app, endpoint)
+	return startTier2(t, ctx, devenv.Tier2Config{TmpDir: tmpDir, Secret: secret}, zlog)
 }
 
-func startTier2AppInternal(t *testing.T, ctx context.Context, t2app *app.Tier2App, endpoint string) (*app.Tier2App, string) {
-	go func() {
-		err := t2app.Run()
-		require.NoError(t, err)
-	}()
-
-	// Wait for t2app to be ready with polling
-	timeout := time.After(5 * time.Second)
-	ticker := time.NewTicker(20 * time.Millisecond)
-	defer ticker.Stop()
-
-waitReady:
-	for {
-		select {
-		case <-timeout:
-			t.Fatal("timeout waiting for t2app to be ready")
-		case <-ticker.C:
-			if t2app.IsReady(ctx) {
-				t.Logf("t2app is ready")
-				break waitReady
-			}
-		}
-	}
+func startTier2(t *testing.T, ctx context.Context, config devenv.Tier2Config, zlog *zap.Logger) (*app.Tier2App, string) {
+	t2app, endpoint, err := devenv.StartTier2(ctx, config, zlog)
+	require.NoError(t, err)
+	t.Logf("t2app is ready on %s", endpoint)
 
 	return t2app, endpoint
 }
@@ -286,142 +174,29 @@ waitReady:
 // startTier1AppWithSecret starts a tier1 that sends subrequests to tier2 using the
 // provided secret key in the Authorization header.
 func startTier1AppWithSecret(t *testing.T, ctx context.Context, tmpDir string, container testcontainers.Container, t2Endpoint string, secret string, zlog *zap.Logger) (*app.Tier1App, string) {
-	os.Setenv("SUBSTREAMS_WORKERS_RAMPUP_TIME", "0")
-
-	relayerPort, err := container.MappedPort(ctx, "10014/tcp")
-	require.NoError(t, err)
-
-	relayerEndpoint := fmt.Sprintf("localhost:%d", relayerPort.Num())
-	t.Logf("Tier1App (with secret) relayer endpoint: %s", relayerEndpoint)
-
-	listenPort := findFreePort(t)
-	substreamsEndpoint := fmt.Sprintf("localhost:%d", listenPort)
-	t1conf := &app.Tier1Config{
-		GRPCListenAddr:                substreamsEndpoint,
-		OneBlocksStoreURL:             filepath.Join(tmpDir, "one-blocks"),
-		MergedBlocksStoreURL:          filepath.Join(tmpDir, "merged-blocks"),
-		BlockStreamAddr:               relayerEndpoint,
-		MeteringConfig:                "logger://",
-		FoundationalStoresConfigPath:  "",
-		ForkedBlocksStoreURL:          "",
-		GRPCShutdownGracePeriod:       0,
-		ServiceDiscoveryURL:           nil,
-		BlockExecutionTimeout:         5 * time.Second,
-		TmpDir:                        filepath.Join(tmpDir, "tmp"),
-		StateStoreURL:                 filepath.Join(tmpDir, "states"),
-		QuickSaveStoreURL:             "",
-		StateStoreDefaultTag:          "",
-		BlockType:                     "sf.acme.type.v1.Block",
-		StateBundleSize:               100,
-		SubrequestsEndpoint:           t2Endpoint,
-		SubrequestsPlaintext:          true,
-		SubrequestsSecret:             secret,
-		MaxSubrequests:                10,
+	return startTier1(t, ctx, devenv.Tier1Config{
+		TmpDir:                        tmpDir,
+		RelayerEndpoint:               relayerEndpoint(t, ctx, container),
+		Tier2Endpoint:                 t2Endpoint,
+		Tier2Secret:                   secret,
+		MaxWorkersPerSession:          5,
+		MetricsPrefix:                 "test-firehose-secret",
 		LiveBackFillerFinalBlockDelay: 2,
-	}
-
-	dauthnull.Register()
-	auth, err := dauth.New("null://", zlog)
-	require.NoError(t, err)
-	metricset := dmetrics.NewSet()
-	headBlockNumMetric := metricset.NewHeadBlockNumber("test-firehose-secret")
-	headTimeDriftmetric := metricset.NewHeadTimeDrift("test-firehose-secret")
-
-	sessionPool, err := dsession.New("local://localhost?max_workers=10&max_workers_per_session=5", zlog)
-	require.NoError(t, err)
-	t1app := app.NewTier1(zlog, t1conf, &app.Tier1Modules{
-		HeadTimeDriftMetric:   headTimeDriftmetric,
-		HeadBlockNumberMetric: headBlockNumMetric,
-		Authenticator:         auth,
-		SessionPool:           sessionPool,
-	})
-	go func() {
-		err := t1app.Run()
-		require.NoError(t, err)
-	}()
-
-	timeout := time.After(20 * time.Second)
-	ticker := time.NewTicker(20 * time.Millisecond)
-	defer ticker.Stop()
-
-waitReady:
-	for {
-		select {
-		case <-timeout:
-			t.Fatal("timeout waiting for t1app (with secret) to be ready")
-		case <-ticker.C:
-			if t1app.IsReady(ctx) {
-				t.Logf("t1app (with secret) is ready")
-				break waitReady
-			}
-		}
-	}
-
-	return t1app, substreamsEndpoint
+	}, zlog)
 }
 
 func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image string, additionalReaderArgs string, burst int) (testcontainers.Container, error) {
-	baseReaderArgs := fmt.Sprintf("start --log-level=error --tracer=firehose --store-dir=/data --genesis-block-burst=%d --block-rate=120 --block-size=1500 --genesis-height=0 --server-addr=:9777 --with-reorgs=false --with-skipped-blocks=false", burst)
-	readerArgs := baseReaderArgs
-	if additionalReaderArgs != "" {
-		readerArgs = baseReaderArgs + " " + additionalReaderArgs
-	}
-
-	return newDummyBlockchainContainerWithArgs(ctx, tmpDir, image, readerArgs)
+	return newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, additionalReaderArgs, burst, 120)
 }
 
 func newDummyBlockchainContainerWithBlockRate(ctx context.Context, tmpDir string, image string, additionalReaderArgs string, burst int, blockRate int) (testcontainers.Container, error) {
-	readerArgs := fmt.Sprintf("start --log-level=error --tracer=firehose --store-dir=/data --genesis-block-burst=%d --block-rate=%d --block-size=1500 --genesis-height=0 --server-addr=:9777 --with-reorgs=false --with-skipped-blocks=false", burst, blockRate)
-	if additionalReaderArgs != "" {
-		readerArgs = readerArgs + " " + additionalReaderArgs
-	}
-
-	return newDummyBlockchainContainerWithArgs(ctx, tmpDir, image, readerArgs)
-}
-
-func newDummyBlockchainContainerWithArgs(ctx context.Context, tmpDir string, image string, readerArgs string) (testcontainers.Container, error) {
-
-	req := testcontainers.ContainerRequest{
-		Image: image,
-		Cmd: []string{
-			"start",
-			"reader-node",
-			"merger",
-			"relayer",
-			"-c",
-			"",
-			"--common-system-shutdown-signal-delay=10s",
-			"--advertise-chain-name=acme-dummy-blockchain",
-			"--reader-node-path=dummy-blockchain",
-			"--reader-node-arguments=" + readerArgs,
-			"--advertise-block-id-encoding=hex",
-		},
-		Env: map[string]string{
-			"DLOG": ".*=debug",
-		},
-		ExposedPorts: []string{"10014/tcp"},
-		HostConfigModifier: func(hostConfig *container.HostConfig) {
-			hostConfig.Binds = []string{tmpDir + ":/app/firehose-data/storage/"}
-		},
-		WaitingFor: wait.ForAll(
-			wait.ForListeningPort("10014/tcp"),
-			wait.ForLog("serving gRPC").WithStartupTimeout(30*time.Second),
-		),
-	}
-
-	fmt.Println(strings.Join(req.Cmd, " "))
-
-	// Start container
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
+	return devenv.StartDummyBlockchain(ctx, devenv.ChainConfig{
+		Image:           image,
+		TmpDir:          tmpDir,
+		Burst:           burst,
+		BlockRate:       blockRate,
+		ExtraReaderArgs: additionalReaderArgs,
 	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return container, nil
 }
 
 type responses []interface{}
@@ -592,13 +367,8 @@ func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv3.Request, e
 }
 
 func findFreePort(t *testing.T) int {
-	// Listen on port 0, which tells the OS to pick any available port
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Error(err)
-	}
-	defer listener.Close()
+	port, err := devenv.FindFreePort()
+	require.NoError(t, err)
 
-	addr := listener.Addr().(*net.TCPAddr)
-	return addr.Port
+	return port
 }

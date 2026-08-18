@@ -17,7 +17,7 @@ Hosted Sinks is available to organizations on The Graph Market. Your database mu
 Before creating a sink, you need:
 
 - An account on [The Graph Market](https://thegraph.market) with an active organization.
-- A Substreams package (`.spkg`) that outputs data using a `db_out` module or relational mappings. See [Substreams:SQL](../sql/sql.md) for how to build one.
+- A Substreams package (`.spkg`) that outputs data in Database Changes Mode (a `db_out` module) or Relational Mappings Mode. See [Substreams:SQL](../sql/sql.md) for how to build one.
 - A running Postgres (default port `5432`) or ClickHouse (default port `9000`) database that is network-accessible from the internet.
 - Your database schema already applied, or a schema that your Substreams package will create automatically. See [Sink Config](../../../references/sql/sink-config.md).
 

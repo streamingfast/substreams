@@ -103,6 +103,7 @@ func (b *ParallelProcessor) Stages() *stage.Stages {
 func (b *ParallelProcessor) Run(ctx context.Context, checkPendingShutdown func() bool) (storeMap store.Map, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	defer b.scheduler.Stages.Close()
 
 	go func() {
 		for {

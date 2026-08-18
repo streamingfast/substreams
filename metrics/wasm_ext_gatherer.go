@@ -18,7 +18,7 @@ type WasmMetricsGatherer struct {
 	logger    *zap.Logger
 }
 
-func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallBegin(moduleName string, extension string) uint64 {
+func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallBegin(moduleName string, extension string, blockNum uint64) uint64 {
 	m.Lock()
 	defer m.Unlock()
 	if m.inProcessCalls == nil {
@@ -33,22 +33,32 @@ func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallBegin(moduleName strin
 	m.inProcessCalls[moduleName][uniqueID] = &inprocessCall{
 		startTime: time.Now(),
 		extension: extension,
+		blockNum:  blockNum,
 	}
 
 	return uniqueID
 }
 
-func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64) {
+func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64, callErr error) {
 	m.Lock()
 	defer m.Unlock()
 
 	if m.inProcessCalls[moduleName] == nil || m.inProcessCalls[moduleName][uniqueID] == nil {
-		m.logger.Warn("inprocess call not found", zap.String("module", moduleName), zap.String("extension", extension), zap.Uint64("unique_id", uniqueID))
+		if m.logger != nil {
+			m.logger.Warn("inprocess call not found", zap.String("module", moduleName), zap.String("extension", extension), zap.Uint64("unique_id", uniqueID))
+		}
 		return
 	}
 
 	duration := time.Since(m.inProcessCalls[moduleName][uniqueID].startTime)
 	delete(m.inProcessCalls[moduleName], uniqueID)
+
+	if m.doneCalls == nil {
+		m.doneCalls = make(map[string]map[string]*pbssinternal.ExternalCallMetric)
+	}
+	if m.doneCalls[moduleName] == nil {
+		m.doneCalls[moduleName] = make(map[string]*pbssinternal.ExternalCallMetric)
+	}
 
 	metric, ok := m.doneCalls[moduleName][extension]
 	if !ok {
@@ -57,10 +67,14 @@ func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallEnd(moduleName string,
 			Count:  0,
 			TimeMs: 0,
 		}
+		m.doneCalls[moduleName][extension] = metric
 	}
 
 	metric.Count++
 	metric.TimeMs += uint64(duration.Milliseconds())
+	if callErr != nil {
+		metric.FailedCount++
+	}
 }
 
 func (m *WasmMetricsGatherer) ApplyToStats(stats *Stats) {
@@ -78,12 +92,17 @@ func (m *WasmMetricsGatherer) ApplyToStats(stats *Stats) {
 			}
 			metrics[extension].count += metric.Count
 			metrics[extension].time += time.Duration(metric.TimeMs) * time.Millisecond
+			metrics[extension].failed += metric.FailedCount
 		}
 	}
 
+	// Deliberately not copying m.inProcessCalls: Stats has no way to ever remove those entries
+	// (the gatherer deletes from its own map when a call ends), so they would inflate the
+	// reported in-flight count and duration forever. This gatherer is applied once its wasm
+	// call has returned anyway, so there is normally nothing in flight left to report.
 }
 
 type WasmExtensionStats interface {
-	RecordModuleWasmExternalCallBegin(moduleName string, extension string) uint64
-	RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64)
+	RecordModuleWasmExternalCallBegin(moduleName string, extension string, blockNum uint64) uint64
+	RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64, callErr error)
 }

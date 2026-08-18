@@ -51,9 +51,15 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+// inFlightProgressInterval is how often tier2 reports what it is doing while a block is still
+// being processed. Frequent enough that a stuck external call shows up in tier1's progress log
+// well before the segment times out, cheap enough to be irrelevant next to the block loop.
+var inFlightProgressInterval = 10 * time.Second
+
 var slowQueryNotificationFrequency = 30 * time.Second
 var slowQueryNotificationThreshold = 300 * time.Second
 var ErrRequestActiveForTooLong = errors.New("request active for too long")
+var ErrRequestStalled = errors.New("request stalled, no block progress")
 
 // sendHostnameHeader mirrors SUBSTREAMS_SEND_HOSTNAME, read once at startup
 // instead of on every request (updateStreamHeadersHostname runs per ProcessRange).
@@ -95,10 +101,13 @@ type Tier2Service struct {
 	connectionCountMutex       sync.RWMutex
 	blockExecutionTimeout      time.Duration
 	segmentExecutionTimeout    time.Duration
+	segmentStallTimeout        time.Duration
 	foundationalEndpoints      map[string]string
 	HostedStoreRegistryAddress string
 
 	checkPendingShutdown func() bool
+	storesScratchSpace   string
+	storesBackend        string
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
 
@@ -121,14 +130,13 @@ func NewTier2(
 		tracer:                  tracing.GetTracer(),
 		logger:                  logger,
 		blockExecutionTimeout:   3 * time.Minute,
-		segmentExecutionTimeout: 60 * time.Minute,
+		segmentExecutionTimeout: 4 * time.Hour,
+		segmentStallTimeout:     10 * time.Minute,
 
 		simulateOverloaded: atomic.NewBool(false),
 
 		activeRequests: active_requests.NewActiveRequestsManager(logger),
 	}
-
-	setSubstreamsStoreSizeLimitFromEnv(logger)
 
 	if debugAPIAddress := os.Getenv("SUBSTREAMS_TIER2_DEBUG_API_ADDR"); debugAPIAddress != "" {
 		debugAPI := debugapi.New(
@@ -236,6 +244,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	fields := []zap.Field{
 		zap.Uint64("segment_size", request.SegmentSize),
+		zap.Uint64("merged_blocks_bundle_size", request.MergedBlocksBundleSizeOrDefault()),
 		zap.Uint32("stage", request.Stage),
 		zap.String("output_module", request.OutputModule),
 		zap.Uint64("first_streamable_block", request.FirstStreamableBlock),
@@ -291,6 +300,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		err := status.Error(codes.InvalidArgument, "missing modules in request")
 		fields = append(fields, zap.Error(err))
 		logger.Info("refusing Substreams ProcessRange request", fields...)
+		return err
 	}
 	moduleNames := make([]string, len(request.Modules.Modules))
 	for i := 0; i < len(moduleNames); i++ {
@@ -415,7 +425,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	}
 
 	storeSizeLimit := reqctx.StoreSizeLimit(ctx)
-	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, storeSizeLimit)
+	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, storeSizeLimit, s.storesScratchSpace, s.storesBackend)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -463,6 +473,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return nil
 	}
 	stores := pipeline.NewStores(ctx, storeConfigs, request.SegmentSize, requestDetails.ResolvedStartBlockNum, stopBlock, true, executionPlan.StoresToWrite)
+	defer stores.Close()
 
 	// this engine will keep the ExistingExecOuts to optimize the execution (for inputs from modules that skip execution)
 	execOutputCacheEngine, err := cache.NewEngine(ctx, executionPlan.ExecoutWriters, request.BlockType, executionPlan.ExistingExecOuts, executionPlan.IndexWriters)
@@ -475,15 +486,21 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	now := time.Now()
 	go func() {
+		reqStats := reqctx.ReqStats(ctx)
+		watchdog := newSegmentWatchdog(now, reqStats.GetBlocksProcessed(), s.segmentStallTimeout, s.segmentExecutionTimeout)
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-time.After(slowQueryNotificationFrequency):
-				if s.segmentExecutionTimeout != 0 && time.Since(now) > s.segmentExecutionTimeout {
-					cancelCause(connect.NewError(connect.CodeDeadlineExceeded, ErrRequestActiveForTooLong))
+				tick := time.Now()
+				if err := watchdog.check(tick, reqStats.GetBlocksProcessed()); err != nil {
+					cancelCause(err)
+					continue
 				}
-				if time.Since(now) > slowQueryNotificationThreshold {
+
+				if tick.Sub(now) > slowQueryNotificationThreshold {
 
 					modStats := reqctx.ReqStats(ctx).AggregatedModulesStats()
 					modStrings := make([]string, len(modStats))
@@ -512,7 +529,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 						userID = fmt.Sprintf("user_id:%s,", auth.UserID())
 					}
 					sort.Strings(modStrings)
-					logger.Info("request active for a long time", zap.Duration("duration", time.Since(now)), zap.Strings("modules", modStrings), zap.Uint64("processed_blocks", reqctx.ReqStats(ctx).GetBlocksProcessed()), zap.String("user_id", userID))
+					logger.Info("request active for a long time", zap.Duration("duration", tick.Sub(now)), zap.Strings("modules", modStrings), zap.Uint64("processed_blocks", watchdog.processedBlocks), zap.Duration("since_last_progress", watchdog.sinceLastProgress(tick)), zap.String("user_id", userID))
 				}
 			}
 		}
@@ -544,6 +561,25 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		s.HostedStoreRegistryAddress,
 		opts...,
 	)
+
+	// Keep reporting while a block is being processed, not only once it completes: a module
+	// blocked on a retrying external call would otherwise stay silent for the whole stall,
+	// and tier1 would show a job running for minutes with no external call metrics at all.
+	go func() {
+		ticker := time.NewTicker(inFlightProgressInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := pipe.SendProgressSnapshot(); err != nil {
+					logger.Debug("cannot send in-flight progress snapshot", zap.Error(err))
+					return
+				}
+			}
+		}
+	}()
 
 	logger.Debug("initializing tier2 pipeline",
 		zap.Uint64("request_start_block", requestDetails.ResolvedStartBlockNum),
@@ -625,7 +661,8 @@ excludable:
 		return pipe.OnStreamTerminated(ctx, streamErr)
 	}
 	sf := &StreamFactory{
-		mergedBlocksStore: mergedBlocksStore,
+		mergedBlocksStore:      mergedBlocksStore,
+		mergedBlocksBundleSize: request.MergedBlocksBundleSizeOrDefault(),
 	}
 	streamFactoryFunc := sf.New
 
@@ -653,7 +690,7 @@ excludable:
 	streamErr = blockStream.Run(ctx)
 	span.EndWithErr(&streamErr)
 
-	if errors.Is(context.Canceled, streamErr) {
+	if errors.Is(streamErr, context.Canceled) {
 		streamErr = context.Cause(ctx)
 	}
 
@@ -728,7 +765,18 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 		logger.Warn("no auth information available in tier2 response handler")
 	}
 
+	// Progress snapshots are emitted from a ticker goroutine while the block loop keeps
+	// sending, and a gRPC stream does not tolerate concurrent Send calls.
+	var mut sync.Mutex
+
 	return func(respAny substreams.ResponseFromAnyTier) error {
+		mut.Lock()
+		defer mut.Unlock()
+
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		resp := respAny.(*pbssinternal.ProcessRangeResponse)
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err), zap.String("user_id", userID), zap.String("key_id", apiKeyID), zap.Error(err))
@@ -799,7 +847,7 @@ func toGRPCError(ctx context.Context, err error) error {
 	if errors.Is(err, context.Canceled) {
 		if context.Cause(ctx) != nil {
 			err = context.Cause(ctx)
-			if err == errShuttingDown {
+			if errors.Is(err, errShuttingDown) {
 				return status.Error(codes.Unavailable, err.Error())
 			}
 			return toGRPCError(context.TODO(), err) // get error parsing from above for the error encapsulated in the cause
@@ -810,7 +858,7 @@ func toGRPCError(ctx context.Context, err error) error {
 		return status.Error(codes.DeadlineExceeded, err.Error())
 	}
 	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-		return status.Error(codes.InvalidArgument, fmt.Sprintf("%s (deterministic error)", err.Error()))
+		return status.Error(codes.InvalidArgument, fmt.Sprintf("%s (new deterministic error)", err.Error()))
 	}
 
 	var errInvalidArg *stream.ErrInvalidArg
@@ -863,8 +911,13 @@ func GetExecutionPlan(
 		}
 	}
 
+	// existingExecOuts is written by the loop below while the cleanup goroutine
+	// iterates over it on context cancellation: guard all accesses with a mutex.
+	var existingExecOutsLock sync.Mutex
 	go func() {
 		<-ctx.Done()
+		existingExecOutsLock.Lock()
+		defer existingExecOutsLock.Unlock()
 		for _, eo := range existingExecOuts {
 			if err := eo.Close(); err != nil {
 				logger.Info("error closing reader", zap.String("filename", eo.Filename()), zap.Error(err))
@@ -872,6 +925,12 @@ func GetExecutionPlan(
 		}
 		// Writers don't need to be closed, canceling the context is enough
 	}()
+
+	setExistingExecOut := func(name string, file execout.FileReader) {
+		existingExecOutsLock.Lock()
+		defer existingExecOutsLock.Unlock()
+		existingExecOuts[name] = file
+	}
 
 	for _, mod := range usedModules {
 		if mod.InitialBlock >= stopBlock {
@@ -911,7 +970,7 @@ func GetExecutionPlan(
 				requiredModules[name] = usedModules[name]
 				break
 			}
-			existingExecOuts[name] = file
+			setExistingExecOut(name, file)
 
 		case pbsubstreams.ModuleKindStore:
 			file, readErr := c.OpenFileReader(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
@@ -921,7 +980,7 @@ func GetExecutionPlan(
 				}
 				requiredModules[name] = usedModules[name]
 			} else {
-				existingExecOuts[name] = file
+				setExistingExecOut(name, file)
 			}
 
 			// if either full or partial kv exists, we can skip the module

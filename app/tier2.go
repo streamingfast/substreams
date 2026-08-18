@@ -22,7 +22,8 @@ import (
 func NewDefaultTier2Config() *Tier2Config {
 	return &Tier2Config{
 		BlockExecutionTimeout:   3 * time.Minute,
-		SegmentExecutionTimeout: 60 * time.Minute,
+		SegmentExecutionTimeout: 4 * time.Hour,
+		SegmentStallTimeout:     10 * time.Minute,
 	}
 }
 
@@ -32,12 +33,15 @@ type Tier2Config struct {
 
 	PipelineOptions []pipeline.Option
 
-	MaximumConcurrentRequests  uint64
-	WASMExtensions             wasm.WASMExtensioner
-	BlockExecutionTimeout      time.Duration
-	SegmentExecutionTimeout    time.Duration
-	TmpDir                     string
-	HostedStoreRegistryAddress string // for hosted stores; legacy use JSON
+	MaximumConcurrentRequests uint64
+	WASMExtensions            wasm.WASMExtensioner
+	BlockExecutionTimeout     time.Duration
+	SegmentExecutionTimeout   time.Duration
+	SegmentStallTimeout       time.Duration
+	TmpDir                    string
+	StoresScratchSpace             string
+	StoresBackend                  string
+	HostedStoreRegistryAddress     string
 
 	Tracing bool
 }
@@ -98,6 +102,10 @@ func (a *Tier2App) Run() error {
 		opts = append(opts, service.WithSegmentExecutionTimeout(a.config.SegmentExecutionTimeout))
 	}
 
+	if a.config.SegmentStallTimeout != 0 {
+		opts = append(opts, service.WithSegmentStallTimeout(a.config.SegmentStallTimeout))
+	}
+
 	opts = append(opts, service.WithReadinessFunc(a.setIsReady))
 
 	if a.config.TmpDir != "" {
@@ -105,6 +113,13 @@ func (a *Tier2App) Run() error {
 	}
 	if a.config.WASMExtensions != nil {
 		opts = append(opts, service.WithWASMExtensioner(a.config.WASMExtensions))
+	}
+
+	if a.config.StoresScratchSpace != "" {
+		opts = append(opts, service.WithStoresScratchSpace(a.config.StoresScratchSpace))
+	}
+	if a.config.StoresBackend != "" {
+		opts = append(opts, service.WithStoresBackend(a.config.StoresBackend))
 	}
 
 	svc, err := service.NewTier2(

@@ -9,12 +9,17 @@ type Tier2RequestParameters struct {
 	MeteringConfig       string
 	FirstStreamableBlock uint64
 
-	MergedBlockStoreURL  string
-	StateStoreURL        string
-	StateBundleSize      uint64
-	StateStoreDefaultTag string
+	MergedBlockStoreURL    string
+	MergedBlocksBundleSize uint64 // number of blocks per merged-blocks file in MergedBlockStoreURL
+	StateStoreURL          string
+	StateBundleSize        uint64
+	StateStoreDefaultTag   string
 
 	BlockType string
+
+	// StoreSizeLimit, if non-zero, overrides the default store size limit (in bytes)
+	// for stores loaded on tier2. Set from the tier1 store-size-limit flag.
+	StoreSizeLimit uint64
 
 	WASMModules                map[string]string
 	FoundationalStoreEndpoints map[string]string

@@ -989,12 +989,20 @@ func LoadManifestFile(inputPath, workingDir string) (*Manifest, error) {
 
 	// Allow environment variables in `imports` element
 	for i, moduleImport := range m.Imports {
-		m.Imports[i][1] = os.ExpandEnv(moduleImport[1])
+		expanded, err := expandEnvVars(moduleImport[1])
+		if err != nil {
+			return nil, fmt.Errorf("import %q: %w", moduleImport[0], err)
+		}
+		m.Imports[i][1] = expanded
 	}
 
 	// Allow environment variables in `protobuf.importPaths` element
 	for i := range m.Protobuf.ImportPaths {
-		m.Protobuf.ImportPaths[i] = os.ExpandEnv(m.Protobuf.ImportPaths[i])
+		expanded, err := expandEnvVars(m.Protobuf.ImportPaths[i])
+		if err != nil {
+			return nil, fmt.Errorf("protobuf import path %q: %w", m.Protobuf.ImportPaths[i], err)
+		}
+		m.Protobuf.ImportPaths[i] = expanded
 	}
 
 	// TODO: put some limits on the NUMBER of modules (max 50 ?)

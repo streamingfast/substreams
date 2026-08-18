@@ -2,14 +2,14 @@
 
 If you require more control over the tables and the data that you want to store into the database, then creating a `db_out` module would be the best option.
 
-You will create a new module, `db_out`, which maps the output of your Substreams to the [DatabaseChanges data model](https://docs.rs/substreams-database-change/latest/substreams_database_change/pb/database/struct.DatabaseChanges.html), which is a format that the SQL sink understands.
+You will create a new module, `db_out`, which maps the output of your Substreams to the [DatabaseChanges data model](https://docs.rs/substreams-database-change/latest/substreams_database_change/pb/database/struct.DatabaseChanges.html) — the format the SQL sink consumes in Database Changes Mode.
 
 ## Running the Sink
 
-To index a `db_out` module, you will have to run two different commands: `substreams-sink-sql setup` to create the necessary tables from a given `schema.sql` file, and `substreams-sink-sql run` to perform the actual execution.
+To index a `db_out` module, you will have to run two different commands: `substreams sink postgres setup` (or `substreams sink clickhouse setup`) to create the necessary tables from a given `schema.sql` file, and `substreams sink postgres` (or `substreams sink clickhouse`) to perform the actual execution.
 
 ```bash
-substreams-sink-sql setup <DSN> <SUBSTREAMS_PACKAGE>
+substreams sink postgres setup <SUBSTREAMS_PACKAGE> --dsn <DSN>
 ```
 
 The `substreams.yaml` file of your package must contain the sink configuration:
@@ -84,11 +84,11 @@ export DSN=postgres://myuser:mypassword@localhost:5432/mydatabase?sslmode=disabl
 - Configure the sink to create the necessary tables.
 
 ```bash
-substreams-sink-sql setup $DSN ./substreams.yaml
+substreams sink postgres setup ./substreams.yaml --dsn $DSN
 ```
 
 - Run the sink
 
 ```bash
-substreams-sink-sql run $DSN ./substreams.yaml
+substreams sink postgres ./substreams.yaml --dsn $DSN
 ```

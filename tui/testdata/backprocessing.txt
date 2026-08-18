@@ -1,0 +1,8 @@
+Backprocessing  █████████▓░░░░░░░░░░  47%  1.7k blk/s  eta 10m32s  4/10 jobs  (1M cached)
+  s0            ████████████████████ 100%
+  s1            ██████░░░░░░░░░░░░░░  30%  4 jobs, oldest 41s
+  out           ██████░░░░░░░░░░░░░░  30%  1,150,000 → 1,500,000
+
+Slowest modules
+  s1  map_pools_created  25ms/blk (avg 13ms)  [eth_call (4): 61%]
+  s0  store_pools        12ms/blk             [store (3 read/blk, 1 write/blk, 0 deletePrefix/blk): 30%]

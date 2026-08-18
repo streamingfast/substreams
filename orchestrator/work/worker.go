@@ -23,7 +23,6 @@ import (
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/storage/store"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	otelCodes "go.opentelemetry.io/otel/codes"
@@ -80,6 +79,7 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 		MeteringConfig:                  tier2ReqParams.MeteringConfig,
 		FirstStreamableBlock:            tier2ReqParams.FirstStreamableBlock,
 		MergedBlocksStore:               tier2ReqParams.MergedBlockStoreURL,
+		MergedBlocksBundleSize:          tier2ReqParams.MergedBlocksBundleSize,
 		StateStore:                      tier2ReqParams.StateStoreURL,
 		SegmentSize:                     tier2ReqParams.StateBundleSize,
 		SegmentNumber:                   segment,
@@ -91,7 +91,7 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 		FoundationalStoreEndpoints:      tier2ReqParams.FoundationalStoreEndpoints,
 		EthCallFallbackToLatestDuration: int64(reqctx.EthCallFallbackToLatestDuration(ctx)),
 		EthCallFallbackToNumberDuration: int64(reqctx.EthCallUseBlockNumberDuration(ctx)),
-		StoreSizeLimit:                  store.DefaultStoreSizeLimit,
+		StoreSizeLimit:                  tier2ReqParams.StoreSizeLimit,
 	}
 }
 
@@ -141,6 +141,10 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 
 			res = w.work(ctx, request, moduleNames, upstream, jobIdx)
 			err := res.Error
+			// Keep the reason around: the request progress log reports failure counts, but
+			// only the error text says whether jobs die on an unreachable RPC endpoint, a
+			// module panic or an overloaded tier2.
+			stats.RecordJobError(jobIdx, err)
 			switch err.(type) {
 			case *RetryableErr:
 				previousError = err

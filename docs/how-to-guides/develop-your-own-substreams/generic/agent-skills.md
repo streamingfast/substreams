@@ -18,8 +18,8 @@ Expert knowledge for developing, building, and debugging Substreams projects on 
 
 Expert knowledge for building SQL database sinks from Substreams data:
 
-- **Database Changes (CDC)** - Stream individual row changes for real-time consistency
-- **Relational Mappings** - Transform data into normalized tables with proper relationships
+- **Database Changes Mode (CDC)** - Stream individual row changes for real-time consistency
+- **Relational Mappings Mode** - Transform data into normalized tables with proper relationships
 - **PostgreSQL** - Advanced patterns, indexing strategies, and performance optimization
 - **ClickHouse** - Analytics-optimized schemas, materialized views, and time-series patterns
 - **Schema Design** - Best practices for blockchain data modeling

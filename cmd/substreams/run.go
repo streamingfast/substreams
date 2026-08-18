@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/spf13/cobra"
@@ -106,6 +108,9 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating ui: %w", err)
 	}
 
+	endpoint, _, _ := sinker.EndpointConfig()
+	ui.SetEndpoint(endpoint)
+
 	testFile := sflags.MustGetString(cmd, "test-file")
 	if testFile != "" {
 		msgDescs, err := manifest.BuildMessageDescriptors(sinker.Package())
@@ -150,21 +155,32 @@ func runRun(cmd *cobra.Command, args []string) error {
 		ui.HandleProgress,
 		ui.HandleDebugSnapshotData,
 		ui.HandleDebugSnapshotComplete,
-		nil,
+		ui.HandleError,
 	)
 	ctx, cancelCause := context.WithCancelCause(ctx)
 	go func() {
 		s := <-derr.SetupSignalHandler(0)
-		fmt.Println("received", s.String())
+		fmt.Fprintln(os.Stderr, "received", s.String())
 		cancelCause(fmt.Errorf("received signal %q", s.String()))
 	}()
+
+	// While the live view holds the terminal it swallows Ctrl-C, so the signal handler above
+	// never fires and the request has to be cancelled from the key press instead.
+	ui.SetInterruptHandler(func() { cancelCause(errors.New("interrupted by user")) })
 
 	ui.Connecting()
 	sinker.Run(ctx, cursor, h)
 	err = sinker.Err()
 
 	ui.Cancel()
+	ui.AbortProgress()
+
+	// The progress block, the usage report and the error each come from a different writer and
+	// otherwise pile up as one wall of text.
+	fmt.Fprintln(os.Stderr)
 	sinker.PrintStats()
+	fmt.Fprintln(os.Stderr)
+
 	if err == nil {
 		if cause := context.Cause(ctx); cause != nil {
 			return cause
@@ -172,9 +188,9 @@ func runRun(cmd *cobra.Command, args []string) error {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
-		fmt.Println("Completed successfully")
+		fmt.Fprintln(os.Stderr, "Completed successfully")
 		return nil
 	}
 
-	return err
+	return explainRunError(err, ui, sflags.MustGetUint64(cmd, "limit-processed-blocks"))
 }

@@ -157,6 +157,15 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 				return MsgFileReadTransientError{NextWait: computeNewWait(waitBefore, r.fileWalker.IsLocal), Error: err}
 			}
 
+			// Request cancelled by the user (or context cancelled): not a fatal error
+			if errors.Is(err, context.Canceled) || r.ctx.Err() != nil {
+				r.logger.Info("context cancelled during download",
+					zap.Int("segment", current),
+					zap.Error(err),
+				)
+				return loop.NewQuitMsg(err)
+			}
+
 			// Fatal error - fail the request
 			r.logger.Error("fatal error loading file",
 				zap.Int("segment", current),

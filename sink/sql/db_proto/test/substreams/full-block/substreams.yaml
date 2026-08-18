@@ -1,0 +1,34 @@
+specVersion: v0.1.0
+package:
+  name: full_block
+  version: v0.1.0
+
+protobuf:
+  files:
+    - full-block.proto
+  descriptorSets:
+    - module: buf.build/streamingfast/substreams-sink-sql
+  importPaths:
+    - ./proto
+  excludePaths:
+    - sf/substreams/rpc
+    - sf/substreams/v1
+    - sf/substreams/index
+    - sf/substreams/index/v1
+    - google
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams.wasm
+
+modules:
+ - name: full_block
+   kind: map
+   initialBlock: 20000000
+   inputs:
+   - source: sf.ethereum.type.v2.Block
+   output :
+    type: proto:sf.ethereum.type.v2.Block
+
+network: mainnet

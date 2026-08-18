@@ -1,69 +1,48 @@
 package tui
 
 import (
-	"embed"
-
-	"bytes"
 	"fmt"
 	"strings"
-	"text/template"
-
-	"github.com/dustin/go-humanize"
 )
 
-//go:embed *.txt.gotmpl
-var viewTplFS embed.FS
-
-var tpl = template.Must(template.New("main_view.txt.gotmpl").Funcs(template.FuncMap{
-	"pad": func(max int, in string) string {
-		l := len(in)
-		if l > max {
-			return in[:max]
-		}
-		return in + strings.Repeat(" ", max-l)
-	},
-	"rpad": func(max int, in string) string {
-		l := len(in)
-		if l > max {
-			return in[:max]
-		}
-		return strings.Repeat(" ", max-l) + in
-	},
-	"humanize": func(in uint64) string {
-		return humanize.Comma(int64(in))
-	},
-	"barmode": func(in ranges, m model) string {
-		return barmode(in, m.BackprocessingCompleteAtBlock, m.BarSize)
-	},
-}).ParseFS(viewTplFS, "*.txt.gotmpl"))
-
-// ▓▒░
-
-func barmode(in ranges, backprocessingCompleteAtBlock, width uint64) string {
-	lo := in.Lo()
-	hi := backprocessingCompleteAtBlock
-	binsize := (hi - lo) / width
-	var out []string
-	for i := uint64(0); i < width; i++ {
-		loCheck := binsize*i + lo
-		hiCheck := binsize*(i+1) + lo
-
-		if in.Covered(loCheck, hiCheck) {
-			out = append(out, "▓")
-		} else if in.PartiallyCovered(loCheck, hiCheck) {
-			out = append(out, "▒")
-		} else {
-			out = append(out, "░")
-		}
+// View renders the live region: the backprocessing block, and the failure report when there
+// is one. The session preamble is deliberately not part of it — see formatSessionPreamble.
+//
+// This used to be a text/template. It was replaced by plain string building because the
+// template carried a branch on a field nothing ever set, which silently swallowed the
+// backprocessing target line and emitted stray blank lines in its place.
+func (m model) View() string {
+	if !m.Connected {
+		return "Connecting...\n"
 	}
-	return strings.Join(out, "")
+
+	lines := m.progressLines()
+	lines = append(lines, m.failureLines()...)
+
+	return strings.Join(lines, "\n") + "\n"
 }
 
-func (m model) View() string {
-	buf := bytes.NewBuffer(nil)
-	err := tpl.Execute(buf, m)
-	if err != nil {
-		return fmt.Errorf("failed rendering template: %w", err).Error()
+func (m model) failureLines() []string {
+	if m.Failures == 0 || m.LastFailure == nil {
+		return nil
 	}
-	return buf.String()
+
+	lines := []string{
+		"",
+		fmt.Sprintf("Failures: %d.", m.Failures),
+		"Last failure:",
+		fmt.Sprintf("  Reason: %s", m.LastFailure.Reason),
+	}
+
+	if len(m.LastFailure.Logs) != 0 {
+		lines = append(lines, "  Logs:")
+		for _, log := range m.LastFailure.Logs {
+			lines = append(lines, "    "+log)
+		}
+	}
+	if m.LastFailure.LogsTruncated {
+		lines = append(lines, "  <logs truncated>")
+	}
+
+	return lines
 }

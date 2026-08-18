@@ -1,0 +1,56 @@
+specVersion: v0.1.0
+package:
+  name: order
+  version: v0.1.0
+
+imports:
+  solana: https://spkg.io/streamingfast/solana-common-v0.3.0.spkg
+
+protobuf:
+  files:
+    - test/relations/relations.proto
+  descriptorSets:
+    - module: buf.build/streamingfast/substreams-sink-sql
+  importPaths:
+    - ./proto
+  excludePaths:
+    - sf/substreams/rpc
+    - sf/substreams/v1
+    - sf/substreams/sink
+    - sf/substreams/index
+    - sf/substreams/index/v1
+    - instructions.proto # sol.instructions.v1 from the v0.2.0 spkg
+    - transactions.proto # sol.transactions.v1 from the v0.2.0 spkg
+    - google
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams.wasm
+
+modules:
+ - name: map_output
+   kind: map
+   inputs:
+   - map: solana:blocks_without_votes
+   output:
+    type: proto:test.relations.Output
+  # For performance, you should use a blockFilter whenever possible, like this:
+  #
+  # blockFilter:
+  #  module: solana:program_ids_without_votes
+  #  query:
+  #      string: program:4vMsoUT2BWatFweudnQM1xedRLfJgJ7hswhcpz4xgBTy
+  #
+  # see https://substreams.dev/streamingfast/solana-common/latest for details
+
+network: solana-mainnet-beta
+
+sink:
+  module: map_output
+  type: sf.substreams.sink.sql.v1.Service
+#  config:
+#    dbt_config:
+#      files: ./dbt
+#      run_interval_seconds: 300
+#      enabled: true

@@ -8,6 +8,7 @@ import (
 	"iter"
 	"path"
 	"sort"
+	"strconv"
 
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
@@ -66,6 +67,7 @@ type fileWriter struct {
 	orderedFlagWritten bool
 	writeError         chan error
 	done               chan struct{}
+	payloadBytes       uint64 // uncompressed size of the payloads written so far
 }
 
 func (fw *fileWriter) Range() *block.Range {
@@ -157,6 +159,7 @@ func (fw *fileWriter) SetItem(clock *pbsubstreams.Clock, data []byte) error {
 	}
 
 	fw.lastWrittenItem = item
+	fw.payloadBytes += uint64(len(cp))
 	return nil
 }
 
@@ -300,7 +303,29 @@ func (fw *fileWriter) Close() error {
 		return fmt.Errorf("closing file %s: %w", fw.Filename(), err)
 	}
 	close(fw.done)
-	return <-fw.writeError // error at the other end of the pipe
+	if err := <-fw.writeError; err != nil { // error at the other end of the pipe
+		return err
+	}
+	fw.setDataSizeMetadata()
+	return nil
+}
+
+// setDataSizeMetadata records the uncompressed payload size of the file as object
+// metadata, so that a reader interested only in the volume of data a segment represents
+// (the cost estimator) can get it without downloading and decompressing the file.
+//
+// Best-effort and detached: the segment is already written and valid without it, and not
+// every dstore backend supports metadata at all.
+func (fw *fileWriter) setDataSizeMetadata() {
+	objStore, filename, size, logger := fw.store, fw.Filename(), fw.payloadBytes, fw.logger
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), setMetadataTimeout)
+		defer cancel()
+		metadata := map[string]string{MetadataDataSize: strconv.FormatUint(size, 10)}
+		if err := objStore.SetMetadata(ctx, filename, metadata); err != nil {
+			logger.Debug("cannot set datasize metadata on execution output file", zap.String("filename", filename), zap.Error(err))
+		}
+	}()
 }
 
 func (c *File) String() string {

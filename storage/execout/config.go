@@ -3,6 +3,7 @@ package execout
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +14,15 @@ import (
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
+
+// MetadataDataSize is the object-store metadata key under which the uncompressed size of
+// an execution output file's payloads is recorded. Same key as the one used for store
+// snapshots.
+const MetadataDataSize = "datasize"
+
+// setMetadataTimeout bounds the fire-and-forget metadata write so it can never hang
+// indefinitely.
+const setMetadataTimeout = 30 * time.Second
 
 type Config struct {
 	name               string
@@ -83,6 +93,51 @@ func (c *Config) OpenFileReader(ctx context.Context, targetRange *block.Range) (
 
 func (c *Config) NewFileWriter(ctx context.Context, targetRange *block.Range) FileWriter {
 	return NewFileWriter(ctx, c.objStore, c.logger, targetRange, c.name)
+}
+
+// UncompressedSize returns the total uncompressed size of the module payloads held in the
+// output file for the given range.
+func (c *Config) UncompressedSize(ctx context.Context, targetRange *block.Range) (size uint64, fromMetadata bool, err error) {
+	return UncompressedSize(ctx, c.objStore, c.logger, targetRange, c.name)
+}
+
+// UncompressedSize returns the total uncompressed size of the module payloads held in the
+// output file for the given range.
+//
+// It prefers the size recorded as object metadata when the file was written, which costs a
+// single attributes lookup; `fromMetadata` then reports true. Files written before that
+// metadata existed (or on a backend that does not support metadata) must be read and their
+// payloads added up, which is much more expensive.
+func UncompressedSize(ctx context.Context, objStore dstore.Store, logger *zap.Logger, targetRange *block.Range, moduleName string) (size uint64, fromMetadata bool, err error) {
+	filename := computeDBinFilename(targetRange.StartBlock, targetRange.ExclusiveEndBlock)
+
+	attrs, err := objStore.ObjectAttributes(ctx, filename)
+	if err != nil {
+		return 0, false, fmt.Errorf("getting object attributes of %q: %w", filename, err)
+	}
+	if v, found := attrs.Metadata[MetadataDataSize]; found {
+		size, err := strconv.ParseUint(v, 10, 64)
+		if err != nil {
+			logger.Info("cannot parse datasize metadata, falling back to reading the file", zap.String("filename", filename), zap.String("datasize", v), zap.Error(err))
+		} else {
+			return size, true, nil
+		}
+	}
+
+	reader, err := OpenFileReader(ctx, objStore, logger, targetRange, moduleName)
+	if err != nil {
+		return 0, false, fmt.Errorf("opening %q: %w", filename, err)
+	}
+	defer reader.Close()
+
+	for item, err := range reader.Iter() {
+		if err != nil {
+			return 0, false, fmt.Errorf("reading %q: %w", filename, err)
+		}
+		size += uint64(len(item.Payload))
+	}
+
+	return size, false, nil
 }
 
 func (c *Config) Name() string                        { return c.name }

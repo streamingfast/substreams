@@ -63,8 +63,10 @@ func init() {
 			sink.FlagFinalBlocksOnly,
 		))
 
-	estimateCmd.Flags().Int("samples", 10, "Number of segments of 1000 blocks to estimate against")
-	estimateCmd.Flags().Int("parallel-requests", 1, "Number of parallel requests to perform")
+	estimateCmd.Flags().Float64("sample-percentage", 1, "Percentage of the requested range the server samples to measure the output size (server-side estimation only)")
+	estimateCmd.Flags().Bool("local", false, "Sample from this client instead of asking the server: works against endpoints without server-side estimation, but only for single-stage modules and it pays for the egress of the sampled blocks")
+	estimateCmd.Flags().Int("samples", 10, "Number of segments of 1000 blocks to estimate against (--local only)")
+	estimateCmd.Flags().Int("parallel-requests", 1, "Number of parallel requests to perform (--local only)")
 	estimateCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt and proceed with estimation")
 
 	rootCmd.AddCommand(estimateCmd)
@@ -76,21 +78,27 @@ var estimateCmd = &cobra.Command{
 
 	Long: cli.Dedent(`
 		Estimates the cost (processed blocks and egress bytes) of running a Substreams module
-		by sampling multiple 1000-block segments evenly distributed across the requested block range.
+		over a block range, by running a small sample of that range and extrapolating.
 
-		The command works by:
-		  1. Dividing the requested range into evenly distributed segments
-		  2. Testing exactly 1000 blocks from each segment (aligned to 1000-block boundaries)
-		  3. Extrapolating the results to estimate costs for the full range
+		By default the endpoint does the work: it samples --sample-percentage of the range on its
+		own workers, measures the size of the output it produced and reports back. The module data
+		itself never leaves the server, so the estimation costs processed blocks but no egress. The
+		server also knows what its cache already holds, so it reports how many blocks are actually
+		left to process, and it handles modules with stores (whose segments cannot be run out of
+		order: with stores, the sample is spread only over the part of the range the cache covers,
+		or falls back to one contiguous run, which the report says).
+
+		With --local the sampling is done from here instead, by streaming the sampled segments: use
+		it against an endpoint that does not support server-side estimation. That mode only works
+		with single-stage modules (mappers only, no stores) and it pays for the egress of every
+		sampled block.
 
 		Limitations and Warnings:
-		  - Only works with single-stage modules (modules containing only mappers, no stores)
-		  - Processed block estimation may be inaccurate for modules with block filters or indexes,
-		    as server-side caching and filtering are not fully accounted for
 		  - Results are approximations based on sampling and can differ significantly from actual usage
-		  - Network conditions, client processing speed, and server-side variations affect estimates
 		  - A non-representative sample (e.g., sampling only low-activity or high-activity periods)
 		    can severely skew results
+		  - With --local, processed block estimation may be inaccurate for modules with block filters
+		    or indexes, as server-side caching and filtering are not fully accounted for
 
 		This is a best-effort approximation tool. Actual costs may vary, sometimes greatly, from
 		these estimates. Ensure that you use a representative sample range to improve accuracy of
@@ -123,6 +131,10 @@ func estimateE(cmd *cobra.Command, args []string) error {
 	// Force production mode for estimation and infinite retries
 	sinkerConfig.Mode = sink.SubstreamsModeProduction
 	sinkerConfig.MaxRetries = -1
+
+	if !sflags.MustGetBool(cmd, "local") {
+		return runServerEstimate(ctx, cmd, sinkerConfig, sflags.MustGetFloat64(cmd, "sample-percentage"))
+	}
 
 	// Get estimate-specific flags
 	numSegments := sflags.MustGetInt(cmd, "samples")
@@ -852,11 +864,14 @@ func generateReport(report *ReportBuilder, results SegmentResults, startBlock, e
 }
 
 func generateSegmentsTable(report *ReportBuilder, tableData [][]string) {
+	renderReportTable(report, []string{"#", "Test Range", "Chain Range", "Duration", "Est. Blocks", "Est. Egress"}, tableData)
+}
+
+func renderReportTable(report *ReportBuilder, headers []string, tableData [][]string) {
 	if len(tableData) == 0 {
 		return
 	}
 
-	headers := []string{"#", "Test Range", "Chain Range", "Duration", "Est. Blocks", "Est. Egress"}
 	firstRow := tableData[0]
 	if len(firstRow) != len(headers) {
 		panic(fmt.Errorf("first row length %d does not match headers length %d (headers %v, first row %v)",

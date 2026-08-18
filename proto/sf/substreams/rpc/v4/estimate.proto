@@ -1,0 +1,151 @@
+syntax = "proto3";
+
+package sf.substreams.rpc.v4;
+
+import "sf/substreams/v1/package.proto";
+
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4;pbsubstreamsrpcv4";
+
+// Estimator computes what running a Substreams request would cost, without ever sending
+// the module data back to the client.
+//
+// The two cost drivers of a real request are (A) the number of blocks that must be
+// processed and (B) the volume of uncompressed data sent back. (A) is derived from the
+// module graph and from what is already in the cache. (B) is measured: a small,
+// configurable fraction of the requested range is actually executed on tier2 workers, and
+// only the *size* of the resulting output cache is read back, then extrapolated over the
+// full range.
+service Estimator {
+  // Estimate samples the requested range and returns a cost estimate. The stream emits
+  // `EstimateProgress` messages while the sample jobs run, then exactly one `Estimate`
+  // message before completing. No module output is ever sent.
+  rpc Estimate(EstimateRequest) returns (stream EstimateResponse);
+}
+
+// EstimateRequest describes the request whose cost should be estimated. Its fields mirror
+// `sf.substreams.rpc.v3.Request` for the parts that affect cost.
+message EstimateRequest {
+  // The Substreams package (.spkg) holding the modules to run.
+  sf.substreams.v1.Package package = 1;
+
+  // Name of the `map` module whose output the real request would stream back. Its output
+  // size is what gets measured.
+  string output_module = 2;
+
+  // If positive, the absolute block number at which the estimated request would start.
+  // If 0, it starts at the first streamable block of the chain. If negative, it is
+  // resolved relative to the chain HEAD (e.g., -1000 means "the last 1000 blocks").
+  int64 start_block_num = 3;
+
+  // Exclusive upper bound of the estimated request. If 0, the estimate runs up to the
+  // most recent final block of the chain.
+  uint64 stop_block_num = 4;
+
+  // Fraction of the requested range, in percent, that gets actually executed to measure
+  // the output size. Must be in (0, 100]. Defaults to 1 (one percent). The sample is
+  // rounded up to whole segments, so it is never smaller than one segment.
+  double sample_percentage = 5;
+
+  // Parameter overrides applied to the package server-side, keyed by module name, same as
+  // `sf.substreams.rpc.v3.Request.params`.
+  map<string, string> params = 6;
+
+  // Network selection applied to the package server-side, same as
+  // `sf.substreams.rpc.v3.Request.network`.
+  string network = 7;
+}
+
+// EstimateResponse is streamed back by `Estimator.Estimate`. Progress messages may be sent
+// any number of times; exactly one `estimate` message is sent last.
+message EstimateResponse {
+  oneof message {
+    EstimateProgress progress = 1;
+    Estimate estimate = 2;
+  }
+}
+
+// EstimateProgress reports how far along the sampling phase is.
+message EstimateProgress {
+  // Number of sample segments that have been resolved so far, either by running a tier2
+  // job or by finding the segment already present in the output cache.
+  uint64 completed_segments = 1;
+  // Total number of sample segments planned for this estimate.
+  uint64 total_segments = 2;
+}
+
+// Estimate is the final result: what the real request would have to process, and how many
+// bytes it would send back.
+message Estimate {
+  // The block range the estimate covers, after resolving relative start blocks and an
+  // open-ended stop block.
+  uint64 resolved_start_block = 1;
+  uint64 resolved_stop_block = 2;
+
+  // The width in blocks of one parallel processing segment on this endpoint.
+  uint64 segment_block_count = 3;
+  // The number of execution stages the module graph is split into. Every stage processes
+  // every block of the range, which is why it acts as a multiplier on the block count.
+  uint32 stage_count = 4;
+
+  // (A) Block processing.
+
+  // Blocks that must be processed inside the requested range, stage multiplier included,
+  // excluding what the cache already covers. This is the number a real request would bill.
+  uint64 blocks_to_process = 5;
+  // Blocks that must be processed *before* the start block to bring the stores up to it,
+  // stage multiplier included, excluding what the cache already covers.
+  uint64 blocks_to_process_before_start_block = 6;
+  // Same as `blocks_to_process` + `blocks_to_process_before_start_block`, but ignoring the
+  // existing cache: what a first-ever run of this request would have processed.
+  uint64 total_blocks_to_process_uncached = 7;
+
+  // (B) Egress.
+
+  // Estimated total uncompressed size, in bytes, of the output module data that the real
+  // request would send back for the whole range.
+  uint64 estimated_egress_bytes = 8;
+  // Measured average uncompressed output size per block in the sample.
+  double bytes_per_block = 9;
+
+  // What was actually measured to produce the estimate above.
+  Sampling sampling = 10;
+}
+
+// Sampling describes the sample that the egress estimate is extrapolated from.
+message Sampling {
+  // Percentage of the requested range that was actually sampled. May differ from the
+  // requested percentage because the sample is rounded up to whole segments and bounded by
+  // the range itself.
+  double percentage = 1;
+
+  // True when the sample is spread at regular intervals over the range. False when the
+  // sample had to be a single contiguous run: store modules are sequential, so a range
+  // whose stores are not already cached can only be sampled from where the stores are
+  // usable, forward.
+  bool sparse = 2;
+
+  // Human-readable explanation of how the sample was planned.
+  string note = 3;
+
+  // Total number of blocks covered by the sampled segments.
+  uint64 sampled_blocks = 4;
+  // Total uncompressed output bytes measured over the sampled segments.
+  uint64 sampled_bytes = 5;
+
+  repeated SampledSegment segments = 6;
+}
+
+// SampledSegment is one segment of the sample and what it measured.
+message SampledSegment {
+  // First block of the segment (inclusive).
+  uint64 start_block = 1;
+  // Last block of the segment (exclusive).
+  uint64 stop_block = 2;
+  // Uncompressed size of the output module data for this segment.
+  uint64 uncompressed_bytes = 3;
+  // True when the segment was already in the output cache, so no tier2 job was run for it.
+  bool from_cache = 4;
+  // True when the size came from the object store's metadata, false when the output file
+  // had to be read to add up its payloads.
+  bool size_from_metadata = 5;
+}

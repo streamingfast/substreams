@@ -137,6 +137,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+- `substreams estimate` asks the endpoint for the estimate instead of sampling from the client. The server runs the
+  sample on its own workers and only reports the measured sizes, so the estimation costs processed blocks and no
+  egress, it accounts for what the server's cache already holds, and it works with modules that have stores. The
+  sampled fraction is set with `--sample-percentage` (default 1%). The previous client-side sampling is still
+  available under `--local` for endpoints without server-side estimation — it remains restricted to single-stage
+  modules and pays for the egress of the sampled blocks — and `--samples` / `--parallel-requests` now only apply to
+  that mode.
+
 - `substreams run` reports backprocessing as progress and rates instead of a list of block ranges. A four-line session
   header (trace ID, module, chain, work to do including what was already cached) is printed once and stays in the
   scrollback, followed by a compact live block: overall percentage, blocks per second, ETA, running jobs against the
@@ -182,6 +190,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Added Ethereum Hoodi testnet (`hoodi`) StreamingFast endpoints (`hoodi.eth.streamingfast.io:443`).
 
 ### Server
+
+- Added `sf.substreams.rpc.v4.Estimator/Estimate` on `substreams-tier1`: a cost estimate for a request, without ever
+  sending the data. Given a package, an output module, a block range and a sampling percentage (default 1%), it reports
+  how many blocks the real request would have to process (stage multiplier included, cached segments excluded) and the
+  estimated uncompressed egress for the range. The egress figure is measured: the sample is actually executed on tier2
+  workers, then only the *size* of the resulting output cache is read back — from the object store's metadata when it is
+  there, so the data itself is never downloaded. A module graph with stores can only be sampled sparsely where its
+  stores are already cached; otherwise the sample falls back to one contiguous run and says so.
+
+- `substreams-tier2` records the uncompressed size of each execution output file it writes as `datasize` object
+  metadata, so the volume a segment represents can be known without downloading it.
 
 - `substreams-tier1` restarts when its block hub can no longer link incoming live blocks, instead of hanging every
   request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be

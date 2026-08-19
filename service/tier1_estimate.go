@@ -254,7 +254,7 @@ func (s *Tier1Service) estimate(
 	for _, seg := range samples.segments {
 		size, fromMetadata, err := outputConfig.UncompressedSize(ctx, seg.rng)
 		if errors.Is(err, dstore.ErrNotFound) {
-			logger.Warn("no output file for sampled segment, counting it as empty", zap.Stringer("segment", seg.rng))
+			logger.Warn("cannot measure sampled segment, counting it as empty", zap.Stringer("segment", seg.rng), zap.Error(err))
 			continue
 		}
 		if err != nil {
@@ -414,18 +414,47 @@ func (s *Tier1Service) planSampling(
 			// Not enough cached store state to jump around: run a contiguous sample from the
 			// highest boundary where the stores are usable.
 			seqStart := highestBoundaryAtOrBelow(readyBoundaries, startBlock)
+
+			// Below the output module's initial block there is nothing to measure: those
+			// segments run the module before it starts, produce no output file, and would be
+			// counted as empty, reporting an egress of zero for the whole range. Refuse rather
+			// than answer with a number we know is wrong.
+			if seqStart < outputModule.InitialBlock {
+				return nil, bsstream.NewErrInvalidArg(
+					"cannot sample range [%d, %d): the stores are only usable from block %d, below the initial block %d of module %q, so a contiguous sample would measure blocks on which the module produces nothing. Estimate a range whose stores this endpoint has already cached",
+					startBlock, stopBlock, seqStart, outputModule.InitialBlock, outputModule.Name)
+			}
+
 			seqSegmenter := block.NewSegmenter(segmentSize, seqStart, stopBlock)
+			firstSeqIdx := seqSegmenter.FirstIndex()
+			if seqSegmenter.Range(firstSeqIdx).Size() != segmentSize {
+				// A store's initial block does not have to sit on a segment boundary, so the
+				// first segment can be a partial one. It still gets processed to keep the
+				// stores continuous, it is just not measured: it covers fewer blocks than a
+				// whole segment and would weigh the extrapolation down.
+				firstSeqIdx++
+			}
+
 			candidates = candidates[:0]
-			for i, idx := 0, seqSegmenter.FirstIndex(); i < wanted && idx <= seqSegmenter.LastIndex(); i, idx = i+1, idx+1 {
+			for i, idx := 0, firstSeqIdx; i < wanted && idx <= seqSegmenter.LastIndex(); i, idx = i+1, idx+1 {
 				candidates = append(candidates, idx)
 			}
+			if len(candidates) == 0 {
+				return nil, bsstream.NewErrInvalidArg("range [%d, %d) holds no complete segment to sample contiguously from block %d, where the stores become usable", startBlock, stopBlock, seqStart)
+			}
+
 			segmenter = seqSegmenter
 			sparse = false
-			note = fmt.Sprintf("%d contiguous segments of %d blocks from block %d: store modules are sequential and the cache does not cover enough of the range to sample it sparsely", len(candidates), segmentSize, seqStart)
+			note = fmt.Sprintf("%d contiguous segments of %d blocks from block %d: store modules are sequential and the cache does not cover enough of the range to sample it sparsely", len(candidates), segmentSize, seqSegmenter.Range(candidates[0]).StartBlock)
 		}
 	}
 
 	picked := pickEvenly(candidates, wanted)
+	if len(picked) == 0 {
+		// Every branch above is meant to leave at least one candidate; if none did, the range
+		// holds no segment this request can run, and the indexing below would panic.
+		return nil, bsstream.NewErrInvalidArg("no segment of range [%d, %d) can be sampled", startBlock, stopBlock)
+	}
 
 	// Segments whose output is already cached cost nothing to measure.
 	cached := make(map[uint64]bool)

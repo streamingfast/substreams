@@ -201,7 +201,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   stores are already cached; otherwise the sample falls back to one contiguous run and says so.
 
 - `substreams-tier2` records the uncompressed size of each execution output file it writes as `datasize` object
-  metadata, so the volume a segment represents can be known without downloading it.
+  metadata, so the volume a segment represents can be known without downloading it. Skipped on object stores where
+  setting metadata means rewriting the object (S3), which falls back to reading the file when the size is needed.
 
 - `substreams-tier1` restarts when its block hub can no longer link incoming live blocks, instead of hanging every
   request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be

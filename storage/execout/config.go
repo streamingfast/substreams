@@ -24,6 +24,13 @@ const MetadataDataSize = "datasize"
 // indefinitely.
 const setMetadataTimeout = 30 * time.Second
 
+// metadataRewriteSchemes lists the dstore backends whose SetMetadata rewrites the object
+// instead of updating it in place. S3 exposes no metadata-update API, so dstore implements
+// it as a CopyObject onto itself: a full server-side copy of every execution output file,
+// which also resets LastModified and adds a version when versioning is on. Too much to pay
+// on every segment for a size hint the reader can recompute, so those backends are skipped.
+var metadataRewriteSchemes = map[string]bool{"s3": true}
+
 type Config struct {
 	name               string
 	moduleHash         string
@@ -105,15 +112,21 @@ func (c *Config) UncompressedSize(ctx context.Context, targetRange *block.Range)
 // output file for the given range.
 //
 // It prefers the size recorded as object metadata when the file was written, which costs a
-// single attributes lookup; `fromMetadata` then reports true. Files written before that
-// metadata existed (or on a backend that does not support metadata) must be read and their
-// payloads added up, which is much more expensive.
+// single attributes lookup; `fromMetadata` then reports true. When the attributes carry no
+// size — a file written before that metadata existed, a backend that does not support
+// metadata at all, or one where recording it is too expensive (see metadataRewriteSchemes)
+// — the file is read and its payloads added up, which is much more expensive.
+//
+// A failing attributes lookup is not one of those fallbacks: it is reported as
+// [dstore.ErrNotFound], because backends disagree on how they signal a missing object (only
+// GCS maps it to that error) and there is nothing to measure either way, so the caller gets
+// a single condition to handle.
 func UncompressedSize(ctx context.Context, objStore dstore.Store, logger *zap.Logger, targetRange *block.Range, moduleName string) (size uint64, fromMetadata bool, err error) {
 	filename := computeDBinFilename(targetRange.StartBlock, targetRange.ExclusiveEndBlock)
 
 	attrs, err := objStore.ObjectAttributes(ctx, filename)
 	if err != nil {
-		return 0, false, fmt.Errorf("getting object attributes of %q: %w", filename, err)
+		return 0, false, fmt.Errorf("%w: getting object attributes of %q: %w", dstore.ErrNotFound, filename, err)
 	}
 	if v, found := attrs.Metadata[MetadataDataSize]; found {
 		size, err := strconv.ParseUint(v, 10, 64)

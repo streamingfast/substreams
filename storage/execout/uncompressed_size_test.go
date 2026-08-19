@@ -2,7 +2,9 @@ package execout
 
 import (
 	"context"
+	"net/url"
 	"testing"
+	"time"
 
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
@@ -61,4 +63,33 @@ func TestFileWriter_RecordsDataSizeMetadata(t *testing.T) {
 	require.NoError(t, writer.Close())
 
 	assert.Equal(t, map[string]string{MetadataDataSize: "10"}, <-written)
+}
+
+// s3SchemeStore is a store whose SetMetadata would be a full object rewrite.
+type s3SchemeStore struct {
+	*dstore.MockStore
+}
+
+func (s *s3SchemeStore) BaseURL() *url.URL { return &url.URL{Scheme: "s3", Path: "/bucket"} }
+
+func TestFileWriter_SkipsDataSizeMetadataOnRewriteBackend(t *testing.T) {
+	ctx := context.Background()
+
+	called := make(chan map[string]string, 1)
+	mock := dstore.NewMockStore(nil)
+	mock.SetMetadataFunc = func(_ context.Context, _ string, metadata map[string]string) error {
+		called <- metadata
+		return nil
+	}
+	store := &s3SchemeStore{mock}
+
+	writer := NewFileWriter(ctx, store, zap.NewNop(), block.NewRange(1000, 2000), "mod")
+	require.NoError(t, writer.SetItem(&pbsubstreams.Clock{Number: 1000, Id: "1000"}, []byte("0123456789")))
+	require.NoError(t, writer.Close())
+
+	select {
+	case metadata := <-called:
+		t.Fatalf("SetMetadata was called on a rewrite backend with %v", metadata)
+	case <-time.After(100 * time.Millisecond):
+	}
 }

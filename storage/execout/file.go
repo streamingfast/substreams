@@ -314,10 +314,15 @@ func (fw *fileWriter) Close() error {
 // metadata, so that a reader interested only in the volume of data a segment represents
 // (the cost estimator) can get it without downloading and decompressing the file.
 //
-// Best-effort and detached: the segment is already written and valid without it, and not
-// every dstore backend supports metadata at all.
+// Best-effort and detached: the segment is already written and valid without it, not every
+// dstore backend supports metadata at all, and on the backends where setting it means
+// rewriting the object it is skipped entirely (see metadataRewriteSchemes). A reader that
+// finds no metadata falls back to reading the file.
 func (fw *fileWriter) setDataSizeMetadata() {
 	objStore, filename, size, logger := fw.store, fw.Filename(), fw.payloadBytes, fw.logger
+	if baseURL := objStore.BaseURL(); baseURL != nil && metadataRewriteSchemes[baseURL.Scheme] {
+		return
+	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), setMetadataTimeout)
 		defer cancel()

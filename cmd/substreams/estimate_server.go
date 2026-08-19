@@ -139,7 +139,7 @@ func requestEstimate(ctx context.Context, config *sink.SinkerConfig, samplePerce
 
 func estimatorCallError(err error) error {
 	if status.Code(err) == codes.Unimplemented {
-		return fmt.Errorf("this endpoint does not support server-side estimation, use --local to sample from here instead: %w", err)
+		return fmt.Errorf("this endpoint does not support server-side estimation, use `substreams estimate-local` to sample from the client instead: %w", err)
 	}
 	return err
 }

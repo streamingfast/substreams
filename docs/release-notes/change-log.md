@@ -140,10 +140,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `substreams estimate` asks the endpoint for the estimate instead of sampling from the client. The server runs the
   sample on its own workers and only reports the measured sizes, so the estimation costs processed blocks and no
   egress, it accounts for what the server's cache already holds, and it works with modules that have stores. The
-  sampled fraction is set with `--sample-percentage` (default 1%). The previous client-side sampling is still
-  available under `--local` for endpoints without server-side estimation — it remains restricted to single-stage
-  modules and pays for the egress of the sampled blocks — and `--samples` / `--parallel-requests` now only apply to
-  that mode.
+  sampled fraction is set with `--sample-percentage` (default 1%).
+
+- Added `substreams estimate-local`, which is the previous `substreams estimate`: sampling done by the client, for
+  endpoints without server-side estimation. It keeps `--samples` and `--parallel-requests`, and its limitations
+  (single-stage modules only, and the sampled blocks are streamed back so the estimation itself costs egress).
 
 - `substreams run` reports backprocessing as progress and rates instead of a list of block ranges. A four-line session
   header (trace ID, module, chain, work to do including what was already cached) is printed once and stays in the

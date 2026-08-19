@@ -26,5 +26,6 @@ package-lock.json
 state.cursor
 /wasigo
 /.claude
+/REVIEW.md
 .substreams.env
 plans/

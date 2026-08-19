@@ -25,6 +25,7 @@ import (
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dmetrics"
+	"github.com/streamingfast/dregistry"
 	"github.com/streamingfast/dsession"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
@@ -33,6 +34,7 @@ import (
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/debugapi"
+	"github.com/streamingfast/substreams/foundational_store"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
@@ -113,15 +115,15 @@ type Tier1Service struct {
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
 
-	enforceCompression         bool
-	activeRequestsSoftLimit    int
-	activeRequestsHardLimit    int
-	tier2RequestParameters     reqctx.Tier2RequestParameters
-	foundationalEndpoints      map[string]string
-	hostedStoreRegistryAddress string
-	sessionPool                dsession.SessionPool
-	activeRequestsManager      *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
-	execOutMessageBufferSize   int
+	enforceCompression       bool
+	activeRequestsSoftLimit  int
+	activeRequestsHardLimit  int
+	tier2RequestParameters   reqctx.Tier2RequestParameters
+	foundationalEndpoints    map[string]string
+	storeResolver            dregistry.Resolver
+	sessionPool              dsession.SessionPool
+	activeRequestsManager    *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
+	execOutMessageBufferSize int
 
 	// liveBackFillerFinalBlockDelay overrides the default 120-block delay the
 	// live backfiller waits past a segment end before concluding merged blocks
@@ -237,29 +239,34 @@ func NewTier1(
 
 	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil), zap.Uint64("merged_blocks_bundle_size", tier2RequestParameters.MergedBlocksBundleSize))
 
+	storeResolver, err := foundational_store.NewResolver(foundationalEndpoints, hostedStoreRegistryAddress, logger)
+	if err != nil {
+		return nil, fmt.Errorf("foundational store resolver: %w", err)
+	}
+
 	var cursorResolverOptions []bstream.FileSourceOption
 	if tier2RequestParameters.MergedBlocksBundleSize != 0 {
 		cursorResolverOptions = append(cursorResolverOptions, bstream.FileSourceWithBundleSize(tier2RequestParameters.MergedBlocksBundleSize))
 	}
 
 	s := &Tier1Service{
-		Shutter:                    shutter.New(),
-		runtimeConfig:              runtimeConfig,
-		blockType:                  blockType,
-		tracer:                     tracing.GetTracer(),
-		resolveCursor:              pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore, cursorResolverOptions...),
-		logger:                     logger,
-		appSetIsReadyState:         appSetIsReadyState,
-		tier2RequestParameters:     tier2RequestParameters,
-		blockExecutionTimeout:      3 * time.Minute,
-		enforceCompression:         enforceCompression,
-		activeRequestsSoftLimit:    activeRequestsSoftLimit,
-		activeRequestsHardLimit:    activeRequestsHardLimit,
-		foundationalEndpoints:      foundationalEndpoints,
-		hostedStoreRegistryAddress: hostedStoreRegistryAddress,
-		sessionPool:                sessionPool,
-		activeRequestsManager:      active_requests.NewActiveRequestsManager(logger),
-		execOutMessageBufferSize:   int(outputBufferSize),
+		Shutter:                  shutter.New(),
+		runtimeConfig:            runtimeConfig,
+		blockType:                blockType,
+		tracer:                   tracing.GetTracer(),
+		resolveCursor:            pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore, cursorResolverOptions...),
+		logger:                   logger,
+		appSetIsReadyState:       appSetIsReadyState,
+		tier2RequestParameters:   tier2RequestParameters,
+		blockExecutionTimeout:    3 * time.Minute,
+		enforceCompression:       enforceCompression,
+		activeRequestsSoftLimit:  activeRequestsSoftLimit,
+		activeRequestsHardLimit:  activeRequestsHardLimit,
+		foundationalEndpoints:    foundationalEndpoints,
+		storeResolver:            storeResolver, // control-plane client is process-wide
+		sessionPool:              sessionPool,
+		activeRequestsManager:    active_requests.NewActiveRequestsManager(logger),
+		execOutMessageBufferSize: int(outputBufferSize),
 	}
 	s.OnTerminating(func(_ error) {
 		s.activeRequestsWG.Wait()
@@ -796,6 +803,11 @@ func (s *Tier1Service) blocks(
 		opts = append(opts, pipeline.WithHeadBlockGetter(s.getHeadBlock))
 	}
 
+	ctx, resolvedEndpoints, err := s.resolveFoundationalStores(ctx, execGraph, reqStats)
+	if err != nil {
+		return err
+	}
+
 	pipe := pipeline.New(
 		ctx,
 		true,
@@ -813,10 +825,9 @@ func (s *Tier1Service) blocks(
 		func() bool {
 			return s.IsTerminating() // pipeline starts draining when the service is actually terminating, (after the global shutdown-signal-delay)
 		},
-		s.foundationalEndpoints,
+		resolvedEndpoints,
 		execOutMessageBufferSize,
 		supportBuffering,
-		s.hostedStoreRegistryAddress,
 		opts...,
 	)
 
@@ -1338,6 +1349,67 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 		return lastError
 	}
 	return lastError
+}
+
+// Per-identifier bound so a hung control-plane RPC cannot stall request setup
+// for the lifetime of the stream.
+var foundationalStoreResolveTimeout = 10 * time.Second
+
+// resolveFoundationalStores looks up every foundational-store identifier in the
+// request on tier1 and puts the concrete endpoints on the tier2 parameters.
+// Workers then just dial those addresses; they do not talk to the control plane.
+func (s *Tier1Service) resolveFoundationalStores(ctx context.Context, execGraph *exec.Graph, reqStats *metrics.Stats) (context.Context, map[string]string, error) {
+	identifiers := foundationalStoreIdentifiers(execGraph)
+	resolved := make(map[string]string, len(identifiers))
+	for _, identifier := range identifiers {
+		start := time.Now()
+		endpoint, err := resolveFoundationalStore(ctx, s.storeResolver, identifier)
+		elapsed := time.Since(start)
+		address := foundational_store.EncodeEndpoint(endpoint)
+		if reqStats != nil {
+			reqStats.RecordFoundationalStoreResolve(identifier, address, elapsed, err)
+		} else {
+			metrics.RecordFoundationalStoreResolution(err == nil, elapsed)
+		}
+		if err != nil {
+			return ctx, nil, fmt.Errorf("failed to resolve foundational store %q: %w", identifier, err)
+		}
+		resolved[identifier] = address
+	}
+
+	if params, ok := reqctx.GetTier2RequestParameters(ctx); ok {
+		params.FoundationalStoreEndpoints = resolved
+		ctx = reqctx.WithTier2RequestParameters(ctx, params)
+	}
+	return ctx, resolved, nil
+}
+
+func resolveFoundationalStore(ctx context.Context, resolver dregistry.Resolver, identifier string) (*dregistry.Endpoint, error) {
+	resolveCtx, cancel := context.WithTimeoutCause(ctx, foundationalStoreResolveTimeout, fmt.Errorf("foundational store resolve timeout after %s", foundationalStoreResolveTimeout))
+	defer cancel()
+	return resolver.Resolve(resolveCtx, identifier)
+}
+
+func foundationalStoreIdentifiers(execGraph *exec.Graph) []string {
+	if execGraph == nil {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	var out []string
+	for _, module := range execGraph.UsedModules() {
+		for _, input := range module.Inputs {
+			fs := input.GetFoundationalStore()
+			if fs == nil {
+				continue
+			}
+			if _, ok := seen[fs.Identifier]; ok {
+				continue
+			}
+			seen[fs.Identifier] = struct{}{}
+			out = append(out, fs.Identifier)
+		}
+	}
+	return out
 }
 
 func setupRequestStats(ctx context.Context, outputModuleName, outputModuleHash string, execGraph *exec.Graph, productionMode, tier2 bool) (context.Context, *metrics.Stats) {

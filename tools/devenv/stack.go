@@ -136,7 +136,7 @@ func StartDummyBlockchain(ctx context.Context, config ChainConfig) (testcontaine
 		// listening. A tier1 started on that gap connects to a relayer that is not serving yet and
 		// ends up with a live stream carrying no partial blocks at all, which looks like a healthy
 		// run until something asserts on flash blocks.
-		WaitingFor: wait.ForLog(`serving gRPC.*`+relayerPort).AsRegexp().WithStartupTimeout(config.startupTimeout()),
+		WaitingFor: wait.ForLog(`serving gRPC.*` + relayerPort).AsRegexp().WithStartupTimeout(config.startupTimeout()),
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -258,6 +258,11 @@ type Tier1Config struct {
 	// Tier1 bootstraps its block hub from the merged blocks on disk before it answers, so a
 	// large genesis burst pushes this well past the handful of seconds a small one needs.
 	ReadyTimeout time.Duration
+	// FoundationalStoresConfigPath is a JSON file of identifier → endpoint.
+	FoundationalStoresConfigPath string
+	// HostedStoreRegistryAddress is the control-plane gRPC address used to resolve
+	// hosted foundational stores that are not in the JSON file.
+	HostedStoreRegistryAddress string
 }
 
 func orDefault(value, fallback time.Duration) time.Duration {
@@ -302,7 +307,8 @@ func StartTier1(ctx context.Context, config Tier1Config, logger *zap.Logger) (*a
 		MergedBlocksStoreURL:          filepath.Join(config.TmpDir, "merged-blocks"),
 		BlockStreamAddr:               config.RelayerEndpoint,
 		MeteringConfig:                "logger://",
-		FoundationalStoresConfigPath:  "",
+		FoundationalStoresConfigPath:  config.FoundationalStoresConfigPath,
+		HostedStoreRegistryAddress:    config.HostedStoreRegistryAddress,
 		ForkedBlocksStoreURL:          "",
 		GRPCShutdownGracePeriod:       0,
 		ServiceDiscoveryURL:           nil,

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/service/config"
@@ -279,4 +280,140 @@ func TestPlanSampling_SkipsPartialFirstSegment(t *testing.T) {
 	}
 	assert.Equal(t, uint64(10*testSegmentSize), plan.blockCount())
 	assert.Contains(t, plan.note, "from block 13000")
+}
+
+func TestExtrapolateSamples(t *testing.T) {
+	sampled := func(startBlock, bytes uint64) *sampleSegment {
+		return &sampleSegment{rng: block.NewRange(startBlock, startBlock+1000), uncompressedSize: bytes, messageCount: 1000}
+	}
+	// payload rate straight through, one message per block, so the spans and the averaging are
+	// what is measured here
+	payloadOnly := func(seg *sampleSegment) (float64, float64) {
+		return float64(seg.uncompressedSize) / float64(seg.rng.Size()), float64(seg.messageCount) / float64(seg.rng.Size())
+	}
+
+	tests := []struct {
+		name       string
+		startBlock uint64
+		stopBlock  uint64
+		segments   []*sampleSegment
+		expect     []sampleSpan
+	}{
+		{
+			name:     "no sample",
+			segments: nil,
+			expect:   []sampleSpan{},
+		},
+		{
+			// a lone sample stands for the whole range at its own rate
+			name:       "single sample",
+			startBlock: 5_000_000,
+			stopBlock:  10_000_000,
+			segments:   []*sampleSegment{sampled(5_000_000, 2_000)},
+			expect:     []sampleSpan{{startBlock: 5_000_000, blocks: 5_000_000, bytes: 10_000_000, messages: 5_000_000}},
+		},
+		{
+			// rates are 1, 2 and 3 bytes per block: a span between two samples averages its
+			// two ends, the last one keeps the rate of the sample that opens it
+			name:       "averages between adjacent samples",
+			startBlock: 5_000_000,
+			stopBlock:  20_000_000,
+			segments:   []*sampleSegment{sampled(5_000_000, 1_000), sampled(10_000_000, 2_000), sampled(15_000_000, 3_000)},
+			expect: []sampleSpan{
+				{startBlock: 5_000_000, blocks: 5_000_000, bytes: 7_500_000, messages: 5_000_000},
+				{startBlock: 10_000_000, blocks: 5_000_000, bytes: 12_500_000, messages: 5_000_000},
+				{startBlock: 15_000_000, blocks: 5_000_000, bytes: 15_000_000, messages: 5_000_000},
+			},
+		},
+		{
+			// sampling starts on a segment boundary, the blocks below it are part of the range
+			name:       "first span reaches down to the start block",
+			startBlock: 4_999_500,
+			stopBlock:  10_000_000,
+			segments:   []*sampleSegment{sampled(5_000_000, 1_000)},
+			expect:     []sampleSpan{{startBlock: 4_999_500, blocks: 5_000_500, bytes: 5_000_500, messages: 5_000_500}},
+		},
+		{
+			// a contiguous sample: every span but the last is one segment wide
+			name:       "contiguous samples",
+			startBlock: 1_000,
+			stopBlock:  1_000_000,
+			segments:   []*sampleSegment{sampled(1_000, 500), sampled(2_000, 1_500)},
+			expect: []sampleSpan{
+				{startBlock: 1_000, blocks: 1_000, bytes: 1_000, messages: 1_000},
+				{startBlock: 2_000, blocks: 998_000, bytes: 1_497_000, messages: 998_000},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			spans := extrapolateSamples(test.segments, test.startBlock, test.stopBlock, payloadOnly)
+			assert.Equal(t, test.expect, spans)
+
+			// the spans partition the range: they add up to it exactly
+			var covered uint64
+			for _, span := range spans {
+				covered += span.blocks
+			}
+			if len(spans) != 0 {
+				assert.Equal(t, test.stopBlock-test.startBlock, covered)
+			}
+		})
+	}
+}
+
+// TestExtrapolateSamples_SparseModule: a module gated by a block index produces output on a
+// fraction of the blocks it covers, so a real request sends that many messages and pays the
+// framing that many times — not once per block of the range.
+func TestExtrapolateSamples_SparseModule(t *testing.T) {
+	framing := newEgressFraming(&pbsubstreams.Module{
+		Name:   "map_out",
+		Output: &pbsubstreams.Module_Output{Type: "proto:sf.substreams.v1.test.MapResult"},
+	}, 1_000_000)
+
+	// one segment of 1000 blocks holding 10 messages of 100 payload bytes each
+	segments := []*sampleSegment{{rng: block.NewRange(0, 1000), uncompressedSize: 1_000, messageCount: 10}}
+
+	spans := extrapolateSamples(segments, 0, 1_000_000, framing.ratesOf)
+	require.Len(t, spans, 1)
+
+	// 1% of blocks carry a message, so a million blocks send ten thousand of them
+	assert.Equal(t, uint64(10_000), spans[0].messages)
+	assert.Equal(t, uint64(10_000)*framing.wireSize(100), spans[0].bytes)
+
+	// counting the framing once per block instead would be two orders of magnitude out
+	assert.Less(t, spans[0].bytes, 1_000_000*framing.overhead(100))
+}
+
+func TestEgressFraming(t *testing.T) {
+	framing := newEgressFraming(&pbsubstreams.Module{
+		Name:   "map_out",
+		Output: &pbsubstreams.Module_Output{Type: "proto:sf.substreams.v1.test.MapResult"},
+	}, 20_000_000)
+
+	// the wrapper around an empty payload is the module name, the type URL, the clock, the
+	// cursor and the final block height
+	empty := framing.wireSize(0)
+	assert.Greater(t, empty, uint64(200))
+	assert.Equal(t, empty, framing.overhead(0))
+
+	// a payload is carried whole, plus the length prefixes around it
+	assert.Equal(t, uint64(1_000)+framing.overhead(1_000), framing.wireSize(1_000))
+	assert.GreaterOrEqual(t, framing.overhead(1_000), empty)
+
+	// framing is noise on a large payload
+	assert.Less(t, float64(framing.overhead(1_000_000))/float64(1_000_000), 0.001)
+
+	// a segment emitting on every block pays the framing once per block
+	dense := &sampleSegment{rng: block.NewRange(0, 1000), uncompressedSize: 10_000, messageCount: 1000}
+	bytesPerBlock, messagesPerBlock := framing.ratesOf(dense)
+	assert.Equal(t, float64(1), messagesPerBlock)
+	assert.Equal(t, float64(framing.wireSize(10)), bytesPerBlock)
+
+	// a segment with nothing in it costs nothing
+	silent := &sampleSegment{rng: block.NewRange(0, 1000)}
+	bytesPerBlock, messagesPerBlock = framing.ratesOf(silent)
+	assert.Zero(t, bytesPerBlock)
+	assert.Zero(t, messagesPerBlock)
 }

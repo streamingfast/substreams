@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -32,6 +33,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv4 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
@@ -39,6 +41,9 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/storage/store/state"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // defaultSamplePercentage is how much of the requested range gets actually executed when
@@ -55,8 +60,9 @@ type sampleSegment struct {
 	rng        *block.Range
 
 	fromCache        bool // output file was already there, no job needed
-	sizeFromMetadata bool // size came from object metadata rather than from reading the file
+	sizeFromMetadata bool // sizes came from object metadata rather than from reading the file
 	uncompressedSize uint64
+	messageCount     uint64 // items in the output file: one `BlockScopedData` each on the wire
 }
 
 // samplePlan is the set of segments that will be executed and measured, plus how they were
@@ -77,6 +83,13 @@ func (p *samplePlan) blockCount() (out uint64) {
 func (p *samplePlan) byteCount() (out uint64) {
 	for _, seg := range p.segments {
 		out += seg.uncompressedSize
+	}
+	return
+}
+
+func (p *samplePlan) messageCount() (out uint64) {
+	for _, seg := range p.segments {
+		out += seg.messageCount
 	}
 	return
 }
@@ -232,6 +245,10 @@ func (s *Tier1Service) estimate(
 	if err := stages.FetchCachesState(ctx); err != nil {
 		return fmt.Errorf("fetch caches state: %w", err)
 	}
+	// Publishes the stage list to the request stats. The sparse sample runs its jobs without
+	// the scheduler, which is what would otherwise report it, and the per-job accounting needs
+	// it to attribute processed blocks to modules.
+	stages.UpdateStats()
 	var headBlock uint64
 	if s.getHeadBlock != nil {
 		if headBlock, err = s.getHeadBlock(); err != nil {
@@ -252,7 +269,7 @@ func (s *Tier1Service) estimate(
 
 	outputConfig := execOutputConfigs.ConfigMap[req.OutputModule]
 	for _, seg := range samples.segments {
-		size, fromMetadata, err := outputConfig.UncompressedSize(ctx, seg.rng)
+		size, messages, fromMetadata, err := outputConfig.OutputStats(ctx, seg.rng)
 		if errors.Is(err, dstore.ErrNotFound) {
 			logger.Warn("cannot measure sampled segment, counting it as empty", zap.Stringer("segment", seg.rng), zap.Error(err))
 			continue
@@ -261,16 +278,27 @@ func (s *Tier1Service) estimate(
 			return fmt.Errorf("measuring output size of segment %s: %w", seg.rng, err)
 		}
 		seg.uncompressedSize = size
+		seg.messageCount = messages
 		seg.sizeFromMetadata = fromMetadata
 	}
 
 	sampledBlocks := samples.blockCount()
 	sampledBytes := samples.byteCount()
+	sampledMessages := samples.messageCount()
 	rangeBlocks := stopBlock - details.ResolvedStartBlockNum
 
+	framing := newEgressFraming(execGraph.OutputModule(), stopBlock)
+	spans := extrapolateSamples(samples.segments, details.ResolvedStartBlockNum, stopBlock, framing.ratesOf)
+
+	var estimatedEgressBytes, estimatedMessages uint64
+	for _, span := range spans {
+		estimatedEgressBytes += span.bytes
+		estimatedMessages += span.messages
+	}
+
 	var bytesPerBlock float64
-	if sampledBlocks != 0 {
-		bytesPerBlock = float64(sampledBytes) / float64(sampledBlocks)
+	if rangeBlocks != 0 {
+		bytesPerBlock = float64(estimatedEgressBytes) / float64(rangeBlocks)
 	}
 
 	estimate := &pbsubstreamsrpcv4.Estimate{
@@ -281,39 +309,198 @@ func (s *Tier1Service) estimate(
 		BlocksToProcess:                 effectiveBlocksAfter,
 		BlocksToProcessBeforeStartBlock: effectiveBlocksBefore,
 		TotalBlocksToProcessUncached:    blocksBefore + blocksAfter,
-		EstimatedEgressBytes:            uint64(bytesPerBlock * float64(rangeBlocks)),
+		EstimatedEgressBytes:            estimatedEgressBytes,
 		BytesPerBlock:                   bytesPerBlock,
+		FramingBytesPerMessage:          framing.overhead(averagePayloadPerMessage(sampledBytes, sampledMessages)),
+		EstimatedMessageCount:           estimatedMessages,
 		Sampling: &pbsubstreamsrpcv4.Sampling{
-			Percentage:    float64(sampledBlocks) / float64(rangeBlocks) * 100,
-			Sparse:        samples.sparse,
-			Note:          samples.note,
-			SampledBlocks: sampledBlocks,
-			SampledBytes:  sampledBytes,
-			Segments:      make([]*pbsubstreamsrpcv4.SampledSegment, 0, len(samples.segments)),
+			Percentage:      float64(sampledBlocks) / float64(rangeBlocks) * 100,
+			Sparse:          samples.sparse,
+			Note:            samples.note,
+			SampledBlocks:   sampledBlocks,
+			SampledBytes:    sampledBytes,
+			SampledMessages: sampledMessages,
+			Segments:        make([]*pbsubstreamsrpcv4.SampledSegment, 0, len(samples.segments)),
 		},
 	}
-	for _, seg := range samples.segments {
-		estimate.Sampling.Segments = append(estimate.Sampling.Segments, &pbsubstreamsrpcv4.SampledSegment{
+	for i, seg := range samples.segments {
+		segment := &pbsubstreamsrpcv4.SampledSegment{
 			StartBlock:        seg.rng.StartBlock,
 			StopBlock:         seg.rng.ExclusiveEndBlock,
 			UncompressedBytes: seg.uncompressedSize,
+			MessageCount:      seg.messageCount,
 			FromCache:         seg.fromCache,
 			SizeFromMetadata:  seg.sizeFromMetadata,
-		})
+		}
+		if i < len(spans) {
+			segment.RepresentedStartBlock = spans[i].startBlock
+			segment.RepresentedBlocks = spans[i].blocks
+			segment.EstimatedBytes = spans[i].bytes
+		}
+		estimate.Sampling.Segments = append(estimate.Sampling.Segments, segment)
 	}
 
 	logger.Info("estimate completed",
 		zap.Uint64("blocks_to_process", estimate.BlocksToProcess),
 		zap.Uint64("blocks_to_process_before_start_block", estimate.BlocksToProcessBeforeStartBlock),
 		zap.Uint64("estimated_egress_bytes", estimate.EstimatedEgressBytes),
+		zap.Uint64("estimated_message_count", estimate.EstimatedMessageCount),
 		zap.Uint64("sampled_blocks", sampledBlocks),
 		zap.Uint64("sampled_bytes", sampledBytes),
+		zap.Uint64("sampled_messages", sampledMessages),
 		zap.Bool("sparse", samples.sparse),
 	)
 
 	return send(&pbsubstreamsrpcv4.EstimateResponse{
 		Message: &pbsubstreamsrpcv4.EstimateResponse_Estimate{Estimate: estimate},
 	})
+}
+
+// estimatedBlockIDLength is how long a block ID string is on most firehose chains: a 32-byte
+// hash, hex-encoded. Chains whose IDs are shorter (base58, for one) make the framing estimate
+// a few bytes per block too generous.
+const estimatedBlockIDLength = 64
+
+// egressFraming models what a client actually receives for one block. The estimate measures
+// module payloads, but those travel wrapped in a `BlockScopedData` that also carries the
+// module name, the output type URL, the clock, the cursor and the final block height with
+// every single block. On a module whose per-block output is small that wrapper is most of the
+// egress, so counting payloads alone reads far too low.
+type egressFraming struct {
+	outputModuleName string
+	outputType       string
+	blockNum         uint64
+	blockID          string
+	cursor           string
+}
+
+func newEgressFraming(outputModule *pbsubstreams.Module, blockNum uint64) *egressFraming {
+	// A representative block: the ID and the cursor derived from it are the two parts whose
+	// length is not known here, and the cursor is built the same way the server builds a real
+	// one, so only the ID length is assumed.
+	blockID := strings.Repeat("f", estimatedBlockIDLength)
+	ref := bstream.NewBlockRef(blockID, blockNum)
+	cursor := (&bstream.Cursor{Step: bstream.StepNewIrreversible, Block: ref, LIB: ref, HeadBlock: ref}).ToOpaque()
+
+	var outputType string
+	if outputModule.Output != nil {
+		outputType = strings.TrimPrefix(outputModule.Output.Type, "proto:")
+	}
+
+	return &egressFraming{
+		outputModuleName: outputModule.Name,
+		outputType:       outputType,
+		blockNum:         blockNum,
+		blockID:          blockID,
+		cursor:           cursor,
+	}
+}
+
+// wireSize is the size of the message that carries `payloadSize` bytes of module output for
+// one block. Built and measured rather than added up by hand so that the nested length
+// prefixes, which grow with the payload, are accounted for.
+func (f *egressFraming) wireSize(payloadSize uint64) uint64 {
+	data := &pbsubstreamsrpc.BlockScopedData{
+		Output: &pbsubstreamsrpc.MapModuleOutput{
+			Name:      f.outputModuleName,
+			MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + f.outputType, Value: make([]byte, payloadSize)},
+		},
+		Clock:            &pbsubstreams.Clock{Id: f.blockID, Number: f.blockNum, Timestamp: timestamppb.New(time.Unix(int64(f.blockNum), 0))},
+		Cursor:           f.cursor,
+		FinalBlockHeight: f.blockNum,
+	}
+	return uint64(proto.Size(data))
+}
+
+// overhead is what wireSize adds on top of the payload itself.
+func (f *egressFraming) overhead(payloadSize uint64) uint64 {
+	return f.wireSize(payloadSize) - payloadSize
+}
+
+// ratesOf turns what was measured on one sample into per-block rates: how many bytes a real
+// request would put on the wire for each block of the range, and how many messages it would
+// send for it.
+//
+// A module gated by a block index only runs on matching blocks, so its segment holds fewer
+// items than it covers blocks, and the framing is paid once per item — not once per block.
+// Deriving the payload average per *message* and multiplying by the message rate keeps the
+// two apart, and collapses to the obvious thing on a module that emits on every block.
+func (f *egressFraming) ratesOf(seg *sampleSegment) (bytesPerBlock, messagesPerBlock float64) {
+	blocks := seg.rng.Size()
+	if blocks == 0 || seg.messageCount == 0 {
+		return 0, 0
+	}
+
+	messagesPerBlock = float64(seg.messageCount) / float64(blocks)
+	payloadPerMessage := float64(seg.uncompressedSize) / float64(seg.messageCount)
+	wirePerMessage := payloadPerMessage + float64(f.overhead(uint64(math.Round(payloadPerMessage))))
+
+	return messagesPerBlock * wirePerMessage, messagesPerBlock
+}
+
+// sampleSpan is the slice of the requested range that one sample stands for, and what was
+// extrapolated over it.
+type sampleSpan struct {
+	startBlock uint64
+	blocks     uint64
+	bytes      uint64
+	messages   uint64
+}
+
+// extrapolateSamples partitions [startBlock, stopBlock) between the samples: each one stands
+// for the blocks between its own start and the start of the next sample, the last one for
+// everything left up to the end of the range. The first span reaches down to `startBlock`,
+// since sampling begins on a segment boundary at or above it.
+//
+// The rate applied to a span is the average of the rates measured at both of its ends, so a
+// span between two samples of unequal density lands between the two rather than inheriting
+// either. The last span, having no sample after it, keeps the rate of the sample that opens
+// it.
+//
+// One span is returned per sample, in the same order, so that the two can be zipped; a span
+// that covers no block has a zero block count.
+func extrapolateSamples(segments []*sampleSegment, startBlock, stopBlock uint64, ratesOf func(*sampleSegment) (bytesPerBlock, messagesPerBlock float64)) []sampleSpan {
+	out := make([]sampleSpan, len(segments))
+	if len(segments) == 0 {
+		return out
+	}
+
+	byteRates := make([]float64, len(segments))
+	messageRates := make([]float64, len(segments))
+	for i, seg := range segments {
+		byteRates[i], messageRates[i] = ratesOf(seg)
+	}
+
+	for i, seg := range segments {
+		spanStart := seg.rng.StartBlock
+		if i == 0 {
+			spanStart = min(spanStart, startBlock)
+		}
+
+		spanStop := stopBlock
+		byteRate, messageRate := byteRates[i], messageRates[i]
+		if i+1 < len(segments) {
+			spanStop = segments[i+1].rng.StartBlock
+			byteRate = (byteRates[i] + byteRates[i+1]) / 2
+			messageRate = (messageRates[i] + messageRates[i+1]) / 2
+		}
+
+		out[i].startBlock = spanStart
+		if spanStop <= spanStart {
+			continue
+		}
+		out[i].blocks = spanStop - spanStart
+		out[i].bytes = uint64(byteRate * float64(out[i].blocks))
+		out[i].messages = uint64(messageRate * float64(out[i].blocks))
+	}
+	return out
+}
+
+func averagePayloadPerMessage(sampledBytes, sampledMessages uint64) uint64 {
+	if sampledMessages == 0 {
+		return 0
+	}
+	return sampledBytes / sampledMessages
 }
 
 // estimateCacheStore resolves the same cache store a `Blocks` request would use, so that

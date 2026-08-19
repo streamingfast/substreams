@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/olekukonko/tablewriter"
+	"github.com/olekukonko/tablewriter/tw"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
@@ -148,30 +150,24 @@ func generateRemoteReport(report *ReportBuilder, estimate *pbsubstreamsrpcv4.Est
 	sampling := estimate.Sampling
 
 	report.LineStyled(dimStyle, "%s", sectionSeparator)
-	report.LineStyled(headerStyle, "Sampled Segments")
+	report.LineStyled(headerStyle, "Segments")
 	report.LineStyled(dimStyle, "%s", sectionSeparator)
 	report.Line("")
 
 	tableData := make([][]string, 0, len(sampling.Segments))
-	for i, segment := range sampling.Segments {
-		source := "job"
-		if segment.FromCache {
-			source = "cache"
+	for _, segment := range sampling.Segments {
+		if segment.RepresentedBlocks == 0 {
+			continue
 		}
-		measure := "read"
-		if segment.SizeFromMetadata {
-			measure = "metadata"
-		}
-
 		tableData = append(tableData, []string{
-			fmt.Sprintf("%d", i+1),
-			fmt.Sprintf("%s - %s", formatx.Integer(segment.StartBlock), formatx.Integer(segment.StopBlock)),
-			formatx.Bytes(segment.UncompressedBytes),
-			source,
-			measure,
+			formatx.Integer(segment.RepresentedStartBlock),
+			formatx.Integer(segment.RepresentedBlocks),
+			formatx.Bytes(segment.EstimatedBytes),
 		})
 	}
-	renderReportTable(report, []string{"#", "Segment", "Uncompressed", "Source", "Measured From"}, tableData)
+	renderReportTable(report, []string{"Start", "Blocks", "Size"}, tableData,
+		tablewriter.WithHeaderAlignment(tw.AlignRight),
+		tablewriter.WithRowAlignment(tw.AlignRight))
 	report.Line("")
 
 	report.LineStyled(dimStyle, "%s", sectionSeparator)
@@ -192,10 +188,11 @@ func generateRemoteReport(report *ReportBuilder, estimate *pbsubstreamsrpcv4.Est
 			formatx.Integer(estimate.ResolvedStopBlock-estimate.ResolvedStartBlock))))
 	report.Line("%s %s",
 		labelStyle.Render("Blocks Sampled:"),
-		valueStyle.Render(fmt.Sprintf("%s (%.2f%% of range, %s)",
+		valueStyle.Render(fmt.Sprintf("%s (%.2f%% of range, %s), %s messages",
 			formatx.Integer(sampling.SampledBlocks),
 			sampling.Percentage,
-			sampleKind)))
+			sampleKind,
+			formatx.Integer(sampling.SampledMessages))))
 	report.Line("%s %s",
 		labelStyle.Render("Stages:"),
 		valueStyle.Render(fmt.Sprintf("%d (every stage processes every block)", estimate.StageCount)))
@@ -218,6 +215,11 @@ func generateRemoteReport(report *ReportBuilder, estimate *pbsubstreamsrpcv4.Est
 	report.Line("%s %s",
 		labelStyle.Render("Average Per Block:"),
 		valueStyle.Render(formatx.Bytes(uint64(estimate.BytesPerBlock))))
+	report.Line("%s %s",
+		labelStyle.Render("Messages Sent:"),
+		valueStyle.Render(fmt.Sprintf("%s (%s of framing each)",
+			formatx.Integer(estimate.EstimatedMessageCount),
+			formatx.Bytes(estimate.FramingBytesPerMessage))))
 	report.Line("")
 
 	if sampling.Note != "" {

@@ -117,7 +117,7 @@ func estimateE(cmd *cobra.Command, args []string) error {
 	return runRemoteEstimate(ctx, cmd, sinkerConfig, sflags.MustGetFloat64(cmd, "sample-percentage"))
 }
 
-func renderReportTable(report *ReportBuilder, headers []string, tableData [][]string) {
+func renderReportTable(report *ReportBuilder, headers []string, tableData [][]string, extra ...tablewriter.Option) {
 	if len(tableData) == 0 {
 		return
 	}
@@ -162,6 +162,9 @@ func renderReportTable(report *ReportBuilder, headers []string, tableData [][]st
 		tablewriter.WithRowAutoWrap(tw.WrapNone),
 		tablewriter.WithPadding(tw.Padding{Right: "  "}),
 	)
+	for _, opt := range extra {
+		opt(table)
+	}
 	table.Header(upperHeaders)
 	_ = table.Bulk(tableData)
 	_ = table.Render()

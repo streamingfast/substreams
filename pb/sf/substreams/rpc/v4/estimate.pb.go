@@ -293,15 +293,25 @@ type Estimate struct {
 	// Same as `blocks_to_process` + `blocks_to_process_before_start_block`, but ignoring the
 	// existing cache: what a first-ever run of this request would have processed.
 	TotalBlocksToProcessUncached uint64 `protobuf:"varint,7,opt,name=total_blocks_to_process_uncached,json=totalBlocksToProcessUncached,proto3" json:"total_blocks_to_process_uncached,omitempty"`
-	// Estimated total uncompressed size, in bytes, of the output module data that the real
-	// request would send back for the whole range.
+	// Estimated total uncompressed size, in bytes, that the real request would send back for
+	// the whole range. It is the sum of the per-sample `estimated_bytes` below, so the parts
+	// always add up to the total.
 	EstimatedEgressBytes uint64 `protobuf:"varint,8,opt,name=estimated_egress_bytes,json=estimatedEgressBytes,proto3" json:"estimated_egress_bytes,omitempty"`
-	// Measured average uncompressed output size per block in the sample.
+	// `estimated_egress_bytes` spread over the blocks of the range.
 	BytesPerBlock float64 `protobuf:"fixed64,9,opt,name=bytes_per_block,json=bytesPerBlock,proto3" json:"bytes_per_block,omitempty"`
 	// What was actually measured to produce the estimate above.
-	Sampling      *Sampling `protobuf:"bytes,10,opt,name=sampling,proto3" json:"sampling,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Sampling *Sampling `protobuf:"bytes,10,opt,name=sampling,proto3" json:"sampling,omitempty"`
+	// What one message costs on the wire beyond the module payload itself: a `BlockScopedData`
+	// carries the module name, the output type URL, the clock, the cursor and the final block
+	// height. On a module whose per-message output is small, this is most of the egress.
+	FramingBytesPerMessage uint64 `protobuf:"varint,11,opt,name=framing_bytes_per_message,json=framingBytesPerMessage,proto3" json:"framing_bytes_per_message,omitempty"`
+	// How many `BlockScopedData` messages the real request would send. This is *not* the number
+	// of blocks in the range: a module gated by a block index only runs, and is only sent, on
+	// matching blocks, so a sparse module sends far fewer messages than the range holds blocks,
+	// and pays the framing above only that many times.
+	EstimatedMessageCount uint64 `protobuf:"varint,12,opt,name=estimated_message_count,json=estimatedMessageCount,proto3" json:"estimated_message_count,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *Estimate) Reset() {
@@ -404,6 +414,20 @@ func (x *Estimate) GetSampling() *Sampling {
 	return nil
 }
 
+func (x *Estimate) GetFramingBytesPerMessage() uint64 {
+	if x != nil {
+		return x.FramingBytesPerMessage
+	}
+	return 0
+}
+
+func (x *Estimate) GetEstimatedMessageCount() uint64 {
+	if x != nil {
+		return x.EstimatedMessageCount
+	}
+	return 0
+}
+
 // Sampling describes the sample that the egress estimate is extrapolated from.
 type Sampling struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -421,10 +445,12 @@ type Sampling struct {
 	// Total number of blocks covered by the sampled segments.
 	SampledBlocks uint64 `protobuf:"varint,4,opt,name=sampled_blocks,json=sampledBlocks,proto3" json:"sampled_blocks,omitempty"`
 	// Total uncompressed output bytes measured over the sampled segments.
-	SampledBytes  uint64            `protobuf:"varint,5,opt,name=sampled_bytes,json=sampledBytes,proto3" json:"sampled_bytes,omitempty"`
-	Segments      []*SampledSegment `protobuf:"bytes,6,rep,name=segments,proto3" json:"segments,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	SampledBytes uint64            `protobuf:"varint,5,opt,name=sampled_bytes,json=sampledBytes,proto3" json:"sampled_bytes,omitempty"`
+	Segments     []*SampledSegment `protobuf:"bytes,6,rep,name=segments,proto3" json:"segments,omitempty"`
+	// Total number of messages measured over the sampled segments.
+	SampledMessages uint64 `protobuf:"varint,7,opt,name=sampled_messages,json=sampledMessages,proto3" json:"sampled_messages,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Sampling) Reset() {
@@ -499,6 +525,13 @@ func (x *Sampling) GetSegments() []*SampledSegment {
 	return nil
 }
 
+func (x *Sampling) GetSampledMessages() uint64 {
+	if x != nil {
+		return x.SampledMessages
+	}
+	return 0
+}
+
 // SampledSegment is one segment of the sample and what it measured.
 type SampledSegment struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -513,8 +546,22 @@ type SampledSegment struct {
 	// True when the size came from the object store's metadata, false when the output file
 	// had to be read to add up its payloads.
 	SizeFromMetadata bool `protobuf:"varint,5,opt,name=size_from_metadata,json=sizeFromMetadata,proto3" json:"size_from_metadata,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// The slice of the requested range this sample stands for: from its own start block up to
+	// the start of the next sample, the last one up to the end of the range. The first one
+	// reaches down to `Estimate.resolved_start_block`, since sampling starts on a segment
+	// boundary at or above it. Together the slices partition the range exactly.
+	RepresentedStartBlock uint64 `protobuf:"varint,6,opt,name=represented_start_block,json=representedStartBlock,proto3" json:"represented_start_block,omitempty"`
+	RepresentedBlocks     uint64 `protobuf:"varint,7,opt,name=represented_blocks,json=representedBlocks,proto3" json:"represented_blocks,omitempty"`
+	// Estimated egress over that slice, framing included: the rate measured on this sample
+	// averaged with the rate of the next one, so a slice between two samples of unequal
+	// density lands between the two rather than inheriting either. The last slice, having no
+	// sample after it, keeps the rate of the sample that opens it.
+	EstimatedBytes uint64 `protobuf:"varint,8,opt,name=estimated_bytes,json=estimatedBytes,proto3" json:"estimated_bytes,omitempty"`
+	// Number of `BlockScopedData` messages the segment holds, which is how many blocks of it
+	// the module actually produced output for.
+	MessageCount  uint64 `protobuf:"varint,9,opt,name=message_count,json=messageCount,proto3" json:"message_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SampledSegment) Reset() {
@@ -582,6 +629,34 @@ func (x *SampledSegment) GetSizeFromMetadata() bool {
 	return false
 }
 
+func (x *SampledSegment) GetRepresentedStartBlock() uint64 {
+	if x != nil {
+		return x.RepresentedStartBlock
+	}
+	return 0
+}
+
+func (x *SampledSegment) GetRepresentedBlocks() uint64 {
+	if x != nil {
+		return x.RepresentedBlocks
+	}
+	return 0
+}
+
+func (x *SampledSegment) GetEstimatedBytes() uint64 {
+	if x != nil {
+		return x.EstimatedBytes
+	}
+	return 0
+}
+
+func (x *SampledSegment) GetMessageCount() uint64 {
+	if x != nil {
+		return x.MessageCount
+	}
+	return 0
+}
+
 var File_sf_substreams_rpc_v4_estimate_proto protoreflect.FileDescriptor
 
 const file_sf_substreams_rpc_v4_estimate_proto_rawDesc = "" +
@@ -604,7 +679,7 @@ const file_sf_substreams_rpc_v4_estimate_proto_rawDesc = "" +
 	"\amessage\"h\n" +
 	"\x10EstimateProgress\x12-\n" +
 	"\x12completed_segments\x18\x01 \x01(\x04R\x11completedSegments\x12%\n" +
-	"\x0etotal_segments\x18\x02 \x01(\x04R\rtotalSegments\"\x9a\x04\n" +
+	"\x0etotal_segments\x18\x02 \x01(\x04R\rtotalSegments\"\x8d\x05\n" +
 	"\bEstimate\x120\n" +
 	"\x14resolved_start_block\x18\x01 \x01(\x04R\x12resolvedStartBlock\x12.\n" +
 	"\x13resolved_stop_block\x18\x02 \x01(\x04R\x11resolvedStopBlock\x12.\n" +
@@ -617,7 +692,9 @@ const file_sf_substreams_rpc_v4_estimate_proto_rawDesc = "" +
 	"\x16estimated_egress_bytes\x18\b \x01(\x04R\x14estimatedEgressBytes\x12&\n" +
 	"\x0fbytes_per_block\x18\t \x01(\x01R\rbytesPerBlock\x12:\n" +
 	"\bsampling\x18\n" +
-	" \x01(\v2\x1e.sf.substreams.rpc.v4.SamplingR\bsampling\"\xe4\x01\n" +
+	" \x01(\v2\x1e.sf.substreams.rpc.v4.SamplingR\bsampling\x129\n" +
+	"\x19framing_bytes_per_message\x18\v \x01(\x04R\x16framingBytesPerMessage\x126\n" +
+	"\x17estimated_message_count\x18\f \x01(\x04R\x15estimatedMessageCount\"\x8f\x02\n" +
 	"\bSampling\x12\x1e\n" +
 	"\n" +
 	"percentage\x18\x01 \x01(\x01R\n" +
@@ -626,7 +703,8 @@ const file_sf_substreams_rpc_v4_estimate_proto_rawDesc = "" +
 	"\x04note\x18\x03 \x01(\tR\x04note\x12%\n" +
 	"\x0esampled_blocks\x18\x04 \x01(\x04R\rsampledBlocks\x12#\n" +
 	"\rsampled_bytes\x18\x05 \x01(\x04R\fsampledBytes\x12@\n" +
-	"\bsegments\x18\x06 \x03(\v2$.sf.substreams.rpc.v4.SampledSegmentR\bsegments\"\xcc\x01\n" +
+	"\bsegments\x18\x06 \x03(\v2$.sf.substreams.rpc.v4.SampledSegmentR\bsegments\x12)\n" +
+	"\x10sampled_messages\x18\a \x01(\x04R\x0fsampledMessages\"\x81\x03\n" +
 	"\x0eSampledSegment\x12\x1f\n" +
 	"\vstart_block\x18\x01 \x01(\x04R\n" +
 	"startBlock\x12\x1d\n" +
@@ -635,7 +713,11 @@ const file_sf_substreams_rpc_v4_estimate_proto_rawDesc = "" +
 	"\x12uncompressed_bytes\x18\x03 \x01(\x04R\x11uncompressedBytes\x12\x1d\n" +
 	"\n" +
 	"from_cache\x18\x04 \x01(\bR\tfromCache\x12,\n" +
-	"\x12size_from_metadata\x18\x05 \x01(\bR\x10sizeFromMetadata2h\n" +
+	"\x12size_from_metadata\x18\x05 \x01(\bR\x10sizeFromMetadata\x126\n" +
+	"\x17represented_start_block\x18\x06 \x01(\x04R\x15representedStartBlock\x12-\n" +
+	"\x12represented_blocks\x18\a \x01(\x04R\x11representedBlocks\x12'\n" +
+	"\x0festimated_bytes\x18\b \x01(\x04R\x0eestimatedBytes\x12#\n" +
+	"\rmessage_count\x18\t \x01(\x04R\fmessageCount2h\n" +
 	"\tEstimator\x12[\n" +
 	"\bEstimate\x12%.sf.substreams.rpc.v4.EstimateRequest\x1a&.sf.substreams.rpc.v4.EstimateResponse0\x01BOZMgithub.com/streamingfast/substreams/pb/sf/substreams/rpc/v4;pbsubstreamsrpcv4b\x06proto3"
 

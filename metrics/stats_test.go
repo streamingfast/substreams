@@ -226,3 +226,17 @@ func TestStats_RecordFoundationalStoreResolve(t *testing.T) {
 	}
 	assert.True(t, found, "progress log should include foundational_stores")
 }
+
+// TestRecordEndSubrequest_NoStagesReported: a caller that runs jobs without the scheduler
+// (the cost estimator's sparse sample) never reports a stage list, and ending a job must
+// still work rather than index an empty slice.
+func TestRecordEndSubrequest_NoStagesReported(t *testing.T) {
+	stats := NewReqStats(&Config{}, nil, nil, zlogTest)
+
+	jobIdx := stats.RecordNewSubrequest(0, 1000, 2000)
+	require.NotPanics(t, func() { stats.RecordEndSubrequest(jobIdx, JobComplete) })
+	assert.Equal(t, uint64(1), stats.completedJobs)
+
+	// an unknown job is ignored rather than dereferenced
+	require.NotPanics(t, func() { stats.RecordEndSubrequest(9999, JobComplete) })
+}

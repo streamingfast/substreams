@@ -101,14 +101,26 @@ message Estimate {
 
   // (B) Egress.
 
-  // Estimated total uncompressed size, in bytes, of the output module data that the real
-  // request would send back for the whole range.
+  // Estimated total uncompressed size, in bytes, that the real request would send back for
+  // the whole range. It is the sum of the per-sample `estimated_bytes` below, so the parts
+  // always add up to the total.
   uint64 estimated_egress_bytes = 8;
-  // Measured average uncompressed output size per block in the sample.
+  // `estimated_egress_bytes` spread over the blocks of the range.
   double bytes_per_block = 9;
 
   // What was actually measured to produce the estimate above.
   Sampling sampling = 10;
+
+  // What one message costs on the wire beyond the module payload itself: a `BlockScopedData`
+  // carries the module name, the output type URL, the clock, the cursor and the final block
+  // height. On a module whose per-message output is small, this is most of the egress.
+  uint64 framing_bytes_per_message = 11;
+
+  // How many `BlockScopedData` messages the real request would send. This is *not* the number
+  // of blocks in the range: a module gated by a block index only runs, and is only sent, on
+  // matching blocks, so a sparse module sends far fewer messages than the range holds blocks,
+  // and pays the framing above only that many times.
+  uint64 estimated_message_count = 12;
 }
 
 // Sampling describes the sample that the egress estimate is extrapolated from.
@@ -133,6 +145,9 @@ message Sampling {
   uint64 sampled_bytes = 5;
 
   repeated SampledSegment segments = 6;
+
+  // Total number of messages measured over the sampled segments.
+  uint64 sampled_messages = 7;
 }
 
 // SampledSegment is one segment of the sample and what it measured.
@@ -148,4 +163,21 @@ message SampledSegment {
   // True when the size came from the object store's metadata, false when the output file
   // had to be read to add up its payloads.
   bool size_from_metadata = 5;
+
+  // The slice of the requested range this sample stands for: from its own start block up to
+  // the start of the next sample, the last one up to the end of the range. The first one
+  // reaches down to `Estimate.resolved_start_block`, since sampling starts on a segment
+  // boundary at or above it. Together the slices partition the range exactly.
+  uint64 represented_start_block = 6;
+  uint64 represented_blocks = 7;
+
+  // Estimated egress over that slice, framing included: the rate measured on this sample
+  // averaged with the rate of the next one, so a slice between two samples of unequal
+  // density lands between the two rather than inheriting either. The last slice, having no
+  // sample after it, keeps the rate of the sample that opens it.
+  uint64 estimated_bytes = 8;
+
+  // Number of `BlockScopedData` messages the segment holds, which is how many blocks of it
+  // the module actually produced output for.
+  uint64 message_count = 9;
 }

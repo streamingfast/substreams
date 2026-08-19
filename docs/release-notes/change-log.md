@@ -200,9 +200,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   there, so the data itself is never downloaded. A module graph with stores can only be sampled sparsely where its
   stores are already cached; otherwise the sample falls back to one contiguous run and says so.
 
+  The egress figure covers the whole `BlockScopedData` a client receives, not just the module payload: the module name,
+  output type URL, clock, cursor and final block height are sent with every message and dominate the egress of a module
+  whose per-message output is small. That overhead is counted once per message rather than once per block, so a module
+  gated by a block index — which only runs, and is only sent, on matching blocks — is not charged for the blocks it
+  skips. Each sample is extrapolated over the slice of the range it stands for, at the average of the rates measured at
+  that slice's two ends, and the reported total is the sum of those slices, so a range whose activity varies is no
+  longer flattened into a single average.
+
 - `substreams-tier2` records the uncompressed size of each execution output file it writes as `datasize` object
-  metadata, so the volume a segment represents can be known without downloading it. Skipped on object stores where
-  setting metadata means rewriting the object (S3), which falls back to reading the file when the size is needed.
+  metadata, and how many items it holds as `itemcount`, so what a segment represents can be known without downloading
+  it: the item count is the number of `BlockScopedData` messages a consumer of that segment receives, which on a module
+  gated by a block index is far below the number of blocks the segment covers. Skipped on object stores where setting
+  metadata means rewriting the object (S3), which falls back to reading the file when the figures are needed.
 
 - Foundational-store endpoint resolution no longer imports the private `services-control-plane` module. The public
   `dregistry` plugin chain (JSON map → control-plane `sf.registry.v1` → identifier passthrough) replaces the inline

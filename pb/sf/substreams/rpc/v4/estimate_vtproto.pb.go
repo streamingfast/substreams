@@ -123,6 +123,8 @@ func (m *Estimate) CloneVT() *Estimate {
 	r.EstimatedEgressBytes = m.EstimatedEgressBytes
 	r.BytesPerBlock = m.BytesPerBlock
 	r.Sampling = m.Sampling.CloneVT()
+	r.FramingBytesPerMessage = m.FramingBytesPerMessage
+	r.EstimatedMessageCount = m.EstimatedMessageCount
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
 		copy(r.unknownFields, m.unknownFields)
@@ -144,6 +146,7 @@ func (m *Sampling) CloneVT() *Sampling {
 	r.Note = m.Note
 	r.SampledBlocks = m.SampledBlocks
 	r.SampledBytes = m.SampledBytes
+	r.SampledMessages = m.SampledMessages
 	if rhs := m.Segments; rhs != nil {
 		tmpContainer := make([]*SampledSegment, len(rhs))
 		for k, v := range rhs {
@@ -172,6 +175,10 @@ func (m *SampledSegment) CloneVT() *SampledSegment {
 	r.UncompressedBytes = m.UncompressedBytes
 	r.FromCache = m.FromCache
 	r.SizeFromMetadata = m.SizeFromMetadata
+	r.RepresentedStartBlock = m.RepresentedStartBlock
+	r.RepresentedBlocks = m.RepresentedBlocks
+	r.EstimatedBytes = m.EstimatedBytes
+	r.MessageCount = m.MessageCount
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
 		copy(r.unknownFields, m.unknownFields)
@@ -365,6 +372,12 @@ func (this *Estimate) EqualVT(that *Estimate) bool {
 	if !this.Sampling.EqualVT(that.Sampling) {
 		return false
 	}
+	if this.FramingBytesPerMessage != that.FramingBytesPerMessage {
+		return false
+	}
+	if this.EstimatedMessageCount != that.EstimatedMessageCount {
+		return false
+	}
 	return string(this.unknownFields) == string(that.unknownFields)
 }
 
@@ -413,6 +426,9 @@ func (this *Sampling) EqualVT(that *Sampling) bool {
 			}
 		}
 	}
+	if this.SampledMessages != that.SampledMessages {
+		return false
+	}
 	return string(this.unknownFields) == string(that.unknownFields)
 }
 
@@ -442,6 +458,18 @@ func (this *SampledSegment) EqualVT(that *SampledSegment) bool {
 		return false
 	}
 	if this.SizeFromMetadata != that.SizeFromMetadata {
+		return false
+	}
+	if this.RepresentedStartBlock != that.RepresentedStartBlock {
+		return false
+	}
+	if this.RepresentedBlocks != that.RepresentedBlocks {
+		return false
+	}
+	if this.EstimatedBytes != that.EstimatedBytes {
+		return false
+	}
+	if this.MessageCount != that.MessageCount {
 		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -699,6 +727,16 @@ func (m *Estimate) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if m.EstimatedMessageCount != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.EstimatedMessageCount))
+		i--
+		dAtA[i] = 0x60
+	}
+	if m.FramingBytesPerMessage != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.FramingBytesPerMessage))
+		i--
+		dAtA[i] = 0x58
+	}
 	if m.Sampling != nil {
 		size, err := m.Sampling.MarshalToSizedBufferVT(dAtA[:i])
 		if err != nil {
@@ -788,6 +826,11 @@ func (m *Sampling) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if m.SampledMessages != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.SampledMessages))
+		i--
+		dAtA[i] = 0x38
+	}
 	if len(m.Segments) > 0 {
 		for iNdEx := len(m.Segments) - 1; iNdEx >= 0; iNdEx-- {
 			size, err := m.Segments[iNdEx].MarshalToSizedBufferVT(dAtA[:i])
@@ -865,6 +908,26 @@ func (m *SampledSegment) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m.unknownFields != nil {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
+	}
+	if m.MessageCount != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.MessageCount))
+		i--
+		dAtA[i] = 0x48
+	}
+	if m.EstimatedBytes != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.EstimatedBytes))
+		i--
+		dAtA[i] = 0x40
+	}
+	if m.RepresentedBlocks != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.RepresentedBlocks))
+		i--
+		dAtA[i] = 0x38
+	}
+	if m.RepresentedStartBlock != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.RepresentedStartBlock))
+		i--
+		dAtA[i] = 0x30
 	}
 	if m.SizeFromMetadata {
 		i--
@@ -1033,6 +1096,12 @@ func (m *Estimate) SizeVT() (n int) {
 		l = m.Sampling.SizeVT()
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
+	if m.FramingBytesPerMessage != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.FramingBytesPerMessage))
+	}
+	if m.EstimatedMessageCount != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.EstimatedMessageCount))
+	}
 	n += len(m.unknownFields)
 	return n
 }
@@ -1065,6 +1134,9 @@ func (m *Sampling) SizeVT() (n int) {
 			n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 		}
 	}
+	if m.SampledMessages != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.SampledMessages))
+	}
 	n += len(m.unknownFields)
 	return n
 }
@@ -1089,6 +1161,18 @@ func (m *SampledSegment) SizeVT() (n int) {
 	}
 	if m.SizeFromMetadata {
 		n += 2
+	}
+	if m.RepresentedStartBlock != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.RepresentedStartBlock))
+	}
+	if m.RepresentedBlocks != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.RepresentedBlocks))
+	}
+	if m.EstimatedBytes != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.EstimatedBytes))
+	}
+	if m.MessageCount != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.MessageCount))
 	}
 	n += len(m.unknownFields)
 	return n
@@ -1871,6 +1955,44 @@ func (m *Estimate) UnmarshalVT(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 11:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FramingBytesPerMessage", wireType)
+			}
+			m.FramingBytesPerMessage = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.FramingBytesPerMessage |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 12:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EstimatedMessageCount", wireType)
+			}
+			m.EstimatedMessageCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.EstimatedMessageCount |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := protohelpers.Skip(dAtA[iNdEx:])
@@ -2057,6 +2179,25 @@ func (m *Sampling) UnmarshalVT(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SampledMessages", wireType)
+			}
+			m.SampledMessages = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.SampledMessages |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := protohelpers.Skip(dAtA[iNdEx:])
@@ -2205,6 +2346,82 @@ func (m *SampledSegment) UnmarshalVT(dAtA []byte) error {
 				}
 			}
 			m.SizeFromMetadata = bool(v != 0)
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RepresentedStartBlock", wireType)
+			}
+			m.RepresentedStartBlock = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RepresentedStartBlock |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RepresentedBlocks", wireType)
+			}
+			m.RepresentedBlocks = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RepresentedBlocks |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EstimatedBytes", wireType)
+			}
+			m.EstimatedBytes = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.EstimatedBytes |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 9:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MessageCount", wireType)
+			}
+			m.MessageCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.MessageCount |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := protohelpers.Skip(dAtA[iNdEx:])

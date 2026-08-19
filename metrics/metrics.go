@@ -25,6 +25,9 @@ var Tier1WorkerRejectedOverloadedCounter *dmetrics.Counter
 var Tier1WasmExtensionCallCounter *dmetrics.CounterVec
 var Tier1WasmExtensionCallDuration *dmetrics.HistogramVec
 
+var FoundationalStoreResolution *dmetrics.CounterVec
+var FoundationalStoreResolutionDuration *dmetrics.HistogramVec
+
 var AppReadinessTier2 *dmetrics.AppReadiness
 var Tier2ActiveRequests *dmetrics.Gauge
 var Tier2RequestCounter *dmetrics.Counter
@@ -102,8 +105,20 @@ func DeclareTier1Metrics(zlog *zap.Logger) {
 	Tier1WasmExtensionCallDuration = MetricSet.NewHistogramVecCustomBuckets(
 		"substreams_tier1_wasm_extension_call_duration_seconds",
 		wasmExtensionCallLabels,
-		wasmExtensionCallDurationBuckets,
+		standardDurationBuckets,
 		"Duration of external calls made by WASM extensions (e.g. eth_call) on tier1, by extension and outcome",
+	)
+
+	FoundationalStoreResolution = MetricSet.NewCounterVec(
+		"substreams_foundational_store_resolution_total",
+		[]string{"result"},
+		"Foundational-store identifier resolutions on tier1, by result (success or error)",
+	)
+	FoundationalStoreResolutionDuration = MetricSet.NewHistogramVecCustomBuckets(
+		"substreams_foundational_store_resolution_duration_seconds",
+		[]string{"result"},
+		standardDurationBuckets,
+		"Duration of foundational-store identifier resolutions on tier1, by result",
 	)
 
 	zlog.Info("registering substreams tier1 metrics")
@@ -111,15 +126,32 @@ func DeclareTier1Metrics(zlog *zap.Logger) {
 
 var wasmExtensionCallLabels = []string{"extension", "outcome"}
 
-// wasmExtensionCallDurationBuckets are the Prometheus default buckets extended with a 30s and 60s
+// standardDurationBuckets are the Prometheus default buckets extended with a 30s and 60s
 // tail, so that slow calls and timeouts (the ones actually clogging a tier) land in a visible
 // bucket instead of all collapsing into +Inf.
-var wasmExtensionCallDurationBuckets = []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60}
+var standardDurationBuckets = []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60}
 
 const (
 	WasmExtensionCallOutcomeSuccess = "success"
 	WasmExtensionCallOutcomeError   = "error"
+
+	FoundationalStoreResolutionSuccess = "success"
+	FoundationalStoreResolutionError   = "error"
 )
+
+// RecordFoundationalStoreResolution records one identifier lookup on tier1.
+// Metrics are nil in tests and on processes that never declared tier1 metrics.
+func RecordFoundationalStoreResolution(ok bool, elapsed time.Duration) {
+	if FoundationalStoreResolution == nil || FoundationalStoreResolutionDuration == nil {
+		return
+	}
+	result := FoundationalStoreResolutionSuccess
+	if !ok {
+		result = FoundationalStoreResolutionError
+	}
+	FoundationalStoreResolution.Inc(result)
+	FoundationalStoreResolutionDuration.ObserveDuration(elapsed, result)
+}
 
 // RecordWasmExtensionCall records a single external call made by a WASM extension, eth_call being
 // the main one. Following the convention used throughout this package, the tier is encoded in the
@@ -161,7 +193,7 @@ func DeclareTier2Metrics(zlog *zap.Logger) {
 	Tier2WasmExtensionCallDuration = MetricSet.NewHistogramVecCustomBuckets(
 		"substreams_tier2_wasm_extension_call_duration_seconds",
 		wasmExtensionCallLabels,
-		wasmExtensionCallDurationBuckets,
+		standardDurationBuckets,
 		"Duration of external calls made by WASM extensions (e.g. eth_call) on tier2, by extension and outcome",
 	)
 

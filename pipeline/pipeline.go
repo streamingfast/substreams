@@ -16,10 +16,9 @@ import (
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/logging/zapx"
-	pbprivateservice "github.com/streamingfast/services-control-plane/pb/sf/hosted/private/service/v1"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/foudational_store"
+	"github.com/streamingfast/substreams/foundational_store"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/plan"
@@ -41,8 +40,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -118,15 +115,8 @@ type Pipeline struct {
 	moduleNameToStage map[string]int
 
 	foundationalClients   map[string][]pbservice.StoreClient
+	foundationalClosers   map[string][]func() error
 	foundationalEndpoints map[string]string
-
-	foundationalClosers map[string][]func() error
-
-	// hostedStoreRegistryAddress for hosted foundational stores resolved via control-plane registry (JSON for legacy)
-	hostedStoreRegistryAddress string
-	cpFSRegistryOnce           sync.Once
-	cpFSRegistryClient         pbprivateservice.FoundationStoreRegistryServiceClient
-	cpFSRegistryConn           *grpc.ClientConn
 
 	processingModule *processingModule
 
@@ -181,36 +171,34 @@ func New(
 	foundationalEndpoints map[string]string,
 	outputBufferSize int,
 	supportBuffering bool,
-	hostedStoreRegistryAddress string,
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
-		ctx:                        ctx,
-		isTier1:                    isTier1,
-		gate:                       newGate(ctx),
-		execOutputCache:            execOutputCache,
-		stateBundleSize:            stateBundleSize,
-		preexistingBlockIndices:    indices,
-		blockType:                  blockType,
-		execGraph:                  execGraph,
-		wasmRuntime:                wasmRuntime,
-		respFunc:                   respFunc,
-		stores:                     stores,
-		foundationalClients:        make(map[string][]pbservice.StoreClient),
-		foundationalClosers:        make(map[string][]func() error),
-		foundationalEndpoints:      foundationalEndpoints,
-		execoutStorage:             execoutStorage,
-		forkHandler:                NewForkHandler(),
-		blockStepMap:               make(map[bstream.StepType]uint64),
-		startTime:                  time.Now(),
-		executionTimeout:           executionTimeout,
-		workerPoolFactory:          workerPoolFactory,
-		checkPendingShutdown:       checkPendingShutdown,
-		moduleNameToStage:          make(map[string]int),
-		outputBufferSize:           outputBufferSize,
-		supportBuffering:           supportBuffering,
-		ModuleBlockIndexes:         make(map[string]*index.BlockIndex),
-		hostedStoreRegistryAddress: hostedStoreRegistryAddress,
+		ctx:                     ctx,
+		isTier1:                 isTier1,
+		gate:                    newGate(ctx),
+		execOutputCache:         execOutputCache,
+		stateBundleSize:         stateBundleSize,
+		preexistingBlockIndices: indices,
+		blockType:               blockType,
+		execGraph:               execGraph,
+		wasmRuntime:             wasmRuntime,
+		respFunc:                respFunc,
+		stores:                  stores,
+		foundationalClients:     make(map[string][]pbservice.StoreClient),
+		foundationalClosers:     make(map[string][]func() error),
+		foundationalEndpoints:   foundationalEndpoints,
+		execoutStorage:          execoutStorage,
+		forkHandler:             NewForkHandler(),
+		blockStepMap:            make(map[bstream.StepType]uint64),
+		startTime:               time.Now(),
+		executionTimeout:        executionTimeout,
+		workerPoolFactory:       workerPoolFactory,
+		checkPendingShutdown:    checkPendingShutdown,
+		moduleNameToStage:       make(map[string]int),
+		outputBufferSize:        outputBufferSize,
+		supportBuffering:        supportBuffering,
+		ModuleBlockIndexes:      make(map[string]*index.BlockIndex),
 	}
 	for _, opt := range opts {
 		opt(pipe)
@@ -1108,20 +1096,11 @@ func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context, logger *zap.Logge
 	return nil
 }
 
-// deploymentIDFromIdentifier strips the "@v<version>" suffix from a hosted-store
-// identifier, returning the bare deployment id. Identifiers without the suffix
-// are returned unchanged.
-func deploymentIDFromIdentifier(identifier string) string {
-	if idx := strings.LastIndex(identifier, "@v"); idx > 0 {
-		return identifier[:idx]
-	}
-	return identifier
-}
-
 // closeFoundationalResources closes the per-identifier foundational store gRPC
-// clients and the shared hosted-store registry connection. gRPC connections are
-// not tied to a context lifetime, so they must be closed explicitly to avoid
-// leaking sockets and background goroutines across requests.
+// clients. gRPC connections are not tied to a context lifetime, so they must
+// be closed explicitly to avoid leaking sockets and background goroutines
+// across requests. The control-plane registry client is process-wide (built
+// once on the tier1/tier2 service) and is not closed here.
 func (p *Pipeline) closeFoundationalResources(logger *zap.Logger) {
 	for identifier, closers := range p.foundationalClosers {
 		for _, closer := range closers {
@@ -1132,14 +1111,6 @@ func (p *Pipeline) closeFoundationalResources(logger *zap.Logger) {
 	}
 	p.foundationalClosers = nil
 	p.foundationalClients = nil
-
-	if p.cpFSRegistryConn != nil {
-		if err := p.cpFSRegistryConn.Close(); err != nil {
-			logger.Warn("closing hosted store registry connection", zap.Error(err))
-		}
-		p.cpFSRegistryConn = nil
-		p.cpFSRegistryClient = nil
-	}
 }
 
 // normalizedOpaqueCursor returns a opaque cursor string without some
@@ -1289,49 +1260,12 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 			identifier := in.FoundationalStore.GetIdentifier()
 			clients, ok := p.foundationalClients[identifier]
 			if !ok {
-				// Look up the endpoint for this foundational store identifier.
-				// 1. JSON registry for current/legacy foundational stores (backward compat)
-				endpoint, hasEndpoint := p.foundationalEndpoints[identifier]
-				if !hasEndpoint {
-					// 2. Hosted stores: resolve via control-plane registry service (legacy/current continue to use JSON)
-					if p.hostedStoreRegistryAddress != "" {
-						logger := reqctx.Logger(p.ctx).Named("hosted_store")
-						logger.Info("looking up hosted store endpoint", zap.String("identifier", identifier), zap.String("hosted_store_registry_address", p.hostedStoreRegistryAddress))
-						p.cpFSRegistryOnce.Do(func() {
-							conn, err := grpc.Dial(p.hostedStoreRegistryAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
-							if err != nil {
-								logger.Error("failed to dial hosted store registry", zap.Error(err))
-								return
-							}
-							p.cpFSRegistryConn = conn
-							p.cpFSRegistryClient = pbprivateservice.NewFoundationStoreRegistryServiceClient(conn)
-						})
-						if p.cpFSRegistryClient != nil {
-							logger.Info("got cpFSRegistryClient")
-
-							resp, err := p.cpFSRegistryClient.GetFoundationStore(p.ctx, &pbprivateservice.GetFoundationStoreRequest{
-								DeploymentId: deploymentIDFromIdentifier(identifier),
-							})
-							if err == nil && resp.Success && resp.Entry != nil {
-								if resp.Entry.InternalEndpoint != "" {
-									endpoint = resp.Entry.InternalEndpoint
-								} else {
-									endpoint = resp.Entry.Endpoint
-								}
-								logger.Info("got foundational store endpoint", zap.String("endpoint", endpoint))
-							}
-							if err != nil {
-								logger.Error("failed to get foundational store", zap.Error(err))
-							}
-						}
-					}
-				}
-				if endpoint == "" {
-					// 3. Fallback to identifier as endpoint (old behaviour)
-					endpoint = identifier
+				endpoint, err := foundational_store.Lookup(p.foundationalEndpoints, identifier)
+				if err != nil {
+					return nil, fmt.Errorf("failed to connect remotely to foundational store with identifier %q, it's either not supported by this specific operator or you have a typo in your identifier: %w", identifier, err)
 				}
 
-				client, closer, err := foudational_store.NewStoreClient(endpoint, logging.Logger(p.ctx, zap.NewNop()))
+				client, closer, err := foundational_store.NewStoreClient(endpoint.Address, endpoint.TLS, logging.Logger(p.ctx, zap.NewNop()))
 				if err != nil {
 					return nil, fmt.Errorf("failed to connect remotely to foundational store with identifier %q, it's either not supported by this specific operator or you have a typo in your identifier: %w", identifier, err)
 				}

@@ -438,6 +438,9 @@ func (s *Stats) progressFields() []zap.Field {
 		zap.Objects("stages", stages),
 		zap.Objects("external_calls", calls),
 	}
+	if len(s.foundationalResolves) > 0 {
+		fields = append(fields, zap.Objects("foundational_stores", s.foundationalResolves))
+	}
 
 	// Reported as context, not as a symptom: see throttledOverWindow.
 	if throttled := s.throttledOverWindow(now, measured); throttled > 0 {
@@ -923,6 +926,14 @@ func (s *Stats) progressHints(
 	now time.Time,
 ) []string {
 	var hints []string
+
+	for _, rec := range s.foundationalResolves {
+		if rec.err != "" {
+			hints = append(hints, fmt.Sprintf(
+				"foundational store %q failed to resolve: %s", rec.identifier, rec.err))
+			break
+		}
+	}
 
 	// 0. The stream was flowing and stopped. Everything below reads as "slow"; this one
 	// says "stopped", which is a different problem and worth stating first.

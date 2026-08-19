@@ -137,6 +137,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+- Changed: `substreams auth` opens a browser so you can pick an organization (if you have more than one) and
+  an API key. The CLI retrieves the selected key over the API — no copy/paste — exchanges it for a JWT, and
+  writes `.substreams.env`. The previous paste-a-JWT-or-API-key flow is `--paste`. With `LOCAL_DEVELOPMENT=true`,
+  JWT issue uses the local issuer; if that issuer is unavailable the API key is stored instead of failing.
+
 - `substreams run` reports backprocessing as progress and rates instead of a list of block ranges. A four-line session
   header (trace ID, module, chain, work to do including what was already cached) is printed once and stays in the
   scrollback, followed by a compact live block: overall percentage, blocks per second, ETA, running jobs against the

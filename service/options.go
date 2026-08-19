@@ -103,12 +103,6 @@ func WithReadinessFunc(f func(bool)) Option {
 	}
 }
 
-func WithFoundationalStoreEndpoints(map[string]string) Option {
-	return func(anyTierService) {
-		// Endpoints now arrive on each ProcessRange request from tier1.
-	}
-}
-
 func WithStoresScratchSpace(path string) Option {
 	return func(a anyTierService) {
 		switch s := a.(type) {

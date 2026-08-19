@@ -1,4 +1,4 @@
-package foudational_store
+package foundational_store
 
 import (
 	"context"
@@ -76,24 +76,6 @@ type staticResolver struct{}
 
 func (staticResolver) Resolve(_ context.Context, identifier string) (*dregistry.Endpoint, error) {
 	return nil, fmt.Errorf("%w: %q", dregistry.ErrNotFound, identifier)
-}
-
-// PrependJSON puts a static identifier→endpoint map in front of an existing resolver.
-func PrependJSON(endpoints map[string]string, next dregistry.Resolver) (dregistry.Resolver, error) {
-	if len(endpoints) == 0 {
-		return next, nil
-	}
-	if err := registerPlugins(); err != nil {
-		return nil, err
-	}
-	jsonResolver, err := jsonResolverFromMap(endpoints)
-	if err != nil {
-		return nil, err
-	}
-	if next == nil {
-		return jsonResolver, nil
-	}
-	return dregistry.Chain(jsonResolver, next), nil
 }
 
 func jsonResolverFromMap(endpoints map[string]string) (dregistry.Resolver, error) {

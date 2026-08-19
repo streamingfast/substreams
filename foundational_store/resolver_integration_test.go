@@ -1,4 +1,4 @@
-package foudational_store
+package foundational_store
 
 import (
 	"context"
@@ -56,29 +56,6 @@ func TestResolver_ThreeTierMatchesDevelopBehavior(t *testing.T) {
 		Address: "direct.example.com:443",
 		TLS:     true,
 	}, got)
-}
-
-func TestPrependJSON_ReusesBaseResolver(t *testing.T) {
-	base, err := NewPassthroughResolver()
-	require.NoError(t, err)
-
-	first, err := PrependJSON(map[string]string{"a": "a.example.com:9000"}, base)
-	require.NoError(t, err)
-	second, err := PrependJSON(map[string]string{"b": "b.example.com:9000"}, base)
-	require.NoError(t, err)
-
-	got, err := first.Resolve(t.Context(), "a")
-	require.NoError(t, err)
-	assert.Equal(t, "a.example.com:9000", got.Address)
-
-	got, err = second.Resolve(t.Context(), "b")
-	require.NoError(t, err)
-	assert.Equal(t, "b.example.com:9000", got.Address)
-
-	// A miss on the per-request JSON still uses the shared passthrough base.
-	got, err = first.Resolve(t.Context(), "passthrough.example.com:9000")
-	require.NoError(t, err)
-	assert.Equal(t, "passthrough.example.com:9000", got.Address)
 }
 
 type fakeRegistry struct {

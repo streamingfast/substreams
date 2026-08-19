@@ -34,7 +34,7 @@ import (
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/debugapi"
-	"github.com/streamingfast/substreams/foudational_store"
+	"github.com/streamingfast/substreams/foundational_store"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
@@ -239,7 +239,7 @@ func NewTier1(
 
 	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil), zap.Uint64("merged_blocks_bundle_size", tier2RequestParameters.MergedBlocksBundleSize))
 
-	storeResolver, err := foudational_store.NewResolver(foundationalEndpoints, hostedStoreRegistryAddress, logger)
+	storeResolver, err := foundational_store.NewResolver(foundationalEndpoints, hostedStoreRegistryAddress, logger)
 	if err != nil {
 		return nil, fmt.Errorf("foundational store resolver: %w", err)
 	}
@@ -1351,6 +1351,10 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 	return lastError
 }
 
+// Per-identifier bound so a hung control-plane RPC cannot stall request setup
+// for the lifetime of the stream.
+var foundationalStoreResolveTimeout = 10 * time.Second
+
 // resolveFoundationalStores looks up every foundational-store identifier in the
 // request on tier1 and puts the concrete endpoints on the tier2 parameters.
 // Workers then just dial those addresses; they do not talk to the control plane.
@@ -1359,9 +1363,9 @@ func (s *Tier1Service) resolveFoundationalStores(ctx context.Context, execGraph 
 	resolved := make(map[string]string, len(identifiers))
 	for _, identifier := range identifiers {
 		start := time.Now()
-		endpoint, err := s.storeResolver.Resolve(ctx, identifier)
+		endpoint, err := resolveFoundationalStore(ctx, s.storeResolver, identifier)
 		elapsed := time.Since(start)
-		address := foudational_store.EncodeEndpoint(endpoint)
+		address := foundational_store.EncodeEndpoint(endpoint)
 		if reqStats != nil {
 			reqStats.RecordFoundationalStoreResolve(identifier, address, elapsed, err)
 		} else {
@@ -1378,6 +1382,12 @@ func (s *Tier1Service) resolveFoundationalStores(ctx context.Context, execGraph 
 		ctx = reqctx.WithTier2RequestParameters(ctx, params)
 	}
 	return ctx, resolved, nil
+}
+
+func resolveFoundationalStore(ctx context.Context, resolver dregistry.Resolver, identifier string) (*dregistry.Endpoint, error) {
+	resolveCtx, cancel := context.WithTimeoutCause(ctx, foundationalStoreResolveTimeout, fmt.Errorf("foundational store resolve timeout after %s", foundationalStoreResolveTimeout))
+	defer cancel()
+	return resolver.Resolve(resolveCtx, identifier)
 }
 
 func foundationalStoreIdentifiers(execGraph *exec.Graph) []string {

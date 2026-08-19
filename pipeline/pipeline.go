@@ -18,7 +18,7 @@ import (
 	"github.com/streamingfast/logging/zapx"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/foudational_store"
+	"github.com/streamingfast/substreams/foundational_store"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/plan"
@@ -1260,12 +1260,12 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 			identifier := in.FoundationalStore.GetIdentifier()
 			clients, ok := p.foundationalClients[identifier]
 			if !ok {
-				endpoint, err := foudational_store.Lookup(p.foundationalEndpoints, identifier)
+				endpoint, err := foundational_store.Lookup(p.foundationalEndpoints, identifier)
 				if err != nil {
 					return nil, fmt.Errorf("failed to connect remotely to foundational store with identifier %q, it's either not supported by this specific operator or you have a typo in your identifier: %w", identifier, err)
 				}
 
-				client, closer, err := foudational_store.NewStoreClient(endpoint.Address, endpoint.TLS, logging.Logger(p.ctx, zap.NewNop()))
+				client, closer, err := foundational_store.NewStoreClient(endpoint.Address, endpoint.TLS, logging.Logger(p.ctx, zap.NewNop()))
 				if err != nil {
 					return nil, fmt.Errorf("failed to connect remotely to foundational store with identifier %q, it's either not supported by this specific operator or you have a typo in your identifier: %w", identifier, err)
 				}

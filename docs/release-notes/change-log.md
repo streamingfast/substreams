@@ -189,6 +189,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   are composed into that chain internally. Tier1 resolves identifiers once per request and sends the concrete endpoints
   to tier2, so workers look up that static map and do not dial the control plane. Store dials now honor the registry's TLS flag instead of guessing
   from `:443`. Resolution success and failure are recorded on the request progress log and as Prometheus metrics.
+  Each identifier lookup times out after 10 seconds so a hung control-plane RPC cannot stall request setup.
 
 - `substreams-tier1` restarts when its block hub can no longer link incoming live blocks, instead of hanging every
   request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be
@@ -198,6 +199,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   back to a file source that waits for merged-blocks to cover that number, it now immediately sends an undo-to-LIB. 
 
 ### Library
+
+- **Breaking** Renamed the misspelled `foudational_store` package to `foundational_store`.
 
 - **Breaking** `sql.Database.WalkMessageDescriptorAndInsert`, `WalkMessageDescriptorAndInsertInto`,
   `BaseDatabase.WalkMessageDescriptorAndInsertWithDialect` and `sql.Dialect.AppendInlineFieldValues` take a

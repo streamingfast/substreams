@@ -1,4 +1,4 @@
-package foudational_store
+package foundational_store
 
 import (
 	"context"
@@ -43,20 +43,6 @@ func TestLookup(t *testing.T) {
 	_, err = Lookup(map[string]string{"known": "grpc://stores.example.com:9000"}, "missing")
 	require.Error(t, err)
 	assert.True(t, dregistry.IsNotFound(err))
-}
-
-func TestPrependJSON(t *testing.T) {
-	base, err := NewPassthroughResolver()
-	require.NoError(t, err)
-
-	resolver, err := PrependJSON(map[string]string{
-		"known": "stores.example.com:9000",
-	}, base)
-	require.NoError(t, err)
-
-	got, err := resolver.Resolve(t.Context(), "known")
-	require.NoError(t, err)
-	assert.Equal(t, "stores.example.com:9000", got.Address)
 }
 
 func TestDeploymentID(t *testing.T) {

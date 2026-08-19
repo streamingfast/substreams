@@ -1,4 +1,4 @@
-package foudational_store
+package foundational_store
 
 import (
 	"fmt"

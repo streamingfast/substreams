@@ -23,9 +23,9 @@ func installTestWasmExtensionCallMetrics(t *testing.T) {
 
 	set := dmetrics.NewSet()
 	Tier1WasmExtensionCallCounter = set.NewCounterVec("test_tier1_wasm_extension_call_counter", wasmExtensionCallLabels, "test")
-	Tier1WasmExtensionCallDuration = set.NewHistogramVecCustomBuckets("test_tier1_wasm_extension_call_duration_seconds", wasmExtensionCallLabels, wasmExtensionCallDurationBuckets, "test")
+	Tier1WasmExtensionCallDuration = set.NewHistogramVecCustomBuckets("test_tier1_wasm_extension_call_duration_seconds", wasmExtensionCallLabels, standardDurationBuckets, "test")
 	Tier2WasmExtensionCallCounter = set.NewCounterVec("test_tier2_wasm_extension_call_counter", wasmExtensionCallLabels, "test")
-	Tier2WasmExtensionCallDuration = set.NewHistogramVecCustomBuckets("test_tier2_wasm_extension_call_duration_seconds", wasmExtensionCallLabels, wasmExtensionCallDurationBuckets, "test")
+	Tier2WasmExtensionCallDuration = set.NewHistogramVecCustomBuckets("test_tier2_wasm_extension_call_duration_seconds", wasmExtensionCallLabels, standardDurationBuckets, "test")
 }
 
 func TestRecordWasmExtensionCall_RoutesToTierMetric(t *testing.T) {

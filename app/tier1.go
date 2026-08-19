@@ -92,8 +92,8 @@ type Tier1Config struct {
 	BlockType               string
 	StateBundleSize         uint64
 	MergedBlocksBundleSize  uint64 // number of blocks per merged-blocks file in MergedBlocksStoreURL (0 means the default of 100)
-	EnforceCompression      bool // refuse incoming requests that do not accept gzip compression (ConnectRPC or GRPC)
-	ActiveRequestsSoftLimit int  // maximum number of active requests a tier1 app can have with external clients before starting to advertise itself as unready in the health check
+	EnforceCompression      bool   // refuse incoming requests that do not accept gzip compression (ConnectRPC or GRPC)
+	ActiveRequestsSoftLimit int    // maximum number of active requests a tier1 app can have with external clients before starting to advertise itself as unready in the health check
 
 	ActiveRequestsHardLimit int // maximum number of active requests a tier1 app can have with external clients, refuse with CodeUnavailable if reached
 	MaxSubrequests          uint64
@@ -317,7 +317,6 @@ func (a *Tier1App) Run() error {
 		StateStoreDefaultTag:       a.config.StateStoreDefaultTag,
 		WASMModules:                wasmModules,
 		FoundationalStoreEndpoints: foundationalStoreEndpoints,
-		HostedStoreRegistryAddress: a.config.HostedStoreRegistryAddress,
 		StoreSizeLimit:             a.config.StoreSizeLimit,
 	}
 

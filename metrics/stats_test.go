@@ -204,3 +204,25 @@ func externalCallMetric(t *testing.T, stats *Stats, module, extension string) *p
 	t.Fatalf("no %q metric reported for module %q", extension, module)
 	return nil
 }
+
+func TestStats_RecordFoundationalStoreResolve(t *testing.T) {
+	stats := NewReqStats(&Config{}, nil, nil, zap.NewNop())
+	stats.RecordFoundationalStoreResolve("good", "grpc://stores.example.com:9000", 5*time.Millisecond, nil)
+	stats.RecordFoundationalStoreResolve("bad", "", 2*time.Millisecond, errors.New("not found"))
+
+	require.Len(t, stats.foundationalResolves, 2)
+	assert.Equal(t, "good", stats.foundationalResolves[0].identifier)
+	assert.Equal(t, "grpc://stores.example.com:9000", stats.foundationalResolves[0].address)
+	assert.Empty(t, stats.foundationalResolves[0].err)
+	assert.Equal(t, "bad", stats.foundationalResolves[1].identifier)
+	assert.Equal(t, "not found", stats.foundationalResolves[1].err)
+
+	fields := stats.progressFields()
+	var found bool
+	for _, field := range fields {
+		if field.Key == "foundational_stores" {
+			found = true
+		}
+	}
+	assert.True(t, found, "progress log should include foundational_stores")
+}

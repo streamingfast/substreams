@@ -118,13 +118,13 @@ func (m *Estimate) CloneVT() *Estimate {
 	r.SegmentBlockCount = m.SegmentBlockCount
 	r.StageCount = m.StageCount
 	r.BlocksToProcess = m.BlocksToProcess
-	r.BlocksToProcessBeforeStartBlock = m.BlocksToProcessBeforeStartBlock
 	r.TotalBlocksToProcessUncached = m.TotalBlocksToProcessUncached
 	r.EstimatedEgressBytes = m.EstimatedEgressBytes
 	r.BytesPerBlock = m.BytesPerBlock
 	r.Sampling = m.Sampling.CloneVT()
 	r.FramingBytesPerMessage = m.FramingBytesPerMessage
 	r.EstimatedMessageCount = m.EstimatedMessageCount
+	r.BlockFiltered = m.BlockFiltered
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
 		copy(r.unknownFields, m.unknownFields)
@@ -142,7 +142,6 @@ func (m *Sampling) CloneVT() *Sampling {
 	}
 	r := new(Sampling)
 	r.Percentage = m.Percentage
-	r.Sparse = m.Sparse
 	r.Note = m.Note
 	r.SampledBlocks = m.SampledBlocks
 	r.SampledBytes = m.SampledBytes
@@ -179,6 +178,7 @@ func (m *SampledSegment) CloneVT() *SampledSegment {
 	r.RepresentedBlocks = m.RepresentedBlocks
 	r.EstimatedBytes = m.EstimatedBytes
 	r.MessageCount = m.MessageCount
+	r.ProcessedBlocks = m.ProcessedBlocks
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
 		copy(r.unknownFields, m.unknownFields)
@@ -357,9 +357,6 @@ func (this *Estimate) EqualVT(that *Estimate) bool {
 	if this.BlocksToProcess != that.BlocksToProcess {
 		return false
 	}
-	if this.BlocksToProcessBeforeStartBlock != that.BlocksToProcessBeforeStartBlock {
-		return false
-	}
 	if this.TotalBlocksToProcessUncached != that.TotalBlocksToProcessUncached {
 		return false
 	}
@@ -376,6 +373,9 @@ func (this *Estimate) EqualVT(that *Estimate) bool {
 		return false
 	}
 	if this.EstimatedMessageCount != that.EstimatedMessageCount {
+		return false
+	}
+	if this.BlockFiltered != that.BlockFiltered {
 		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -395,9 +395,6 @@ func (this *Sampling) EqualVT(that *Sampling) bool {
 		return false
 	}
 	if this.Percentage != that.Percentage {
-		return false
-	}
-	if this.Sparse != that.Sparse {
 		return false
 	}
 	if this.Note != that.Note {
@@ -470,6 +467,9 @@ func (this *SampledSegment) EqualVT(that *SampledSegment) bool {
 		return false
 	}
 	if this.MessageCount != that.MessageCount {
+		return false
+	}
+	if this.ProcessedBlocks != that.ProcessedBlocks {
 		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -727,6 +727,16 @@ func (m *Estimate) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if m.BlockFiltered {
+		i--
+		if m.BlockFiltered {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x68
+	}
 	if m.EstimatedMessageCount != 0 {
 		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.EstimatedMessageCount))
 		i--
@@ -762,11 +772,6 @@ func (m *Estimate) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.TotalBlocksToProcessUncached))
 		i--
 		dAtA[i] = 0x38
-	}
-	if m.BlocksToProcessBeforeStartBlock != 0 {
-		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.BlocksToProcessBeforeStartBlock))
-		i--
-		dAtA[i] = 0x30
 	}
 	if m.BlocksToProcess != 0 {
 		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.BlocksToProcess))
@@ -860,16 +865,6 @@ func (m *Sampling) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x1a
 	}
-	if m.Sparse {
-		i--
-		if m.Sparse {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
-		}
-		i--
-		dAtA[i] = 0x10
-	}
 	if m.Percentage != 0 {
 		i -= 8
 		binary.LittleEndian.PutUint64(dAtA[i:], uint64(math.Float64bits(float64(m.Percentage))))
@@ -908,6 +903,11 @@ func (m *SampledSegment) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m.unknownFields != nil {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
+	}
+	if m.ProcessedBlocks != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.ProcessedBlocks))
+		i--
+		dAtA[i] = 0x50
 	}
 	if m.MessageCount != 0 {
 		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.MessageCount))
@@ -1080,9 +1080,6 @@ func (m *Estimate) SizeVT() (n int) {
 	if m.BlocksToProcess != 0 {
 		n += 1 + protohelpers.SizeOfVarint(uint64(m.BlocksToProcess))
 	}
-	if m.BlocksToProcessBeforeStartBlock != 0 {
-		n += 1 + protohelpers.SizeOfVarint(uint64(m.BlocksToProcessBeforeStartBlock))
-	}
 	if m.TotalBlocksToProcessUncached != 0 {
 		n += 1 + protohelpers.SizeOfVarint(uint64(m.TotalBlocksToProcessUncached))
 	}
@@ -1102,6 +1099,9 @@ func (m *Estimate) SizeVT() (n int) {
 	if m.EstimatedMessageCount != 0 {
 		n += 1 + protohelpers.SizeOfVarint(uint64(m.EstimatedMessageCount))
 	}
+	if m.BlockFiltered {
+		n += 2
+	}
 	n += len(m.unknownFields)
 	return n
 }
@@ -1114,9 +1114,6 @@ func (m *Sampling) SizeVT() (n int) {
 	_ = l
 	if m.Percentage != 0 {
 		n += 9
-	}
-	if m.Sparse {
-		n += 2
 	}
 	l = len(m.Note)
 	if l > 0 {
@@ -1173,6 +1170,9 @@ func (m *SampledSegment) SizeVT() (n int) {
 	}
 	if m.MessageCount != 0 {
 		n += 1 + protohelpers.SizeOfVarint(uint64(m.MessageCount))
+	}
+	if m.ProcessedBlocks != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.ProcessedBlocks))
 	}
 	n += len(m.unknownFields)
 	return n
@@ -1851,25 +1851,6 @@ func (m *Estimate) UnmarshalVT(dAtA []byte) error {
 					break
 				}
 			}
-		case 6:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field BlocksToProcessBeforeStartBlock", wireType)
-			}
-			m.BlocksToProcessBeforeStartBlock = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return protohelpers.ErrIntOverflow
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.BlocksToProcessBeforeStartBlock |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
 		case 7:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field TotalBlocksToProcessUncached", wireType)
@@ -1993,6 +1974,26 @@ func (m *Estimate) UnmarshalVT(dAtA []byte) error {
 					break
 				}
 			}
+		case 13:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field BlockFiltered", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.BlockFiltered = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := protohelpers.Skip(dAtA[iNdEx:])
@@ -2055,26 +2056,6 @@ func (m *Sampling) UnmarshalVT(dAtA []byte) error {
 			v = uint64(binary.LittleEndian.Uint64(dAtA[iNdEx:]))
 			iNdEx += 8
 			m.Percentage = float64(math.Float64frombits(v))
-		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Sparse", wireType)
-			}
-			var v int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return protohelpers.ErrIntOverflow
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				v |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Sparse = bool(v != 0)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Note", wireType)
@@ -2418,6 +2399,25 @@ func (m *SampledSegment) UnmarshalVT(dAtA []byte) error {
 				b := dAtA[iNdEx]
 				iNdEx++
 				m.MessageCount |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 10:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ProcessedBlocks", wireType)
+			}
+			m.ProcessedBlocks = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ProcessedBlocks |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}

@@ -27,15 +27,6 @@ func TestPickEvenly(t *testing.T) {
 	assert.Equal(t, []int{0}, pickEvenly(in, 1))
 }
 
-func TestHighestBoundaryAtOrBelow(t *testing.T) {
-	boundaries := map[uint64]struct{}{0: {}, 1000: {}, 5000: {}, 90000: {}}
-
-	assert.Equal(t, uint64(5000), highestBoundaryAtOrBelow(boundaries, 7000))
-	assert.Equal(t, uint64(5000), highestBoundaryAtOrBelow(boundaries, 5000))
-	assert.Equal(t, uint64(1000), highestBoundaryAtOrBelow(boundaries, 4999))
-	assert.Equal(t, uint64(0), highestBoundaryAtOrBelow(boundaries, 999))
-}
-
 const testSegmentSize = 1000
 
 // TestPlanSampling_NoStores: without stores every segment can run on its own, so the sample
@@ -47,7 +38,6 @@ func TestPlanSampling_NoStores(t *testing.T) {
 	plan, err := svc.planSampling(context.Background(), execGraph, execoutConfigs, storeConfigs, 0, 1_000_000, 1)
 	require.NoError(t, err)
 
-	assert.True(t, plan.sparse)
 	require.Len(t, plan.segments, 10)
 	assert.Equal(t, uint64(0), plan.segments[0].rng.StartBlock)
 	assert.Equal(t, uint64(100_000), plan.segments[1].rng.StartBlock)
@@ -55,98 +45,56 @@ func TestPlanSampling_NoStores(t *testing.T) {
 	assert.Equal(t, uint64(10_000), plan.blockCount())
 }
 
-// TestPlanSampling_StoresCachedPartially: with stores, only the segments whose stores are
-// already cached can be run out of order, so the sample stays inside that part of the range.
-func TestPlanSampling_StoresCachedPartially(t *testing.T) {
+// TestPlanSampling_StoresCoverRange: every segment can run on its own when the stores are
+// snapshotted at each of its boundaries, so the sample is spread over the whole range.
+func TestPlanSampling_StoresCoverRange(t *testing.T) {
 	svc, execGraph, baseStore := newEstimateTestService(t, true)
-
-	storeHash := execGraph.ModuleHashes()["store_a"]
-	for endBlock := uint64(testSegmentSize); endBlock <= 500_000; endBlock += testSegmentSize {
-		baseStore.SetFile(fmt.Sprintf("%s/states/%010d-%010d.kv", storeHash, endBlock, 0), []byte("kv"))
-	}
+	writeStoreSnapshots(t, execGraph, baseStore, 1_000_000)
 
 	execoutConfigs, storeConfigs := newEstimateTestConfigs(t, execGraph, baseStore)
 
 	plan, err := svc.planSampling(context.Background(), execGraph, execoutConfigs, storeConfigs, 0, 1_000_000, 1)
 	require.NoError(t, err)
 
-	assert.True(t, plan.sparse)
 	require.Len(t, plan.segments, 10)
-	for _, seg := range plan.segments {
-		assert.LessOrEqual(t, seg.rng.ExclusiveEndBlock, uint64(500_000), "sampled outside of the cached stores")
-	}
-	// spread over the cached part rather than bunched at its beginning
-	assert.Greater(t, plan.segments[9].rng.StartBlock, uint64(400_000))
+	assert.Equal(t, uint64(0), plan.segments[0].rng.StartBlock)
+	assert.Equal(t, uint64(900_000), plan.segments[9].rng.StartBlock)
 }
 
-// TestPlanSampling_StoresCachedFractionOfRange: the wanted sample count is derived from the
-// *whole* range, but the segments are picked from the cached part only. Asking for 5M blocks
-// with stores cached up to 1M still gets 50 samples (1% of 5M), spread over that first fifth.
-func TestPlanSampling_StoresCachedFractionOfRange(t *testing.T) {
+// TestPlanSampling_StoresCoverPartOfRange: the stores stop partway, so the request is refused
+// and told which part of the range it could ask for instead.
+func TestPlanSampling_StoresCoverPartOfRange(t *testing.T) {
 	svc, execGraph, baseStore := newEstimateTestService(t, true)
-
-	const cachedUpTo = uint64(1_000_000)
-
-	storeHash := execGraph.ModuleHashes()["store_a"]
-	for endBlock := uint64(testSegmentSize); endBlock <= cachedUpTo; endBlock += testSegmentSize {
-		baseStore.SetFile(fmt.Sprintf("%s/states/%010d-%010d.kv", storeHash, endBlock, 0), []byte("kv"))
-	}
+	writeStoreSnapshots(t, execGraph, baseStore, 500_000)
 
 	execoutConfigs, storeConfigs := newEstimateTestConfigs(t, execGraph, baseStore)
 
-	plan, err := svc.planSampling(context.Background(), execGraph, execoutConfigs, storeConfigs, 0, 5_000_000, 1)
-	require.NoError(t, err)
-
-	assert.True(t, plan.sparse)
-	require.Len(t, plan.segments, 50, "1%% of the 5000 segments of the range")
-	assert.Equal(t, uint64(50*testSegmentSize), plan.blockCount())
-
-	for _, seg := range plan.segments {
-		assert.LessOrEqual(t, seg.rng.ExclusiveEndBlock, cachedUpTo+testSegmentSize, "sampled past the cached stores")
-	}
-	// evenly spread over the cached part, not bunched at its beginning
-	assert.Equal(t, uint64(0), plan.segments[0].rng.StartBlock)
-	assert.GreaterOrEqual(t, plan.segments[49].rng.StartBlock, uint64(900_000))
-	assert.Equal(t, uint64(20_000), plan.segments[1].rng.StartBlock-plan.segments[0].rng.StartBlock)
+	_, err := svc.planSampling(context.Background(), execGraph, execoutConfigs, storeConfigs, 0, 1_000_000, 1)
+	require.Error(t, err)
+	// the snapshot ending at 500000 makes the segment that starts there runnable too
+	assert.Contains(t, err.Error(), "only covers [0, 501000)")
+	assert.Contains(t, err.Error(), "Estimate [0, 501000) instead")
 }
 
-// TestPlanSampling_StoresCachedTooSmall: the cached part of the range must hold at least as
-// many segments as we want to sample, otherwise sampling it would measure a sliver of the
-// range and call it representative. Below that, a contiguous sample is the honest answer.
-func TestPlanSampling_StoresCachedTooSmall(t *testing.T) {
-	svc, execGraph, baseStore := newEstimateTestService(t, true)
-
-	storeHash := execGraph.ModuleHashes()["store_a"]
-	for endBlock := uint64(testSegmentSize); endBlock <= 5*testSegmentSize; endBlock += testSegmentSize {
-		baseStore.SetFile(fmt.Sprintf("%s/states/%010d-%010d.kv", storeHash, endBlock, 0), []byte("kv"))
-	}
-
-	execoutConfigs, storeConfigs := newEstimateTestConfigs(t, execGraph, baseStore)
-
-	// 1% of 1000 segments is 10 samples, the stores only cover 6 usable boundaries
-	plan, err := svc.planSampling(context.Background(), execGraph, execoutConfigs, storeConfigs, 0, 1_000_000, 1)
-	require.NoError(t, err)
-
-	assert.False(t, plan.sparse)
-	require.Len(t, plan.segments, 10)
-	assert.Equal(t, uint64(0), plan.segments[0].rng.StartBlock)
-	assert.Equal(t, uint64(9*testSegmentSize), plan.segments[9].rng.StartBlock)
-}
-
-// TestPlanSampling_StoresNotCached: nothing cached means the stores can only be built
-// forward from their initial block, so the sample has to be contiguous.
+// TestPlanSampling_StoresNotCached: with nothing snapshotted, only the segment the stores
+// start on can run, which is not a range worth estimating.
 func TestPlanSampling_StoresNotCached(t *testing.T) {
 	svc, execGraph, baseStore := newEstimateTestService(t, true)
 	execoutConfigs, storeConfigs := newEstimateTestConfigs(t, execGraph, baseStore)
 
-	plan, err := svc.planSampling(context.Background(), execGraph, execoutConfigs, storeConfigs, 0, 1_000_000, 1)
-	require.NoError(t, err)
+	_, err := svc.planSampling(context.Background(), execGraph, execoutConfigs, storeConfigs, 0, 1_000_000, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "only covers [0, 1000)")
+}
 
-	assert.False(t, plan.sparse)
-	require.Len(t, plan.segments, 10)
-	for i, seg := range plan.segments {
-		assert.Equal(t, uint64(i*testSegmentSize), seg.rng.StartBlock)
-	}
+// TestPlanSampling_StoresStartAboveRange: no segment of the range can run at all.
+func TestPlanSampling_StoresStartAboveRange(t *testing.T) {
+	svc, execGraph, baseStore := newEstimateTestService(t, true, setInitialBlock("store_a", 500_000))
+	execoutConfigs, storeConfigs := newEstimateTestConfigs(t, execGraph, baseStore)
+
+	_, err := svc.planSampling(context.Background(), execGraph, execoutConfigs, storeConfigs, 600_000, 1_000_000, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "holds no store state")
 }
 
 // TestPlanSampling_AlreadyCachedOutputs: segments whose output file is already there are
@@ -227,6 +175,17 @@ func newEstimateTestService(t *testing.T, withStore bool, tweaks ...func(modules
 	return svc, execGraph, dstore.NewMockStore(nil)
 }
 
+// writeStoreSnapshots lays down a full KV snapshot at every segment boundary up to
+// `upToBlock`, which is what makes those segments runnable on their own.
+func writeStoreSnapshots(t *testing.T, execGraph *exec.Graph, baseStore *dstore.MockStore, upToBlock uint64) {
+	t.Helper()
+
+	storeHash := execGraph.ModuleHashes()["store_a"]
+	for endBlock := uint64(testSegmentSize); endBlock <= upToBlock; endBlock += testSegmentSize {
+		baseStore.SetFile(fmt.Sprintf("%s/states/%010d-%010d.kv", storeHash, endBlock, 0), []byte("kv"))
+	}
+}
+
 func newEstimateTestConfigs(t *testing.T, execGraph *exec.Graph, baseStore dstore.Store) (*execout.Configs, store.ConfigMap) {
 	t.Helper()
 
@@ -249,42 +208,10 @@ func setInitialBlock(moduleName string, initialBlock uint64) func([]*pbsubstream
 	}
 }
 
-// TestPlanSampling_RefusesSamplingBelowOutputInitialBlock: with cold stores the contiguous
-// sample would start where the stores are usable, which can be far below the block at which
-// the output module starts producing. Measuring there would report an egress of zero for the
-// whole range, so the request is refused instead.
-func TestPlanSampling_RefusesSamplingBelowOutputInitialBlock(t *testing.T) {
-	svc, execGraph, baseStore := newEstimateTestService(t, true, setInitialBlock("map_out", 500_000))
-	execoutConfigs, storeConfigs := newEstimateTestConfigs(t, execGraph, baseStore)
-
-	_, err := svc.planSampling(context.Background(), execGraph, execoutConfigs, storeConfigs, 600_000, 1_000_000, 1)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "produces nothing")
-}
-
-// TestPlanSampling_SkipsPartialFirstSegment: a store's initial block does not have to sit on
-// a segment boundary, and the partial segment it opens measures fewer blocks than a whole
-// one, so the sample starts at the first complete segment above it.
-func TestPlanSampling_SkipsPartialFirstSegment(t *testing.T) {
-	svc, execGraph, baseStore := newEstimateTestService(t, true, setInitialBlock("store_a", 12_345))
-	execoutConfigs, storeConfigs := newEstimateTestConfigs(t, execGraph, baseStore)
-
-	plan, err := svc.planSampling(context.Background(), execGraph, execoutConfigs, storeConfigs, 20_000, 1_000_000, 1)
-	require.NoError(t, err)
-
-	assert.False(t, plan.sparse)
-	require.Len(t, plan.segments, 10)
-	assert.Equal(t, uint64(13_000), plan.segments[0].rng.StartBlock, "the partial [12345, 13000) segment is not measured")
-	for _, seg := range plan.segments {
-		assert.Equal(t, uint64(testSegmentSize), seg.rng.Size())
-	}
-	assert.Equal(t, uint64(10*testSegmentSize), plan.blockCount())
-	assert.Contains(t, plan.note, "from block 13000")
-}
-
 func TestExtrapolateSamples(t *testing.T) {
+	// a segment the module ran on every block of, emitting once per block
 	sampled := func(startBlock, bytes uint64) *sampleSegment {
-		return &sampleSegment{rng: block.NewRange(startBlock, startBlock+1000), uncompressedSize: bytes, messageCount: 1000}
+		return &sampleSegment{rng: block.NewRange(startBlock, startBlock+1000), uncompressedSize: bytes, messageCount: 1000, processedBlocks: 1000}
 	}
 	// payload rate straight through, one message per block, so the spans and the averaging are
 	// what is measured here
@@ -310,7 +237,7 @@ func TestExtrapolateSamples(t *testing.T) {
 			startBlock: 5_000_000,
 			stopBlock:  10_000_000,
 			segments:   []*sampleSegment{sampled(5_000_000, 2_000)},
-			expect:     []sampleSpan{{startBlock: 5_000_000, blocks: 5_000_000, bytes: 10_000_000, messages: 5_000_000}},
+			expect:     []sampleSpan{{startBlock: 5_000_000, blocks: 5_000_000, bytes: 10_000_000, messages: 5_000_000, processedBlocks: 5_000_000}},
 		},
 		{
 			// rates are 1, 2 and 3 bytes per block: a span between two samples averages its
@@ -320,9 +247,9 @@ func TestExtrapolateSamples(t *testing.T) {
 			stopBlock:  20_000_000,
 			segments:   []*sampleSegment{sampled(5_000_000, 1_000), sampled(10_000_000, 2_000), sampled(15_000_000, 3_000)},
 			expect: []sampleSpan{
-				{startBlock: 5_000_000, blocks: 5_000_000, bytes: 7_500_000, messages: 5_000_000},
-				{startBlock: 10_000_000, blocks: 5_000_000, bytes: 12_500_000, messages: 5_000_000},
-				{startBlock: 15_000_000, blocks: 5_000_000, bytes: 15_000_000, messages: 5_000_000},
+				{startBlock: 5_000_000, blocks: 5_000_000, bytes: 7_500_000, messages: 5_000_000, processedBlocks: 5_000_000},
+				{startBlock: 10_000_000, blocks: 5_000_000, bytes: 12_500_000, messages: 5_000_000, processedBlocks: 5_000_000},
+				{startBlock: 15_000_000, blocks: 5_000_000, bytes: 15_000_000, messages: 5_000_000, processedBlocks: 5_000_000},
 			},
 		},
 		{
@@ -331,7 +258,7 @@ func TestExtrapolateSamples(t *testing.T) {
 			startBlock: 4_999_500,
 			stopBlock:  10_000_000,
 			segments:   []*sampleSegment{sampled(5_000_000, 1_000)},
-			expect:     []sampleSpan{{startBlock: 4_999_500, blocks: 5_000_500, bytes: 5_000_500, messages: 5_000_500}},
+			expect:     []sampleSpan{{startBlock: 4_999_500, blocks: 5_000_500, bytes: 5_000_500, messages: 5_000_500, processedBlocks: 5_000_500}},
 		},
 		{
 			// a contiguous sample: every span but the last is one segment wide
@@ -340,8 +267,8 @@ func TestExtrapolateSamples(t *testing.T) {
 			stopBlock:  1_000_000,
 			segments:   []*sampleSegment{sampled(1_000, 500), sampled(2_000, 1_500)},
 			expect: []sampleSpan{
-				{startBlock: 1_000, blocks: 1_000, bytes: 1_000, messages: 1_000},
-				{startBlock: 2_000, blocks: 998_000, bytes: 1_497_000, messages: 998_000},
+				{startBlock: 1_000, blocks: 1_000, bytes: 1_000, messages: 1_000, processedBlocks: 1_000},
+				{startBlock: 2_000, blocks: 998_000, bytes: 1_497_000, messages: 998_000, processedBlocks: 998_000},
 			},
 		},
 	}
@@ -386,6 +313,59 @@ func TestExtrapolateSamples_SparseModule(t *testing.T) {
 	assert.Less(t, spans[0].bytes, 1_000_000*framing.overhead(100))
 }
 
+// TestExtrapolateSamples_BlockFiltered: a module gated by a block index is only run on the
+// blocks its index keeps, and that share is what a real request over the range would process.
+func TestExtrapolateSamples_BlockFiltered(t *testing.T) {
+	framing := newEgressFraming(&pbsubstreams.Module{Name: "map_out"}, 1_000_000)
+
+	segments := []*sampleSegment{
+		// ran on 5% of the blocks, emitted on 4% of them
+		{rng: block.NewRange(0, 1000), uncompressedSize: 4_000, messageCount: 40, processedBlocks: 50},
+		// already cached: no job ran, so the item count stands in for the processed blocks
+		{rng: block.NewRange(500_000, 501_000), uncompressedSize: 3_000, messageCount: 30, fromCache: true},
+	}
+
+	spans := extrapolateSamples(segments, 0, 1_000_000, framing.ratesOf)
+	require.Len(t, spans, 2)
+
+	// first span averages 5% and 3%, the last keeps the 3% of the sample that opens it
+	assert.Equal(t, uint64(20_000), spans[0].processedBlocks)
+	assert.Equal(t, uint64(15_000), spans[1].processedBlocks)
+
+	// far below the 1,000,000 blocks the range holds
+	assert.Less(t, spans[0].processedBlocks+spans[1].processedBlocks, uint64(50_000))
+}
+
+// TestSamplePlanProcessedBlockCount: the segments the sample jobs ran are in the cache once
+// the estimate is done, so what they processed comes off the work a real request has left.
+func TestSamplePlanProcessedBlockCount(t *testing.T) {
+	plan := &samplePlan{segments: []*sampleSegment{
+		{rng: block.NewRange(0, 1000), processedBlocks: 1000},
+		{rng: block.NewRange(500_000, 501_000), processedBlocks: 50},
+		// already cached before the estimate ran: no job, nothing to discount
+		{rng: block.NewRange(900_000, 901_000), messageCount: 1000, fromCache: true},
+	}}
+
+	assert.Equal(t, uint64(1050), plan.processedBlockCount())
+}
+
+func TestWithFilteredOutputStage(t *testing.T) {
+	// one stage, nothing cached: the measured count is the whole answer
+	blocks, effective := withFilteredOutputStage(1_000_000, 1_000_000, 1, 50_000)
+	assert.Equal(t, uint64(50_000), blocks)
+	assert.Equal(t, uint64(50_000), effective)
+
+	// two stages, half of the work already cached: only the output module's stage is filtered
+	blocks, effective = withFilteredOutputStage(2_000_000, 1_000_000, 2, 50_000)
+	assert.Equal(t, uint64(1_050_000), blocks)
+	assert.Equal(t, uint64(525_000), effective)
+
+	// a module that runs on every block leaves the plan's numbers untouched
+	blocks, effective = withFilteredOutputStage(2_000_000, 1_400_000, 2, 1_000_000)
+	assert.Equal(t, uint64(2_000_000), blocks)
+	assert.Equal(t, uint64(1_400_000), effective)
+}
+
 func TestEgressFraming(t *testing.T) {
 	framing := newEgressFraming(&pbsubstreams.Module{
 		Name:   "map_out",
@@ -406,7 +386,7 @@ func TestEgressFraming(t *testing.T) {
 	assert.Less(t, float64(framing.overhead(1_000_000))/float64(1_000_000), 0.001)
 
 	// a segment emitting on every block pays the framing once per block
-	dense := &sampleSegment{rng: block.NewRange(0, 1000), uncompressedSize: 10_000, messageCount: 1000}
+	dense := &sampleSegment{rng: block.NewRange(0, 1000), uncompressedSize: 10_000, messageCount: 1000, processedBlocks: 1000}
 	bytesPerBlock, messagesPerBlock := framing.ratesOf(dense)
 	assert.Equal(t, float64(1), messagesPerBlock)
 	assert.Equal(t, float64(framing.wireSize(10)), bytesPerBlock)

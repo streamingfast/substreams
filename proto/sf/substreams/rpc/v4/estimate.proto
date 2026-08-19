@@ -90,13 +90,14 @@ message Estimate {
   // (A) Block processing.
 
   // Blocks that must be processed inside the requested range, stage multiplier included,
-  // excluding what the cache already covers. This is the number a real request would bill.
+  // excluding what the cache already covers. This is the number a real request issued right
+  // after this estimate would bill: the segments the sample jobs just ran are in the cache
+  // now, and are counted out of it.
   uint64 blocks_to_process = 5;
-  // Blocks that must be processed *before* the start block to bring the stores up to it,
-  // stage multiplier included, excluding what the cache already covers.
-  uint64 blocks_to_process_before_start_block = 6;
-  // Same as `blocks_to_process` + `blocks_to_process_before_start_block`, but ignoring the
-  // existing cache: what a first-ever run of this request would have processed.
+  reserved 6; // was blocks_to_process_before_start_block, always zero now that the stores
+              // must already cover the range for it to be estimated at all
+  // Same as `blocks_to_process`, but ignoring the existing cache: what a first-ever run of
+  // this request would have processed.
   uint64 total_blocks_to_process_uncached = 7;
 
   // (B) Egress.
@@ -121,6 +122,11 @@ message Estimate {
   // matching blocks, so a sparse module sends far fewer messages than the range holds blocks,
   // and pays the framing above only that many times.
   uint64 estimated_message_count = 12;
+
+  // True when the module graph is gated by a block filter. The block counts above are then
+  // extrapolated from what the sample jobs were actually run on rather than derived from the
+  // range, since a filtered module skips the blocks its index rules out.
+  bool block_filtered = 13;
 }
 
 // Sampling describes the sample that the egress estimate is extrapolated from.
@@ -130,11 +136,8 @@ message Sampling {
   // the range itself.
   double percentage = 1;
 
-  // True when the sample is spread at regular intervals over the range. False when the
-  // sample had to be a single contiguous run: store modules are sequential, so a range
-  // whose stores are not already cached can only be sampled from where the stores are
-  // usable, forward.
-  bool sparse = 2;
+  reserved 2; // was `sparse`: a sample is always spread over the range now, a request whose
+              // stores do not already cover it is refused instead
 
   // Human-readable explanation of how the sample was planned.
   string note = 3;
@@ -180,4 +183,9 @@ message SampledSegment {
   // Number of `BlockScopedData` messages the segment holds, which is how many blocks of it
   // the module actually produced output for.
   uint64 message_count = 9;
+
+  // Blocks of the segment the module was actually run on, which is below the segment size
+  // when a block filter rules blocks out. Zero for a segment served from the cache, where no
+  // job ran and `message_count` stands in for it.
+  uint64 processed_blocks = 10;
 }

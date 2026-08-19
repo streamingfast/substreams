@@ -26,7 +26,6 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
-	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/stage"
@@ -63,13 +62,13 @@ type sampleSegment struct {
 	sizeFromMetadata bool // sizes came from object metadata rather than from reading the file
 	uncompressedSize uint64
 	messageCount     uint64 // items in the output file: one `BlockScopedData` each on the wire
+	processedBlocks  uint64 // blocks the job actually ran on, blocks skipped by a block index excluded
 }
 
 // samplePlan is the set of segments that will be executed and measured, plus how they were
-// picked. `sparse` false means the segments are contiguous: see planSampling.
+// picked.
 type samplePlan struct {
 	segments []*sampleSegment
-	sparse   bool
 	note     string
 }
 
@@ -90,6 +89,17 @@ func (p *samplePlan) byteCount() (out uint64) {
 func (p *samplePlan) messageCount() (out uint64) {
 	for _, seg := range p.segments {
 		out += seg.messageCount
+	}
+	return
+}
+
+// processedBlockCount is the work the sample jobs did. Segments that were already in the
+// cache did not run one, and contribute nothing.
+func (p *samplePlan) processedBlockCount() (out uint64) {
+	for _, seg := range p.segments {
+		if !seg.fromCache {
+			out += seg.processedBlocks
+		}
 	}
 	return
 }
@@ -255,7 +265,9 @@ func (s *Tier1Service) estimate(
 			logger.Warn("cannot get head block", zap.Error(err))
 		}
 	}
-	blocksBefore, effectiveBlocksBefore, blocksAfter, effectiveBlocksAfter := stages.BlocksToProcess(headBlock)
+	// The blocks needed before the start block are always already cached: a range whose stores
+	// do not reach it is refused when the sample is planned, so there is nothing to build.
+	_, _, blocksAfter, effectiveBlocksAfter := stages.BlocksToProcess(headBlock)
 
 	// (B) What the real request would send back, measured on a sample of the range.
 	samples, err := s.planSampling(ctx, execGraph, execOutputConfigs, storeConfigs, details.ResolvedStartBlockNum, stopBlock, percentage)
@@ -290,11 +302,29 @@ func (s *Tier1Service) estimate(
 	framing := newEgressFraming(execGraph.OutputModule(), stopBlock)
 	spans := extrapolateSamples(samples.segments, details.ResolvedStartBlockNum, stopBlock, framing.ratesOf)
 
-	var estimatedEgressBytes, estimatedMessages uint64
+	var estimatedEgressBytes, estimatedMessages, outputStageBlocks uint64
 	for _, span := range spans {
 		estimatedEgressBytes += span.bytes
 		estimatedMessages += span.messages
+		outputStageBlocks += span.processedBlocks
 	}
+
+	// Without a block filter the module runs on every block, so the sampled rate is 1 and the
+	// two numbers below come out exactly as the plan says. With one, the output module's stage
+	// only runs on the blocks its index keeps, and that measured share replaces the stage's
+	// full share of the plan.
+	blockFiltered := graphHasBlockFilter(execGraph)
+	if blockFiltered {
+		stageCount := uint64(len(execGraph.StagedUsedModules()))
+		blocksAfter, effectiveBlocksAfter = withFilteredOutputStage(blocksAfter, effectiveBlocksAfter, stageCount, outputStageBlocks)
+	}
+
+	// The sample jobs filled the output cache for the segments they ran, and the cache state
+	// was read before they did. A real request issued now would find those segments there, so
+	// the work left is what the plan said minus what estimating just did. The uncached figure
+	// is deliberately left alone: it answers what a first-ever run would have cost.
+	justProcessed := min(samples.processedBlockCount(), effectiveBlocksAfter)
+	effectiveBlocksAfter -= justProcessed
 
 	var bytesPerBlock float64
 	if rangeBlocks != 0 {
@@ -302,20 +332,19 @@ func (s *Tier1Service) estimate(
 	}
 
 	estimate := &pbsubstreamsrpcv4.Estimate{
-		ResolvedStartBlock:              details.ResolvedStartBlockNum,
-		ResolvedStopBlock:               stopBlock,
-		SegmentBlockCount:               segmentSize,
-		StageCount:                      uint32(len(execGraph.StagedUsedModules())),
-		BlocksToProcess:                 effectiveBlocksAfter,
-		BlocksToProcessBeforeStartBlock: effectiveBlocksBefore,
-		TotalBlocksToProcessUncached:    blocksBefore + blocksAfter,
-		EstimatedEgressBytes:            estimatedEgressBytes,
-		BytesPerBlock:                   bytesPerBlock,
-		FramingBytesPerMessage:          framing.overhead(averagePayloadPerMessage(sampledBytes, sampledMessages)),
-		EstimatedMessageCount:           estimatedMessages,
+		ResolvedStartBlock:           details.ResolvedStartBlockNum,
+		ResolvedStopBlock:            stopBlock,
+		SegmentBlockCount:            segmentSize,
+		StageCount:                   uint32(len(execGraph.StagedUsedModules())),
+		BlocksToProcess:              effectiveBlocksAfter,
+		TotalBlocksToProcessUncached: blocksAfter,
+		BlockFiltered:                blockFiltered,
+		EstimatedEgressBytes:         estimatedEgressBytes,
+		BytesPerBlock:                bytesPerBlock,
+		FramingBytesPerMessage:       framing.overhead(averagePayloadPerMessage(sampledBytes, sampledMessages)),
+		EstimatedMessageCount:        estimatedMessages,
 		Sampling: &pbsubstreamsrpcv4.Sampling{
 			Percentage:      float64(sampledBlocks) / float64(rangeBlocks) * 100,
-			Sparse:          samples.sparse,
 			Note:            samples.note,
 			SampledBlocks:   sampledBlocks,
 			SampledBytes:    sampledBytes,
@@ -329,6 +358,7 @@ func (s *Tier1Service) estimate(
 			StopBlock:         seg.rng.ExclusiveEndBlock,
 			UncompressedBytes: seg.uncompressedSize,
 			MessageCount:      seg.messageCount,
+			ProcessedBlocks:   seg.processedBlocks,
 			FromCache:         seg.fromCache,
 			SizeFromMetadata:  seg.sizeFromMetadata,
 		}
@@ -342,13 +372,13 @@ func (s *Tier1Service) estimate(
 
 	logger.Info("estimate completed",
 		zap.Uint64("blocks_to_process", estimate.BlocksToProcess),
-		zap.Uint64("blocks_to_process_before_start_block", estimate.BlocksToProcessBeforeStartBlock),
+		zap.Bool("block_filtered", blockFiltered),
+		zap.Uint64("blocks_processed_by_the_estimate", justProcessed),
 		zap.Uint64("estimated_egress_bytes", estimate.EstimatedEgressBytes),
 		zap.Uint64("estimated_message_count", estimate.EstimatedMessageCount),
 		zap.Uint64("sampled_blocks", sampledBlocks),
 		zap.Uint64("sampled_bytes", sampledBytes),
 		zap.Uint64("sampled_messages", sampledMessages),
-		zap.Bool("sparse", samples.sparse),
 	)
 
 	return send(&pbsubstreamsrpcv4.EstimateResponse{
@@ -438,13 +468,33 @@ func (f *egressFraming) ratesOf(seg *sampleSegment) (bytesPerBlock, messagesPerB
 	return messagesPerBlock * wirePerMessage, messagesPerBlock
 }
 
+// processedBlocksPerBlock is the share of the blocks a sample covers that the module was
+// actually run on. A block index gates execution, so a filtered module runs on a fraction of
+// them, and that fraction is what a real request over the range would be billed for.
+//
+// A segment served from the cache ran no job, so there is no count to take: its output item
+// count stands in for it, which is exact for a module that emits whenever it runs.
+func processedBlocksPerBlock(seg *sampleSegment) float64 {
+	blocks := seg.rng.Size()
+	if blocks == 0 {
+		return 0
+	}
+
+	processed := seg.processedBlocks
+	if seg.fromCache {
+		processed = seg.messageCount
+	}
+	return float64(processed) / float64(blocks)
+}
+
 // sampleSpan is the slice of the requested range that one sample stands for, and what was
 // extrapolated over it.
 type sampleSpan struct {
-	startBlock uint64
-	blocks     uint64
-	bytes      uint64
-	messages   uint64
+	startBlock      uint64
+	blocks          uint64
+	bytes           uint64
+	messages        uint64
+	processedBlocks uint64
 }
 
 // extrapolateSamples partitions [startBlock, stopBlock) between the samples: each one stands
@@ -467,8 +517,10 @@ func extrapolateSamples(segments []*sampleSegment, startBlock, stopBlock uint64,
 
 	byteRates := make([]float64, len(segments))
 	messageRates := make([]float64, len(segments))
+	processedRates := make([]float64, len(segments))
 	for i, seg := range segments {
 		byteRates[i], messageRates[i] = ratesOf(seg)
+		processedRates[i] = processedBlocksPerBlock(seg)
 	}
 
 	for i, seg := range segments {
@@ -478,11 +530,12 @@ func extrapolateSamples(segments []*sampleSegment, startBlock, stopBlock uint64,
 		}
 
 		spanStop := stopBlock
-		byteRate, messageRate := byteRates[i], messageRates[i]
+		byteRate, messageRate, processedRate := byteRates[i], messageRates[i], processedRates[i]
 		if i+1 < len(segments) {
 			spanStop = segments[i+1].rng.StartBlock
 			byteRate = (byteRates[i] + byteRates[i+1]) / 2
 			messageRate = (messageRates[i] + messageRates[i+1]) / 2
+			processedRate = (processedRates[i] + processedRates[i+1]) / 2
 		}
 
 		out[i].startBlock = spanStart
@@ -492,8 +545,38 @@ func extrapolateSamples(segments []*sampleSegment, startBlock, stopBlock uint64,
 		out[i].blocks = spanStop - spanStart
 		out[i].bytes = uint64(byteRate * float64(out[i].blocks))
 		out[i].messages = uint64(messageRate * float64(out[i].blocks))
+		out[i].processedBlocks = uint64(processedRate * float64(out[i].blocks))
 	}
 	return out
+}
+
+// graphHasBlockFilter reports whether any module of the graph is gated by a block index.
+func graphHasBlockFilter(execGraph *exec.Graph) bool {
+	for _, module := range execGraph.UsedModules() {
+		if module.BlockFilter != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// withFilteredOutputStage swaps the output module's stage out of the planned block counts and
+// puts the measured one in its place. Every stage covers the same segments, so the plan's
+// figure divides evenly between them; only the stage the sample actually ran is known to be
+// filtered, and the others are left whole.
+//
+// The cache-aware figure is scaled by the same share of the work the plan says is left, since
+// the sample measures the range rather than what the cache still misses.
+func withFilteredOutputStage(blocksAfter, effectiveBlocksAfter, stageCount, outputStageBlocks uint64) (uint64, uint64) {
+	if stageCount == 0 || blocksAfter == 0 {
+		return blocksAfter, effectiveBlocksAfter
+	}
+
+	otherStages := blocksAfter - blocksAfter/stageCount
+	filtered := otherStages + outputStageBlocks
+	uncachedShare := float64(effectiveBlocksAfter) / float64(blocksAfter)
+
+	return filtered, uint64(float64(filtered) * uncachedShare)
 }
 
 func averagePayloadPerMessage(sampledBytes, sampledMessages uint64) uint64 {
@@ -578,70 +661,18 @@ func (s *Tier1Service) planSampling(
 		candidates = append(candidates, idx)
 	}
 
-	sparse := true
 	note := fmt.Sprintf("%d segments of %d blocks, spread evenly over the %d segments of the range", wanted, segmentSize, totalSegments)
 
+	// A segment can only run on its own if every store is loadable at its first block. Rather
+	// than work around a partially built cache, the request is refused and told where the
+	// stores do reach.
 	if len(storeConfigs) != 0 {
-		readyBoundaries, err := storeReadyBoundaries(ctx, storeConfigs, segmentSize, stopBlock)
-		if err != nil {
+		if err := requireStoresOver(ctx, storeConfigs, segmentSize, segmenter, firstIdx, lastIdx); err != nil {
 			return nil, err
-		}
-
-		usable := make([]int, 0, len(candidates))
-		for _, idx := range candidates {
-			if _, found := readyBoundaries[segmenter.Range(idx).StartBlock]; found {
-				usable = append(usable, idx)
-			}
-		}
-
-		if len(usable) >= wanted {
-			candidates = usable
-			note = fmt.Sprintf("%d segments of %d blocks, spread evenly over the %d segments whose stores are already cached", wanted, segmentSize, len(usable))
-		} else {
-			// Not enough cached store state to jump around: run a contiguous sample from the
-			// highest boundary where the stores are usable.
-			seqStart := highestBoundaryAtOrBelow(readyBoundaries, startBlock)
-
-			// Below the output module's initial block there is nothing to measure: those
-			// segments run the module before it starts, produce no output file, and would be
-			// counted as empty, reporting an egress of zero for the whole range. Refuse rather
-			// than answer with a number we know is wrong.
-			if seqStart < outputModule.InitialBlock {
-				return nil, bsstream.NewErrInvalidArg(
-					"cannot sample range [%d, %d): the stores are only usable from block %d, below the initial block %d of module %q, so a contiguous sample would measure blocks on which the module produces nothing. Estimate a range whose stores this endpoint has already cached",
-					startBlock, stopBlock, seqStart, outputModule.InitialBlock, outputModule.Name)
-			}
-
-			seqSegmenter := block.NewSegmenter(segmentSize, seqStart, stopBlock)
-			firstSeqIdx := seqSegmenter.FirstIndex()
-			if seqSegmenter.Range(firstSeqIdx).Size() != segmentSize {
-				// A store's initial block does not have to sit on a segment boundary, so the
-				// first segment can be a partial one. It still gets processed to keep the
-				// stores continuous, it is just not measured: it covers fewer blocks than a
-				// whole segment and would weigh the extrapolation down.
-				firstSeqIdx++
-			}
-
-			candidates = candidates[:0]
-			for i, idx := 0, firstSeqIdx; i < wanted && idx <= seqSegmenter.LastIndex(); i, idx = i+1, idx+1 {
-				candidates = append(candidates, idx)
-			}
-			if len(candidates) == 0 {
-				return nil, bsstream.NewErrInvalidArg("range [%d, %d) holds no complete segment to sample contiguously from block %d, where the stores become usable", startBlock, stopBlock, seqStart)
-			}
-
-			segmenter = seqSegmenter
-			sparse = false
-			note = fmt.Sprintf("%d contiguous segments of %d blocks from block %d: store modules are sequential and the cache does not cover enough of the range to sample it sparsely", len(candidates), segmentSize, seqSegmenter.Range(candidates[0]).StartBlock)
 		}
 	}
 
 	picked := pickEvenly(candidates, wanted)
-	if len(picked) == 0 {
-		// Every branch above is meant to leave at least one candidate; if none did, the range
-		// holds no segment this request can run, and the indexing below would panic.
-		return nil, bsstream.NewErrInvalidArg("no segment of range [%d, %d) can be sampled", startBlock, stopBlock)
-	}
 
 	// Segments whose output is already cached cost nothing to measure.
 	cached := make(map[uint64]bool)
@@ -653,7 +684,7 @@ func (s *Tier1Service) planSampling(
 		cached[file.BlockRange.ExclusiveEndBlock] = true
 	}
 
-	out := &samplePlan{sparse: sparse, note: note}
+	out := &samplePlan{note: note}
 	for _, idx := range picked {
 		rng := segmenter.Range(idx)
 		out.segments = append(out.segments, &sampleSegment{
@@ -663,6 +694,43 @@ func (s *Tier1Service) planSampling(
 		})
 	}
 	return out, nil
+}
+
+// requireStoresOver checks that every segment of the sample range can run on its own, and
+// refuses the request otherwise, naming the part of the range where the stores do reach.
+//
+// A tier2 job on a segment loads each store from the snapshot ending at that segment's first
+// block, so a segment is only runnable where every store is either snapshotted or has not
+// started yet. Building the missing state would mean processing the range up to it, which is
+// the very cost the estimate is supposed to report rather than incur.
+func requireStoresOver(ctx context.Context, storeConfigs store.ConfigMap, segmentSize uint64, segmenter *block.Segmenter, firstIdx, lastIdx int) error {
+	readyBoundaries, err := storeReadyBoundaries(ctx, storeConfigs, segmentSize, segmenter.ExclusiveEndBlock())
+	if err != nil {
+		return err
+	}
+
+	// The runnable part of the range is a prefix: stores are built forward, so the first
+	// segment whose stores are missing ends it.
+	usableUpTo := segmenter.Range(firstIdx).StartBlock
+	for idx := firstIdx; idx <= lastIdx; idx++ {
+		if _, found := readyBoundaries[segmenter.Range(idx).StartBlock]; !found {
+			break
+		}
+		usableUpTo = segmenter.Range(idx).ExclusiveEndBlock
+	}
+
+	if usableUpTo >= segmenter.Range(lastIdx).ExclusiveEndBlock {
+		return nil
+	}
+
+	firstBlock := segmenter.Range(firstIdx).StartBlock
+	if usableUpTo <= firstBlock {
+		return bsstream.NewErrInvalidArg("this endpoint holds no store state for range [%d, %d): estimating it would mean building the stores first, which is the cost being estimated. Run the request over a range whose stores are already built, or ask for an estimate once they are",
+			firstBlock, segmenter.ExclusiveEndBlock())
+	}
+
+	return bsstream.NewErrInvalidArg("this endpoint's store state only covers [%d, %d) of the requested range: estimating past it would mean building the missing stores, which is the cost being estimated. Estimate [%d, %d) instead",
+		firstBlock, usableUpTo, firstBlock, usableUpTo)
 }
 
 // storeReadyBoundaries returns the block boundaries at which a tier2 job can load every
@@ -717,15 +785,6 @@ func storeReadyBoundaries(ctx context.Context, storeConfigs store.ConfigMap, seg
 	return out, nil
 }
 
-func highestBoundaryAtOrBelow(boundaries map[uint64]struct{}, blockNum uint64) (out uint64) {
-	for boundary := range boundaries {
-		if boundary <= blockNum && boundary >= out {
-			out = boundary
-		}
-	}
-	return
-}
-
 // pickEvenly takes `count` elements spread as evenly as possible over `in`.
 func pickEvenly(in []int, count int) []int {
 	if count >= len(in) {
@@ -776,16 +835,14 @@ func (s *Tier1Service) runSampling(
 	stop := progress.reportPeriodically(ctx)
 	defer stop()
 
-	if !samples.sparse {
-		return s.runContiguousSample(ctx, execGraph, execOutputConfigs, storeConfigs, samples, progress)
-	}
-	return s.runSparseSample(ctx, execGraph, todo, progress)
+	return s.runSampleJobs(ctx, execGraph, todo, progress)
 }
 
-// runSparseSample runs one tier2 job per sampled segment. The segments were picked so that
-// all stores are usable at their first block, so a single job on the last stage produces
-// everything that segment needs, with no squashing and no ordering constraint between them.
-func (s *Tier1Service) runSparseSample(ctx context.Context, execGraph *exec.Graph, todo []*sampleSegment, progress *estimateProgress) error {
+// runSampleJobs runs one tier2 job per sampled segment. Every store is usable at each
+// segment's first block — planSampling refuses the request otherwise — so a single job on the
+// last stage produces everything that segment needs, with no squashing and no ordering
+// constraint between them.
+func (s *Tier1Service) runSampleJobs(ctx context.Context, execGraph *exec.Graph, todo []*sampleSegment, progress *estimateProgress) error {
 	details := reqctx.Details(ctx)
 	workerPool := s.runtimeConfig.WorkerPoolFactory(ctx)
 	lastStage := execGraph.OutputModuleStageIndex()
@@ -808,71 +865,15 @@ func (s *Tier1Service) runSparseSample(ctx context.Context, execGraph *exec.Grap
 			switch msg := worker.Work(ctx, unit, seg.rng.StartBlock, moduleNames, upstream, false)().(type) {
 			case work.MsgJobFailed:
 				return fmt.Errorf("sample job on segment %s failed: %w", seg.rng, msg.Error)
+			case work.MsgJobSucceeded:
+				// What the module was actually run on. A block index gates execution, so this
+				// is below the segment size whenever the request filters blocks.
+				seg.processedBlocks = msg.ProcessedBlocks
 			}
 			return progress.completeOne()
 		})
 	}
 	return eg.Wait()
-}
-
-// runContiguousSample runs a contiguous sample through the regular parallel processor: the
-// stores have to be built stage by stage and squashed between segments, which is exactly
-// what it does. The request plan is stripped of its read side so that no module data is
-// ever read back or sent.
-func (s *Tier1Service) runContiguousSample(
-	ctx context.Context,
-	execGraph *exec.Graph,
-	execOutputConfigs *execout.Configs,
-	storeConfigs store.ConfigMap,
-	samples *samplePlan,
-	progress *estimateProgress,
-) error {
-	// The whole contiguous range is handed to the processor, cached segments included: it
-	// skips what the cache already covers, and starting past them would leave the stores
-	// unusable at the first segment it does have to run.
-	details := *reqctx.Details(ctx)
-	sampleStart := samples.segments[0].rng.StartBlock
-	sampleStop := samples.segments[len(samples.segments)-1].rng.ExclusiveEndBlock
-
-	details.ResolvedStartBlockNum = sampleStart
-	details.StopBlockNum = sampleStop
-	details.LinearHandoffBlockNum = sampleStop
-	ctx = reqctx.WithRequest(ctx, &details)
-
-	scheduleStores := execGraph.StagedUsedModules()[0].LastLayer().IsStoreLayer()
-	var lowestStoresInitBlock uint64
-	if scheduleStores {
-		lowestStoresInitBlock = min(*execGraph.LowestStoresInitBlock(), sampleStop)
-	}
-
-	reqPlan, err := plan.BuildTier1RequestPlan(true, s.runtimeConfig.SegmentSize, execGraph.LowestInitBlock(), lowestStoresInitBlock, sampleStart, sampleStop, sampleStop, scheduleStores)
-	if err != nil {
-		return fmt.Errorf("building sample request plan: %w", err)
-	}
-	reqPlan.ReadExecOut = nil // we measure the output files, we never read them back
-
-	processor, err := orchestrator.BuildParallelProcessor(
-		ctx,
-		reqPlan,
-		s.runtimeConfig.WorkerPoolFactory(ctx),
-		execGraph,
-		execOutputConfigs,
-		func(substreams.ResponseFromAnyTier) error { return nil },
-		storeConfigs,
-		true, // noop mode: no output is sent anywhere
-		0,
-		false,
-	)
-	if err != nil {
-		return fmt.Errorf("building parallel processor: %w", err)
-	}
-
-	if _, err := processor.Run(ctx, s.IsTerminating); err != nil {
-		return fmt.Errorf("running sample jobs: %w", err)
-	}
-
-	progress.completeMany(uint64(len(samples.segments)) - progress.completed.Load())
-	return progress.report()
 }
 
 // acquireEstimateSession takes the same kind of session a `Blocks` request takes: the

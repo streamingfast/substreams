@@ -175,11 +175,6 @@ func generateRemoteReport(report *ReportBuilder, estimate *pbsubstreamsrpcv4.Est
 	report.LineStyled(dimStyle, "%s", sectionSeparator)
 	report.Line("")
 
-	sampleKind := "contiguous"
-	if sampling.Sparse {
-		sampleKind = "spread over the range"
-	}
-
 	report.Line("%s %s",
 		labelStyle.Render("Requested Range:"),
 		valueStyle.Render(fmt.Sprintf("%s - %s (%s blocks)",
@@ -188,22 +183,25 @@ func generateRemoteReport(report *ReportBuilder, estimate *pbsubstreamsrpcv4.Est
 			formatx.Integer(estimate.ResolvedStopBlock-estimate.ResolvedStartBlock))))
 	report.Line("%s %s",
 		labelStyle.Render("Blocks Sampled:"),
-		valueStyle.Render(fmt.Sprintf("%s (%.2f%% of range, %s), %s messages",
+		valueStyle.Render(fmt.Sprintf("%s (%.2f%% of range), %s messages",
 			formatx.Integer(sampling.SampledBlocks),
 			sampling.Percentage,
-			sampleKind,
 			formatx.Integer(sampling.SampledMessages))))
 	report.Line("%s %s",
 		labelStyle.Render("Stages:"),
 		valueStyle.Render(fmt.Sprintf("%d (every stage processes every block)", estimate.StageCount)))
 	report.Line("")
 
+	// A block filter makes the module skip blocks its index rules out, so the count is
+	// extrapolated from what the sample jobs ran on; without one it comes straight from the
+	// request plan and is exact.
+	blocksLabel := "Blocks To Process:"
+	if estimate.BlockFiltered {
+		blocksLabel = "Blocks To Process (estimated):"
+	}
 	report.Line("%s %s",
-		labelStyle.Render("Blocks To Process (in range):"),
+		labelStyle.Render(blocksLabel),
 		successStyle.Render(formatx.Integer(estimate.BlocksToProcess)))
-	report.Line("%s %s",
-		labelStyle.Render("Blocks To Process (stores, before start block):"),
-		successStyle.Render(formatx.Integer(estimate.BlocksToProcessBeforeStartBlock)))
 	report.Line("%s %s",
 		labelStyle.Render("Blocks To Process (if nothing was cached):"),
 		valueStyle.Render(formatx.Integer(estimate.TotalBlocksToProcessUncached)))
@@ -212,14 +210,6 @@ func generateRemoteReport(report *ReportBuilder, estimate *pbsubstreamsrpcv4.Est
 	report.Line("%s %s",
 		labelStyle.Render("Estimated Egress Bytes (uncompressed):"),
 		successStyle.Render(formatx.Bytes(estimate.EstimatedEgressBytes)))
-	report.Line("%s %s",
-		labelStyle.Render("Average Per Block:"),
-		valueStyle.Render(formatx.Bytes(uint64(estimate.BytesPerBlock))))
-	report.Line("%s %s",
-		labelStyle.Render("Messages Sent:"),
-		valueStyle.Render(fmt.Sprintf("%s (%s of framing each)",
-			formatx.Integer(estimate.EstimatedMessageCount),
-			formatx.Bytes(estimate.FramingBytesPerMessage))))
 	report.Line("")
 
 	if sampling.Note != "" {

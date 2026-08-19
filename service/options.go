@@ -103,14 +103,9 @@ func WithReadinessFunc(f func(bool)) Option {
 	}
 }
 
-func WithFoundationalStoreEndpoints(endpoints map[string]string) Option {
-	return func(a anyTierService) {
-		switch s := a.(type) {
-		case *Tier1Service:
-			// not used
-		case *Tier2Service:
-			s.foundationalEndpoints = endpoints
-		}
+func WithFoundationalStoreEndpoints(map[string]string) Option {
+	return func(anyTierService) {
+		// Endpoints now arrive on each ProcessRange request from tier1.
 	}
 }
 

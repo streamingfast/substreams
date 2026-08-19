@@ -51,8 +51,8 @@ var estimateLocalCmd = &cobra.Command{
 		range, and extrapolating from them.
 
 		Prefer "substreams estimate", which has the endpoint do the sampling: it costs no egress,
-		accounts for what the server already holds in cache and supports modules with stores. Use
-		this command against an endpoint that does not support server-side estimation.
+		accounts for what the endpoint already holds in cache and supports modules with stores. Use
+		this command against an endpoint that does not support remote estimation.
 
 		The command works by:
 		  1. Dividing the requested range into evenly distributed segments

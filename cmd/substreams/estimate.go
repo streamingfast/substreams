@@ -54,7 +54,7 @@ func init() {
 			sink.FlagFinalBlocksOnly,
 		))
 
-	estimateCmd.Flags().Float64("sample-percentage", 1, "Percentage of the requested range the server samples to measure the output size")
+	estimateCmd.Flags().Float64("sample-percentage", 1, "Percentage of the requested range the endpoint samples to measure the output size")
 	estimateCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt and proceed with estimation")
 
 	rootCmd.AddCommand(estimateCmd)
@@ -71,9 +71,9 @@ var estimateCmd = &cobra.Command{
 
 		The endpoint samples --sample-percentage of the range on its own workers, measures the
 		size of the output it produced and reports back. The module data itself never leaves the
-		server, so the estimation costs processed blocks but no egress. The server also knows what
-		its cache already holds, so it reports how many blocks are actually left to process, and it
-		handles modules with stores (whose segments cannot be run out of order: with stores, the
+		endpoint, so the estimation costs processed blocks but no egress. The endpoint also knows
+		what its cache already holds, so it reports how many blocks are actually left to process,
+		and it handles modules with stores (whose segments cannot be run out of order: with stores, the
 		sample is spread only over the part of the range the cache covers, or falls back to one
 		contiguous run, which the report says).
 
@@ -114,7 +114,7 @@ func estimateE(cmd *cobra.Command, args []string) error {
 	}
 	sinkerConfig.Mode = sink.SubstreamsModeProduction
 
-	return runServerEstimate(ctx, cmd, sinkerConfig, sflags.MustGetFloat64(cmd, "sample-percentage"))
+	return runRemoteEstimate(ctx, cmd, sinkerConfig, sflags.MustGetFloat64(cmd, "sample-percentage"))
 }
 
 func renderReportTable(report *ReportBuilder, headers []string, tableData [][]string) {

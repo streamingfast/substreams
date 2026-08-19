@@ -19,16 +19,16 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// runServerEstimate asks the endpoint for an estimate instead of sampling from here.
+// runRemoteEstimate asks the endpoint for an estimate instead of sampling from here.
 //
-// The server runs the sample itself on its tier2 workers and measures the size of the
+// The endpoint runs the sample itself on its tier2 workers and measures the size of the
 // output cache it produced, so no module data is ever transferred: the estimation costs
 // processed blocks, never egress. It also knows what its cache already holds, which is
 // something a client cannot see, and it handles module graphs with stores.
-func runServerEstimate(ctx context.Context, cmd *cobra.Command, config *sink.SinkerConfig, samplePercentage float64) error {
+func runRemoteEstimate(ctx context.Context, cmd *cobra.Command, config *sink.SinkerConfig, samplePercentage float64) error {
 	report := NewReportBuilder()
 
-	// the server resolves a negative start block and an open-ended stop block, so both are
+	// the endpoint resolves a negative start block and an open-ended stop block, so both are
 	// only described here, never computed with
 	startDescription := formatx.Integer(uint64(config.StartBlock))
 	if config.StartBlock < 0 {
@@ -44,15 +44,15 @@ func runServerEstimate(ctx context.Context, cmd *cobra.Command, config *sink.Sin
 	report.Line("%s %s", labelStyle.Render("Package:"), valueStyle.Render(config.Pkg.PackageMeta[0].Name))
 	report.Line("%s  %s", labelStyle.Render("Module:"), valueStyle.Render(config.OutputModule.Name))
 	report.Line("%s  %s", labelStyle.Render("Range:"), valueStyle.Render(fmt.Sprintf("%s - %s", startDescription, stopDescription)))
-	report.Line("%s %s", labelStyle.Render("Samples:"), valueStyle.Render(fmt.Sprintf("%.2f%% of the range, sampled server-side", samplePercentage)))
+	report.Line("%s %s", labelStyle.Render("Samples:"), valueStyle.Render(fmt.Sprintf("%.2f%% of the range, sampled remotely", samplePercentage)))
 	report.Line(dimStyle.Render(sectionSeparator))
 	report.Line("")
 
 	if !sflags.MustGetBool(cmd, "yes") {
 		report.Line(labelStyle.Render("This estimation will:"))
-		report.Line("  • Run %.2f%% of the requested range on the server's workers", samplePercentage)
+		report.Line("  • Run %.2f%% of the requested range on the endpoint's workers", samplePercentage)
 		report.Line("  • Consume those blocks from your plan's processed blocks quota")
-		report.Line("  • Generate no egress: the data never leaves the server")
+		report.Line("  • Generate no egress: the data never leaves the endpoint")
 		report.Line("")
 		report.Line(noteStyle.Render("Results are approximations and may differ significantly from actual usage,"))
 		report.Line(noteStyle.Render("especially if the sample is not representative (e.g., sampling only low-activity"))
@@ -78,7 +78,7 @@ func runServerEstimate(ctx context.Context, cmd *cobra.Command, config *sink.Sin
 		return err
 	}
 
-	generateServerReport(report, estimate)
+	generateRemoteReport(report, estimate)
 	return nil
 }
 
@@ -122,7 +122,7 @@ func requestEstimate(ctx context.Context, config *sink.SinkerConfig, samplePerce
 	for {
 		response, err := stream.Recv()
 		if err == io.EOF {
-			return nil, fmt.Errorf("server closed the stream without sending an estimate")
+			return nil, fmt.Errorf("endpoint closed the stream without sending an estimate")
 		}
 		if err != nil {
 			return nil, estimatorCallError(err)
@@ -139,12 +139,12 @@ func requestEstimate(ctx context.Context, config *sink.SinkerConfig, samplePerce
 
 func estimatorCallError(err error) error {
 	if status.Code(err) == codes.Unimplemented {
-		return fmt.Errorf("this endpoint does not support server-side estimation, use `substreams estimate-local` to sample from the client instead: %w", err)
+		return fmt.Errorf("this endpoint does not support remote estimation, use `substreams estimate-local` to sample from the client instead: %w", err)
 	}
 	return err
 }
 
-func generateServerReport(report *ReportBuilder, estimate *pbsubstreamsrpcv4.Estimate) {
+func generateRemoteReport(report *ReportBuilder, estimate *pbsubstreamsrpcv4.Estimate) {
 	sampling := estimate.Sampling
 
 	report.LineStyled(dimStyle, "%s", sectionSeparator)

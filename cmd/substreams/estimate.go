@@ -54,11 +54,14 @@ func init() {
 			sink.FlagFinalBlocksOnly,
 		))
 
-	estimateCmd.Flags().Float64("sample-percentage", 1, "Percentage of the requested range the endpoint samples to measure the output size")
+	estimateCmd.Flags().Float64("sample-percentage", 1, fmt.Sprintf("Percentage of the requested range the endpoint samples to measure the output size (max %g)", maxSamplePercentage))
 	estimateCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt and proceed with estimation")
 
 	rootCmd.AddCommand(estimateCmd)
 }
+
+// maxSamplePercentage mirrors the server-side cap on how much of the range can be sampled.
+const maxSamplePercentage = 10.0
 
 var estimateCmd = &cobra.Command{
 	Use:   "estimate [<manifest> [<module_name>]]",
@@ -114,7 +117,12 @@ func estimateE(cmd *cobra.Command, args []string) error {
 	}
 	sinkerConfig.Mode = sink.SubstreamsModeProduction
 
-	return runRemoteEstimate(ctx, cmd, sinkerConfig, sflags.MustGetFloat64(cmd, "sample-percentage"))
+	samplePercentage := sflags.MustGetFloat64(cmd, "sample-percentage")
+	if samplePercentage <= 0 || samplePercentage > maxSamplePercentage {
+		return fmt.Errorf("--sample-percentage must be in (0, %g], got %g", maxSamplePercentage, samplePercentage)
+	}
+
+	return runRemoteEstimate(ctx, cmd, sinkerConfig, samplePercentage)
 }
 
 func renderReportTable(report *ReportBuilder, headers []string, tableData [][]string, extra ...tablewriter.Option) {

@@ -42,7 +42,7 @@ message EstimateRequest {
   uint64 stop_block_num = 4;
 
   // Fraction of the requested range, in percent, that gets actually executed to measure
-  // the output size. Must be in (0, 100]. Defaults to 1 (one percent). The sample is
+  // the output size. Must be in (0, 10]. Defaults to 1 (one percent). The sample is
   // rounded up to whole segments, so it is never smaller than one segment.
   double sample_percentage = 5;
 

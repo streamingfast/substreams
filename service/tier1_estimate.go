@@ -49,6 +49,10 @@ import (
 // the request does not ask for a specific percentage.
 const defaultSamplePercentage = 1.0
 
+// maxSamplePercentage is the highest sampling ratio a request may ask for: above that, running
+// the sample costs about as much as running the real thing, which defeats the purpose.
+const maxSamplePercentage = 10.0
+
 // estimateProgressInterval is how often the sampling phase reports back to the client.
 // It only exists to keep the connection alive and show that something is happening.
 const estimateProgressInterval = 5 * time.Second
@@ -151,8 +155,8 @@ func (s *Tier1Service) estimate(
 	if percentage == 0 {
 		percentage = defaultSamplePercentage
 	}
-	if percentage < 0 || percentage > 100 {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("sample_percentage must be in (0, 100], got %f", percentage))
+	if percentage < 0 || percentage > maxSamplePercentage {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("sample_percentage must be in (0, %g], got %f", maxSamplePercentage, percentage))
 	}
 
 	// The estimated request is always a production-mode one: that is the mode whose cost we

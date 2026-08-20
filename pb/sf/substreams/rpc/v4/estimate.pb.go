@@ -39,7 +39,7 @@ type EstimateRequest struct {
 	// most recent final block of the chain.
 	StopBlockNum uint64 `protobuf:"varint,4,opt,name=stop_block_num,json=stopBlockNum,proto3" json:"stop_block_num,omitempty"`
 	// Fraction of the requested range, in percent, that gets actually executed to measure
-	// the output size. Must be in (0, 100]. Defaults to 1 (one percent). The sample is
+	// the output size. Must be in (0, 10]. Defaults to 1 (one percent). The sample is
 	// rounded up to whole segments, so it is never smaller than one segment.
 	SamplePercentage float64 `protobuf:"fixed64,5,opt,name=sample_percentage,json=samplePercentage,proto3" json:"sample_percentage,omitempty"`
 	// Parameter overrides applied to the package server-side, keyed by module name, same as

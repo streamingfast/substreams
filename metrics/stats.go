@@ -122,6 +122,50 @@ type Stats struct {
 	windowLocalBlocks windowedCounter
 	// windowExternalCalls turns the cumulative external-call totals into a windowed delta.
 	windowExternalCalls windowedCallCounters
+
+	// foundationalResolves is filled once at request start on tier1 when identifiers
+	// are turned into endpoints. Failures matter more than hits: a miss here means
+	// every worker and the linear path will fail the same way.
+	foundationalResolves []foundationalStoreResolve
+}
+
+type foundationalStoreResolve struct {
+	identifier string
+	address    string
+	elapsed    time.Duration
+	err        string
+}
+
+func (r foundationalStoreResolve) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
+	encoder.AddString("identifier", r.identifier)
+	if r.address != "" {
+		encoder.AddString("address", r.address)
+	}
+	encoder.AddString("duration", humanDuration(r.elapsed))
+	if r.err != "" {
+		encoder.AddString("error", r.err)
+	}
+	return nil
+}
+
+// RecordFoundationalStoreResolve records one identifier lookup for the request
+// progress log and for the Prometheus counters.
+func (s *Stats) RecordFoundationalStoreResolve(identifier, address string, elapsed time.Duration, err error) {
+	if s == nil {
+		return
+	}
+	rec := foundationalStoreResolve{
+		identifier: identifier,
+		address:    address,
+		elapsed:    elapsed,
+	}
+	if err != nil {
+		rec.err = err.Error()
+	}
+	s.Lock()
+	s.foundationalResolves = append(s.foundationalResolves, rec)
+	s.Unlock()
+	RecordFoundationalStoreResolution(err == nil, elapsed)
 }
 
 type runningJobs map[uint64]*extendedJob

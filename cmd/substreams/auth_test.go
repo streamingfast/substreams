@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -63,6 +65,22 @@ func TestWriteAuthEnvFileAPIKey(t *testing.T) {
 	assert.Equal(t, "export SUBSTREAMS_API_KEY=server_abc\n", string(got))
 }
 
+func TestWriteAuthEnvFileChmodsExisting(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".substreams.env")
+	require.NoError(t, os.WriteFile(path, []byte("export OLD=1\n"), 0o644))
+
+	require.NoError(t, writeAuthEnvFile(path, authCredentials{token: "jwt-token"}))
+
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+
+	got, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "export SUBSTREAMS_API_TOKEN=jwt-token\n", string(got))
+}
+
 func TestAuthIssueBaseURL(t *testing.T) {
 	t.Setenv("SUBSTREAMS_AUTH_ISSUE_URL", "")
 	t.Setenv("LOCAL_DEVELOPMENT", "")
@@ -97,6 +115,16 @@ func TestRedactSecrets(t *testing.T) {
 	got := redactSecrets(in)
 	assert.NotContains(t, got, "server_deadbeef0123456789")
 	assert.Contains(t, got, "[redacted]")
+}
+
+func TestRedactSecretsDeviceCode(t *testing.T) {
+	in := `{"device_code":"secret-device","deviceCode":"camel-device","message":"bad"}`
+	got := redactSecrets(in)
+	assert.NotContains(t, got, "secret-device")
+	assert.NotContains(t, got, "camel-device")
+	assert.Contains(t, got, `"device_code":"[redacted]"`)
+	assert.Contains(t, got, `"deviceCode":"[redacted]"`)
+	assert.Contains(t, got, "bad")
 }
 
 func TestPortalClientAuthorizeCamelCase(t *testing.T) {
@@ -199,6 +227,19 @@ func TestPortalClientConnectError(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid_argument")
 }
 
+func TestPortalClientConnectErrorRedactsDeviceCode(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`not-json {"device_code":"secret-device"} leftover`))
+	}))
+	t.Cleanup(srv.Close)
+
+	_, err := newPortalClient(srv.URL).CliAPIKeyToken(t.Context(), "secret-device")
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "secret-device")
+	assert.Contains(t, err.Error(), `"device_code":"[redacted]"`)
+}
+
 func TestParseCLIAPIKeyStatus(t *testing.T) {
 	assert.Equal(t, cliAPIKeyApproved, parseCLIAPIKeyStatus("CLI_API_KEY_TOKEN_STATUS_APPROVED"))
 	assert.Equal(t, cliAPIKeyPending, parseCLIAPIKeyStatus("pending"))
@@ -279,6 +320,168 @@ func TestWaitForCLIAPIKeyDeadline(t *testing.T) {
 	require.EqualError(t, err, "login expired before a key was selected")
 }
 
+func TestWaitForCLIAPIKeyRetries5xxThenSucceeds(t *testing.T) {
+	var n atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if n.Add(1) == 1 {
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`{"code":"unavailable","message":"try again"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"status":"APPROVED","apiKey":"server_abc"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	got, err := waitForCLIAPIKey(t.Context(), newPortalClient(srv.URL), "code", time.Millisecond, time.Minute, func(context.Context, time.Duration) error {
+		return nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "server_abc", got.APIKey)
+	assert.Equal(t, 2, int(n.Load()))
+}
+
+func TestWaitForCLIAPIKeyFailsFastOn4xx(t *testing.T) {
+	var n atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n.Add(1)
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"code":"invalid_argument","message":"unknown device code"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	_, err := waitForCLIAPIKey(t.Context(), newPortalClient(srv.URL), "code", time.Second, time.Minute, func(context.Context, time.Duration) error {
+		require.Fail(t, "should not sleep after 4xx")
+		return nil
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "polling login")
+	assert.Equal(t, 1, int(n.Load()))
+}
+
+func TestWaitForCLIAPIKeyRetriesTransportThenSucceeds(t *testing.T) {
+	var calls int
+	tok := &funcTokener{fn: func() (*cliAPIKeyTokenResult, error) {
+		calls++
+		if calls == 1 {
+			return nil, &portalAPIError{retryable: true, err: errors.New("connection refused")}
+		}
+		return &cliAPIKeyTokenResult{Status: cliAPIKeyApproved, APIKey: "server_abc"}, nil
+	}}
+
+	got, err := waitForCLIAPIKey(t.Context(), tok, "code", time.Millisecond, time.Minute, func(context.Context, time.Duration) error {
+		return nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "server_abc", got.APIKey)
+	assert.Equal(t, 2, calls)
+}
+
+func TestWaitForCLIAPIKeyRetriesTimeoutThenSucceeds(t *testing.T) {
+	var calls int
+	tok := &funcTokener{fn: func() (*cliAPIKeyTokenResult, error) {
+		calls++
+		if calls == 1 {
+			return nil, &portalAPIError{
+				retryable: true,
+				err:       fmt.Errorf("CliApiKeyToken request: %w", context.DeadlineExceeded),
+			}
+		}
+		return &cliAPIKeyTokenResult{Status: cliAPIKeyApproved, APIKey: "server_abc"}, nil
+	}}
+
+	got, err := waitForCLIAPIKey(t.Context(), tok, "code", time.Millisecond, time.Minute, func(context.Context, time.Duration) error {
+		return nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "server_abc", got.APIKey)
+	assert.Equal(t, 2, calls)
+}
+
+func TestWaitForCLIAPIKeyDoesNotRetryCanceled(t *testing.T) {
+	tok := &funcTokener{fn: func() (*cliAPIKeyTokenResult, error) {
+		return nil, &portalAPIError{
+			retryable: false,
+			err:       fmt.Errorf("CliApiKeyToken request: %w", context.Canceled),
+		}
+	}}
+	_, err := waitForCLIAPIKey(t.Context(), tok, "code", time.Second, time.Minute, func(context.Context, time.Duration) error {
+		require.Fail(t, "should not sleep after cancel")
+		return nil
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestVerificationURLComplete(t *testing.T) {
+	got, err := verificationURL(&cliAPIKeyAuthorizeResult{
+		VerificationURIComplete: "https://thegraph.market/auth/cli?user_code=ABCD-1234",
+		VerificationURI:         "https://thegraph.market/auth/cli",
+		UserCode:                "ABCD-1234",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://thegraph.market/auth/cli?user_code=ABCD-1234", got)
+}
+
+func TestVerificationURLFallback(t *testing.T) {
+	got, err := verificationURL(&cliAPIKeyAuthorizeResult{
+		VerificationURI: "http://localhost:3000/auth/cli",
+		UserCode:        "ABCD-1234",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "http://localhost:3000/auth/cli?user_code=ABCD-1234", got)
+}
+
+func TestVerificationURLQueryEscapesUserCode(t *testing.T) {
+	got, err := verificationURL(&cliAPIKeyAuthorizeResult{
+		VerificationURI: "http://localhost:3000/auth/cli",
+		UserCode:        "A B",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "http://localhost:3000/auth/cli?user_code=A+B", got)
+}
+
+func TestVerificationURLMissing(t *testing.T) {
+	_, err := verificationURL(&cliAPIKeyAuthorizeResult{DeviceCode: "device_secret"})
+	require.EqualError(t, err, "missing http(s) verification URL")
+}
+
+func TestVerificationURLRejectsNonHTTP(t *testing.T) {
+	_, err := verificationURL(&cliAPIKeyAuthorizeResult{
+		VerificationURIComplete: "javascript:alert(1)",
+	})
+	require.EqualError(t, err, "missing http(s) verification URL")
+}
+
+func TestRunCliAPIKeyAuthRequiresHTTPVerificationURL(t *testing.T) {
+	var tokenCalls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/sf.portalapi.v1.PortalApi/CliApiKeyAuthorize":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"deviceCode": "device_secret",
+				"expiresIn":  "600",
+				"interval":   "1",
+			})
+		case "/sf.portalapi.v1.PortalApi/CliApiKeyToken":
+			tokenCalls.Add(1)
+			http.Error(w, "should not poll", http.StatusInternalServerError)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	var opened string
+	_, err := runCliAPIKeyAuth(t.Context(), newPortalClient(srv.URL), io.Discard, func(u string) error {
+		opened = u
+		return nil
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing http(s) verification URL")
+	assert.Equal(t, 0, int(tokenCalls.Load()))
+	assert.Empty(t, opened)
+}
+
 func TestRunCliAPIKeyAuthSuccess(t *testing.T) {
 	var authorizeCalls, tokenCalls atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -324,6 +527,14 @@ func TestRunCliAPIKeyAuthSuccess(t *testing.T) {
 	assert.Contains(t, out.String(), `"dev"`)
 	assert.NotContains(t, out.String(), "device_secret")
 	assert.NotContains(t, out.String(), "server_abc")
+}
+
+type funcTokener struct {
+	fn func() (*cliAPIKeyTokenResult, error)
+}
+
+func (f *funcTokener) CliAPIKeyToken(ctx context.Context, deviceCode string) (*cliAPIKeyTokenResult, error) {
+	return f.fn()
 }
 
 type scriptedTokener struct {

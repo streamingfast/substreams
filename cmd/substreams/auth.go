@@ -167,7 +167,11 @@ func writeAuthEnvFile(path string, creds authCredentials) error {
 	if creds.apiKey != "" {
 		fmt.Fprintf(&b, "export SUBSTREAMS_API_KEY=%s\n", creds.apiKey)
 	}
-	return os.WriteFile(path, []byte(b.String()), 0o600)
+	if err := os.WriteFile(path, []byte(b.String()), 0o600); err != nil {
+		return err
+	}
+	// WriteFile only applies the mode on create; re-login must tighten an existing file.
+	return os.Chmod(path, 0o600)
 }
 
 func portalAPIBaseURL() string {
@@ -191,6 +195,9 @@ func authIssueBaseURL() string {
 }
 
 func tryOpenURL(rawURL string) error {
+	if !isHTTPURL(rawURL) {
+		return fmt.Errorf("refusing to open non-http(s) URL")
+	}
 	var name string
 	var args []string
 	switch runtime.GOOS {
@@ -245,11 +252,15 @@ type authIssueResponse struct {
 }
 
 var (
-	serverKeyPattern  = regexp.MustCompile(`server_[A-Za-z0-9]+`)
-	apiKeyJSONPattern = regexp.MustCompile(`"api_key"\s*:\s*"[^"]*"`)
+	serverKeyPattern       = regexp.MustCompile(`server_[A-Za-z0-9]+`)
+	apiKeyJSONPattern      = regexp.MustCompile(`"api_key"\s*:\s*"[^"]*"`)
+	deviceCodeJSONPattern  = regexp.MustCompile(`"device_code"\s*:\s*"[^"]*"`)
+	deviceCodeCamelPattern = regexp.MustCompile(`"deviceCode"\s*:\s*"[^"]*"`)
 )
 
 func redactSecrets(s string) string {
 	s = apiKeyJSONPattern.ReplaceAllString(s, `"api_key":"[redacted]"`)
+	s = deviceCodeJSONPattern.ReplaceAllString(s, `"device_code":"[redacted]"`)
+	s = deviceCodeCamelPattern.ReplaceAllString(s, `"deviceCode":"[redacted]"`)
 	return serverKeyPattern.ReplaceAllString(s, "server_[redacted]")
 }

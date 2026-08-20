@@ -199,16 +199,16 @@ func generateRemoteReport(report *ReportBuilder, estimate *pbsubstreamsrpcv4.Est
 	if estimate.BlockFiltered {
 		blocksLabel = "Blocks To Process (estimated):"
 	}
-	report.Line("%s %s",
-		labelStyle.Render(blocksLabel),
-		successStyle.Render(formatx.Integer(estimate.BlocksToProcess)))
-	report.Line("%s %s",
-		labelStyle.Render("Blocks To Process (if nothing was cached):"),
-		valueStyle.Render(formatx.Integer(estimate.TotalBlocksToProcessUncached)))
-	report.Line("")
+	blocks := successStyle.Render(formatx.Integer(estimate.BlocksToProcess))
+	// What a first-ever run would have processed, less what is left: the work the cache
+	// already holds, the segments this estimate just ran included.
+	if cached := estimate.TotalBlocksToProcessUncached - min(estimate.TotalBlocksToProcessUncached, estimate.BlocksToProcess); cached != 0 {
+		blocks += dimStyle.Render(fmt.Sprintf(" (cached: %s)", formatx.Integer(cached)))
+	}
 
+	report.Line("%s %s", labelStyle.Render(blocksLabel), blocks)
 	report.Line("%s %s",
-		labelStyle.Render("Estimated Egress Bytes (uncompressed):"),
+		labelStyle.Render("Egress Bytes (estimated):"),
 		successStyle.Render(formatx.Bytes(estimate.EstimatedEgressBytes)))
 	report.Line("")
 

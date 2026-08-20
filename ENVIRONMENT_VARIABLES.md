@@ -11,7 +11,7 @@ This document lists all environment variables used by the Substreams project, or
 - **Purpose**: Indicates if running in local development mode
 - **Usage**: Set to "true" to use localhost URLs instead of production URLs
 - **Default**: `false` (device login talks to `https://admin.streamingfast.io`; `--paste` uses `https://thegraph.market`)
-- **Local values**: device login talks to `http://localhost:9000`; `--paste` uses `http://localhost:3000`
+- **Local values**: device login talks to `http://localhost:9000`; `--paste` uses `http://localhost:3000`. JWT issue uses `http://localhost:8080` (see `SUBSTREAMS_AUTH_ISSUE_URL`); if that issuer is unavailable the API key is stored instead of failing.
 - **Location**: `cmd/substreams/auth.go`
 
 #### `SUBSTREAMS_PORTAL_API`

@@ -139,7 +139,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Changed: `substreams auth` opens a browser so you can pick an organization (if you have more than one) and
   an API key. The CLI retrieves the selected key over the API — no copy/paste — exchanges it for a JWT, and
-  writes `.substreams.env`. The previous paste-a-JWT-or-API-key flow is `--paste`. With `LOCAL_DEVELOPMENT=true`,
+  writes `.substreams.env` (mode 0600, including when the file already exists). The previous paste-a-JWT-or-API-key
+  flow is `--paste`. Login polling keeps going through transport errors, timeouts, and 5xx until the device-code
+  deadline, and fails fast without a usable `http`/`https` verification URL. With `LOCAL_DEVELOPMENT=true`,
   JWT issue uses the local issuer; if that issuer is unavailable the API key is stored instead of failing.
 
 - `substreams run` reports backprocessing as progress and rates instead of a list of block ranges. A four-line session

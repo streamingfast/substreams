@@ -625,9 +625,14 @@ func (s *Stats) RecordJobRetried(jobIdx uint64) {
 func (s *Stats) RecordEndSubrequest(jobIdx uint64, status JobStatus) {
 	s.Lock()
 	defer s.Unlock()
-	job := s.runningJobs[jobIdx]
+	job, ok := s.runningJobs[jobIdx]
+	if !ok {
+		return
+	}
 
-	for i := 0; i <= int(job.Stage); i++ {
+	// The stage list is only known once the scheduler has reported it; a caller that runs
+	// jobs without one (the cost estimator's sparse sample) still gets the counters below.
+	for i := 0; i <= int(job.Stage) && i < len(s.stages); i++ {
 		for _, mod := range s.stages[i].Modules {
 			if _, ok := s.modulesStats[mod]; !ok {
 				s.modulesStats[mod] = newExtendedStats(mod)

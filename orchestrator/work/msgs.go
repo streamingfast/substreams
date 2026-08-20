@@ -19,6 +19,11 @@ type MsgJobSucceeded struct {
 	Unit     stage.Unit
 	Worker   Worker
 	Streamed bool
+
+	// ProcessedBlocks is what the worker reported on completion: one count per block and per
+	// stage it actually executed, so blocks skipped by a block index and blocks served from
+	// the cache are not in it.
+	ProcessedBlocks uint64
 }
 
 type MsgPendingShutdown struct {

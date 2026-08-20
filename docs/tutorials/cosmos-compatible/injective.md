@@ -25,7 +25,7 @@ Tip: Have the start block of your transaction or specific events ready.
 
 ## Step 2: Visualize the Data
 
-1. Run `substreams auth` to sign in at [The Graph Market](https://thegraph.market/), pick an API key in your browser, then load credentials with `. ./.substreams.env`.
+1. Run `substreams auth` to create your [account](https://thegraph.market/) and generate an authentication token (JWT), then pass this token back as input.
 
 2. Run `substreams build` to compile the project.
 

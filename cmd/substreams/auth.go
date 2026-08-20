@@ -8,76 +8,33 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
-	"regexp"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
-	"github.com/streamingfast/cli/sflags"
-)
-
-const (
-	defaultPortalAPIURL = "https://admin.streamingfast.io"
-	localPortalAPIURL   = "http://localhost:9000"
-	defaultAuthBaseURL  = "https://auth.thegraph.market"
-	localAuthBaseURL    = "http://localhost:8080"
-	defaultMarketURL    = "https://thegraph.market"
-	localMarketURL      = "http://localhost:3000"
-	deviceClientName    = "substreams CLI"
-	authEnvFilename     = ".substreams.env"
 )
 
 var authCmd = &cobra.Command{
-	Use:   "auth",
-	Short: "Login for Substreams development",
-	Long: `Login to The Graph Market and retrieve an API key without copy/paste.
-
-The command opens a browser so you can pick an organization (if you have more
-than one) and an API key. The selected key is fetched over the API, exchanged
-for a JWT, and written to .substreams.env.
-
-Use --paste to enter a JWT or API key yourself.`,
+	Use:          "auth",
+	Short:        "Login command for Substreams development",
 	RunE:         runAuthE,
 	SilenceUsage: true,
 }
 
 func init() {
-	authCmd.Flags().Bool("paste", false, "Paste a JWT or API key instead of picking one in the browser")
 	rootCmd.AddCommand(authCmd)
 }
 
 func runAuthE(cmd *cobra.Command, args []string) error {
-	if sflags.MustGetBool(cmd, "paste") {
-		creds, err := runPasteAuth()
-		if err != nil {
-			return err
-		}
-		return writeAuthCredentials(creds)
-	}
+	localDevelopment := os.Getenv("LOCAL_DEVELOPMENT")
 
-	key, err := runCliAPIKeyAuth(cmd.Context(), newPortalClient(portalAPIBaseURL()), os.Stdout, tryOpenURL)
-	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			return fmt.Errorf("login cancelled")
-		}
-		return err
-	}
+	baseURL := "https://thegraph.market"
+	authBaseURL := "https://auth.thegraph.market"
 
-	creds, err := resolveCredentials(key)
-	if err != nil {
-		return err
-	}
-	return writeAuthCredentials(creds)
-}
-
-func runPasteAuth() (authCredentials, error) {
-	baseURL := defaultMarketURL
-	if os.Getenv("LOCAL_DEVELOPMENT") == "true" {
-		baseURL = localMarketURL
+	if localDevelopment == "true" {
+		baseURL = "http://localhost:3000"
 	}
 
 	signupURL := baseURL + "/auth/signup"
@@ -89,7 +46,7 @@ func runPasteAuth() (authCredentials, error) {
 	fmt.Println()
 	fmt.Println("If you already have an account, follow this link to generate a JWT token:")
 	fmt.Println("    " + cli.PurpleStyle.Render(baseURL+"/auth/substreams-devenv"))
-	fmt.Println()
+	fmt.Println("")
 
 	var token string
 	form := huh.NewForm(
@@ -109,106 +66,34 @@ func runPasteAuth() (authCredentials, error) {
 	)
 
 	if err := form.Run(); err != nil {
-		return authCredentials{}, fmt.Errorf("error running form: %w", err)
+		return fmt.Errorf("error running form: %w", err)
 	}
 
-	return resolveCredentials(token)
-}
-
-type authCredentials struct {
-	token  string
-	apiKey string
-}
-
-func resolveCredentials(value string) (authCredentials, error) {
-	if !strings.HasPrefix(value, "server_") {
-		return authCredentials{token: value}, nil
-	}
-
-	fmt.Println("Exchanging API key for JWT token...")
-	jwtToken, err := exchangeAPIKeyForJWT(value, authIssueBaseURL())
-	if err != nil {
-		if os.Getenv("LOCAL_DEVELOPMENT") == "true" {
-			fmt.Println("Could not issue a JWT from the local issuer; writing the API key instead.")
-			fmt.Println()
-			return authCredentials{apiKey: value}, nil
+	if strings.HasPrefix(token, "server_") {
+		fmt.Println("Detected API key, exchanging for JWT token...")
+		jwtToken, err := exchangeAPIKeyForJWT(token, authBaseURL)
+		if err != nil {
+			return fmt.Errorf("exchanging API key for JWT token: %w", err)
 		}
-		return authCredentials{}, fmt.Errorf("exchanging API key for JWT token: %w", err)
+		token = jwtToken
+		fmt.Println("Successfully obtained JWT token.")
+		fmt.Println()
 	}
-	fmt.Println("Successfully obtained JWT token.")
-	fmt.Println()
-	return authCredentials{token: jwtToken}, nil
-}
 
-func writeAuthCredentials(creds authCredentials) error {
 	fmt.Println("Writing `./.substreams.env`.  NOTE: Add it to `.gitignore`.")
-	fmt.Println()
+	fmt.Println("")
 
-	if err := writeAuthEnvFile(authEnvFilename, creds); err != nil {
+	err := os.WriteFile(".substreams.env", []byte(fmt.Sprintf("export SUBSTREAMS_API_TOKEN=%s\n", token)), 0644)
+	if err != nil {
 		return fmt.Errorf("writing .substreams.env file: %w", err)
 	}
 
 	fmt.Println("Load credentials in current terminal with the following command:")
-	fmt.Println()
+	fmt.Println("")
 	fmt.Println(cli.PurpleStyle.Render("       . ./.substreams.env"))
 	fmt.Println()
 
 	return nil
-}
-
-func writeAuthEnvFile(path string, creds authCredentials) error {
-	if creds.token == "" && creds.apiKey == "" {
-		return errors.New("no credentials to write")
-	}
-	var b strings.Builder
-	if creds.token != "" {
-		fmt.Fprintf(&b, "export SUBSTREAMS_API_TOKEN=%s\n", creds.token)
-	}
-	if creds.apiKey != "" {
-		fmt.Fprintf(&b, "export SUBSTREAMS_API_KEY=%s\n", creds.apiKey)
-	}
-	if err := os.WriteFile(path, []byte(b.String()), 0o600); err != nil {
-		return err
-	}
-	// WriteFile only applies the mode on create; re-login must tighten an existing file.
-	return os.Chmod(path, 0o600)
-}
-
-func portalAPIBaseURL() string {
-	if u := strings.TrimSpace(os.Getenv("SUBSTREAMS_PORTAL_API")); u != "" {
-		return strings.TrimRight(u, "/")
-	}
-	if os.Getenv("LOCAL_DEVELOPMENT") == "true" {
-		return localPortalAPIURL
-	}
-	return defaultPortalAPIURL
-}
-
-func authIssueBaseURL() string {
-	if u := strings.TrimSpace(os.Getenv("SUBSTREAMS_AUTH_ISSUE_URL")); u != "" {
-		return strings.TrimRight(u, "/")
-	}
-	if os.Getenv("LOCAL_DEVELOPMENT") == "true" {
-		return localAuthBaseURL
-	}
-	return defaultAuthBaseURL
-}
-
-func tryOpenURL(rawURL string) error {
-	if !isHTTPURL(rawURL) {
-		return fmt.Errorf("refusing to open non-http(s) URL")
-	}
-	var name string
-	var args []string
-	switch runtime.GOOS {
-	case "darwin":
-		name, args = "open", []string{rawURL}
-	case "windows":
-		name, args = "rundll32", []string{"url.dll,FileProtocolHandler", rawURL}
-	default:
-		name, args = "xdg-open", []string{rawURL}
-	}
-	return exec.Command(name, args...).Start()
 }
 
 func exchangeAPIKeyForJWT(apiKey string, authBaseURL string) (string, error) {
@@ -236,12 +121,12 @@ func exchangeAPIKeyForJWT(apiKey string, authBaseURL string) (string, error) {
 	}
 
 	if response.StatusCode != 200 {
-		return "", fmt.Errorf("request failed with code %d: %s", response.StatusCode, redactSecrets(string(fullBody)))
+		return "", fmt.Errorf("request failed with code %d: %s", response.StatusCode, fullBody)
 	}
 
 	var authResp authIssueResponse
 	if err := json.Unmarshal(fullBody, &authResp); err != nil {
-		return "", fmt.Errorf("unmarshalling response %q: %w", redactSecrets(string(fullBody)), err)
+		return "", fmt.Errorf("unmarshalling response %q: %w", fullBody, err)
 	}
 
 	return authResp.Token, nil
@@ -249,18 +134,4 @@ func exchangeAPIKeyForJWT(apiKey string, authBaseURL string) (string, error) {
 
 type authIssueResponse struct {
 	Token string `json:"token"`
-}
-
-var (
-	serverKeyPattern       = regexp.MustCompile(`server_[A-Za-z0-9]+`)
-	apiKeyJSONPattern      = regexp.MustCompile(`"api_key"\s*:\s*"[^"]*"`)
-	deviceCodeJSONPattern  = regexp.MustCompile(`"device_code"\s*:\s*"[^"]*"`)
-	deviceCodeCamelPattern = regexp.MustCompile(`"deviceCode"\s*:\s*"[^"]*"`)
-)
-
-func redactSecrets(s string) string {
-	s = apiKeyJSONPattern.ReplaceAllString(s, `"api_key":"[redacted]"`)
-	s = deviceCodeJSONPattern.ReplaceAllString(s, `"device_code":"[redacted]"`)
-	s = deviceCodeCamelPattern.ReplaceAllString(s, `"deviceCode":"[redacted]"`)
-	return serverKeyPattern.ReplaceAllString(s, "server_[redacted]")
 }

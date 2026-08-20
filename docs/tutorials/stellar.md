@@ -50,7 +50,7 @@ In this guide, you'll learn how to initialize a Stellar-based Substreams project
 
 ## Step 2: Visualize the Data
 
-1. Run `substreams auth` to sign in at [The Graph Market](https://thegraph.market/), pick an API key in your browser, then load credentials with `. ./.substreams.env`.
+1. Run `substreams auth` to create your [account](https://thegraph.market/) and generate an authentication token (JWT), then pass this token back as input.
 
 2. Now you can freely use the `substreams gui` to visualize and iterate on your extracted data.
 

@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -114,31 +116,49 @@ func (c *portalClient) CliAPIKeyToken(ctx context.Context, deviceCode string) (*
 	}, nil
 }
 
+type portalAPIError struct {
+	retryable bool
+	err       error
+}
+
+func (e *portalAPIError) Error() string   { return e.err.Error() }
+func (e *portalAPIError) Unwrap() error   { return e.err }
+func (e *portalAPIError) Retryable() bool { return e.retryable }
+
 func (c *portalClient) post(ctx context.Context, method string, payload any) ([]byte, error) {
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("encoding %s request: %w", method, err)
+		return nil, &portalAPIError{err: fmt.Errorf("encoding %s request: %w", method, err)}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+portalAPIPrefix+method, bytes.NewReader(raw))
 	if err != nil {
-		return nil, fmt.Errorf("creating %s request: %w", method, err)
+		return nil, &portalAPIError{err: fmt.Errorf("creating %s request: %w", method, err)}
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Connect-Protocol-Version", connectProtocolVersion)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("%s request: %w", method, err)
+		return nil, &portalAPIError{
+			retryable: !errors.Is(err, context.Canceled),
+			err:       fmt.Errorf("%s request: %w", method, err),
+		}
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("reading %s response: %w", method, err)
+		return nil, &portalAPIError{
+			retryable: true,
+			err:       fmt.Errorf("reading %s response: %w", method, err),
+		}
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s failed: %s", method, connectErrorMessage(resp.StatusCode, body))
+		return nil, &portalAPIError{
+			retryable: resp.StatusCode >= 500,
+			err:       fmt.Errorf("%s failed: %s", method, connectErrorMessage(resp.StatusCode, body)),
+		}
 	}
 	return body, nil
 }
@@ -282,16 +302,56 @@ type connectErrorBody struct {
 func connectErrorMessage(status int, body []byte) string {
 	var parsed connectErrorBody
 	if err := json.Unmarshal(body, &parsed); err == nil && parsed.Message != "" {
+		msg := redactSecrets(parsed.Message)
 		if parsed.Code != "" {
-			return fmt.Sprintf("HTTP %d (%s): %s", status, parsed.Code, parsed.Message)
+			return fmt.Sprintf("HTTP %d (%s): %s", status, redactSecrets(parsed.Code), msg)
 		}
-		return fmt.Sprintf("HTTP %d: %s", status, parsed.Message)
+		return fmt.Sprintf("HTTP %d: %s", status, msg)
 	}
 	trimmed := strings.TrimSpace(string(body))
 	if trimmed == "" {
 		return fmt.Sprintf("HTTP %d", status)
 	}
-	return fmt.Sprintf("HTTP %d: %s", status, trimmed)
+	return fmt.Sprintf("HTTP %d: %s", status, redactSecrets(trimmed))
+}
+
+func isHTTPURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https":
+		return true
+	default:
+		return false
+	}
+}
+
+func verificationURL(auth *cliAPIKeyAuthorizeResult) (string, error) {
+	raw := auth.VerificationURIComplete
+	if raw == "" && auth.VerificationURI != "" && auth.UserCode != "" {
+		u, err := url.Parse(auth.VerificationURI)
+		if err != nil {
+			return "", fmt.Errorf("invalid verification URL: %w", err)
+		}
+		q := u.Query()
+		q.Set("user_code", auth.UserCode)
+		u.RawQuery = q.Encode()
+		raw = u.String()
+	}
+	if !isHTTPURL(raw) {
+		return "", fmt.Errorf("missing http(s) verification URL")
+	}
+	return raw, nil
+}
+
+func isRetryablePollError(err error) bool {
+	if err == nil || errors.Is(err, context.Canceled) {
+		return false
+	}
+	var p *portalAPIError
+	return errors.As(err, &p) && p.Retryable()
 }
 
 func firstNonEmpty(values ...string) string {
@@ -309,9 +369,9 @@ func runCliAPIKeyAuth(ctx context.Context, client *portalClient, out io.Writer, 
 		return "", fmt.Errorf("starting login: %w", err)
 	}
 
-	verifyURL := auth.VerificationURIComplete
-	if verifyURL == "" && auth.VerificationURI != "" && auth.UserCode != "" {
-		verifyURL = auth.VerificationURI + "?user_code=" + auth.UserCode
+	verifyURL, err := verificationURL(auth)
+	if err != nil {
+		return "", fmt.Errorf("starting login: %w", err)
 	}
 
 	fmt.Fprintln(out, "Authenticate with The Graph Market.")
@@ -378,21 +438,23 @@ func waitForCLIAPIKey(
 
 		result, err := client.CliAPIKeyToken(ctx, deviceCode)
 		if err != nil {
-			return nil, fmt.Errorf("polling login: %w", err)
-		}
-
-		switch result.Status {
-		case cliAPIKeyApproved:
-			if result.APIKey == "" {
-				return nil, fmt.Errorf("login approved but no API key was returned")
+			if !isRetryablePollError(err) {
+				return nil, fmt.Errorf("polling login: %w", err)
 			}
-			return result, nil
-		case cliAPIKeyDenied:
-			return nil, fmt.Errorf("login was denied")
-		case cliAPIKeyExpired:
-			return nil, fmt.Errorf("login expired before a key was selected")
-		case cliAPIKeySlowDown:
-			wait += slowDownExtraWait
+		} else {
+			switch result.Status {
+			case cliAPIKeyApproved:
+				if result.APIKey == "" {
+					return nil, fmt.Errorf("login approved but no API key was returned")
+				}
+				return result, nil
+			case cliAPIKeyDenied:
+				return nil, fmt.Errorf("login was denied")
+			case cliAPIKeyExpired:
+				return nil, fmt.Errorf("login expired before a key was selected")
+			case cliAPIKeySlowDown:
+				wait += slowDownExtraWait
+			}
 		}
 
 		if !time.Now().Before(deadline) {

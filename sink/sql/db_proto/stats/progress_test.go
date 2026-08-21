@@ -3,6 +3,8 @@ package stats
 import (
 	"testing"
 
+	protosql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
+	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/spool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -18,7 +20,7 @@ func TestProgressBlocksAhead(t *testing.T) {
 	// Before the first commit there is no applied mark. Subtracting zero from the block
 	// number would report the whole chain height as backlog and warn on every startup.
 	progress.RecordDownloaded(20_000_050)
-	progress.RecordBuffered(3, 0)
+	progress.RecordBuffered(3, protosql.WriteStats{}, false)
 	assert.Equal(t, uint64(3), progress.BlocksAhead(), "with nothing applied, the gap is what is buffered")
 
 	progress.RecordDownloaded(20_000_100)
@@ -55,26 +57,28 @@ func TestProgressWarnsOnlyWhenTheBufferStopsLookingLikeAWorkingSet(t *testing.T)
 
 	progress.RecordApplied(1500)
 	progress.RecordDownloaded(3000) // 1500 behind, under 2000
-	progress.RecordBuffered(1500, 0)
+	progress.RecordBuffered(1500, protosql.WriteStats{}, false)
 	progress.Log(logger)
 
 	require.Equal(t, 1, logs.Len())
 	assert.Equal(t, zapcore.InfoLevel, logs.All()[0].Level, "a few batches in flight is normal")
 
 	progress.RecordApplied(500) // 2500 behind, over 2000
-	progress.RecordBuffered(2500, 4<<20)
+	progress.RecordBuffered(2500, protosql.WriteStats{}, false)
 	progress.Log(logger)
 
-	require.Equal(t, 2, logs.Len())
-	entry := logs.All()[1]
-	assert.Equal(t, zapcore.WarnLevel, entry.Level)
+	// The spool lines follow the progress one, so pick the warning out rather than
+	// counting entries.
+	warnings := logs.FilterLevelExact(zapcore.WarnLevel).All()
+	require.Len(t, warnings, 1)
+	entry := warnings[0]
 	assert.Contains(t, entry.Message, "falling behind")
 
 	fields := entry.ContextMap()
 	assert.Equal(t, uint64(2500), fields["blocks_ahead"])
 	assert.Equal(t, uint64(3000), fields["downloaded_through"])
 	assert.Equal(t, uint64(500), fields["applied_through"])
-	assert.Equal(t, "4.0MiB", fields["buffered_on_disk"])
+	assert.NotContains(t, fields, "buffered_on_disk", "nothing is on disk when nothing spools")
 }
 
 func TestProgressStaysQuietBeforeTheFirstBlock(t *testing.T) {
@@ -96,7 +100,7 @@ func TestProgressResumeBlockAvoidsStartupBacklog(t *testing.T) {
 	progress.SetResumeBlock(20_000_000)
 
 	progress.RecordDownloaded(20_000_010)
-	progress.RecordBuffered(10, 0)
+	progress.RecordBuffered(10, protosql.WriteStats{}, false)
 	progress.Log(logger)
 
 	require.Equal(t, uint64(10), progress.BlocksAhead())
@@ -114,30 +118,52 @@ func TestProgressResumeBlockAvoidsStartupBacklog(t *testing.T) {
 func TestFallingBehindMeasuresTheSpoolAgainstItsQuota(t *testing.T) {
 	t.Run("a huge block span holding almost nothing is not behind", func(t *testing.T) {
 		progress := NewProgress(10)
-		progress.SetBufferQuota(8 << 30)
 		progress.RecordApplied(1)
 		progress.RecordDownloaded(5_000_000)
-		progress.RecordBuffered(4_999_999, 150<<10)
+		progress.RecordBuffered(0, spooled(4_999_999, 150<<10, 8<<30), true)
 
-		require.False(t, progress.fallingBehind(progress.BlocksAhead()))
+		require.False(t, progress.fallingBehind(progress.BlocksAhead(), 8<<30))
 	})
 
 	t.Run("past half the quota is behind", func(t *testing.T) {
 		progress := NewProgress(10)
-		progress.SetBufferQuota(8 << 30)
 		progress.RecordApplied(1)
 		progress.RecordDownloaded(1000)
-		progress.RecordBuffered(999, 5<<30)
+		progress.RecordBuffered(0, spooled(999, 5<<30, 8<<30), true)
 
-		require.True(t, progress.fallingBehind(progress.BlocksAhead()))
+		require.True(t, progress.fallingBehind(progress.BlocksAhead(), 8<<30))
+
+		core, logs := observer.New(zapcore.DebugLevel)
+		progress.Log(zap.New(core))
+
+		fields := logs.All()[0].ContextMap()
+		require.Equal(t, "5.0 GiB", fields["buffered_on_disk"])
+		require.Equal(t, "62.5%", fields["quota_used"])
 	})
 
 	t.Run("without a spool the block count still decides", func(t *testing.T) {
 		progress := NewProgress(10)
 		progress.RecordApplied(1)
 		progress.RecordDownloaded(5000)
-		progress.RecordBuffered(4999, 0)
+		progress.RecordBuffered(4999, protosql.WriteStats{}, false)
 
-		require.True(t, progress.fallingBehind(progress.BlocksAhead()))
+		require.True(t, progress.fallingBehind(progress.BlocksAhead(), 0))
 	})
+
+	// The quota outlives the spool: after the switch to direct inserts nothing is
+	// buffered, and comparing a permanent zero against it would mean the sink could never
+	// report falling behind again for the rest of the run.
+	t.Run("once the spool is closed the block count decides again", func(t *testing.T) {
+		progress := NewProgress(10)
+		progress.RecordApplied(1)
+		progress.RecordDownloaded(5000)
+		progress.RecordBuffered(4999, protosql.WriteStats{}, false)
+
+		require.True(t, progress.fallingBehind(progress.BlocksAhead(), 8<<30))
+	})
+}
+
+// spooled builds the snapshot a spool holding this much would report.
+func spooled(blocks, bytes, quota int64) protosql.WriteStats {
+	return protosql.WriteStats{Stats: spool.Stats{BlocksBuffered: blocks, BytesOnDisk: bytes, Quota: quota}}
 }

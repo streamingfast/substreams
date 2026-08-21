@@ -297,11 +297,13 @@ func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
 		return fmt.Errorf("flushing: %w", err)
 	}
 
-	var flushDurationPerBlock time.Duration
-	if len(s.holding) > 0 {
-		flushDurationPerBlock = flushDuration / time.Duration(len(s.holding))
+	// Only when the rows really were written here. With a spool this call returned
+	// before anything reached the server, and the timing is fed from what the applier
+	// committed instead — see Stats.RecordBuffered.
+	buffered, buffering := s.db.BufferStats()
+	if !buffering && len(s.holding) > 0 {
+		s.stats.FlushDuration.Add(flushDuration / time.Duration(len(s.holding)))
 	}
-	s.stats.FlushDuration.Add(flushDurationPerBlock)
 
 	s.lastAppliedBlockNum = lastClock.Number
 	s.lastAppliedBlockTime = lastClock.Timestamp.AsTime()
@@ -319,10 +321,10 @@ func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
 
 	// With a local buffer the rows are only queued at this point, not durable, so the
 	// applied mark has to come from what the buffer actually committed.
-	if _, _, applied, buffering := s.db.BufferStats(); !buffering {
+	if !buffering {
 		s.stats.Progress.RecordApplied(lastClock.Number)
-	} else if applied > 0 {
-		s.stats.Progress.RecordApplied(applied)
+	} else if buffered.AppliedBlock > 0 {
+		s.stats.Progress.RecordApplied(buffered.AppliedBlock)
 	}
 	s.recordBuffered()
 
@@ -332,26 +334,26 @@ func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
 // recordBuffered reports what sits between the stream and the database: blocks held in
 // memory for the next flush, plus whatever a local buffer has queued on disk.
 func (s *Sinker) recordBuffered() {
-	bufferedBlocks, bufferedBytes, _, buffering := s.db.BufferStats()
-	if !buffering {
-		s.stats.Progress.RecordBuffered(len(s.holding), 0)
-		return
-	}
-
-	s.stats.Progress.RecordBuffered(len(s.holding)+int(bufferedBlocks), bufferedBytes)
+	buffered, buffering := s.db.BufferStats()
+	s.stats.RecordBuffered(len(s.holding), buffered, buffering)
 }
 
 // recordDecodeStats folds the per-block timings the workers measured back into the
 // shared stats, on this goroutine: Average.Add is not safe for concurrent use.
-func (s *Sinker) recordDecodeStats(results []*decoded, insertDuration time.Duration) {
+//
+// Every duration here is one block's. The insert used to be added once per batch while
+// the two above it were added per block, so the panel reported three averages in the same
+// column with one of them in a different unit, and it grew with --decode-batch-size
+// rather than with the cost of a block.
+func (s *Sinker) recordDecodeStats(results []*decoded, _ time.Duration) {
 	for _, result := range results {
 		if result.empty {
 			continue
 		}
 		s.stats.UnmarshallingDuration.Add(result.unmarshalDuration)
 		s.stats.EntitiesInsertDuration.Add(result.walkDuration)
+		s.stats.BlockInsertDuration.Add(result.insertDuration)
 	}
-	s.stats.BlockInsertDuration.Add(insertDuration)
 }
 
 func (s *Sinker) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *sink.Cursor) (err error) {

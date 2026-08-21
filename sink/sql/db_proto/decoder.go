@@ -105,6 +105,11 @@ type decoded struct {
 
 	unmarshalDuration time.Duration
 	walkDuration      time.Duration
+	// insertDuration is what this one block cost on the serial path — the block row plus
+	// replaying its buffered rows into the database or the spool. It is measured per
+	// block rather than per batch so the average reads in the same unit as the two above
+	// it, which is what the stats panel claims of all three.
+	insertDuration time.Duration
 }
 
 // ResolveDecodeWorkers turns a requested worker count into the one that will be used.
@@ -257,7 +262,8 @@ func (d *decoder) apply(results []*decoded, db sql.Database) (time.Duration, err
 			return 0, fmt.Errorf("applying block %d: %w", result.blockNum, err)
 		}
 
-		insertDuration += time.Since(startAt)
+		result.insertDuration = time.Since(startAt)
+		insertDuration += result.insertDuration
 	}
 
 	return insertDuration, nil

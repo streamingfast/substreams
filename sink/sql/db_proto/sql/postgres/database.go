@@ -943,14 +943,17 @@ func (d *Database) Close(ctx context.Context) error {
 	return err
 }
 
-// BufferStats reports what the local buffer is holding, for the progress line.
-func (d *Database) BufferStats() (blocks int64, bytes int64, appliedBlock uint64, enabled bool) {
+// BufferStats reports what the local buffer is holding and what it has committed.
+func (d *Database) BufferStats() (sql.WriteStats, bool) {
 	inserter, ok := d.inserter.(*localBufferInserter)
 	if !ok {
-		return 0, 0, 0, false
+		return sql.WriteStats{}, false
 	}
 
-	return inserter.buffer.BlocksBuffered(), inserter.buffer.BytesOnDisk(), inserter.buffer.AppliedBlock(), true
+	// DatabaseBytesWritten is left zero: pgx owns the connection, so there is no socket
+	// here to count, and reporting the spooled size as if it were the wire size would be
+	// worse than saying nothing.
+	return sql.WriteStats{Stats: inserter.buffer.Stats()}, true
 }
 
 func (d *Database) Flush() (time.Duration, error) {

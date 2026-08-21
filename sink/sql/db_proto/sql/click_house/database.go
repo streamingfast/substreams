@@ -26,17 +26,21 @@ import (
 
 type Database struct {
 	*sql.BaseDatabase
-	schema          *schema.Schema
-	sinkInfoFolder  string
-	cursorFilePath  string
-	logger          *zap.Logger
-	dialect         *DialectClickHouse
-	cachedClient    *ch.Client
-	dsn             *db.DSN
-	ctx             context.Context
-	inserter        *AccumulatorInserter
-	spoolOptions    *spool.Options
-	spool           *spool.Spool
+	schema         *schema.Schema
+	sinkInfoFolder string
+	cursorFilePath string
+	logger         *zap.Logger
+	dialect        *DialectClickHouse
+	cachedClient   *ch.Client
+	dsn            *db.DSN
+	ctx            context.Context
+	inserter       *AccumulatorInserter
+	spoolOptions   *spool.Options
+	spool          *spool.Spool
+	// wire counts what actually went down the socket, which the spool's own byte count
+	// cannot: that one is the segment on disk, before ch-go's columnar encoding and
+	// before compression.
+	wire            *wireCounter
 	bytesEncoding   bytes.Encoding
 	queryRetryCount int
 	queryRetrySleep time.Duration
@@ -78,6 +82,7 @@ func NewDatabase(
 		bytesEncoding:   bytesEncoding,
 		queryRetryCount: queryRetryCount,
 		queryRetrySleep: queryRetrySleep,
+		wire:            &wireCounter{},
 	}
 	if database.queryRetryCount <= 0 {
 		database.queryRetryCount = 3
@@ -119,13 +124,16 @@ func (d *Database) Open() error {
 	return nil
 }
 
-func newClient(dsn *db.DSN, logger *zap.Logger) (*ch.Client, error) {
+func newClient(dsn *db.DSN, logger *zap.Logger, counter *wireCounter) (*ch.Client, error) {
 	chOption := ch.Options{
 		Address:     fmt.Sprintf("%s:%d", dsn.Host, dsn.Port),
 		Database:    dsn.Database,
 		User:        dsn.Username,
 		Password:    dsn.Password,
 		DialTimeout: 30 * time.Second,
+	}
+	if counter != nil {
+		chOption.Dialer = counter
 	}
 
 	for key, value := range dsn.Options.Iter() {
@@ -160,7 +168,7 @@ func newClient(dsn *db.DSN, logger *zap.Logger) (*ch.Client, error) {
 
 func (d *Database) client() (*ch.Client, error) {
 	if d.cachedClient == nil || d.cachedClient.IsClosed() {
-		client, err := newClient(d.dsn, d.logger)
+		client, err := newClient(d.dsn, d.logger, d.wire)
 		if err != nil {
 			return nil, fmt.Errorf("creating clickhouse client: %w", err)
 		}
@@ -172,7 +180,7 @@ func (d *Database) client() (*ch.Client, error) {
 }
 
 func (d *Database) freshClient() (*ch.Client, error) {
-	client, err := newClient(d.dsn, d.logger)
+	client, err := newClient(d.dsn, d.logger, d.wire)
 	if err != nil {
 		return nil, fmt.Errorf("creating clickhouse client: %w", err)
 	}
@@ -181,7 +189,7 @@ func (d *Database) freshClient() (*ch.Client, error) {
 }
 
 func (d *Database) clientNoCache(dsn *db.DSN) (*ch.Client, error) {
-	client, err := newClient(dsn, d.logger)
+	client, err := newClient(dsn, d.logger, d.wire)
 	if err != nil {
 		return nil, fmt.Errorf("creating clickhouse client: %w", err)
 	}
@@ -709,12 +717,15 @@ func (d *Database) Close(ctx context.Context) error {
 }
 
 // BufferStats reports what sits between the stream and the server.
-func (d *Database) BufferStats() (int64, int64, uint64, bool) {
+func (d *Database) BufferStats() (sql.WriteStats, bool) {
 	if d.spool == nil {
-		return 0, 0, 0, false
+		return sql.WriteStats{}, false
 	}
 
-	return d.spool.BlocksBuffered(), d.spool.BytesOnDisk(), d.spool.AppliedBlock(), true
+	return sql.WriteStats{
+		Stats:                d.spool.Stats(),
+		DatabaseBytesWritten: d.wire.BytesWritten(),
+	}, true
 }
 
 func (d *Database) DatabaseHash(schemaName string) (uint64, error) {

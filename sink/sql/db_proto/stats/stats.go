@@ -1,6 +1,7 @@
 package stats
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/streamingfast/logging/zapx"
@@ -58,11 +59,18 @@ func (a *Average) LastItemsAverage(count int) time.Duration {
 //
 // Every sample here is one block's cost, and a per-block mean lands in tenths of a
 // microsecond — a column of "0.02ms" and "0.08ms" that no one can weigh against each
-// other or against a wall clock. Times a hundred, the same numbers read in milliseconds
-// and their ratios are obvious at a glance. It is presentation only: Average and
+// other or against a wall clock. Scaled up, the same numbers read in milliseconds and
+// their ratios are obvious at a glance. It is presentation only: Average and
 // LastItemsAverage still return the per-block value that the live-flush heuristic
 // compares against a block time.
-const blocksPerSample = 100
+const blocksPerSample = 1000
+
+// The field names carry the scale, derived from it rather than written out, so the two
+// cannot drift apart when the constant is retuned.
+var (
+	scaledField       = fmt.Sprintf("per_%d_blocks", blocksPerSample)
+	scaledRecentField = fmt.Sprintf("recent_per_%d_blocks", blocksPerSample)
+)
 
 func (a *Average) Log(logger *zap.Logger) { a.LogAs(logger, a.title) }
 
@@ -70,8 +78,8 @@ func (a *Average) Log(logger *zap.Logger) { a.LogAs(logger, a.title) }
 // which write path is in use.
 func (a *Average) LogAs(logger *zap.Logger, title string) {
 	logger.Info(title,
-		zapx.HumanDuration("per_100_blocks", a.Average()*blocksPerSample),
-		zapx.HumanDuration("recent_per_100_blocks", a.LastItemsAverage(a.lastX)*blocksPerSample),
+		zapx.HumanDuration(scaledField, a.Average()*blocksPerSample),
+		zapx.HumanDuration(scaledRecentField, a.LastItemsAverage(a.lastX)*blocksPerSample),
 	)
 }
 

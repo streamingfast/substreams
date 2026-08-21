@@ -194,14 +194,16 @@ func TestFlushDurationIgnoresTheSpoolWhenNothingSpools(t *testing.T) {
 // A per-block mean lands in tenths of a microsecond, which no one can weigh against
 // anything. The stored value stays per-block, because the live-flush heuristic compares
 // it against a block time; only the rendering scales.
-func TestAveragesRenderPerHundredBlocks(t *testing.T) {
+func TestAveragesRenderAtTheBlockScale(t *testing.T) {
 	core, logs := observer.New(zapcore.InfoLevel)
 
 	average := NewAverage("title", 100, 10)
 	average.Add(60 * time.Microsecond)
 	average.Log(zap.New(core))
 
-	require.Equal(t, "6.00ms", logs.All()[0].ContextMap()["per_100_blocks"])
+	rendered := logs.All()[0].ContextMap()
+	require.Equal(t, "60.00ms", rendered[scaledField], "60us a block over 1000 blocks")
+	require.Contains(t, rendered, scaledRecentField)
 	require.Equal(t, 60*time.Microsecond, average.Average(), "the stored value is untouched")
 }
 

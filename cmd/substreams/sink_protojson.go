@@ -55,6 +55,10 @@ func configureProtoJSONFlags(flags *pflag.FlagSet) {
 			`))
 
 	flags.String("filter", ".", "Filter to apply to the data when choosing what to extract. Use '.' to extract the full message from that block.")
+	flags.String("compression", "", FlagMultiLineDescription(`
+				Compression to apply to output files, one of 'zstd' or 'gzip', empty means no compression.
+				The matching extension ('.zst' or '.gz') is appended to the file names.
+			`))
 	flags.String("working-dir", "./localdata/working", "Working store where we accumulate data")
 	flags.Uint64P("blocks-per-file", "n", 1000, "Number of blocks per file")
 
@@ -88,6 +92,12 @@ func JSONRunE(cmd *cobra.Command, args []string) error {
 	stateStorePath := sflags.MustGetString(cmd, "state-file")
 	blocksPerFile := sflags.MustGetUint64(cmd, "blocks-per-file")
 	bufferMaxSize := sflags.MustGetUint64(cmd, "buffer-max-size")
+	compression := sflags.MustGetString(cmd, "compression")
+
+	compressionExtension, err := compressionFileExtension(compression)
+	if err != nil {
+		return err
+	}
 
 	zlog.Info("sink to JSON",
 		zap.String("filter", filter),
@@ -96,6 +106,7 @@ func JSONRunE(cmd *cobra.Command, args []string) error {
 		zap.String("state_store", stateStorePath),
 		zap.Uint64("blocks_per_file", blocksPerFile),
 		zap.Uint64("buffer_max_size", bufferMaxSize),
+		zap.String("compression", compression),
 	)
 
 	sinkerConfig, err := sink.ConfigFromViper(cmd,
@@ -126,7 +137,7 @@ func JSONRunE(cmd *cobra.Command, args []string) error {
 		cli.Ensure(size >= blocksPerFile, "You requested %d blocks per file but your block range spans only %d blocks, this would produce 0 file, refusing to start", blocksPerFile, size)
 	}
 
-	fileOutputStore, err := dstore.NewStore(fileOutputPath, "", "", false)
+	fileOutputStore, err := dstore.NewStore(fileOutputPath, compressionExtension, compression, false)
 	if err != nil {
 		return fmt.Errorf("new store %q: %w", fileOutputPath, err)
 	}
@@ -187,4 +198,19 @@ type description string
 
 func (d description) Apply(cmd *cobra.Command) {
 	cmd.Long = string(d)
+}
+
+// compressionFileExtension returns the file extension matching the compression
+// algorithm, the extension is appended by the store to every written file.
+func compressionFileExtension(compression string) (string, error) {
+	switch compression {
+	case "":
+		return "", nil
+	case "zstd":
+		return "zst", nil
+	case "gzip":
+		return "gz", nil
+	default:
+		return "", fmt.Errorf("invalid compression %q, accepted values are 'zstd', 'gzip' or empty for no compression", compression)
+	}
 }

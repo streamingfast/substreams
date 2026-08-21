@@ -2,6 +2,8 @@ package stats
 
 import (
 	"fmt"
+	"slices"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/logging/zapx"
@@ -9,7 +11,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// Average is a rolling window of per-block durations.
+//
+// It is appended to from the sinker's goroutine and read from the logging ticker's, so it
+// locks. A slice is not safe to grow and range over at the same time: the reader can pick
+// up a header whose length has been published but whose backing array has not, and index
+// past the end of the old one.
 type Average struct {
+	mutex      sync.Mutex
 	Duration   []time.Duration
 	windowSize int
 	title      string
@@ -24,6 +33,9 @@ func NewAverage(title string, windowSize int, lastX int) *Average {
 	}
 }
 func (a *Average) Add(d time.Duration) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
 	a.Duration = append(a.Duration, d)
 	if len(a.Duration) > a.windowSize {
 		a.Duration = a.Duration[1:]
@@ -31,6 +43,9 @@ func (a *Average) Add(d time.Duration) {
 }
 
 func (a *Average) Average() time.Duration {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
 	if len(a.Duration) == 0 {
 		return 0
 	}
@@ -42,6 +57,9 @@ func (a *Average) Average() time.Duration {
 }
 
 func (a *Average) LastItemsAverage(count int) time.Duration {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
 	if len(a.Duration) == 0 {
 		return 0
 	}
@@ -53,6 +71,14 @@ func (a *Average) LastItemsAverage(count int) time.Duration {
 		total += d.Nanoseconds()
 	}
 	return time.Duration(total / int64(count))
+}
+
+// Samples copies the window out, for a caller that wants the values rather than a mean.
+func (a *Average) Samples() []time.Duration {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	return slices.Clone(a.Duration)
 }
 
 // blocksPerSample is what the durations are scaled to before they are printed.
@@ -85,16 +111,23 @@ func (a *Average) LogAs(logger *zap.Logger, title string) {
 
 type Stats struct {
 	logger                    *zap.Logger
-	BlockCount                int
 	WaitDurationBetweenBlocks *Average
 	BlockProcessingDuration   *Average
 	UnmarshallingDuration     *Average
 	BlockInsertDuration       *Average
 	EntitiesInsertDuration    *Average
 	FlushDuration             *Average
-	LastBlockProcessAt        time.Time
-	TotalProcessingDuration   time.Duration
-	TotalDurationBetween      time.Duration
+
+	// The running totals are written per block from the sinker's goroutine and read from
+	// the logging ticker's, so they are guarded too. LastBlockProcessAt is three words, so
+	// a reader can otherwise catch a wall clock and a monotonic reading from either side
+	// of the same write.
+	totalsMutex             sync.Mutex
+	blockCount              int
+	lastBlockProcessAt      time.Time
+	totalProcessingDuration time.Duration
+	totalDurationBetween    time.Duration
+	totalQuotaWait          time.Duration
 
 	// Progress is how far the download is ahead of the database.
 	Progress *Progress
@@ -150,19 +183,88 @@ func NewStats(logger *zap.Logger, blockBatchSize int) *Stats {
 	return s
 }
 
+// RecordBlockProcessed folds one block's wall clock into the running totals.
+//
+// held is the part of it the sinker spent blocked on the spool's disk quota. That is the
+// database refusing more work, not the cost of the block, and leaving it inside the
+// processing figure makes "processing" grow precisely when the database slows down —
+// while the wait between blocks shrinks to nothing, because the stream was never what
+// the sinker was waiting for. It is reported on its own instead.
+func (s *Stats) RecordBlockProcessed(elapsed, held time.Duration) {
+	processing := max(elapsed-held, 0)
+
+	s.BlockProcessingDuration.Add(processing)
+
+	s.totalsMutex.Lock()
+	defer s.totalsMutex.Unlock()
+
+	s.lastBlockProcessAt = time.Now()
+	s.totalProcessingDuration += processing
+	s.totalQuotaWait += held
+}
+
+// RecordBlockReceived notes a block arriving, and how long the sinker waited on the
+// stream for it. It reports whether any block had been seen before this one.
+func (s *Stats) RecordBlockReceived() (waited time.Duration, first bool) {
+	s.totalsMutex.Lock()
+	defer s.totalsMutex.Unlock()
+
+	first = s.blockCount == 0
+	s.blockCount++
+	if first {
+		return 0, true
+	}
+
+	waited = time.Since(s.lastBlockProcessAt)
+	s.totalDurationBetween += waited
+
+	return waited, false
+}
+
+// Start marks the sinker as running, so the wait before the first block is measured from
+// here rather than from the zero time.
+func (s *Stats) Start() {
+	s.totalsMutex.Lock()
+	defer s.totalsMutex.Unlock()
+
+	s.lastBlockProcessAt = time.Now()
+}
+
+// BlockCount is how many blocks have reached the sinker.
+func (s *Stats) BlockCount() int {
+	s.totalsMutex.Lock()
+	defer s.totalsMutex.Unlock()
+
+	return s.blockCount
+}
+
 func (s *Stats) Log() {
 	s.logger.Info("-----------------------------------")
 
-	if s.BlockCount == 0 {
+	s.totalsMutex.Lock()
+	blockCount, lastBlock := s.blockCount, s.lastBlockProcessAt
+	processing, between, quotaWait := s.totalProcessingDuration, s.totalDurationBetween, s.totalQuotaWait
+	s.totalsMutex.Unlock()
+
+	if blockCount == 0 {
 		s.logger.Info("Stats: no blocks processed yet")
 	} else {
-		s.logger.Info("Stats",
-			zap.Int("block_count", s.BlockCount),
-			zapx.HumanDuration("Processing Time", s.TotalProcessingDuration),
-			zapx.HumanDuration("Total Wait Duration", s.TotalDurationBetween),
-			zapx.HumanDuration("Total Duration", s.TotalDurationBetween+s.TotalProcessingDuration),
-			zap.Time("Last Block Process At", s.LastBlockProcessAt),
+		fields := []zap.Field{
+			zap.Int("block_count", blockCount),
+			zapx.HumanDuration("Processing Time", processing),
+			zapx.HumanDuration("Total Wait Duration", between),
+		}
+		// Only when there is one, so a run that never filled its spool is not told about
+		// a category that did not apply to it.
+		if quotaWait > 0 {
+			fields = append(fields, zapx.HumanDuration("Held By Database", quotaWait))
+		}
+		fields = append(fields,
+			zapx.HumanDuration("Total Duration", between+processing+quotaWait),
+			zap.Time("Last Block Process At", lastBlock),
 		)
+
+		s.logger.Info("Stats", fields...)
 
 		s.WaitDurationBetweenBlocks.Log(s.logger)
 		s.BlockProcessingDuration.Log(s.logger)

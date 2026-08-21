@@ -1,6 +1,7 @@
 package stats
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -160,10 +161,10 @@ func TestFlushDurationIsFedByTheApplierWhileSpooling(t *testing.T) {
 	// The counters start at zero with the process, so the first snapshot is itself an
 	// interval: 1s of applying over the 10 blocks it committed.
 	stats.RecordBuffered(0, committed(1, 10, time.Second), true)
-	require.Equal(t, []time.Duration{100 * time.Millisecond}, stats.FlushDuration.Duration)
+	require.Equal(t, []time.Duration{100 * time.Millisecond}, stats.FlushDuration.Samples())
 
 	stats.RecordBuffered(0, committed(2, 20, 3*time.Second), true)
-	require.Equal(t, []time.Duration{100 * time.Millisecond, 200 * time.Millisecond}, stats.FlushDuration.Duration,
+	require.Equal(t, []time.Duration{100 * time.Millisecond, 200 * time.Millisecond}, stats.FlushDuration.Samples(),
 		"the second interval is 2s over 10 blocks, not the running total")
 }
 
@@ -173,22 +174,22 @@ func TestFlushDurationDefersASnapshotWithNoNewBlocks(t *testing.T) {
 	stats := NewStats(zap.NewNop(), 10)
 
 	stats.RecordBuffered(0, committed(1, 10, time.Second), true)
-	require.Len(t, stats.FlushDuration.Duration, 1)
+	require.Len(t, stats.FlushDuration.Samples(), 1)
 
 	// Segment counted, its blocks and duration not yet.
 	stats.RecordBuffered(0, committed(2, 10, time.Second), true)
-	require.Len(t, stats.FlushDuration.Duration, 1, "nothing to measure yet")
+	require.Len(t, stats.FlushDuration.Samples(), 1, "nothing to measure yet")
 
 	// The rest lands: the whole interval is still measured, not just what came after.
 	stats.RecordBuffered(0, committed(2, 20, 3*time.Second), true)
-	require.Equal(t, []time.Duration{100 * time.Millisecond, 200 * time.Millisecond}, stats.FlushDuration.Duration)
+	require.Equal(t, []time.Duration{100 * time.Millisecond, 200 * time.Millisecond}, stats.FlushDuration.Samples())
 }
 
 func TestFlushDurationIgnoresTheSpoolWhenNothingSpools(t *testing.T) {
 	stats := NewStats(zap.NewNop(), 10)
 
 	stats.RecordBuffered(5, protosql.WriteStats{}, false)
-	require.Empty(t, stats.FlushDuration.Duration, "flushHolding owns the timing when the write is inline")
+	require.Empty(t, stats.FlushDuration.Samples(), "flushHolding owns the timing when the write is inline")
 }
 
 // A per-block mean lands in tenths of a microsecond, which no one can weigh against
@@ -218,7 +219,7 @@ func TestInsertTimingIsNamedForThePathInUse(t *testing.T) {
 	} {
 		core, logs := observer.New(zapcore.InfoLevel)
 		stats := NewStats(zap.New(core), 10)
-		stats.BlockCount = 1
+		stats.RecordBlockReceived()
 		stats.RecordBuffered(0, committed(1, 10, time.Second), test.spooling)
 		stats.Log()
 
@@ -232,7 +233,7 @@ func TestWalkTimingIsNamedForTheWalkInBothModes(t *testing.T) {
 	for _, spooling := range []bool{true, false} {
 		core, logs := observer.New(zapcore.InfoLevel)
 		stats := NewStats(zap.New(core), 10)
-		stats.BlockCount = 1
+		stats.RecordBlockReceived()
 		stats.RecordBuffered(0, committed(1, 10, time.Second), spooling)
 		stats.Log()
 
@@ -261,4 +262,67 @@ func TestWireBytesAreOmittedWhenTheDriverCannotCountThem(t *testing.T) {
 
 	throughput = fields(t, logAfter(t, progress, 30*time.Second), "               Spool throughput")
 	require.Equal(t, "4.0 GiB", throughput["db_bytes"])
+}
+
+// The window is appended to from the sinker's goroutine and read from the logging
+// ticker's. Growing a slice while ranging over it can hand the reader a header whose
+// length is published ahead of its backing array.
+func TestStatsSurviveConcurrentRecordingAndLogging(t *testing.T) {
+	stats := NewStats(zap.NewNop(), 10)
+
+	var wait sync.WaitGroup
+	wait.Add(2)
+
+	go func() {
+		defer wait.Done()
+		for block := range 2000 {
+			stats.RecordBlockReceived()
+			stats.RecordBlockProcessed(time.Duration(block)*time.Microsecond, time.Microsecond)
+			stats.BlockProcessingDuration.Add(time.Microsecond)
+			stats.RecordBuffered(0, committed(int64(block), int64(block)*10, time.Second), true)
+		}
+	}()
+
+	go func() {
+		defer wait.Done()
+		for range 2000 {
+			stats.Log()
+			stats.BlockCount()
+		}
+	}()
+
+	wait.Wait()
+}
+
+// Time the sinker spends blocked on the spool's disk quota is the database refusing more
+// work, not the cost of a block. Leaving it in makes "processing" grow exactly when the
+// database slows down.
+func TestHeldTimeIsKeptOutOfTheProcessingTotal(t *testing.T) {
+	core, logs := observer.New(zapcore.InfoLevel)
+	stats := NewStats(zap.New(core), 10)
+
+	stats.RecordBlockReceived()
+	stats.RecordBlockProcessed(10*time.Second, 7*time.Second)
+	stats.Log()
+
+	reported := logs.FilterMessage("Stats").All()[0].ContextMap()
+	require.Equal(t, "3s", reported["Processing Time"], "10s of wall clock less the 7s held")
+	require.Equal(t, "7s", reported["Held By Database"])
+	require.Equal(t, "10s", reported["Total Duration"], "the wall clock is still accounted for")
+
+	require.Equal(t, []time.Duration{3 * time.Second}, stats.BlockProcessingDuration.Samples(),
+		"the per-block average is net of the hold too")
+}
+
+// A run that never filled its spool should not be told about a category that did not
+// apply to it.
+func TestHeldTimeIsAbsentWhenNothingWasHeld(t *testing.T) {
+	core, logs := observer.New(zapcore.InfoLevel)
+	stats := NewStats(zap.New(core), 10)
+
+	stats.RecordBlockReceived()
+	stats.RecordBlockProcessed(time.Second, 0)
+	stats.Log()
+
+	require.NotContains(t, logs.FilterMessage("Stats").All()[0].ContextMap(), "Held By Database")
 }

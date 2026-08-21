@@ -23,6 +23,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   for the database, and what share of its time the applier spends working rather than waiting. That last one is what
   says whether the database or the stream is the limit — a gap on its own never did.
 
+- Fixed: time the sink spends held by a full spool is reported on its own rather than
+  counted as block processing. It happens inside the per-block timer, so a database that
+  cannot keep up used to inflate `Block Processing Duration` and deflate the wait between
+  blocks — saying the sink was busy when it was blocked. The statistics line gains
+  `Held By Database` when there is any.
+
+- Fixed: the statistics windows are no longer appended to and read from two goroutines
+  without synchronisation.
+
 - Spool recovery reports itself while it runs. Replaying the segments a killed backfill left behind happens at startup,
   before anything else logs, and takes as long as it takes to COPY them; it previously said nothing until it had
   finished, which read as a hang.

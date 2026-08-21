@@ -24,6 +24,9 @@ type Sinker struct {
 	rootMessageDescriptor protoreflect.MessageDescriptor
 	lastAppliedBlockNum   uint64
 	lastAppliedBlockTime  time.Time
+	// quotaWaitSoFar is the spool's cumulative held-by-database time as of the last
+	// reading. Touched only on this goroutine, which is the one the quota blocks.
+	quotaWaitSoFar time.Duration
 
 	// directInserts records that the stream reached the chain head and the database was
 	// switched off any buffered write path. It only ever goes from false to true.
@@ -95,7 +98,7 @@ func (s *Sinker) Run(ctx context.Context) error {
 		s.stats.Progress.SetResumeBlock(cursor.Block().Num())
 	}
 
-	s.stats.LastBlockProcessAt = time.Now()
+	s.stats.Start()
 	s.Sinker.Run(ctx, cursor, s)
 
 	return s.Sinker.Err()
@@ -152,18 +155,19 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 		return fmt.Errorf("received data from wrong output module, expected to received from %q but got module's output for %q", s.OutputModuleName(), output.Name)
 	}
 
+	// The spool holds the stream when its disk quota is full, and that hold happens inside
+	// this handler — under StoreCursor, by way of MaybeSeal. Timing the handler alone would
+	// book it as the cost of processing a block, so what the quota held is measured across
+	// the same span and reported separately.
 	startAt := time.Now()
+	heldAt := s.quotaWaitSoFar
 	defer func() {
-		s.stats.LastBlockProcessAt = time.Now()
-		s.stats.BlockProcessingDuration.Add(time.Since(startAt))
-		s.stats.TotalProcessingDuration += time.Since(startAt)
+		s.stats.RecordBlockProcessed(time.Since(startAt), s.quotaWaitSoFar-heldAt)
 	}()
 
-	if s.stats.BlockCount > 0 {
-		s.stats.WaitDurationBetweenBlocks.Add(time.Since(s.stats.LastBlockProcessAt))
-		s.stats.TotalDurationBetween += time.Since(s.stats.LastBlockProcessAt)
+	if waited, first := s.stats.RecordBlockReceived(); !first {
+		s.stats.WaitDurationBetweenBlocks.Add(waited)
 	}
-	s.stats.BlockCount++
 
 	// The switch happens before this block is held, which is what makes the spool safe
 	// against reorgs: `isLive` here comes from the cursor-based liveness checker the sink
@@ -339,6 +343,9 @@ func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
 // memory for the next flush, plus whatever a local buffer has queued on disk.
 func (s *Sinker) recordBuffered() {
 	buffered, buffering := s.db.BufferStats()
+	// Read on this goroutine only, which is also the one the quota blocks, so the handler
+	// can difference it across its own span without a lock.
+	s.quotaWaitSoFar = buffered.QuotaWait
 	s.stats.RecordBuffered(len(s.holding), buffered, buffering)
 }
 

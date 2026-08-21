@@ -68,12 +68,6 @@ That ID is used in two places:
 - as the **hostname** of the store's gRPC endpoint, and
 - as the **store reference** in a Substreams manifest.
 
-{% hint style="warning" %}
-A freshly created store's endpoint is **not reachable immediately** — provisioning usually
-takes **5 to 10 minutes**. Until then calls fail with a gateway error such as
-`fault filter abort`. Wait and retry.
-{% endhint %}
-
 ### Endpoint convention
 
 Once deployed, the store is reachable at:

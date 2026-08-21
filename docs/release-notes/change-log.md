@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
+- Added: `substreams sink protojson --compression` to write output files compressed with `zstd` or `gzip`, appending the matching `.zst` or `.gz` extension to each file. Defaults to no compression.
+
 - Fixed: **BREAKING** `substreams sink postgres` in Relational Mappings Mode stores `bytes` fields as binary in their
   `BYTEA` columns. Under the default `--bytes-encoding=raw` they were corrupted: a 7-byte value became the 14
   characters of its base64 form including quotes, or of its hex form with `--no-constraints`. The same confusion stored

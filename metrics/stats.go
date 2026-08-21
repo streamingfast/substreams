@@ -122,6 +122,50 @@ type Stats struct {
 	windowLocalBlocks windowedCounter
 	// windowExternalCalls turns the cumulative external-call totals into a windowed delta.
 	windowExternalCalls windowedCallCounters
+
+	// foundationalResolves is filled once at request start on tier1 when identifiers
+	// are turned into endpoints. Failures matter more than hits: a miss here means
+	// every worker and the linear path will fail the same way.
+	foundationalResolves []foundationalStoreResolve
+}
+
+type foundationalStoreResolve struct {
+	identifier string
+	address    string
+	elapsed    time.Duration
+	err        string
+}
+
+func (r foundationalStoreResolve) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
+	encoder.AddString("identifier", r.identifier)
+	if r.address != "" {
+		encoder.AddString("address", r.address)
+	}
+	encoder.AddString("duration", humanDuration(r.elapsed))
+	if r.err != "" {
+		encoder.AddString("error", r.err)
+	}
+	return nil
+}
+
+// RecordFoundationalStoreResolve records one identifier lookup for the request
+// progress log and for the Prometheus counters.
+func (s *Stats) RecordFoundationalStoreResolve(identifier, address string, elapsed time.Duration, err error) {
+	if s == nil {
+		return
+	}
+	rec := foundationalStoreResolve{
+		identifier: identifier,
+		address:    address,
+		elapsed:    elapsed,
+	}
+	if err != nil {
+		rec.err = err.Error()
+	}
+	s.Lock()
+	s.foundationalResolves = append(s.foundationalResolves, rec)
+	s.Unlock()
+	RecordFoundationalStoreResolution(err == nil, elapsed)
 }
 
 type runningJobs map[uint64]*extendedJob
@@ -581,9 +625,14 @@ func (s *Stats) RecordJobRetried(jobIdx uint64) {
 func (s *Stats) RecordEndSubrequest(jobIdx uint64, status JobStatus) {
 	s.Lock()
 	defer s.Unlock()
-	job := s.runningJobs[jobIdx]
+	job, ok := s.runningJobs[jobIdx]
+	if !ok {
+		return
+	}
 
-	for i := 0; i <= int(job.Stage); i++ {
+	// The stage list is only known once the scheduler has reported it; a caller that runs
+	// jobs without one (the cost estimator's sparse sample) still gets the counters below.
+	for i := 0; i <= int(job.Stage) && i < len(s.stages); i++ {
 		for _, mod := range s.stages[i].Modules {
 			if _, ok := s.modulesStats[mod]; !ok {
 				s.modulesStats[mod] = newExtendedStats(mod)

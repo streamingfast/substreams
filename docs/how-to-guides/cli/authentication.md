@@ -4,57 +4,62 @@ This guide explains how to authenticate when running a Substreams package (`.spk
 
 ## Overview
 
-`substreams auth` opens a browser so you can pick an organization (if you belong to more than one) and an API key. The CLI retrieves the selected key over the API — you do not copy and paste it — exchanges it for a JWT, and writes the token to `.substreams.env`.
+Substreams requires authentication to ensure secure and controlled access to providers. This guide focuses on obtaining and using a JWT token from The Graph Market to authenticate your Substreams execution.
 
 ## Prerequisites
 
-- The [Substreams CLI](./installing-the-cli.md) installed.
-- A browser, so you can sign in and pick a key.
-- An account with [The Graph Market](https://thegraph.market), or be ready to create one during login.
+- A Substreams package (`.spkg`) ready to deploy.
+- An account with [The Graph Market](https://thegraph.market).
 
-## Step 1: Run login
+## Step 1: Obtain a JWT Token
 
-```bash
-substreams auth
-```
+To authenticate with The Graph Market, you need to generate a JWT token. Follow these steps:
 
-The command prints an approval URL (and tries to open it in your browser). Sign in, choose an organization if asked, then select an API key.
+1. **Log in to The Graph Market**:
+   - Visit [https://thegraph.market](https://thegraph.market).
+   - Log in to your existing account or create a new one if you don't have an account.
 
-On success it writes `.substreams.env` with `SUBSTREAMS_API_TOKEN`. Add that file to `.gitignore`.
+2. **Access the Dashboard**:
+   - Click on `Dashboard` in the navigation menu or go directly to [https://thegraph.market/dashboard](https://thegraph.market/dashboard).
 
-## Step 2: Load the credentials
+   ![Dashboard](../../.gitbook/assets/intro/thegraphmarket.png)
 
-```bash
-. ./.substreams.env
-```
+3. **Create a New API Key**:
+   - In the dashboard, click on `Create New Key`.
+   - Input a recognizable name for future reference.
+   - This is not the _authentication token_, but a key to generate tokens.
 
-Other `substreams` commands also read `.substreams.env` automatically when it is present next to the manifest (or in the current directory).
+4. **Generate an API Token**:
+   - For security reasons, the API token is hidden. In the `API TOKEN` section, click the button besides the hidden token.
+   - The system will generate a JWT token. **Copy** and **save** this token securely, as it will be required for authentication.
 
-## Paste a JWT or API key instead
+## Step 2: Set the JWT Token as an Environment Variable
 
-If you already have a Graph Market JWT or `server_` API key:
+To authenticate Substreams on your local machine, you need to set the JWT token as an environment variable.
 
-```bash
-substreams auth --paste
-```
+### Unix-like Systems (macOS, Linux)
 
-Paste the value when prompted. An API key is exchanged for a JWT automatically.
+1. **Open a terminal** on your machine.
 
-You can also set the token yourself:
+2. **Set the environment variable** using the following command:
 
-```bash
-export SUBSTREAMS_API_TOKEN="<YOUR-JWT-TOKEN>"
-```
+   ```bash
+   export SUBSTREAMS_API_TOKEN="<YOUR-JWT-TOKEN>"
+   ```
 
-## Step 3: Verify authentication
+   Replace `<YOUR-JWT-TOKEN>` with the JWT token you obtained earlier.
 
-Run a test Substreams against Ethereum Mainnet:
+## Step 3: Verify Authentication
 
-```bash
-substreams gui ethereum-common@v0.3.1 all_events --start-block=15000000
-```
+To ensure that your authentication is set up correctly, you can run a test Substreams. Here's how:
 
-If the stream starts without an authentication error, your credentials are in place.
+1. Run the following command in your terminal to get all the events on Ethereum Mainnet:
+
+   ```bash
+   substreams gui ethereum-common@v0.3.1 all_events --start-block=15000000
+   ```
+
+2. Verify that the Substreams runs without errors, confirming that your authentication is successful.
 
 ## Need Help?
 

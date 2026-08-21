@@ -23,7 +23,6 @@ type Tier2RequestParameters struct {
 
 	WASMModules                map[string]string
 	FoundationalStoreEndpoints map[string]string
-	HostedStoreRegistryAddress string
 }
 
 func WithTier2RequestParameters(ctx context.Context, parameters Tier2RequestParameters) context.Context {

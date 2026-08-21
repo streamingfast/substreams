@@ -137,6 +137,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+- `substreams estimate` asks the endpoint for the estimate instead of sampling from the client. The endpoint runs the
+  sample on its own workers and only reports the measured sizes, so the estimation costs processed blocks and no
+  egress, it accounts for what the endpoint's cache already holds, and it works with modules that have stores. The
+  sampled fraction is set with `--sample-percentage` (default 1%).
+
+- Added `substreams estimate-local`, which is the previous `substreams estimate`: sampling done by the client, for
+  endpoints without remote estimation. It keeps `--samples` and `--parallel-requests`, and its limitations
+  (single-stage modules only, and the sampled blocks are streamed back so the estimation itself costs egress).
+
 - `substreams run` reports backprocessing as progress and rates instead of a list of block ranges. A four-line session
   header (trace ID, module, chain, work to do including what was already cached) is printed once and stays in the
   scrollback, followed by a compact live block: overall percentage, blocks per second, ETA, running jobs against the
@@ -181,7 +190,67 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Added Ethereum Hoodi testnet (`hoodi`) StreamingFast endpoints (`hoodi.eth.streamingfast.io:443`).
 
+- A packed `.spkg` now records the initial block of *every* module under *every* network it declares, along with the
+  effective params of every module accepting them, instead of only the values explicitly written in the manifest's
+  `networks:` section. A consumer such as substreams.dev can describe what the package does on each of its networks
+  without reimplementing the module-graph derivation. For a 20-module package supporting 10 networks this adds roughly
+  3 KB.
+
+- Fixed: switching networks on a packed `.spkg` no longer leaves modules that inherit their initial block pinned to the
+  network that was active when the package was packed. Only modules named explicitly under `networks:` were being
+  overridden, and the derivation that would have updated the others had already been baked in at pack time, so a package
+  packed on `mainnet` and run with `--network sepolia` silently kept `mainnet` start blocks for every derived module.
+  Packages published before this release need to be repacked from source: the information needed to correct them is not
+  recoverable from the artifact.
+
+- `substreams pack`, `substreams registry publish` and `substreams registry verify` warn when a network name is not a
+  known Firehose network registry ID or alias, or when it is an alias resolving to several networks — consumers cannot
+  map such a name onto a real chain. It stays a warning, never an error, so private and unlisted chains keep publishing.
+
+- `substreams info` gained `--network`, to inspect a package as any of the networks it declares rather than only its
+  default one, and `--expand-networks`, to list the initial block and params of every module under every network. The
+  `Networks` section is summarized to one line per network by default, since a package supporting many networks now
+  carries an entry per module per network.
+
 ### Server
+
+- Added `sf.substreams.rpc.v4.Estimator/Estimate` on `substreams-tier1`: a cost estimate for a request, without ever
+  sending the data. Given a package, an output module, a block range and a sampling percentage (default 1%), it reports
+  how many blocks the real request would have to process (stage multiplier included, cached segments excluded) and the
+  estimated uncompressed egress for the range. The egress figure is measured: the sample is actually executed on tier2
+  workers, then only the *size* of the resulting output cache is read back — from the object store's metadata when it is
+  there, so the data itself is never downloaded. A module graph with stores is only estimated over a range whose store
+  snapshots the endpoint already holds; anything else is refused, naming the part of the range that could be estimated
+  instead, since building the missing stores is the very cost being reported.
+
+  The egress figure covers the whole `BlockScopedData` a client receives, not just the module payload: the module name,
+  output type URL, clock, cursor and final block height are sent with every message and dominate the egress of a module
+  whose per-message output is small. That overhead is counted once per message rather than once per block, so a module
+  gated by a block index — which only runs, and is only sent, on matching blocks — is not charged for the blocks it
+  skips. Each sample is extrapolated over the slice of the range it stands for, at the average of the rates measured at
+  that slice's two ends, and the reported total is the sum of those slices, so a range whose activity varies is no
+  longer flattened into a single average.
+
+  When the module graph is gated by a block filter, the block count is measured too: each sample job reports the blocks
+  it was actually run on, and that share is extrapolated over the range the same way, so the report no longer bills a
+  filtered module for the blocks its index skips.
+
+  The blocks left to process are counted after the estimate itself: the sample jobs fill the output cache, so a request
+  issued right after finds those segments there. The "if nothing was cached" figure is unaffected.
+
+- `substreams-tier2` records the uncompressed size of each execution output file it writes as `datasize` object
+  metadata, and how many items it holds as `itemcount`, so what a segment represents can be known without downloading
+  it: the item count is the number of `BlockScopedData` messages a consumer of that segment receives, which on a module
+  gated by a block index is far below the number of blocks the segment covers. Skipped on object stores where setting
+  metadata means rewriting the object (S3), which falls back to reading the file when the figures are needed.
+
+- Foundational-store endpoint resolution no longer imports the private `services-control-plane` module. The public
+  `dregistry` plugin chain (JSON map → control-plane `sf.registry.v1` → identifier passthrough) replaces the inline
+  client. Existing `FoundationalStoresConfigPath` and `HostedStoreRegistryAddress` flags are unchanged on tier1; they
+  are composed into that chain internally. Tier1 resolves identifiers once per request and sends the concrete endpoints
+  to tier2, so workers look up that static map and do not dial the control plane. Store dials now honor the registry's TLS flag instead of guessing
+  from `:443`. Resolution success and failure are recorded on the request progress log and as Prometheus metrics.
+  Each identifier lookup times out after 10 seconds so a hung control-plane RPC cannot stall request setup.
 
 - `substreams-tier1` restarts when its block hub can no longer link incoming live blocks, instead of hanging every
   request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be
@@ -191,6 +260,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   back to a file source that waits for merged-blocks to cover that number, it now immediately sends an undo-to-LIB. 
 
 ### Library
+
+- **Breaking** Renamed the misspelled `foudational_store` package to `foundational_store`.
 
 - **Breaking** `sql.Database.WalkMessageDescriptorAndInsert`, `WalkMessageDescriptorAndInsertInto`,
   `BaseDatabase.WalkMessageDescriptorAndInsertWithDialect` and `sql.Dialect.AppendInlineFieldValues` take a
@@ -217,6 +288,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Bumped notably `github.com/ClickHouse/clickhouse-go/v2` to v2.48.0, `github.com/AfterShip/clickhouse-sql-parser` to
   v0.5.5, `google.golang.org/grpc` to v1.83.0 and the OpenTelemetry SDK to v1.45.0.
+
+- `golang.org/x/mod` is at v0.40.0, which clears CVE-2026-56864 and CVE-2026-56865, both reported as HIGH against the
+  published `ghcr.io/streamingfast/substreams` image.
 
 ### Summary of changed flags and subcommands
 
@@ -250,7 +324,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 setup                         no longer creates constraints by default; needs --apply-constraints=always
 cross-mode flags              wrong-mode flags now hard-error at startup (develop warned/ignored)
 clickhouse state flags        --cursor-file-path etc. now also on setup; defaults unchanged
-
 
 ## v1.21.0
 

@@ -2,6 +2,8 @@ package manifest
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/schollz/closestmatch"
@@ -42,17 +44,104 @@ func ApplyNetwork(network string, pkg *pbsubstreams.Package) error {
 			closest = append(closest, module.Name)
 			if module.Name == mod {
 				module.InitialBlock = block
+				found = true
 			}
-			found = true
 		}
 		if !found {
 			closeEnough := closestmatch.New(closest, []int{2}).Closest(mod)
-			return fmt.Errorf("param for module %q: module not found, did you mean %q ?", mod, closeEnough)
+			return fmt.Errorf("initialBlock for module %q: module not found, did you mean %q ?", mod, closeEnough)
 		}
 
 	}
 
 	return nil
+}
+
+// densifyNetworks expands every network entry so that each module of the package carries an explicit
+// 'initialBlock', and each module accepting params carries an explicit 'params' value. A packaged
+// .spkg then describes every network it supports without a consumer having to re-derive anything
+// from the module graph.
+//
+// It must run before ApplyNetwork and computeInitialBlock, while modules still hold their authored
+// initial block, UNSET being the marker for "derive me from the module graph". Once computeInitialBlock
+// has replaced those markers, modules inheriting their initial block are frozen to whichever network
+// was active at that moment, and the authored intent is unrecoverable.
+//
+// Modules are left exactly as they were found, so the regular resolution that follows is unaffected.
+func densifyNetworks(pkg *pbsubstreams.Package, graph *ModuleGraph) error {
+	if pkg.Networks == nil {
+		return nil
+	}
+
+	modules := pkg.Modules.GetModules()
+
+	// The default network is allowed to have no entry of its own, ApplyNetwork would then fail to find it.
+	if pkg.Network != "" {
+		if _, found := pkg.Networks[pkg.Network]; !found {
+			pkg.Networks[pkg.Network] = &pbsubstreams.NetworkParams{}
+		}
+	}
+
+	authoredInitialBlocks := make([]uint64, len(modules))
+	for i, module := range modules {
+		authoredInitialBlocks[i] = module.InitialBlock
+	}
+
+	restoreAuthored := func() {
+		for i, module := range modules {
+			module.InitialBlock = authoredInitialBlocks[i]
+		}
+	}
+	defer restoreAuthored()
+
+	for _, name := range slices.Sorted(maps.Keys(pkg.Networks)) {
+		netParams := pkg.Networks[name]
+
+		restoreAuthored()
+		for _, module := range modules {
+			if initialBlock, found := netParams.InitialBlocks[module.Name]; found {
+				module.InitialBlock = initialBlock
+			}
+		}
+
+		if err := computeInitialBlock(modules, graph); err != nil {
+			return fmt.Errorf("network %q: %w", name, err)
+		}
+
+		initialBlocks := make(map[string]uint64, len(modules))
+		for _, module := range modules {
+			initialBlocks[module.Name] = module.InitialBlock
+		}
+		netParams.InitialBlocks = initialBlocks
+
+		netParams.Params = densifiedParams(netParams.Params, modules)
+	}
+
+	return nil
+}
+
+// densifiedParams returns the effective param value of every module accepting one, which is the
+// network's own override when it has one and the value carried by the module otherwise. Modules
+// without a 'params' input are skipped, ApplyParams rejects them.
+func densifiedParams(overrides map[string]string, modules []*pbsubstreams.Module) map[string]string {
+	var out map[string]string
+	for _, module := range modules {
+		if len(module.Inputs) == 0 || module.Inputs[0].GetParams() == nil {
+			continue
+		}
+
+		value := module.Inputs[0].GetParams().Value
+		if override, found := overrides[module.Name]; found {
+			value = override
+		}
+
+		if out == nil {
+			out = make(map[string]string)
+		}
+		out[module.Name] = value
+	}
+
+	return out
 }
 
 // validateNetworks checks that network overloads have the same keys for initialBlocks and params for modules that are owned by the package

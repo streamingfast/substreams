@@ -39,9 +39,8 @@ type Tier2Config struct {
 	SegmentExecutionTimeout   time.Duration
 	SegmentStallTimeout       time.Duration
 	TmpDir                    string
-	StoresScratchSpace             string
-	StoresBackend                  string
-	HostedStoreRegistryAddress     string
+	StoresScratchSpace        string
+	StoresBackend             string
 
 	Tracing bool
 }
@@ -131,8 +130,6 @@ func (a *Tier2App) Run() error {
 	if err != nil {
 		return err
 	}
-
-	svc.HostedStoreRegistryAddress = a.config.HostedStoreRegistryAddress
 
 	if a.modules.Authenticator == nil {
 		trustAuth, err := dauth.New("trust://", a.logger)

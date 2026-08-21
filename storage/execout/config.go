@@ -3,6 +3,7 @@ package execout
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +14,28 @@ import (
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
+
+// MetadataDataSize is the object-store metadata key under which the uncompressed size of
+// an execution output file's payloads is recorded. Same key as the one used for store
+// snapshots.
+const MetadataDataSize = "datasize"
+
+// MetadataItemCount is the object-store metadata key under which the number of items an
+// execution output file holds is recorded. One item is one block the module produced output
+// for, and one `BlockScopedData` message on the wire — which is not the same as one block of
+// the range: a module gated by a block index runs, and is sent, only on matching blocks.
+const MetadataItemCount = "itemcount"
+
+// setMetadataTimeout bounds the fire-and-forget metadata write so it can never hang
+// indefinitely.
+const setMetadataTimeout = 30 * time.Second
+
+// metadataRewriteSchemes lists the dstore backends whose SetMetadata rewrites the object
+// instead of updating it in place. S3 exposes no metadata-update API, so dstore implements
+// it as a CopyObject onto itself: a full server-side copy of every execution output file,
+// which also resets LastModified and adds a version when versioning is on. Too much to pay
+// on every segment for a size hint the reader can recompute, so those backends are skipped.
+var metadataRewriteSchemes = map[string]bool{"s3": true}
 
 type Config struct {
 	name               string
@@ -83,6 +106,74 @@ func (c *Config) OpenFileReader(ctx context.Context, targetRange *block.Range) (
 
 func (c *Config) NewFileWriter(ctx context.Context, targetRange *block.Range) FileWriter {
 	return NewFileWriter(ctx, c.objStore, c.logger, targetRange, c.name)
+}
+
+// OutputStats returns the total uncompressed size of the module payloads held in the output
+// file for the given range, and how many items it holds.
+func (c *Config) OutputStats(ctx context.Context, targetRange *block.Range) (size, items uint64, fromMetadata bool, err error) {
+	return OutputStats(ctx, c.objStore, c.logger, targetRange, c.name)
+}
+
+// OutputStats returns the total uncompressed size of the module payloads held in the output
+// file for the given range, and how many items it holds. The item count is what a consumer
+// of that segment receives as `BlockScopedData` messages, so it is what the per-message
+// overhead of a real request has to be multiplied by.
+//
+// It prefers the figures recorded as object metadata when the file was written, which cost a
+// single attributes lookup; `fromMetadata` then reports true. When the attributes carry
+// neither — a file written before that metadata existed, a backend that does not support
+// metadata at all, or one where recording it is too expensive (see metadataRewriteSchemes) —
+// the file is read and its items added up, which is much more expensive.
+//
+// A failing attributes lookup is not one of those fallbacks: it is reported as
+// [dstore.ErrNotFound], because backends disagree on how they signal a missing object (only
+// GCS maps it to that error) and there is nothing to measure either way, so the caller gets
+// a single condition to handle.
+func OutputStats(ctx context.Context, objStore dstore.Store, logger *zap.Logger, targetRange *block.Range, moduleName string) (size, items uint64, fromMetadata bool, err error) {
+	filename := computeDBinFilename(targetRange.StartBlock, targetRange.ExclusiveEndBlock)
+
+	attrs, err := objStore.ObjectAttributes(ctx, filename)
+	if err != nil {
+		return 0, 0, false, fmt.Errorf("%w: getting object attributes of %q: %w", dstore.ErrNotFound, filename, err)
+	}
+	// Both keys are written together, so a file carrying only one of them predates the other
+	// and has to be read anyway; there is no point in reporting half the answer.
+	if size, sizeFound := parseMetadataCount(logger, filename, attrs.Metadata, MetadataDataSize); sizeFound {
+		if items, itemsFound := parseMetadataCount(logger, filename, attrs.Metadata, MetadataItemCount); itemsFound {
+			return size, items, true, nil
+		}
+	}
+
+	reader, err := OpenFileReader(ctx, objStore, logger, targetRange, moduleName)
+	if err != nil {
+		return 0, 0, false, fmt.Errorf("opening %q: %w", filename, err)
+	}
+	defer reader.Close()
+
+	for item, err := range reader.Iter() {
+		if err != nil {
+			return 0, 0, false, fmt.Errorf("reading %q: %w", filename, err)
+		}
+		size += uint64(len(item.Payload))
+		items++
+	}
+
+	return size, items, false, nil
+}
+
+func parseMetadataCount(logger *zap.Logger, filename string, metadata map[string]string, key string) (uint64, bool) {
+	raw, found := metadata[key]
+	if !found {
+		return 0, false
+	}
+
+	value, err := strconv.ParseUint(raw, 10, 64)
+	if err != nil {
+		logger.Info("cannot parse execution output metadata, falling back to reading the file",
+			zap.String("filename", filename), zap.String("key", key), zap.String("value", raw), zap.Error(err))
+		return 0, false
+	}
+	return value, true
 }
 
 func (c *Config) Name() string                        { return c.name }

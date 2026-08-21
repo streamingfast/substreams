@@ -10,12 +10,18 @@ import (
 //
 // It is a snapshot rather than a set of accessors because the numbers only mean anything
 // together: rows without the time they took is not a rate, and a gap without the
-// applier's occupancy does not say whose fault it is. Everything cumulative counts from
-// process start, so the caller derives intervals by differencing two snapshots.
+// applier's occupancy does not say whose fault it is.
+//
+// The cumulative fields count what this process's applier goroutine has committed, so the
+// caller derives intervals by differencing two snapshots. Segments replayed by recovery
+// are not among them: recovery applies them before the goroutine starts, and counting
+// another run's work as this one's throughput would misreport the rate for as long as the
+// averages take to age out.
 type Stats struct {
-	// Applied, cumulative. Bytes is the segment size on disk, in whatever format the
-	// codec writes — it is what the sizer steers and what the disk quota bounds, not what
-	// crossed the network.
+	// Applied, cumulative: each counts only what a segment that reached the database
+	// carried, never what is still queued. Bytes is that segment's size on disk, in
+	// whatever format the codec writes — what the sizer steers and the disk quota bounds,
+	// not what crossed the network.
 	Segments      int64
 	Blocks        int64
 	Rows          int64

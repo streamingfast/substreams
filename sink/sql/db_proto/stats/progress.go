@@ -21,8 +21,8 @@ import (
 // run should be limited by the stream, not by the database — and when it is not, the gap
 // is where that shows. But a gap alone does not say whose fault it is: it grows both when
 // the database is slow and when the stream merely bursts. That is what the spool's own
-// account is here for, and why it lives on the same type rather than beside it — the two
-// were being fed the same numbers from the same call and rendering them twice.
+// account is here for, and why it lives on this type rather than beside it: both are fed
+// from one call, and a second tracker would hold the same numbers and print them twice.
 //
 // The counters are written from the sinker's goroutine and read from the logging ticker,
 // hence the atomics; the write-path snapshot is a struct, hence the mutex.
@@ -129,8 +129,8 @@ func (p *Progress) RecordBuffered(held int, buffered protosql.WriteStats, spooli
 	// and it is what the closed-spool totals are printed from.
 }
 
-// Spooling reports whether rows are going to disk right now, which is what decides that a
-// flush no longer means the rows are stored.
+// Spooling reports whether rows are going to disk right now, which is what decides
+// whether a flush means the rows are stored.
 func (p *Progress) Spooling() bool {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
@@ -231,7 +231,7 @@ func (p *Progress) Log(logger *zap.Logger) {
 			zap.Int64("segments", current.Segments),
 			zap.Int64("blocks", current.Blocks),
 			zap.String("rows", humanize.Comma(current.Rows)),
-			zap.String("spooled_bytes", humanBytes(current.Bytes)),
+			zap.String("total_applied_bytes", humanBytes(current.Bytes)),
 			zapx.HumanDuration("applying", current.ApplyDuration),
 			zapx.HumanDuration("quota_wait", current.QuotaWait),
 		}
@@ -272,11 +272,13 @@ func (p *Progress) logSpool(logger *zap.Logger, current, previous protosql.Write
 
 	throughput := []zap.Field{
 		zap.String("rows", fmt.Sprintf("%s/s (%s total)", humanize.Comma(perSecond(rows, elapsed)), humanize.Comma(current.Rows))),
-		// Named for what it is: the spooled payload the applier consumed, which is what
-		// the sizer and the disk quota are denominated in. db_bytes is what reached the
-		// server, after the driver's encoding and any compression.
-		zap.String("spool_rate", humanBytes(perSecond(bytes, elapsed))+"/s"),
-		zap.String("spooled_bytes", humanBytes(current.Bytes)),
+		// Counted only once a segment has reached the database, and sized in the format
+		// the codec wrote rather than on the wire: with COPY the two coincide, but a
+		// rendered write mode wraps the payload in statements and ClickHouse re-encodes
+		// it columnar and may compress it. db_bytes is the wire figure where a driver can
+		// measure it.
+		zap.String("applied_rate", humanBytes(perSecond(bytes, elapsed))+"/s"),
+		zap.String("total_applied_bytes", humanBytes(current.Bytes)),
 	}
 	// Only a driver that counts its own socket can answer this — pgx owns the connection,
 	// so the PostgreSQL path leaves it zero. Printing that zero would read as a database

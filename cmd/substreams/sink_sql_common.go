@@ -524,12 +524,14 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 
 	app.SuperviseAndStartUsing(sqlSinker, sqlSinker.Run)
 
-	// The graceful delay has to outlast the sinker's own shutdown work, not merely be
-	// non-zero: WaitForTermination treats 0 as "do not wait" — unlike BlockUntilTerminated,
-	// where 0 means "wait forever" — so it returned while Run was still being cancelled and
-	// the process exited before its defers. That lost the final stats, and worse, the seal
-	// of the open spool segment. closeTimeout bounds that seal at 30s, so we have to put a
-	// higher duration here.
+	// The graceful delay has to outlast the sinker's own shutdown work, and must not be
+	// zero: WaitForTermination reads 0 as "do not wait" — unlike BlockUntilTerminated,
+	// where it means "wait forever" — and returns while Run is still being cancelled, so
+	// none of its defers get to run. Those defers seal the open spool segment; without
+	// them its blocks are streamed, and paid for, a second time on the next start.
+	//
+	// db_proto's closeTimeout bounds that shutdown at 30s, so anything above it is enough
+	// and anything below it truncates the seal on a slow disk.
 	if err := app.WaitForTermination(zlog, 0, 45*time.Second); err != nil {
 		cli.Quit("application terminated with error: %s", err)
 	}

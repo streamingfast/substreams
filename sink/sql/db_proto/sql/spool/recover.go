@@ -37,13 +37,12 @@ func (b *Spool) recover(ctx context.Context) error {
 	}
 	slices.Sort(dirs)
 
-	// Said before the first segment is touched, not after the last.
+	// Announced before the first segment is touched, because a summary at the end cannot
+	// be read until the wait it describes is over.
 	//
-	// Recovery runs inside Open, which is before the sinker starts and before anything
-	// else logs, and replaying a spool a killed backfill left behind is minutes of binary
-	// COPY. Reporting only the summary at the end meant those minutes looked like a hang
-	// at startup: the process was busy in the database, and the last thing it had said was
-	// that it had read the sink info.
+	// Recovery runs inside Open, ahead of the sinker and of anything else that logs, and
+	// replaying the spool a killed backfill left behind is minutes of binary COPY. Silence
+	// across those minutes is indistinguishable from a process that has hung.
 	b.logger.Info("recovering the local spool, the stream does not start until this finishes",
 		zap.Int("segments_on_disk", len(dirs)),
 		zap.String("dir", b.options.Dir))

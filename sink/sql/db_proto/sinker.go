@@ -301,9 +301,9 @@ func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
 		return fmt.Errorf("flushing: %w", err)
 	}
 
-	// Only when the rows really were written here. With a spool this call returned
-	// before anything reached the server, and the timing is fed from what the applier
-	// committed instead — see Stats.RecordBuffered.
+	// Only when the rows really were written here. With a spool, Flush returns before
+	// anything reaches the server, and the timing comes from what the applier committed
+	// instead — see Stats.RecordBuffered.
 	buffered, buffering := s.db.BufferStats()
 	if !buffering && len(s.holding) > 0 {
 		s.stats.FlushDuration.Add(flushDuration / time.Duration(len(s.holding)))
@@ -345,10 +345,9 @@ func (s *Sinker) recordBuffered() {
 // recordDecodeStats folds the per-block timings the workers measured back into the
 // shared stats, on this goroutine: Average.Add is not safe for concurrent use.
 //
-// Every duration here is one block's. The insert used to be added once per batch while
-// the two above it were added per block, so the panel reported three averages in the same
-// column with one of them in a different unit, and it grew with --decode-batch-size
-// rather than with the cost of a block.
+// Every duration here is one block's, including the insert. The panel prints the three
+// as one column of averages, so a total added once per batch would sit among them in a
+// different unit and grow with --decode-batch-size rather than with the cost of a block.
 func (s *Sinker) recordDecodeStats(results []*decoded) {
 	for _, result := range results {
 		if result.empty {

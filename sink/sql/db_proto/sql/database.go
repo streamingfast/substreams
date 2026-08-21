@@ -92,10 +92,10 @@ type Database interface {
 	// which case the caller knows a flush means the rows are stored and the snapshot
 	// says nothing.
 	//
-	// It returns the whole snapshot rather than the few numbers the progress line
-	// started with because they are only readable together: a gap says the database is
-	// behind, and only the applier's occupancy next to it says whether that is the
-	// database being slow or the stream having burst.
+	// The whole snapshot rather than the few numbers the gap needs, because they are only
+	// readable together: a gap says the database is behind, and only the applier's
+	// occupancy next to it says whether that is the database being slow or the stream
+	// having burst.
 	BufferStats() (stats WriteStats, enabled bool)
 }
 

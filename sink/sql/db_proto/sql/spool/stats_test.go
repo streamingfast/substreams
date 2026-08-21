@@ -175,8 +175,8 @@ func TestSealReasonNamesEveryCountItIndexes(t *testing.T) {
 }
 
 // Recovery runs inside Open, before the sinker starts and before anything else logs, and
-// replaying a spool a killed backfill left behind is minutes of COPY. It has to say so on
-// the way in: reporting only the summary at the end made those minutes read as a hang.
+// replaying the spool a killed backfill left behind is minutes of COPY. It has to say so
+// on the way in: a summary at the end cannot be read until the wait is already over.
 func TestRecoveryAnnouncesItselfBeforeReplaying(t *testing.T) {
 	root := t.TempDir()
 	segment := filepath.Join(root, "test", "seg-000000000001")
@@ -246,9 +246,10 @@ func (a *blockingApplier) Apply(context.Context, string, *Manifest) error {
 	return nil
 }
 
-// A segment that takes longer than the logging interval used to contribute to neither
-// side of the ratio, so an applier pinned on a degraded database reported itself as doing
-// nothing — the exact inversion of the reading this number exists to give.
+// A segment that takes longer than the logging interval must still count towards the
+// ratio while it runs. Counting only on completion leaves an applier pinned on a degraded
+// database reporting itself as doing nothing — the exact inversion of the reading this
+// number exists to give.
 func TestApplierBusyCountsTheSegmentStillInFlight(t *testing.T) {
 	applier := &blockingApplier{entered: make(chan struct{}), release: make(chan struct{})}
 	options := Options{Dir: t.TempDir(), MaxIdle: -1}

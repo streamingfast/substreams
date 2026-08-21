@@ -103,7 +103,7 @@ func TestRatesAreDifferencedBetweenTicks(t *testing.T) {
 
 	throughput := fields(t, logAfter(t, progress, time.Minute), "               Spool throughput")
 	require.Contains(t, throughput["rows"], "(6,200 total)", "the total stays cumulative")
-	require.Equal(t, "3.0 MiB", throughput["spooled_bytes"], "bytes are cumulative; only the rate is differenced")
+	require.Equal(t, "3.0 MiB", throughput["total_applied_bytes"], "bytes are cumulative; only the rate is differenced")
 }
 
 // The applier's occupancy is the one number that says whether the database or the stream

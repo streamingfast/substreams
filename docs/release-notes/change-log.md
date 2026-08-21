@@ -13,6 +13,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
+- Fixed: `substreams sink postgres|clickhouse` in Relational Mappings Mode now waits for the sink to shut down before
+  the process exits. On SIGINT or SIGTERM it returned immediately, so the run's final statistics were lost and — worse
+  — the open spool segment was never sealed, and every block it held was streamed, and paid for, again on the next
+  start. Interrupting a backfill is the normal way one ends, so this affected most runs.
+
+- The periodic statistics now report what the local spool is doing: segments committed and their rate, rows and bytes
+  applied, how long one commit takes, how much of the disk budget is in use, how long the stream has been held waiting
+  for the database, and what share of its time the applier spends working rather than waiting. That last one is what
+  says whether the database or the stream is the limit — a gap on its own never did.
+
+- Spool recovery reports itself while it runs. Replaying the segments a killed backfill left behind happens at startup,
+  before anything else logs, and takes as long as it takes to COPY them; it previously said nothing until it had
+  finished, which read as a hang.
+
+- Statistics panel: durations are reported per 100 blocks rather than as a per-block mean in fractions of a
+  microsecond, and two rows are named for what they measure — `Entities Insert Duration` is now `Message Walk
+  Duration`, and `Block Insert Duration` reads `Spool Write Duration` while a spool is open, since nothing is inserted
+  into a database on that path. The `Flush duration` row is fed by what the applier committed when spooling, where it
+  previously timed a call that returns before anything is written and so reported zero.
+
 - Fixed: **BREAKING** `substreams sink postgres` in Relational Mappings Mode stores `bytes` fields as binary in their
   `BYTEA` columns. Under the default `--bytes-encoding=raw` they were corrupted: a 7-byte value became the 14
   characters of its base64 form including quotes, or of its hex form with `--no-constraints`. The same confusion stored

@@ -28,3 +28,4 @@ state.cursor
 /.claude
 /REVIEW.md
 .substreams.env
+plans/

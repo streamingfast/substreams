@@ -172,6 +172,9 @@ func ApplyPackageTransformations(pkg *pbsubstreams.Package, skipPackageValidatio
 		if err := validateNetworks(pkg, importIncludedModules, pkg.Network); err != nil {
 			return nil, err
 		}
+		if err := densifyNetworks(pkg, graph); err != nil {
+			return nil, err
+		}
 		if err := ApplyNetwork(pkg.Network, pkg); err != nil {
 			return nil, err
 		}

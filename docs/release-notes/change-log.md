@@ -139,6 +139,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+- Changed: `substreams auth` opens a browser so you can pick an organization (if you have more than one) and
+  an API key. The CLI retrieves the selected key over the API — no copy/paste — exchanges it for a JWT, and
+  writes `.substreams.env` (mode 0600, including when the file already exists). The previous paste-a-JWT-or-API-key
+  flow is `--paste`. Login polling keeps going through transport errors, timeouts, and 5xx until the device-code
+  deadline, and fails fast without a usable `http`/`https` verification URL. With `LOCAL_DEVELOPMENT=true`,
+  JWT issue uses the local issuer; if that issuer is unavailable the API key is stored instead of failing.
+
 - `substreams estimate` asks the endpoint for the estimate instead of sampling from the client. The endpoint runs the
   sample on its own workers and only reports the measured sizes, so the estimation costs processed blocks and no
   egress, it accounts for what the endpoint's cache already holds, and it works with modules that have stores. The
@@ -191,6 +198,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `Completed successfully` must check the exit code instead.
 
 - Added Ethereum Hoodi testnet (`hoodi`) StreamingFast endpoints (`hoodi.eth.streamingfast.io:443`).
+
+- A packed `.spkg` now records the initial block of *every* module under *every* network it declares, along with the
+  effective params of every module accepting them, instead of only the values explicitly written in the manifest's
+  `networks:` section. A consumer such as substreams.dev can describe what the package does on each of its networks
+  without reimplementing the module-graph derivation. For a 20-module package supporting 10 networks this adds roughly
+  3 KB.
+
+- Fixed: switching networks on a packed `.spkg` no longer leaves modules that inherit their initial block pinned to the
+  network that was active when the package was packed. Only modules named explicitly under `networks:` were being
+  overridden, and the derivation that would have updated the others had already been baked in at pack time, so a package
+  packed on `mainnet` and run with `--network sepolia` silently kept `mainnet` start blocks for every derived module.
+  Packages published before this release need to be repacked from source: the information needed to correct them is not
+  recoverable from the artifact.
+
+- `substreams pack`, `substreams registry publish` and `substreams registry verify` warn when a network name is not a
+  known Firehose network registry ID or alias, or when it is an alias resolving to several networks — consumers cannot
+  map such a name onto a real chain. It stays a warning, never an error, so private and unlisted chains keep publishing.
+
+- `substreams info` gained `--network`, to inspect a package as any of the networks it declares rather than only its
+  default one, and `--expand-networks`, to list the initial block and params of every module under every network. The
+  `Networks` section is summarized to one line per network by default, since a package supporting many networks now
+  carries an entry per module per network.
 
 ### Server
 
@@ -269,6 +298,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Bumped notably `github.com/ClickHouse/clickhouse-go/v2` to v2.48.0, `github.com/AfterShip/clickhouse-sql-parser` to
   v0.5.5, `google.golang.org/grpc` to v1.83.0 and the OpenTelemetry SDK to v1.45.0.
 
+- `golang.org/x/mod` is at v0.40.0, which clears CVE-2026-56864 and CVE-2026-56865, both reported as HIGH against the
+  published `ghcr.io/streamingfast/substreams` image.
+
 ### Summary of changed flags and subcommands
 
 #### ADDED (relational-mappings `run` unless noted)
@@ -301,7 +333,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 setup                         no longer creates constraints by default; needs --apply-constraints=always
 cross-mode flags              wrong-mode flags now hard-error at startup (develop warned/ignored)
 clickhouse state flags        --cursor-file-path etc. now also on setup; defaults unchanged
-
 
 ## v1.21.0
 

@@ -137,6 +137,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+- `substreams estimate` asks the endpoint for the estimate instead of sampling from the client. The endpoint runs the
+  sample on its own workers and only reports the measured sizes, so the estimation costs processed blocks and no
+  egress, it accounts for what the endpoint's cache already holds, and it works with modules that have stores. The
+  sampled fraction is set with `--sample-percentage` (default 1%).
+
+- Added `substreams estimate-local`, which is the previous `substreams estimate`: sampling done by the client, for
+  endpoints without remote estimation. It keeps `--samples` and `--parallel-requests`, and its limitations
+  (single-stage modules only, and the sampled blocks are streamed back so the estimation itself costs egress).
+
 - `substreams run` reports backprocessing as progress and rates instead of a list of block ranges. A four-line session
   header (trace ID, module, chain, work to do including what was already cached) is printed once and stays in the
   scrollback, followed by a compact live block: overall percentage, blocks per second, ETA, running jobs against the
@@ -204,6 +213,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   carries an entry per module per network.
 
 ### Server
+
+- Added `sf.substreams.rpc.v4.Estimator/Estimate` on `substreams-tier1`: a cost estimate for a request, without ever
+  sending the data. Given a package, an output module, a block range and a sampling percentage (default 1%), it reports
+  how many blocks the real request would have to process (stage multiplier included, cached segments excluded) and the
+  estimated uncompressed egress for the range. The egress figure is measured: the sample is actually executed on tier2
+  workers, then only the *size* of the resulting output cache is read back — from the object store's metadata when it is
+  there, so the data itself is never downloaded. A module graph with stores is only estimated over a range whose store
+  snapshots the endpoint already holds; anything else is refused, naming the part of the range that could be estimated
+  instead, since building the missing stores is the very cost being reported.
+
+  The egress figure covers the whole `BlockScopedData` a client receives, not just the module payload: the module name,
+  output type URL, clock, cursor and final block height are sent with every message and dominate the egress of a module
+  whose per-message output is small. That overhead is counted once per message rather than once per block, so a module
+  gated by a block index — which only runs, and is only sent, on matching blocks — is not charged for the blocks it
+  skips. Each sample is extrapolated over the slice of the range it stands for, at the average of the rates measured at
+  that slice's two ends, and the reported total is the sum of those slices, so a range whose activity varies is no
+  longer flattened into a single average.
+
+  When the module graph is gated by a block filter, the block count is measured too: each sample job reports the blocks
+  it was actually run on, and that share is extrapolated over the range the same way, so the report no longer bills a
+  filtered module for the blocks its index skips.
+
+  The blocks left to process are counted after the estimate itself: the sample jobs fill the output cache, so a request
+  issued right after finds those segments there. The "if nothing was cached" figure is unaffected.
+
+- `substreams-tier2` records the uncompressed size of each execution output file it writes as `datasize` object
+  metadata, and how many items it holds as `itemcount`, so what a segment represents can be known without downloading
+  it: the item count is the number of `BlockScopedData` messages a consumer of that segment receives, which on a module
+  gated by a block index is far below the number of blocks the segment covers. Skipped on object stores where setting
+  metadata means rewriting the object (S3), which falls back to reading the file when the figures are needed.
 
 - Foundational-store endpoint resolution no longer imports the private `services-control-plane` module. The public
   `dregistry` plugin chain (JSON map → control-plane `sf.registry.v1` → identifier passthrough) replaces the inline

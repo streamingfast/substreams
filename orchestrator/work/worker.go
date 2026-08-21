@@ -36,6 +36,10 @@ var lastWorkerID uint64
 
 type Result struct {
 	Error error
+
+	// ProcessedBlocks is what the worker reported on completion: one count per block and per
+	// stage it actually executed, so blocks skipped by a block index are not in it.
+	ProcessedBlocks uint64
 }
 
 type Worker interface {
@@ -239,9 +243,10 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 			zap.Float64("processing_time_per_block", timeTook.Seconds()/float64(request.SegmentSize)),
 		)
 		return MsgJobSucceeded{
-			Unit:     unit,
-			Worker:   w,
-			Streamed: streamOutput,
+			Unit:            unit,
+			Worker:          w,
+			Streamed:        streamOutput,
+			ProcessedBlocks: res.ProcessedBlocks,
 		}
 	}
 }
@@ -309,6 +314,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	span.SetAttributes(attribute.String("substreams.remote_hostname", remoteHostname))
 
 	stats := reqctx.ReqStats(ctx)
+	var processedBlocks uint64
 	for {
 		resp, err := stream.Recv()
 
@@ -337,7 +343,8 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 
 			case *pbssinternal.ProcessRangeResponse_Completed:
 				logger.Debug("worker done")
-				stats.RecordBlocksProcessed(r.Completed.ProcessedBlocks) // add workers' processed blocks count to our own stats
+				processedBlocks = r.Completed.ProcessedBlocks
+				stats.RecordBlocksProcessed(processedBlocks) // add workers' processed blocks count to our own stats
 
 			case *pbssinternal.ProcessRangeResponse_BlockScopedData:
 				clock := r.BlockScopedData.Clock
@@ -371,7 +378,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 
 		if err != nil {
 			if err == io.EOF {
-				return &Result{}
+				return &Result{ProcessedBlocks: processedBlocks}
 			}
 			if ctx.Err() != nil {
 				return &Result{Error: ctx.Err()}

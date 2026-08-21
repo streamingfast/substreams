@@ -75,7 +75,11 @@ func NewProgress(blockBatchSize int) *Progress {
 // once the switch to direct inserts has closed it — the blocks are held in memory and
 // their count is what matters.
 func (p *Progress) fallingBehind(ahead uint64, quota int64) bool {
-	if buffered := p.bufferedBytes.Load(); buffered > 0 && quota > 0 {
+	return p.fallingBehindOn(p.bufferedBytes.Load(), ahead, quota)
+}
+
+func (p *Progress) fallingBehindOn(buffered int64, ahead uint64, quota int64) bool {
+	if buffered > 0 && quota > 0 {
 		return buffered*2 >= quota
 	}
 
@@ -110,12 +114,19 @@ func (p *Progress) RecordBuffered(held int, buffered protosql.WriteStats, spooli
 	defer p.mutex.Unlock()
 
 	p.spooling = spooling
-	if spooling {
+	switch {
+	case spooling:
 		p.everSpooled = true
 		p.current = buffered
+	case buffered.Segments > p.current.Segments:
+		// Closing the spool drains everything still queued, so the driver's parting
+		// snapshot holds segments the last spooling one could not. Without this the
+		// closed-spool totals stop short by the whole final drain — up to the entire disk
+		// budget's worth of committed rows.
+		p.current = buffered
 	}
-	// When it is off, current is deliberately left where it was: it is the last true
-	// reading, and it is what the closed-spool totals are printed from.
+	// Otherwise current is deliberately left where it was: it is the last true reading,
+	// and it is what the closed-spool totals are printed from.
 }
 
 // Spooling reports whether rows are going to disk right now, which is what decides that a
@@ -188,22 +199,30 @@ func (p *Progress) Log(logger *zap.Logger) {
 		zap.Int64("blocks_buffered", p.heldBlocks.Load()),
 		zap.Uint64("peak_blocks_ahead", p.peakBlocksAhead.Load()),
 	}
-	if buffered := p.bufferedBytes.Load(); buffered > 0 {
+	buffered := p.bufferedBytes.Load()
+	if buffered > 0 {
 		fields = append(fields, zap.String("buffered_on_disk", humanBytes(buffered)))
 		if current.Quota > 0 {
 			fields = append(fields, zap.String("quota_used", percent(float64(buffered)/float64(current.Quota))))
 		}
 	}
 
-	if p.fallingBehind(ahead, current.Quota) {
+	// Judged on the same reading that was printed, or the warning can claim the buffer is
+	// over half its budget on a line that shows no buffer at all.
+	if p.fallingBehindOn(buffered, ahead, current.Quota) {
 		logger.Warn("database is falling behind the stream, the buffer is over half of what it was given", fields...)
 	} else {
 		logger.Info("              Pipeline progress", fields...)
 	}
 
 	switch {
-	case spooling && elapsed > 0:
-		p.logSpool(logger, current, previous, elapsed)
+	case spooling:
+		// Below a second the deltas are noise and the rates read as wild multiples; the
+		// final Log on the way out of Run lands right after a tick and would otherwise
+		// leave the operator with a nonsense number as the last thing it said.
+		if elapsed >= time.Second {
+			p.logSpool(logger, current, previous, elapsed)
+		}
 	case everSpooled:
 		// The spool was closed at the chain head. Rates over an applier that has stopped
 		// are zero and would read as one that has stalled, and what is "in flight" is

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dustin/go-humanize"
 	"go.uber.org/zap"
 )
 
@@ -109,7 +108,7 @@ func (b *Spool) recover(ctx context.Context) error {
 			zap.String("progress", fmt.Sprintf("%d/%d", index+1, len(dirs))),
 			zap.Uint64("first_block", manifest.FirstBlock),
 			zap.Uint64("last_block", manifest.LastBlock),
-			zap.String("bytes", humanize.IBytes(uint64(segmentBytes(manifest)))))
+			zap.String("bytes", humanBytes(segmentBytes(manifest))))
 
 		if err := b.applier.Apply(ctx, dir, manifest); err != nil {
 			// Left to fail, because a segment the database refuses says something is wrong

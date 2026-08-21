@@ -128,6 +128,10 @@ func (s *Sinker) closeDatabase() {
 	if err := s.db.Close(ctx); err != nil {
 		s.logger.Warn("closing the database", zap.Error(err))
 	}
+
+	// Closing drains whatever was still queued, and LogStats runs after this. Without one
+	// last reading the run's final panel stops short by that entire drain.
+	s.recordBuffered()
 }
 
 type Holder struct {
@@ -282,7 +286,7 @@ func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
 		}
 	}
 
-	insertDuration, err := s.decoder.apply(decodedBlocks, s.db)
+	err = s.decoder.apply(decodedBlocks, s.db)
 	if err != nil {
 		if s.useTransaction {
 			s.logger.Error("rolling back transaction", zap.Error(err))
@@ -290,7 +294,7 @@ func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
 		}
 		return fmt.Errorf("applying blocks: %w", err)
 	}
-	s.recordDecodeStats(decodedBlocks, insertDuration)
+	s.recordDecodeStats(decodedBlocks)
 
 	flushDuration, err := s.db.Flush()
 	if err != nil {
@@ -345,7 +349,7 @@ func (s *Sinker) recordBuffered() {
 // the two above it were added per block, so the panel reported three averages in the same
 // column with one of them in a different unit, and it grew with --decode-batch-size
 // rather than with the cost of a block.
-func (s *Sinker) recordDecodeStats(results []*decoded, _ time.Duration) {
+func (s *Sinker) recordDecodeStats(results []*decoded) {
 	for _, result := range results {
 		if result.empty {
 			continue

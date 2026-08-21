@@ -111,13 +111,25 @@ type Spool struct {
 	// working and waiting for a segment. Nothing else here answers whether the database
 	// or the stream is the limit: a gap can be large because the database is slow, or
 	// merely because the stream burst, and only the ratio tells those apart.
-	applierBusy atomic.Int64
-	applierIdle atomic.Int64
+	//
+	// Both only accrue when the activity ends, so the one in progress is tracked
+	// separately and folded in when the snapshot is taken. Without that, a segment that
+	// takes longer than the logging interval contributes to neither side, and an applier
+	// stuck on a degraded database reports itself as doing nothing at all — the exact
+	// inversion of the reading these exist to give.
+	applierBusy   atomic.Int64
+	applierIdle   atomic.Int64
+	applyingSince atomic.Int64
+	waitingSince  atomic.Int64
 
 	// quotaWait is how long the stream has been held because the spool was full. Any
 	// non-zero value means the database is gating download rather than the other way
-	// round, which is otherwise reported once as a warning and then never again.
-	quotaWait atomic.Int64
+	// round, which is otherwise reported once as a warning and then never again. As
+	// above, the hold in progress is folded in at snapshot time: a single hold can last
+	// longer than the logging interval, and reporting zero throughout it says the
+	// opposite of what is happening.
+	quotaWait      atomic.Int64
+	quotaHeldSince atomic.Int64
 
 	// sealed counts segments by what closed them. A run whose segments are mostly sealed
 	// by the idle timer is committing short segments, which is what starves the sizer and
@@ -341,6 +353,7 @@ func (b *Spool) awaitQuota(ctx context.Context, incoming int64) error {
 	defer func() {
 		if !heldFrom.IsZero() {
 			b.quotaWait.Add(int64(time.Since(heldFrom)))
+			b.quotaHeldSince.Store(0)
 		}
 	}()
 
@@ -355,8 +368,8 @@ func (b *Spool) awaitQuota(ctx context.Context, incoming int64) error {
 		// rather than waiting forever for room it can never fit into.
 		if onDisk == 0 && incoming > b.options.MaxBytes {
 			b.logger.Warn("local spool segment exceeds its disk budget, allowing it because the spool is empty",
-				zap.String("segment", humanize.IBytes(uint64(incoming))),
-				zap.String("quota", humanize.IBytes(uint64(b.options.MaxBytes))))
+				zap.String("segment", humanBytes(incoming)),
+				zap.String("quota", humanBytes(b.options.MaxBytes)))
 			return nil
 		}
 
@@ -365,9 +378,10 @@ func (b *Spool) awaitQuota(ctx context.Context, incoming int64) error {
 		}
 		if !warned {
 			heldFrom = time.Now()
+			b.quotaHeldSince.Store(heldFrom.UnixNano())
 			b.logger.Warn("local spool is full, holding the stream until the database catches up",
-				zap.String("on_disk", humanize.IBytes(uint64(onDisk))),
-				zap.String("quota", humanize.IBytes(uint64(b.options.MaxBytes))))
+				zap.String("on_disk", humanBytes(onDisk)),
+				zap.String("quota", humanBytes(b.options.MaxBytes)))
 			warned = true
 		}
 
@@ -466,6 +480,13 @@ func (b *Spool) Drain(ctx context.Context) error {
 }
 
 // Close seals whatever is left, drains the applier and reports the first failure.
+//
+// The drain is bounded by ctx. Sealing is what Close exists for — a segment left unsealed
+// is discarded on the next start and its blocks streamed again — and that happens first,
+// under the same deadline. Waiting for the queue to reach the database is a convenience
+// on top: every segment in it is sealed and on disk, so recovery replays whatever the
+// deadline cut short. Blocking a shutdown indefinitely on a database that has stopped
+// responding buys nothing that the next start does not redo.
 func (b *Spool) Close(ctx context.Context) error {
 	var err error
 	b.closeOnce.Do(func() {
@@ -477,7 +498,19 @@ func (b *Spool) Close(ctx context.Context) error {
 		b.queueMutex.Unlock()
 		b.queueCond.Broadcast()
 
-		b.waitGroup.Wait()
+		drained := make(chan struct{})
+		go func() {
+			b.waitGroup.Wait()
+			close(drained)
+		}()
+
+		select {
+		case <-drained:
+		case <-ctx.Done():
+			b.logger.Warn("the local spool did not finish draining before shutdown, its sealed segments are replayed on the next start",
+				zap.Int("segments_left", b.queueDepth()),
+				zap.Error(ctx.Err()))
+		}
 	})
 
 	if err != nil {
@@ -485,6 +518,13 @@ func (b *Spool) Close(ctx context.Context) error {
 	}
 
 	return b.pendingError()
+}
+
+func (b *Spool) queueDepth() int {
+	b.queueMutex.Lock()
+	defer b.queueMutex.Unlock()
+
+	return len(b.queue)
 }
 
 func (b *Spool) enqueue(pending *sealedSegment) {
@@ -566,7 +606,9 @@ func (b *Spool) applyLoop(ctx context.Context) {
 		// The wait is measured, not just endured: an applier that spends its time here is
 		// keeping up and the stream is the limit, one that never waits is the limit.
 		waitFrom := time.Now()
+		b.waitingSince.Store(waitFrom.UnixNano())
 		pending, ok := b.dequeue()
+		b.waitingSince.Store(0)
 		b.applierIdle.Add(int64(time.Since(waitFrom)))
 		if !ok {
 			return
@@ -584,17 +626,23 @@ func (b *Spool) applyLoop(ctx context.Context) {
 		}
 
 		startAt := time.Now()
-		if err := b.applier.Apply(ctx, pending.dir, pending.manifest); err != nil {
+		b.applyingSince.Store(startAt.UnixNano())
+		err := b.applier.Apply(ctx, pending.dir, pending.manifest)
+		b.applyingSince.Store(0)
+		if err != nil {
 			b.setError(fmt.Errorf("applying segment %s: %w", pending.dir, err))
 			continue
 		}
 		elapsed := time.Since(startAt)
 		b.applierBusy.Add(int64(elapsed))
-		b.appliedSegments.Add(1)
 		b.appliedBlocks.Add(pending.manifest.BlockCount())
 		b.appliedRows.Add(pending.manifest.RowCount())
 		b.appliedBytes.Add(pending.bytes)
 		b.applyDuration.Add(int64(elapsed))
+		// Counted last, so a snapshot taken mid-update never sees a segment whose blocks,
+		// rows and duration have not landed yet — every ratio derived from it would divide
+		// by a count the numerators had not caught up with.
+		b.appliedSegments.Add(1)
 
 		b.appliedBlock.Store(pending.manifest.LastBlock)
 		b.bytesOnDisk.Add(-pending.bytes)
@@ -606,9 +654,19 @@ func (b *Spool) applyLoop(ctx context.Context) {
 		b.logger.Debug("applied segment",
 			zap.Uint64("first_block", pending.manifest.FirstBlock),
 			zap.Uint64("last_block", pending.manifest.LastBlock),
-			zap.String("bytes", humanize.IBytes(uint64(pending.bytes))),
+			zap.String("bytes", humanBytes(pending.bytes)),
 			zap.Duration("elapsed", elapsed))
 	}
+}
+
+// humanBytes renders a size, clamping a negative to zero rather than printing the 16EiB
+// an unsigned conversion would produce from a corrupt manifest.
+func humanBytes(n int64) string {
+	if n < 0 {
+		n = 0
+	}
+
+	return humanize.IBytes(uint64(n))
 }
 
 func segmentBytes(manifest *Manifest) int64 {

@@ -1,6 +1,9 @@
 package spool
 
-import "time"
+import (
+	"sync/atomic"
+	"time"
+)
 
 // Stats is one consistent read of what the spool has committed and what it is still
 // holding.
@@ -46,6 +49,22 @@ type Stats struct {
 	Quota          int64
 }
 
+// since is how long an activity marked as in progress has been running, or zero when
+// none is. The marker is a wall-clock stamp, so a clock stepped backwards is clamped to
+// zero rather than reported as negative time.
+func since(marker *atomic.Int64) time.Duration {
+	started := marker.Load()
+	if started == 0 {
+		return 0
+	}
+
+	if elapsed := time.Now().UnixNano() - started; elapsed > 0 {
+		return time.Duration(elapsed)
+	}
+
+	return 0
+}
+
 // Stats reads the counters and the open segment together.
 //
 // The open segment is included in the queued totals for the same reason BytesOnDisk
@@ -63,11 +82,12 @@ func (b *Spool) Stats() Stats {
 		openBlocks = b.current.blockCount()
 		openAge = time.Since(b.current.startedAt)
 	}
+	// Read under the same lock as the open segment they are added to, or a segment that
+	// seals between the two reads is counted once as open and once as sealed.
+	sealedBytes, sealedBlocks := b.bytesOnDisk.Load(), b.blocksAhead.Load()
 	b.mutex.Unlock()
 
-	b.queueMutex.Lock()
-	depth := len(b.queue)
-	b.queueMutex.Unlock()
+	depth := b.queueDepth()
 
 	stats := Stats{
 		Segments:      b.appliedSegments.Load(),
@@ -76,9 +96,12 @@ func (b *Spool) Stats() Stats {
 		Bytes:         b.appliedBytes.Load(),
 		ApplyDuration: time.Duration(b.applyDuration.Load()),
 
-		ApplierBusy: time.Duration(b.applierBusy.Load()),
-		ApplierIdle: time.Duration(b.applierIdle.Load()),
-		QuotaWait:   time.Duration(b.quotaWait.Load()),
+		// Each folds in the activity still in progress, so a segment or a hold that
+		// outlasts the logging interval is reported while it is happening rather than
+		// only once it ends.
+		ApplierBusy: time.Duration(b.applierBusy.Load()) + since(&b.applyingSince),
+		ApplierIdle: time.Duration(b.applierIdle.Load()) + since(&b.waitingSince),
+		QuotaWait:   time.Duration(b.quotaWait.Load()) + since(&b.quotaHeldSince),
 
 		QueueDepth:    depth,
 		SegmentTarget: b.sizer.size(),
@@ -86,8 +109,8 @@ func (b *Spool) Stats() Stats {
 		OpenBlocks:    openBlocks,
 		OpenAge:       openAge,
 
-		BlocksBuffered: b.blocksAhead.Load() + openBlocks,
-		BytesOnDisk:    b.bytesOnDisk.Load() + openBytes,
+		BlocksBuffered: sealedBlocks + openBlocks,
+		BytesOnDisk:    sealedBytes + openBytes,
 		AppliedBlock:   b.appliedBlock.Load(),
 		Quota:          b.options.MaxBytes,
 	}
@@ -96,4 +119,16 @@ func (b *Spool) Stats() Stats {
 	}
 
 	return stats
+}
+
+// ApplierBusyRatioForTest is the share of the applier's wall clock spent applying. It
+// exists for the test that guards against the in-flight segment going uncounted; the
+// panel differences two snapshots instead, which a single ratio cannot express.
+func (s Stats) ApplierBusyRatioForTest() float64 {
+	total := s.ApplierBusy + s.ApplierIdle
+	if total <= 0 {
+		return 0
+	}
+
+	return float64(s.ApplierBusy) / float64(total)
 }

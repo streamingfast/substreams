@@ -40,7 +40,11 @@ type Database struct {
 	// wire counts what actually went down the socket, which the spool's own byte count
 	// cannot: that one is the segment on disk, before ch-go's columnar encoding and
 	// before compression.
-	wire            *wireCounter
+	wire *wireCounter
+	// finalSpoolStats is what the spool had committed when it was closed, kept because
+	// closing it drains everything still queued and that last drain would otherwise never
+	// reach the totals.
+	finalSpoolStats spool.Stats
 	bytesEncoding   bytes.Encoding
 	queryRetryCount int
 	queryRetrySleep time.Duration
@@ -211,9 +215,14 @@ func (d *Database) SwitchToDirectInserts(ctx context.Context, reason string, _ b
 	d.logger.Info(reason + ", draining the spool and switching to direct inserts. " +
 		"--db-write-* and --spool-* no longer apply from here on")
 
-	if err := d.spool.Close(ctx); err != nil {
+	// Detached from the caller's deadline on purpose. Everything still queued has to
+	// reach the server before the first direct insert does: the applier advances the
+	// stored cursor as it goes, so abandoning it here would let it rewind the cursor
+	// behind blocks the direct path had already written.
+	if err := d.spool.Close(context.WithoutCancel(ctx)); err != nil {
 		return fmt.Errorf("draining the spool: %w", err)
 	}
+	d.finalSpoolStats = d.spool.Stats()
 	d.spool = nil
 	d.spoolOptions = nil
 
@@ -718,14 +727,17 @@ func (d *Database) Close(ctx context.Context) error {
 
 // BufferStats reports what sits between the stream and the server.
 func (d *Database) BufferStats() (sql.WriteStats, bool) {
-	if d.spool == nil {
-		return sql.WriteStats{}, false
+	// Once the spool is closed its parting totals are still reported, with enabled false
+	// so the caller knows a flush now means the rows are stored.
+	stats := d.finalSpoolStats
+	if d.spool != nil {
+		stats = d.spool.Stats()
 	}
 
 	return sql.WriteStats{
-		Stats:                d.spool.Stats(),
+		Stats:                stats,
 		DatabaseBytesWritten: d.wire.BytesWritten(),
-	}, true
+	}, d.spool != nil
 }
 
 func (d *Database) DatabaseHash(schemaName string) (uint64, error) {

@@ -53,6 +53,10 @@ type Database struct {
 	// and is what the startup log reports.
 	writeMode         sql.WriteMode
 	resolvedWriteMode sql.WriteMode
+	// finalSpoolStats is what the spool had committed when it was closed, kept because
+	// closing it drains everything still queued and that last drain would otherwise never
+	// reach the totals.
+	finalSpoolStats spool.Stats
 }
 
 // bufferActive reports whether rows are currently being routed to the spool.
@@ -293,9 +297,13 @@ func (d *Database) SwitchToDirectInserts(ctx context.Context, reason string, atC
 		"--write-mode, --db-write-* and --spool-* no longer apply from here on",
 		zap.String("write_mode_was", string(d.resolvedWriteMode)))
 
-	if err := inserter.close(ctx); err != nil {
+	// Detached from the caller's deadline on purpose: everything still queued has to
+	// reach the server before the first direct insert does, since the applier records its
+	// own progress as it goes.
+	if err := inserter.close(context.WithoutCancel(ctx)); err != nil {
 		return fmt.Errorf("draining the spool: %w", err)
 	}
+	d.finalSpoolStats = inserter.buffer.Stats()
 
 	if atChainHead {
 		// The drain above applied every segment and removed its directory, so there is
@@ -945,14 +953,16 @@ func (d *Database) Close(ctx context.Context) error {
 
 // BufferStats reports what the local buffer is holding and what it has committed.
 func (d *Database) BufferStats() (sql.WriteStats, bool) {
+	// DatabaseBytesWritten is left zero throughout: pgx owns the connection, so there is
+	// no socket here to count, and reporting the spooled size as if it were the wire size
+	// would be worse than saying nothing.
 	inserter, ok := d.inserter.(*localBufferInserter)
 	if !ok {
-		return sql.WriteStats{}, false
+		// Closed at the chain head, or never opened. The totals it finished with are
+		// still worth reporting, and they include the drain that closing it performed.
+		return sql.WriteStats{Stats: d.finalSpoolStats}, false
 	}
 
-	// DatabaseBytesWritten is left zero: pgx owns the connection, so there is no socket
-	// here to count, and reporting the spooled size as if it were the wire size would be
-	// worse than saying nothing.
 	return sql.WriteStats{Stats: inserter.buffer.Stats()}, true
 }
 

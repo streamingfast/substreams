@@ -111,10 +111,13 @@ func (s *Stats) RecordBuffered(held int, buffered protosql.WriteStats, spooling 
 		return
 	}
 
+	// Advanced only when a sample was taken from it. Assigning unconditionally discarded
+	// the applying time of any snapshot caught before its block count had landed, so that
+	// segment's cost was never measured by anything.
 	if blocks := buffered.Blocks - s.lastCommit.Blocks; blocks > 0 {
 		s.FlushDuration.Add((buffered.ApplyDuration - s.lastCommit.ApplyDuration) / time.Duration(blocks))
+		s.lastCommit = buffered
 	}
-	s.lastCommit = buffered
 }
 
 func NewStats(logger *zap.Logger, blockBatchSize int) *Stats {

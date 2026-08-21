@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -194,23 +195,25 @@ func TestRecoveryAnnouncesItselfBeforeReplaying(t *testing.T) {
 	require.Len(t, applier.applied, 1)
 	require.NoDirExists(t, segment, "a replayed segment is removed")
 
-	var announced, perSegment, summary bool
-	for _, entry := range logs.All() {
+	// Order is the whole point: the announcement has to precede the COPY it is warning
+	// about, not follow it. Asserting only presence would pass with it moved to the end.
+	announced, perSegment, summary := -1, -1, -1
+	for index, entry := range logs.All() {
 		switch entry.Message {
 		case "recovering the local spool, the stream does not start until this finishes":
-			announced = true
+			announced = index
 			require.Equal(t, int64(1), entry.ContextMap()["segments_on_disk"])
 		case "replaying a spool segment":
-			perSegment = true
+			perSegment = index
 			require.Equal(t, "1/1", entry.ContextMap()["progress"])
 		case "recovered the local spool":
-			summary = true
+			summary = index
 			require.Equal(t, int64(1), entry.ContextMap()["segments_replayed"])
 		}
 	}
-	require.True(t, announced, "the wait has to be announced before it starts")
-	require.True(t, perSegment, "each segment is minutes of COPY, so each one reports")
-	require.True(t, summary)
+	require.NotEqual(t, -1, announced, "the wait has to be announced")
+	require.Less(t, announced, perSegment, "announced before the first segment is replayed")
+	require.Less(t, perSegment, summary, "each segment reports before the summary")
 }
 
 // A spool with nothing on disk is the common case and must stay silent.
@@ -222,4 +225,79 @@ func TestRecoveryStaysQuietWithAnEmptySpool(t *testing.T) {
 	t.Cleanup(func() { _ = spool.Close(context.Background()) })
 
 	require.Zero(t, logs.Len())
+}
+
+// blockingApplier holds one Apply open so a snapshot can be taken mid-segment.
+type blockingApplier struct {
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (a *blockingApplier) EnsureSchema(context.Context) error { return nil }
+
+func (a *blockingApplier) AlreadyApplied(context.Context, *Manifest) (bool, error) {
+	return false, nil
+}
+
+func (a *blockingApplier) Apply(context.Context, string, *Manifest) error {
+	close(a.entered)
+	<-a.release
+
+	return nil
+}
+
+// A segment that takes longer than the logging interval used to contribute to neither
+// side of the ratio, so an applier pinned on a degraded database reported itself as doing
+// nothing — the exact inversion of the reading this number exists to give.
+func TestApplierBusyCountsTheSegmentStillInFlight(t *testing.T) {
+	applier := &blockingApplier{entered: make(chan struct{}), release: make(chan struct{})}
+	options := Options{Dir: t.TempDir(), MaxIdle: -1}
+
+	spool, err := New(context.Background(), options, countingCodec{}, applier, "test", zap.NewNop())
+	require.NoError(t, err)
+
+	spool.RecordBlock(1)
+	require.NoError(t, spool.Insert("transfers", []any{1}))
+	spool.RecordCursor("a-cursor")
+	require.NoError(t, spool.Seal(context.Background(), SealBySize))
+
+	<-applier.entered
+	time.Sleep(5 * time.Millisecond)
+
+	stats := spool.Stats()
+	require.Positive(t, stats.ApplierBusy, "the segment in flight counts while it is in flight")
+	require.Zero(t, stats.Segments, "and is not counted as applied until it is")
+	require.Positive(t, stats.ApplierBusyRatioForTest(), "so the ratio is not zero at the worst moment")
+
+	close(applier.release)
+	require.NoError(t, spool.Close(context.Background()))
+}
+
+// Close is bounded by its context: sealed segments are durable and recovery replays them,
+// so a database that has stopped responding must not hold the process open indefinitely.
+func TestCloseGivesUpOnTheDrainWhenTheDeadlinePasses(t *testing.T) {
+	applier := &blockingApplier{entered: make(chan struct{}), release: make(chan struct{})}
+	t.Cleanup(func() { close(applier.release) })
+
+	spool, err := New(context.Background(), Options{Dir: t.TempDir(), MaxIdle: -1}, countingCodec{}, applier, "test", zap.NewNop())
+	require.NoError(t, err)
+
+	spool.RecordBlock(1)
+	require.NoError(t, spool.Insert("transfers", []any{1}))
+	spool.RecordCursor("a-cursor")
+	require.NoError(t, spool.Seal(context.Background(), SealBySize))
+	<-applier.entered
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- spool.Close(ctx) }()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err, "an abandoned drain is not a failure, its segments are replayed")
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close ignored its deadline and blocked on the applier")
+	}
 }

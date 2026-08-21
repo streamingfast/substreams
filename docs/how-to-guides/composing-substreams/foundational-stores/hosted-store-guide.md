@@ -31,8 +31,8 @@ A hosted store is a **key → value** map with a few blockchain‑specific prope
 
 - **Keys** are raw `bytes` — they can be a string, a hash, an address, or any composite key you choose.
 - **Values** are a `google.protobuf.Any` — i.e. any protobuf message you define, tagged with its `@type`.
-- **Block‑aware reads** — every read is performed *at a block number*. The store tells you whether it has reached that block yet (`block_reached`), so your reads stay deterministic alongside the chain.
-- **Readiness** — a store starts **not ready**. Direct `Get`/`GetFirst` then return `block_reached = false` (even if the keys are already written). A Substreams that queries a not‑ready store **hangs** until you flip it ready with `Feed.SetReady`.
+- **Readiness** — a store starts **not ready**. Direct `Get`/`GetFirst` then report the store hasn't reached the requested block yet (even if the keys are already written). A Substreams that queries a not‑ready store **hangs** until you flip it ready with `Feed.SetReady`.
+- **Block‑aware reads** — every read targets a specific block number. The response tells you whether the store has ingested up to that block yet (`block_reached = true`). If `block_reached` is `false`, treat the result as not-yet-final rather than as "key not found".
 
 You populate a hosted store by writing entries directly over gRPC with the `Feed.Set` call
 (the **remote feed** flow). Data written this way is treated as **already final**. You can
@@ -59,7 +59,8 @@ Creating a Remote Feed Hosted Store only requires two fields:
 
 - **Name** — a label for the store.
 - **Type URL** — the fully‑qualified protobuf type of the values you'll feed in
-  (e.g. `sf.substreams.example.v1.TestValue`).
+  (e.g. `com.acme.example.v1.TestValue`). The protobuf package and message name are entirely
+  free‑form — pick whatever fits your own project, this is not a StreamingFast‑defined type.
 
 When you create one you get back a **deployment ID** (e.g. `depxado8480c1026b3edb7f`).
 That ID is used in two places:
@@ -67,9 +68,11 @@ That ID is used in two places:
 - as the **hostname** of the store's gRPC endpoint, and
 - as the **store reference** in a Substreams manifest.
 
-A freshly created store's endpoint is not reachable immediately — it usually takes
-**5 to 10 minutes**. Until then calls fail with a gateway error such as
+{% hint style="warning" %}
+A freshly created store's endpoint is **not reachable immediately** — provisioning usually
+takes **5 to 10 minutes**. Until then calls fail with a gateway error such as
 `fault filter abort`. Wait and retry.
+{% endhint %}
 
 ### Endpoint convention
 
@@ -84,6 +87,29 @@ Example: `depxado8480c1026b3edb7f.hs.streamingfast.io:443`
 - TLS on port **443**, gRPC over HTTP/2.
 - Authenticated with an **API key** (see next section).
 
+### Generating client bindings
+
+The store's Protobuf definitions are published on the Buf Schema Registry at
+[buf.build/streamingfast/substreams-foundational-store](https://buf.build/streamingfast/substreams-foundational-store) —
+you don't need to vendor the `.proto` files locally. Point `buf generate` at the remote
+module and pick the plugin for your language, e.g. for Rust with a `buf.gen.yaml`:
+
+```yaml
+version: v2
+plugins:
+  - remote: buf.build/community/neoeinstein-prost
+    out: gen/rust
+  - remote: buf.build/community/neoeinstein-tonic
+    out: gen/rust
+```
+
+```bash
+buf generate buf.build/streamingfast/substreams-foundational-store
+```
+
+See the [Buf Generate docs](https://buf.build/docs/generate/overview/) for Go, TypeScript,
+Python, and other language plugins.
+
 ---
 
 ## 3. Authentication
@@ -94,22 +120,26 @@ Calls to the store carry a StreamingFast **API key** in the gRPC `x-api-key` met
 x-api-key: <api-key>
 ```
 
-An API key is **created automatically** when you create the store — you don't have to
-make one yourself. You can also use any key from
+An API key is **created automatically** when you create the store, so you don't have to make
+one yourself beforehand. Manage your keys at
 [https://thegraph.market/api-keys](https://thegraph.market/api-keys).
 
-Keys start with `hosted`, `server`, `web`, `worker`, or `mobile`. The examples below
-use `$SF_API_KEY`.
+The examples below use `$SF_API_KEY` for that value.
 
 ---
 
 ## 4. Write entries — `Feed.Set`
 
-The remote‑feed ingest service is `sf.substreams.foundational_store.feed.v2.Feed`. Its `Set`
-method writes a batch of entries. Data written this way is treated as **final** and persisted
-immediately (latest‑value semantics, no fork handling).
+The remote‑feed ingest service is
+[`sf.substreams.foundational_store.feed.v2.Feed`](https://buf.build/streamingfast/substreams-foundational-store/docs/main:sf.substreams.foundational_store.feed.v2#sf.substreams.foundational_store.feed.v2.Feed).
+Its `Set` method writes a batch of entries. Data written this way is treated as **final** and
+persisted immediately (latest‑value semantics, no fork handling).
 
 ### Entry shape
+
+See [`SinkEntries`](https://buf.build/streamingfast/substreams-foundational-store/docs/main:sf.substreams.foundational_store.model.v2#sf.substreams.foundational_store.model.v2.SinkEntries)
+and [`Entry`](https://buf.build/streamingfast/substreams-foundational-store/docs/main:sf.substreams.foundational_store.model.v2#sf.substreams.foundational_store.model.v2.Entry)
+on the Buf Schema Registry:
 
 ```protobuf
 message SinkEntries {
@@ -126,21 +156,21 @@ message Entry {
 ### Example with `grpcurl`
 
 This writes a single entry — key `test-key-1` (base64‑encoded bytes), value a
-`sf.substreams.example.v1.TestValue`:
+`com.acme.example.v1.TestValue`:
 
 ```bash
 grpcurl \
   --import-path "./proto" \
   --proto sf/substreams/foundational-store/feed/v2/feed.proto \
   --proto sf/substreams/foundational-store/model/v2/model.proto \
-  --proto sf/substreams/example/v1/example.proto \
+  --proto com/acme/example/v1/example.proto \
   -H "x-api-key: $SF_API_KEY" \
   -d '{
     "entries": {
       "entries": [{
         "key": { "bytes": "dGVzdC1rZXktMQ==" },
         "value": {
-          "@type": "type.googleapis.com/sf.substreams.example.v1.TestValue",
+          "@type": "type.googleapis.com/com.acme.example.v1.TestValue",
           "value": "my_super_value"
         }
       }]
@@ -183,8 +213,11 @@ not ready.
 
 ### Option A — query the store directly (`Store.Get`)
 
-The query service is `sf.substreams.foundational_store.service.v2.Store`. Reads are performed
-**at a block** and return one result per requested key, in order.
+The query service is
+[`sf.substreams.foundational_store.service.v2.Store`](https://buf.build/streamingfast/substreams-foundational-store/docs/main:sf.substreams.foundational_store.service.v2#sf.substreams.foundational_store.service.v2.Store).
+Reads are performed **at a block** and return one result per requested key, in order. See
+[`GetRequest`](https://buf.build/streamingfast/substreams-foundational-store/docs/main:sf.substreams.foundational_store.service.v2#sf.substreams.foundational_store.service.v2.GetRequest)
+and [`GetResponse`](https://buf.build/streamingfast/substreams-foundational-store/docs/main:sf.substreams.foundational_store.service.v2#sf.substreams.foundational_store.service.v2.GetResponse):
 
 ```protobuf
 message GetRequest {
@@ -206,7 +239,7 @@ grpcurl \
   --import-path "./proto" \
   --proto sf/substreams/foundational-store/service/v2/service.proto \
   --proto sf/substreams/foundational-store/model/v2/model.proto \
-  --proto sf/substreams/example/v1/example.proto \
+  --proto com/acme/example/v1/example.proto \
   -H "x-api-key: $SF_API_KEY" \
   -d '{
     "block_number": "100",
@@ -251,7 +284,7 @@ modules:
       - source: sf.acme.type.v1.Block
       - foundational-store: <deployment-id>@v0.1.0
     output:
-      type: proto:sf.substreams.example.v1.TestValue
+      type: proto:com.acme.example.v1.TestValue
 ```
 
 > **Note:** the `@<version>` suffix (e.g. `@v0.1.0`) is **ignored by the system** — the store is
@@ -277,7 +310,7 @@ use substreams::store::FoundationalStore;
 use substreams::pb::sf::substreams::foundational_store::model::v2::ResponseCode;
 
 mod pb;
-use pb::sf::substreams::example::v1::TestValue;
+use pb::com::acme::example::v1::TestValue;
 
 #[substreams::handlers::map]
 fn map_query_test_store(
@@ -332,7 +365,7 @@ substreams run substreams.yaml map_query_test_store \
 
 1. **Create** a Remote Feed Hosted Store in [The Graph Market](https://thegraph.market)
    (**Hosted Services** → **Hosted Store** → **Remote feed**) → note the **deployment ID**.
-2. **Wait** until the endpoint answers (often 5–10 minutes after create).
+2. **Listen** for a response from the endpoint. The Store is now running.
 3. **Authenticate** with an API key (`x-api-key`).
 4. **Write** your entries with `Feed.Set`, then call `Feed.SetReady`. A Substreams that
    queries the store before that **hangs** until you mark it ready.
@@ -344,71 +377,11 @@ substreams run substreams.yaml map_query_test_store \
 
 ## 7. Proto reference
 
-All messages live under `sf.substreams.foundational_store.*` (package
-`substreams-foundational-store`).
-
-### Model — `model/v2/model.proto`
-
-```protobuf
-message Key { bytes bytes = 1; }
-message Keys { repeated Key keys = 1; }
-
-message Entry {
-  Key key = 2;
-  google.protobuf.Any value = 4;
-}
-
-message SinkEntries {
-  repeated Entry entries = 1;
-  bool if_not_exist = 2;
-}
-
-message QueriedEntry {
-  ResponseCode code = 1;
-  Entry entry = 2;
-}
-message QueriedEntries { repeated QueriedEntry entries = 2; }
-
-enum ResponseCode {
-  RESPONSE_CODE_UNSPECIFIED = 0;
-  RESPONSE_CODE_FOUND = 1;
-  RESPONSE_CODE_NOT_FOUND = 2;
-  RESPONSE_CODE_NOT_FOUND_FINALIZE = 4;
-}
-```
-
-### Feed (write) — `feed/v2/feed.proto`
-
-```protobuf
-service Feed {
-  rpc Set(SetRequest) returns (SetResponse);            // write a batch of entries (final)
-  rpc SetReady(SetReadyRequest) returns (SetReadyResponse); // toggle read readiness
-}
-
-message SetRequest { model.v2.SinkEntries entries = 1; }
-message SetResponse {}
-message SetReadyRequest { bool ready = 1; }
-message SetReadyResponse {}
-```
-
-### Store (read) — `service/v2/service.proto`
-
-```protobuf
-service Store {
-  rpc Get(GetRequest) returns (GetResponse);       // exact key match
-  rpc GetFirst(GetRequest) returns (GetResponse);  // first key >= requested
-}
-
-message GetRequest {
-  uint64 block_number = 1;
-  bytes  block_hash   = 2;
-  repeated model.v2.Key keys = 3;
-}
-message GetResponse {
-  bool block_reached = 1;
-  model.v2.QueriedEntries entries = 2;
-}
-```
+The authoritative message and service definitions — `model/v2/model.proto`,
+`feed/v2/feed.proto`, and `service/v2/service.proto` — are published at
+[buf.build/streamingfast/substreams-foundational-store](https://buf.build/streamingfast/substreams-foundational-store).
+Browse them there, or see the [Foundational Store Reference](../../../references/foundational-store-reference.md)
+for the architecture and data model behind them.
 
 ---
 

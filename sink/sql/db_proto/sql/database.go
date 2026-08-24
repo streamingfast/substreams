@@ -9,6 +9,7 @@ import (
 
 	pbSchema "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/schema/v1"
 	sink "github.com/streamingfast/substreams/sink"
+	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/spool"
 	"github.com/streamingfast/substreams/sink/sql/proto"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -86,11 +87,31 @@ type Database interface {
 	// reach the server rather than being streamed again.
 	Close(ctx context.Context) error
 
-	// BufferStats reports what is buffered between the stream and the server: how many
-	// blocks, how many bytes on disk, and the last block actually committed. enabled is
-	// false when nothing buffers locally, in which case the caller knows a flush means
-	// the rows are stored.
-	BufferStats() (blocks int64, bytes int64, appliedBlock uint64, enabled bool)
+	// BufferStats reports what sits between the stream and the server, and what the
+	// applier has done to drain it. enabled is false when nothing buffers locally, in
+	// which case the caller knows a flush means the rows are stored and the snapshot
+	// says nothing.
+	//
+	// The whole snapshot rather than the few numbers the gap needs, because they are only
+	// readable together: a gap says the database is behind, and only the applier's
+	// occupancy next to it says whether that is the database being slow or the stream
+	// having burst.
+	BufferStats() (stats WriteStats, enabled bool)
+}
+
+// WriteStats is the spool's own account of what it committed, plus what only the driver
+// can answer.
+//
+// The split is the point: the spool measures segments on disk, in the format its codec
+// writes, which is what the sizer steers and the quota bounds. How many bytes that turned
+// into on the wire depends on the driver's encoding and on whether the connection
+// compresses, so it cannot come from here — and a driver that does not measure it leaves
+// it zero rather than reporting a wrong number.
+type WriteStats struct {
+	spool.Stats
+
+	// DatabaseBytesWritten is what actually went down the socket to the server.
+	DatabaseBytesWritten int64
 }
 
 type BaseDatabase struct {

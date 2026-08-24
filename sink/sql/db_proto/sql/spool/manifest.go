@@ -51,6 +51,16 @@ func (m *Manifest) BlockCount() int64 {
 	return int64(m.LastBlock-m.FirstBlock) + 1
 }
 
+// RowCount is how many rows the segment holds across every table.
+func (m *Manifest) RowCount() int64 {
+	var rows int64
+	for _, table := range m.Tables {
+		rows += table.Rows
+	}
+
+	return rows
+}
+
 // CursorOnly reports a segment that carries no rows. It exists so that a stretch of
 // blocks whose module output is empty still advances the cursor, rather than being
 // streamed, and paid for, again on restart.

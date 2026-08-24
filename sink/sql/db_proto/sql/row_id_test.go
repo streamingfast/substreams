@@ -123,13 +123,13 @@ func (rowIDDialect) UseRowIDField(string) bool { return true }
 
 type plainDialect struct{}
 
-func (plainDialect) SchemaHash() string                            { return "" }
-func (plainDialect) FullTableName(table *schema.Table) string      { return table.Name }
-func (plainDialect) GetTable(table string) *schema.Table           { return &schema.Table{Name: table} }
-func (plainDialect) GetTables() []*schema.Table                    { return nil }
-func (plainDialect) UseVersionField() bool                         { return false }
-func (plainDialect) UseDeletedField() bool                         { return false }
-func (plainDialect) UseRowIDField(string) bool                     { return false }
+func (plainDialect) SchemaHash() string                       { return "" }
+func (plainDialect) FullTableName(table *schema.Table) string { return table.Name }
+func (plainDialect) GetTable(table string) *schema.Table      { return &schema.Table{Name: table} }
+func (plainDialect) GetTables() []*schema.Table               { return nil }
+func (plainDialect) UseVersionField() bool                    { return false }
+func (plainDialect) UseDeletedField() bool                    { return false }
+func (plainDialect) UseRowIDField(string) bool                { return false }
 func (plainDialect) AppendInlineFieldValues(fieldValues []any, fd protoreflect.FieldDescriptor, fv protoreflect.Value, dm protoreflect.Message) ([]any, error) {
 	return fieldValues, nil
 }

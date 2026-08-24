@@ -13,6 +13,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
+- Fixed: `substreams sink postgres|clickhouse` in Relational Mappings Mode now waits for the sink to shut down before
+  the process exits. On SIGINT or SIGTERM it returned immediately, so the run's final statistics were lost and — worse
+  — the open spool segment was never sealed, and every block it held was streamed, and paid for, again on the next
+  start. Interrupting a backfill is the normal way one ends, so this affected most runs.
+
+- The periodic statistics now report what the local spool is doing: segments committed and their rate, rows and bytes
+  applied, how long one commit takes, how much of the disk budget is in use, how long the stream has been held waiting
+  for the database, and what share of its time the applier spends working rather than waiting. That last one is what
+  says whether the database or the stream is the limit — a gap on its own never did.
+
+- Fixed: time the sink spends held by a full spool is reported on its own rather than
+  counted as block processing. It happens inside the per-block timer, so a database that
+  cannot keep up used to inflate `Block Processing Duration` and deflate the wait between
+  blocks — saying the sink was busy when it was blocked. The statistics line gains
+  `Held By Database` when there is any.
+
+- Fixed: the statistics windows are no longer appended to and read from two goroutines
+  without synchronisation.
+
+- Spool recovery reports itself while it runs. Replaying the segments a killed backfill left behind happens at startup,
+  before anything else logs, and takes as long as it takes to COPY them; it previously said nothing until it had
+  finished, which read as a hang.
+
+- Statistics panel: durations are reported per 100 blocks rather than as a per-block mean in fractions of a
+  microsecond, and two rows are named for what they measure — `Entities Insert Duration` is now `Message Walk
+  Duration`, and `Block Insert Duration` reads `Spool Write Duration` while a spool is open, since nothing is inserted
+  into a database on that path. The `Flush duration` row is fed by what the applier committed when spooling, where it
+  previously timed a call that returns before anything is written and so reported zero.
+
 - Added: `substreams sink protojson --compression` to write output files compressed with `zstd` or `gzip`, appending the matching `.zst` or `.gz` extension to each file. Defaults to no compression.
 
 - Fixed: **BREAKING** `substreams sink postgres` in Relational Mappings Mode stores `bytes` fields as binary in their

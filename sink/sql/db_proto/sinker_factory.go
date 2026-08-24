@@ -42,10 +42,6 @@ type SinkerFactoryOptions struct {
 	Clickhouse SinkerFactoryClickhouse
 }
 
-// defaultSpoolMaxBytes mirrors the spool's own default, for the one place that has to know
-// the quota before the spool is built.
-const defaultSpoolMaxBytes int64 = 8 << 30
-
 type SinkerFactoryClickhouse struct {
 	SinkInfoFolder  string
 	CursorFilePath  string
@@ -95,17 +91,10 @@ func SinkerFactory(
 
 		warnAboutMissingConstraints(database, options.Constraints, logger)
 
+		// What "falling behind" is measured against once rows go to disk rides on the
+		// snapshot itself, so it is the budget the spool actually resolved rather than the
+		// flag before defaults were applied.
 		stats := stats2.NewStats(logger, options.DecodeBatchSize)
-		if options.Spool != nil {
-			// What "falling behind" is measured against once rows go to disk. A block count
-			// cannot say it: a sparse backfill spans millions of blocks holding almost
-			// nothing, and would report itself as behind from the first minute.
-			quota := options.Spool.MaxBytes
-			if quota <= 0 {
-				quota = defaultSpoolMaxBytes
-			}
-			stats.Progress.SetBufferQuota(quota)
-		}
 
 		return NewSinker(
 			rootMessageDescriptor,

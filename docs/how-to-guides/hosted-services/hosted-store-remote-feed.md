@@ -10,9 +10,8 @@ Substreams modules — or any gRPC client — read those entries back at a given
 height.
 
 This guide is for the **Remote feed** flavor of a Hosted Store: you (or another
-service) push values in. The create wizard also offers a **Substreams feed** mode,
-where a package reads the chain and populates the store for you — that path is not
-covered here.
+service) push values in. For a package that reads the chain and populates the
+store, see the [Substreams Feed Hosted Store Guide](hosted-store-substreams-feed.md).
 
 This guide shows you how to:
 
@@ -49,8 +48,9 @@ Stores are provisioned through [**The Graph Market**](https://thegraph.market), 
 
 - [https://thegraph.market/sinks/new](https://thegraph.market/sinks/new) — create a new service.
   1. Choose **Hosted Store**.
-  2. Set the feed mode to **Remote feed** (off‑chain writes over gRPC). Do **not** pick
-     **Substreams feed** unless a package should populate the store from the chain.
+  2. Set the feed mode to **Remote feed** (off‑chain writes over gRPC). For a
+     package that populates the store from the chain, use the
+     [Substreams Feed Hosted Store Guide](hosted-store-substreams-feed.md) instead.
   3. Give it a **name** and a **Type URL**.
 - [https://thegraph.market/sinks](https://thegraph.market/sinks) — list your services and copy
   the store's deployment ID.
@@ -118,8 +118,6 @@ An API key is **created automatically** when you create the store, so you don't 
 one yourself beforehand. Manage your keys at
 [https://thegraph.market/api-keys](https://thegraph.market/api-keys).
 
-The examples below use `$SF_API_KEY` for that value.
-
 ---
 
 ## 4. Write entries — `Feed.Set`
@@ -147,48 +145,27 @@ message Entry {
 }
 ```
 
-### Example with `grpcurl`
+### Calling `Feed.Set`
 
-This writes a single entry — key `test-key-1` (base64‑encoded bytes), value a
-`com.acme.example.v1.TestValue`:
+Send `Set` from the Buf Schema Registry explorer for
+[`sf.substreams.foundational_store.feed.v2`](https://buf.build/streamingfast/substreams-foundational-store/docs/main:sf.substreams.foundational_store.feed.v2):
 
-```bash
-grpcurl \
-  --import-path "./proto" \
-  --proto sf/substreams/foundational-store/feed/v2/feed.proto \
-  --proto sf/substreams/foundational-store/model/v2/model.proto \
-  --proto com/acme/example/v1/example.proto \
-  -H "x-api-key: $SF_API_KEY" \
-  -d '{
-    "entries": {
-      "entries": [{
-        "key": { "bytes": "dGVzdC1rZXktMQ==" },
-        "value": {
-          "@type": "type.googleapis.com/com.acme.example.v1.TestValue",
-          "value": "my_super_value"
-        }
-      }]
-    }
-  }' \
-  <deployment-id>.hs.streamingfast.io:443 \
-  sf.substreams.foundational_store.feed.v2.Feed/Set
-```
+1. Open that page and select **Set**.
+2. Set the target to `<deployment-id>.hs.streamingfast.io:443`.
+3. Add metadata `x-api-key: <api-key>`.
+4. Fill the `SinkEntries` request: one or more `Entry` values, each with `key.bytes` and a
+   `google.protobuf.Any` `value`.
 
 Notes:
 
-- `key.bytes` is **base64** in JSON (gRPC bytes encoding). `dGVzdC1rZXktMQ==` decodes to `test-key-1`.
+- `key.bytes` is **base64** in JSON (gRPC bytes encoding).
 - `value` is a `google.protobuf.Any`: the `@type` must be the fully‑qualified type URL of your value message, and the remaining fields are that message's fields.
 - Use `"if_not_exist": true` at the `entries` level to avoid overwriting existing keys.
 
 ### Marking the store ready
 
 A new store is **not ready**. Hold reads off while you populate it, then flip the flag with
-`Feed.SetReady`:
-
-```bash
-grpcurl ... -d '{ "ready": true }' \
-  <endpoint> sf.substreams.foundational_store.feed.v2.Feed/SetReady
-```
+`Feed.SetReady` — same Buf page, select **SetReady**, and send `{ "ready": true }`.
 
 Until you call `SetReady` with `ready = true`:
 
@@ -226,22 +203,13 @@ message GetResponse {
 }
 ```
 
-Example:
+Call `Get` and `GetFirst` from the Buf Schema Registry explorer for
+[`sf.substreams.foundational_store.service.v2`](https://buf.build/streamingfast/substreams-foundational-store/docs/main:sf.substreams.foundational_store.service.v2):
 
-```bash
-grpcurl \
-  --import-path "./proto" \
-  --proto sf/substreams/foundational-store/service/v2/service.proto \
-  --proto sf/substreams/foundational-store/model/v2/model.proto \
-  --proto com/acme/example/v1/example.proto \
-  -H "x-api-key: $SF_API_KEY" \
-  -d '{
-    "block_number": "100",
-    "keys": [{ "bytes": "dGVzdC1rZXktMQ==" }]
-  }' \
-  <deployment-id>.hs.streamingfast.io:443 \
-  sf.substreams.foundational_store.service.v2.Store/Get
-```
+1. Open that page and select **Get** or **GetFirst**.
+2. Set the target to `<deployment-id>.hs.streamingfast.io:443`.
+3. Add metadata `x-api-key: <api-key>`.
+4. Set `block_number` and the `keys` to look up (`key.bytes` is **base64** in JSON).
 
 - **`Get`** returns exact key matches.
 - **`GetFirst`** returns, for each requested key, the first key **≥** it (lexicographic order) — useful for range scans / "next key" lookups.
@@ -374,14 +342,16 @@ substreams run substreams.yaml map_query_test_store \
 The authoritative message and service definitions — `model/v2/model.proto`,
 `feed/v2/feed.proto`, and `service/v2/service.proto` — are published at
 [buf.build/streamingfast/substreams-foundational-store](https://buf.build/streamingfast/substreams-foundational-store).
-Browse them there, or see the [Foundational Store Reference](../../../references/foundational-store-reference.md)
+Browse them there, or see the [Foundational Store Reference](../../references/foundational-store-reference.md)
 for the architecture and data model behind them.
 
 ---
 
 ## Related resources
 
-- [Foundational Stores](foundational-stores.md) — chain-specific foundational stores populated by a Substreams package (the **Substreams feed** mode).
-- [Consuming a Foundational Store](../../../tutorials/consuming-foundational-store.md) — querying a foundational store from a Substreams module, imported as a package.
-- [Hosting a Foundational Store](../../../references/foundational-stores/hosting-foundational-stores.md) — running your own foundational store server instead of using a StreamingFast-managed one.
-- [Foundational Store Reference](../../../references/foundational-store-reference.md) — architecture and data model shared by both hosted and self-hosted stores.
+- [Hosted Services](hosted-services.md) — the managed Sink and Store offerings StreamingFast runs for you.
+- [Substreams Feed Hosted Store Guide](hosted-store-substreams-feed.md) — let a Substreams package populate the store from the chain.
+- [Foundational Stores](../composing-substreams/foundational-stores/foundational-stores.md) — chain-specific foundational stores populated by a Substreams package.
+- [Consuming a Foundational Store](../../tutorials/consuming-foundational-store.md) — querying a foundational store from a Substreams module, imported as a package.
+- [Hosting a Foundational Store](../../references/foundational-stores/hosting-foundational-stores.md) — running your own foundational store server instead of using a StreamingFast-managed one.
+- [Foundational Store Reference](../../references/foundational-store-reference.md) — architecture and data model shared by both hosted and self-hosted stores.

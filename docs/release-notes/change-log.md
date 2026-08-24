@@ -11,6 +11,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Docs
+
+- Add a Hosted Services how-to that describes Hosted Sinks and Hosted Stores, with
+  separate Remote Feed and Substreams Feed hosted-store guides. Move the Hosted
+  Sinks how-to under Hosted Services.
+
 ### Sink
 
 - Fixed: **BREAKING** `substreams sink postgres` in Relational Mappings Mode stores `bytes` fields as binary in their

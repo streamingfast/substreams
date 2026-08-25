@@ -21,6 +21,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `Request.progress_messages_interval_ms` is now honoured: it was validated and then ignored. Setting it pins the
   progress cadence for the whole request instead of using the ramp above; the 500ms minimum is unchanged.
 
+- `substreams-tier1` now names the usage marker it writes in every module cache folder after the request's plan tier: `last_used_<plan>` (lowercase, e.g. `last_used_pro`), still plain `last_used` when unauthenticated. `firecore tools substreams purge` reads the plan back from that name to apply a retention per plan.
+
 ## v1.22.0
 
 ### Sink

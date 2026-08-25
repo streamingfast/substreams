@@ -610,15 +610,27 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 	return nil
 }
 
+// lastUsedFilename names the usage marker written in every module's cache folder:
+// `last_used` for unauthenticated requests, `last_used_<plan>` (lowercase) otherwise.
+// `firecore tools substreams purge` reads the plan back from that name to apply a
+// retention per plan.
+func lastUsedFilename(planTier string) string {
+	if planTier == "" {
+		return "last_used"
+	}
+	return "last_used_" + strings.ToLower(planTier)
+}
+
 func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph, cacheStore dstore.Store) error {
+	filename := lastUsedFilename(reqctx.Details(ctx).PlanTier)
 	for _, module := range execGraph.UsedModules() {
 		moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes()[module.Name])
 		if err != nil {
 			return fmt.Errorf("getting substore: %w", err)
 		}
 		moduleStore.SetOverwrite(true)
-		if err := moduleStore.WriteObject(ctx, "last_used", strings.NewReader(time.Now().Format("2006-01-02"))); err != nil {
-			return fmt.Errorf("writing last_used file")
+		if err := moduleStore.WriteObject(ctx, filename, strings.NewReader(time.Now().Format("2006-01-02"))); err != nil {
+			return fmt.Errorf("writing %s file", filename)
 		}
 	}
 	return nil
@@ -700,6 +712,7 @@ func (s *Tier1Service) blocks(
 	parallelism := reqctx.GetEffectiveHeaderValues(ctx, header, s.runtimeConfig.DefaultParallelSubrequests, reqctx.DefaultMaxStageLayerParallelExecutorCount)
 	requestDetails.MaxParallelJobs = parallelism.Workers
 	requestDetails.MaxStageLayerParallelExecutor = parallelism.StageLayerExecutors
+	requestDetails.PlanTier = parallelism.PlanTier
 	reqStats.SetWorkerCounts(parallelism.RequestedWorkers, parallelism.GrantedWorkers, parallelism.Workers)
 	logFields = append(logFields, zap.Object("parallelism", parallelism))
 

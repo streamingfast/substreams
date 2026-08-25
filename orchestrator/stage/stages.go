@@ -687,8 +687,12 @@ func (s *Stages) markShadowedUnits(segmentIdx int) (someShadowed bool) {
 		unit := Unit{Segment: segmentIdx, Stage: stageIdx}
 		segmentState := s.getState(unit)
 		if segmentState != UnitCompleted && segmentState != UnitNoOp {
+			// A unit can only be shadowed by a job of the stage above that has not run
+			// yet: that job executes this stage too and reports it on success. A unit
+			// above that is Merging or PartialPresent got its partial from disk, no job
+			// will ever come back for the shadowed one.
 			nextState := s.getState(Unit{Segment: segmentIdx, Stage: stageIdx + 1})
-			if nextState == UnitPending || nextState == UnitScheduled || nextState == UnitMerging || nextState == UnitShadowed {
+			if nextState == UnitPending || nextState == UnitScheduled || nextState == UnitShadowed {
 				s.setState(unit, UnitShadowed)
 				someShadowed = true
 			}

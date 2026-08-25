@@ -312,6 +312,47 @@ func TestShadowSimple(t *testing.T) {
 		M:S..`)
 }
 
+// A unit whose upper neighbour is merging a partial found on disk must not be shadowed:
+// no job will run for that upper unit, so nothing would ever un-shadow it and the stage
+// would wait forever.
+func TestShadowNotUnderMergeFromDisk(t *testing.T) {
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true)
+	assert.NoError(t, err)
+
+	stages := NewStages(
+		context.Background(),
+		exec.TestGraphStagedModules(5, 5, 5, 5, 5),
+		reqPlan,
+		nil,
+		nil,
+	)
+	stages.allocSegments(0)
+	stages.forceTransition(0, 0, UnitCompleted)
+	stages.forceTransition(0, 1, UnitPending)
+	stages.forceTransition(0, 2, UnitMerging)
+	stages.shadowableSegment = 0
+
+	stages.markShadowedUnits(0)
+	segmentStateEquals(t, stages, `
+		S:C
+		S:.
+		M:M`)
+
+	stages.forceTransition(0, 2, UnitPartialPresent)
+	stages.markShadowedUnits(0)
+	segmentStateEquals(t, stages, `
+		S:C
+		S:.
+		M:P`)
+
+	stages.forceTransition(0, 2, UnitPending)
+	stages.markShadowedUnits(0)
+	segmentStateEquals(t, stages, `
+		S:C
+		S:Z
+		M:.`)
+}
+
 func TestShadowStartAfter(t *testing.T) {
 	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 30, 90, 90, true)
 	assert.NoError(t, err)

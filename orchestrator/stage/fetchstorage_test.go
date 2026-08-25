@@ -525,8 +525,8 @@ func TestFetchOutputMapperState(t *testing.T) {
 				storeConfigs: store.ConfigMap{
 					"test_store": testStoreConfig(t, "test_store", 0, "hash", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "value", &dstore.MockStore{
 						Files: map[string][]byte{
-							"hash/states/0000000010-0000000000.kv": nil,
-							"hash/states/0000000040-0000000000.kv": nil,
+							"hash/states/0000000010-0000000000.kv":      nil,
+							"hash/states/0000000040-0000000000.kv":      nil,
 							"hash/states/0000000060-0000000050.partial": nil,
 						}},
 					),

@@ -13,6 +13,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Progress messages are sent far less often. The cadence now widens with the age of the request — every second for
+  the first minute, every 10 seconds up to 5 minutes, every 30 seconds up to 10 minutes, then every minute — and it
+  applies to the linear phase too, which previously sent one every 200ms. Progress messages count as egress like any
+  other response, so a long-running or live request paid for a steady stream of them.
+
+- `Request.progress_messages_interval_ms` is now honoured: it was validated and then ignored. Setting it pins the
+  progress cadence for the whole request instead of using the ramp above; the 500ms minimum is unchanged.
+
 - `substreams-tier1` now names the usage marker it writes in every module cache folder after the request's plan tier: `last_used_<plan>` (lowercase, e.g. `last_used_pro`), still plain `last_used` when unauthenticated. `firecore tools substreams purge` reads the plan back from that name to apply a retention per plan.
 
 ## v1.22.0

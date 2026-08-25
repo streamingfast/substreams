@@ -114,6 +114,29 @@ func (s *Stages) MarkSegmentPending(u Unit) {
 	)
 }
 
+// ReprocessMapSegment sends a map-stage unit back to Pending so its job runs again,
+// when the output file it was supposed to have written cannot be found. Returns false
+// when the unit is not in a done state (a job may already be re-running it).
+func (s *Stages) ReprocessMapSegment(segmentIdx int) bool {
+	stageIdx := len(s.stages) - 1
+	if s.stages[stageIdx].kind != KindMap {
+		return false
+	}
+	u := Unit{Stage: stageIdx, Segment: segmentIdx}
+	switch s.getState(u) {
+	case UnitCompleted, UnitPartialPresent:
+	default:
+		return false
+	}
+	s.setState(u, UnitPending)
+	// NextJob only scans from nextJobCursor; the cursor had moved past this segment
+	// when the unit was done.
+	if segmentIdx < s.nextJobCursor {
+		s.nextJobCursor = segmentIdx
+	}
+	return true
+}
+
 func (s *Stages) MarkJobSuccess(u Unit) (shadowedUnits []Unit) {
 	s.MarkSegmentPartialPresent(u)
 

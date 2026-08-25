@@ -756,3 +756,21 @@ func TestStages_dependenciesCompleted(t *testing.T) {
 		})
 	}
 }
+
+func TestReprocessMapSegment(t *testing.T) {
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true)
+	assert.NoError(t, err)
+	stages := NewStages(context.Background(), exec.TestGraphStagedModules(5, 5, 5, 5, 5), reqPlan, nil, nil)
+
+	stages.allocSegments(3)
+	stages.forceTransition(3, 2, UnitCompleted)
+	stages.nextJobCursor = 4
+
+	assert.True(t, stages.ReprocessMapSegment(3))
+	assert.Equal(t, UnitPending, stages.getState(Unit{Stage: 2, Segment: 3}))
+	assert.Equal(t, 3, stages.nextJobCursor)
+
+	assert.False(t, stages.ReprocessMapSegment(3), "already pending")
+	stages.forceTransition(3, 2, UnitScheduled)
+	assert.False(t, stages.ReprocessMapSegment(3), "job running")
+}

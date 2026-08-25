@@ -27,9 +27,11 @@ stateDiagram-v2
     %%NO: Pending --> Merging
     %%  we'll leave the messaging schedule the Squasher and take it from PartialPresent --> Merging
     Pending --> Completed: init storage fetch
-    %%  the initial storage state fetcher found a file with the complete store, and we've
-    %%  scheduled the squasher to load the latest that we found, and marked all the
-    %%  preceding ones as having a complete snapshot on disk (to satisfy any dependent jobs)
+    %%  the initial storage state fetcher found a file with the complete store for this
+    %%  exact segment. Only seen files are marked: older snapshots may have been pruned.
+    Pending --> NoOp: init storage fetch
+    %%  the segment is below the resume segment (a later complete store covers it), so
+    %%  nothing will ever read its files.
 
     %%NO: PartialPresent --> Pending: squasher didn't find partial
     %%  we'll let PartialPresent go to the squasher, and if it doesn't find it
@@ -143,6 +145,15 @@ func (s *Stages) ReleaseJob(u Unit) {
 func (s *Stages) markSegmentScheduled(u Unit) {
 	s.transition(u, UnitScheduled,
 		UnitPending, // after scheduling some work (NextJob())
+	)
+}
+
+// markSegmentNoOp is used for store segments below the resume segment: a later fullKV
+// covers them and nothing will ever read their (possibly pruned) files.
+func (s *Stages) markSegmentNoOp(u Unit) {
+	s.transition(u, UnitNoOp,
+		UnitPending,
+		UnitNoOp,
 	)
 }
 

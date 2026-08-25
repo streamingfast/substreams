@@ -476,7 +476,7 @@ func (s *Stages) MoveSegmentCompletedForward(stageIdx int) {
 	stage := s.stages[stageIdx]
 	for i := stage.segmentCompleted + 1; i <= stage.segmenter.LastIndex(); i++ {
 		unit := Unit{Stage: stageIdx, Segment: i}
-		if s.getState(unit) == UnitCompleted {
+		if state := s.getState(unit); state == UnitCompleted || state == UnitNoOp {
 			stage.segmentCompleted = i
 		} else {
 			return
@@ -713,17 +713,16 @@ func (s *Stages) dependenciesCompleted(u Unit) bool {
 		return true
 	}
 
-	previousSegmentParent := s.getState(Unit{Segment: u.Segment - 1, Stage: u.Stage - 1})
-
+	// A job loads the lower stages' fullKV at its segment start block, which is only
+	// guaranteed to exist once the previous segment of every lower stage is done. A
+	// completed unit says nothing about the segments before it: snapshots may be pruned.
 	for i := u.Stage - 1; i >= 0; i-- {
+		if !s.previousUnitComplete(Unit{Segment: u.Segment, Stage: i}) {
+			return false
+		}
 		state := s.getState(Unit{Segment: u.Segment, Stage: i})
 		switch state {
-		case UnitCompleted, UnitNoOp:
-		case UnitShadowed, UnitPartialPresent:
-			// if the direct parent stage is shadowed or UnitPartialPresent, we need the previous segment's previous stage to be completed
-			if previousSegmentParent != UnitCompleted && previousSegmentParent != UnitNoOp {
-				return false
-			}
+		case UnitCompleted, UnitNoOp, UnitShadowed, UnitPartialPresent:
 		default:
 			return false
 		}

@@ -4,14 +4,20 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/streamingfast/substreams/block"
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
-
 	"github.com/streamingfast/substreams/storage/store/state"
 )
 
-var firstPassStoresWalkMaxSegments = 50 // arbitrary "small" number of segments to scan for the first pass. Scan time is slow when listing thousands of files in object storage
+// storesWalkWindowSegments is the number of segments covered by the first listing window
+// when looking for store snapshots. Each following window is storesWalkWindowGrowth times
+// larger, so a store whose nearest snapshot is far behind costs O(log n) bounded listings
+// instead of one listing of its whole history.
+var storesWalkWindowSegments = 50
+
+const storesWalkWindowGrowth = 4
 
 // FetchCachesState will look at the cache for:
 // 1. the output mapper (if we are in production mode and producing ExecOuts)
@@ -22,7 +28,12 @@ var firstPassStoresWalkMaxSegments = 50 // arbitrary "small" number of segments 
 //
 // )
 // Then, the internal "s.segmentStates" will be updated.
-// It tries to fetch the minimal number of files, because with object-storage (gcs, s3, ...), listing files can be slow and costly
+//
+// Store snapshots may have been pruned: a fullKV existing at block `x` does NOT imply that
+// the fullKVs for blocks <x still exist. A unit is only marked Completed when its file was
+// actually seen. The resume segment is the highest segment at or below the first segment
+// needing work for which every store module has a fullKV; every segment below it is
+// marked NoOp since nothing will ever read those files.
 func (s *Stages) FetchCachesState(
 	ctx context.Context,
 ) error {
@@ -74,40 +85,19 @@ func (s *Stages) FetchCachesState(
 		return nil
 	}
 
-	completes := make(unitMap)
-	partials := make(unitMap)
-
-	// We make a first pass to fetch the state of the stores, trying to read no more than a handful of files per store, for performance considerations
-	// The idea is that object storage only allows scanning forward when listing files, and it is quite slow on some backends.
-	// Since we know that the presence of a fullKV file for block `x` implies that all the fullKV files for blocks <x are present, we can backfill the states without actually scanning all the files
-	firstPassStoresWalk := s.firstPassStoresWalk()
-	cacheState, err := state.FetchState(ctx, s.storeConfigs, firstPassStoresWalk.StartBlock, firstPassStoresWalk.ExclusiveEndBlock)
+	target := s.storesTargetSegment()
+	cacheState, resume, err := s.scanStoreSnapshots(ctx, target)
 	if err != nil {
 		return fmt.Errorf("fetching stores storage state: %w", err)
 	}
+	reqctx.Logger(ctx).Info("stores resume point",
+		zap.Int("target_segment", target),
+		zap.Int("resume_segment", resume),
+		zap.String("snapshots", cacheState.Summary()),
+	)
 
-	modulesFetchedOverAllRange := make(map[string]bool)
-	var someStoresAreMissingFullKVs bool
-stageLoop:
-	for _, stage := range s.stages {
-		for _, mod := range stage.storeModuleStates {
-			modulesFetchedOverAllRange[mod.name] = false
-			if firstPassStoresWalk.StartBlock > mod.segmenter.InitialBlock() && (cacheState.Snapshots[mod.name] == nil || len(cacheState.Snapshots[mod.name].FullKVFiles) == 0) {
-				someStoresAreMissingFullKVs = true
-				break stageLoop
-			}
-		}
-	}
-
-	// Second pass: we if we didn't see any expected fullKV for a store in our first pass, we scan again, with the full range
-	// Note that we don't reuse the snapshots already fetched: listing a few files twice same few files twice is negligible.
-	if someStoresAreMissingFullKVs {
-		cacheState, err = state.FetchState(ctx, s.storeConfigs, s.storeSegmenter.InitialBlock(), s.storeSegmenter.ExclusiveEndBlock())
-		if err != nil {
-			return fmt.Errorf("fetching stores storage state: %w", err)
-		}
-	}
-
+	completes := make(unitMap)
+	partials := make(unitMap)
 	segmenter := s.globalSegmenter
 
 	for stageIdx, stage := range s.stages {
@@ -146,25 +136,25 @@ stageLoop:
 			continue
 		}
 
+		for segmentIdx := stage.segmenter.FirstIndex(); segmentIdx < resume; segmentIdx++ {
+			s.markSegmentNoOp(Unit{Stage: stageIdx, Segment: segmentIdx})
+		}
+
 		for _, mod := range stage.storeModuleStates {
 			files := cacheState.Snapshots[mod.name]
+			if files == nil {
+				continue
+			}
 			modSegmenter := mod.segmenter
 
 			for _, fullKV := range files.FullKVFiles {
 				segmentIdx := modSegmenter.IndexForEndBlock(fullKV.Range.ExclusiveEndBlock)
+				if segmentIdx < resume {
+					continue
+				}
 				rng := segmenter.Range(segmentIdx)
 				if rng == nil || rng.ExclusiveEndBlock != fullKV.Range.ExclusiveEndBlock {
 					continue
-				}
-				if !modulesFetchedOverAllRange[mod.name] {
-					// here we backfill the previous segments for modules that were not fetched completely
-					for backfillIdx := modSegmenter.FirstIndex(); backfillIdx < segmentIdx; backfillIdx++ {
-						unit := Unit{Stage: stageIdx, Segment: backfillIdx}
-						if allDone := markFound(completes, unit, mod.name, moduleCount(unit)); allDone {
-							s.markSegmentCompleted(unit)
-						}
-					}
-					modulesFetchedOverAllRange[mod.name] = true
 				}
 				unit := Unit{Stage: stageIdx, Segment: segmentIdx}
 				if allDone := markFound(completes, unit, mod.name, moduleCount(unit)); allDone {
@@ -174,6 +164,9 @@ stageLoop:
 
 			for _, partial := range files.Partials {
 				segmentIdx := modSegmenter.IndexForStartBlock(partial.Range.StartBlock)
+				if segmentIdx <= resume {
+					continue
+				}
 				rng := segmenter.Range(segmentIdx)
 				if rng == nil {
 					continue
@@ -201,19 +194,98 @@ stageLoop:
 	return nil
 }
 
-// firstPassStoresWalk will give you an optimistic range for scanning the presence of files in a store
-func (s *Stages) firstPassStoresWalk() *block.Range {
-	lastIndex := s.storeSegmenter.LastIndex()
-	firstIndex := s.storeSegmenter.FirstIndex()
-
-	idx := firstIndex
-	if lastIndex > firstPassStoresWalkMaxSegments {
-		idx = lastIndex - firstPassStoresWalkMaxSegments
-		if idx < firstIndex {
-			idx = firstIndex
+// storesTargetSegment is the last store segment that must be complete before any job can
+// run: the segment right before the first mapper segment still needing to be produced, or
+// the last store segment when no mapper output is missing (the linear pipeline then needs
+// the stores at the handoff block).
+func (s *Stages) storesTargetSegment() int {
+	target := s.storeSegmenter.LastIndex()
+	if s.mapSegmenter == nil {
+		return target
+	}
+	mapStage := len(s.stages) - 1
+	for segmentIdx := s.mapSegmenter.FirstIndex(); segmentIdx <= s.mapSegmenter.LastIndex(); segmentIdx++ {
+		if s.getState(Unit{Stage: mapStage, Segment: segmentIdx}) == UnitPending {
+			return min(target, segmentIdx-1)
 		}
 	}
-	return block.NewRange(s.storeSegmenter.Range(idx).StartBlock, s.storeSegmenter.ExclusiveEndBlock())
+	return target
+}
+
+// scanStoreSnapshots lists store snapshot files in windows walking backwards from the
+// target segment, until a resume segment is found or the lowest module initial block is
+// reached. The first window also covers everything above the target, so that snapshots
+// left by a previous run are reused. Returns every file seen and the resume segment (-1
+// when no common fullKV exists at or below the target).
+func (s *Stages) scanStoreSnapshots(ctx context.Context, target int) (*state.StoreSnapshotsMap, int, error) {
+	lowest := s.storeSegmenter.FirstIndex()
+	all := state.NewStoreSnapshotsMap()
+
+	windowLow := max(lowest, target-storesWalkWindowSegments+1)
+	windowSize := storesWalkWindowSegments
+	inclusiveTo := s.storeSegmenter.ExclusiveEndBlock()
+
+	for {
+		from := s.storeSegmenter.Range(windowLow).StartBlock
+		fetched, err := state.FetchState(ctx, s.storeConfigs, from, inclusiveTo)
+		if err != nil {
+			return nil, 0, err
+		}
+		all.Merge(fetched)
+
+		if resume, found := s.resumeSegment(all, target, windowLow); found {
+			return all, resume, nil
+		}
+		if windowLow <= lowest {
+			return all, -1, nil
+		}
+
+		inclusiveTo = from - 1
+		windowSize *= storesWalkWindowGrowth
+		windowLow = max(lowest, windowLow-windowSize)
+	}
+}
+
+// resumeSegment returns the highest segment in [floor, target] for which every store
+// module already started has a fullKV file in `snapshots`.
+func (s *Stages) resumeSegment(snapshots *state.StoreSnapshotsMap, target, floor int) (int, bool) {
+	seen := make(map[string]map[uint64]struct{}, len(snapshots.Snapshots))
+	for name, files := range snapshots.Snapshots {
+		ends := make(map[uint64]struct{}, len(files.FullKVFiles))
+		for _, file := range files.FullKVFiles {
+			ends[file.Range.ExclusiveEndBlock] = struct{}{}
+		}
+		seen[name] = ends
+	}
+
+	for segmentIdx := target; segmentIdx >= floor; segmentIdx-- {
+		complete := true
+		for _, stage := range s.stages {
+			if stage.kind != KindStore {
+				continue
+			}
+			for _, mod := range stage.storeModuleStates {
+				if segmentIdx < mod.segmenter.FirstIndex() {
+					continue
+				}
+				rng := mod.segmenter.Range(segmentIdx)
+				if rng == nil {
+					continue
+				}
+				if _, ok := seen[mod.name][rng.ExclusiveEndBlock]; !ok {
+					complete = false
+					break
+				}
+			}
+			if !complete {
+				break
+			}
+		}
+		if complete {
+			return segmentIdx, true
+		}
+	}
+	return 0, false
 }
 
 func (s *Stages) fetchOutputMapperState(ctx context.Context) (mapperName string, mapperFiles execout.FileInfos, err error) {

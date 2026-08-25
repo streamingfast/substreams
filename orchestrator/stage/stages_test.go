@@ -587,6 +587,27 @@ func TestStages_dependenciesCompleted(t *testing.T) {
 			want: false,
 		},
 
+		// --- Completed parent whose previous segment is not done: its fullKV at the
+		// segment start block is not guaranteed to exist (snapshots may be pruned) ---
+		{
+			name: "stage 1 parent completed but previous segment parent pending",
+			s: makeDepsStages(0, 2, 0, []stageStates{
+				{UnitPending, UnitPending},
+				{UnitCompleted, UnitPending},
+			}),
+			unit: Unit{Segment: 1, Stage: 1},
+			want: false,
+		},
+		{
+			name: "stage 1 parent completed and previous segment parent noop",
+			s: makeDepsStages(0, 2, 0, []stageStates{
+				{UnitNoOp, UnitPending},
+				{UnitCompleted, UnitPending},
+			}),
+			unit: Unit{Segment: 1, Stage: 1},
+			want: true,
+		},
+
 		// --- Shadowed parent: allowed only when the previous segment's parent is done ---
 		{
 			name: "stage 1 parent shadowed prev-segment-parent completed",

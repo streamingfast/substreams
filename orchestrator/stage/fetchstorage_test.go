@@ -146,13 +146,13 @@ func TestFetchOutputMapperState(t *testing.T) {
 					),
 				},
 			},
-			wantStates: `S:CCC
+			wantStates: `S:NNC
 			M:.CC`,
 			wantErr: false,
 		},
 
 		{
-			name:          "stores not found in first pass, fetches all",
+			name:          "stores not found in first window, walks back",
 			startBlockNum: 60, // dev mode needs stores ready at 60
 			stages: &Stages{
 				globalSegmenter: segmenter(0, 60), // calculated from the storeModuleStates
@@ -181,13 +181,13 @@ func TestFetchOutputMapperState(t *testing.T) {
 							_, found := storePreWalked.Get("test_store")
 							if !found {
 								storePreWalked.Set("test_store", true)
-								assert.Equal(t, "0000000030-", start)
+								assert.Equal(t, "0000000040-", start)
 								assert.Equal(t, "0000000061-", end)
 								return nil
 							}
 
 							assert.Equal(t, "0000000000-", start)
-							assert.Equal(t, "0000000061-", end)
+							assert.Equal(t, "0000000040-", end)
 							return walkFiles([]string{
 								"hash/states/0000000010-0000000000.kv",
 								"hash/states/0000000020-0000000000.kv",
@@ -202,13 +202,13 @@ func TestFetchOutputMapperState(t *testing.T) {
 							_, found := storePreWalked.Get("test_store2")
 							if !found {
 								storePreWalked.Set("test_store2", true)
-								assert.Equal(t, "0000000030-", start)
+								assert.Equal(t, "0000000040-", start)
 								assert.Equal(t, "0000000061-", end)
 								return nil
 							}
 
 							assert.Equal(t, "0000000000-", start)
-							assert.Equal(t, "0000000061-", end)
+							assert.Equal(t, "0000000040-", end)
 							return walkFiles([]string{
 								"hash/states/0000000020-0000000010.kv",
 							}, f)
@@ -216,7 +216,7 @@ func TestFetchOutputMapperState(t *testing.T) {
 					}),
 				},
 			},
-			wantStates: `S:CC`, // segments [0-10], [10-20]
+			wantStates: `S:NC`, // [10-20] is the resume point, [0-10] is never read
 			wantErr:    false,
 		},
 		{
@@ -250,7 +250,7 @@ func TestFetchOutputMapperState(t *testing.T) {
 						WalkFunc:     failWalk(t),
 						WalkFromFunc: failWalkFrom(t),
 						WalkFromToFunc: func(ctx context.Context, prefix, start, end string, f func(string) error) error {
-							assert.Equal(t, "0000000010-", start)
+							assert.Equal(t, "0000000020-", start)
 							assert.Equal(t, "0000000041-", end)
 							return walkFiles([]string{
 								"hash/states/0000000010-0000000000.kv",
@@ -264,7 +264,7 @@ func TestFetchOutputMapperState(t *testing.T) {
 						WalkFunc:     failWalk(t),
 						WalkFromFunc: failWalkFrom(t),
 						WalkFromToFunc: func(ctx context.Context, prefix, start, end string, f func(string) error) error {
-							assert.Equal(t, "0000000010-", start)
+							assert.Equal(t, "0000000020-", start)
 							assert.Equal(t, "0000000041-", end)
 							return nil
 						},
@@ -274,14 +274,14 @@ func TestFetchOutputMapperState(t *testing.T) {
 						WalkFunc:     failWalk(t),
 						WalkFromFunc: failWalkFrom(t),
 						WalkFromToFunc: func(ctx context.Context, prefix, start, end string, f func(string) error) error {
-							assert.Equal(t, "0000000010-", start)
+							assert.Equal(t, "0000000020-", start)
 							assert.Equal(t, "0000000041-", end)
 							return nil
 						},
 					}),
 				},
 			},
-			wantStates: `S:CCC`, // segments [0-10], [10-20] and [20-30] are fetched
+			wantStates: `S:NNC`, // [20-30] is the resume point
 			wantErr:    false,
 		},
 		{
@@ -315,10 +315,9 @@ func TestFetchOutputMapperState(t *testing.T) {
 						WalkFunc:     failWalk(t),
 						WalkFromFunc: failWalkFrom(t),
 						WalkFromToFunc: func(ctx context.Context, prefix, start, end string, f func(string) error) error {
-							assert.Equal(t, "0000000020-", start)
+							assert.Equal(t, "0000000030-", start)
 							assert.Equal(t, "0000000051-", end)
 							return walkFiles([]string{
-								// 0-10 is inferred
 								"hash/states/0000000020-0000000000.kv",
 								"hash/states/0000000030-0000000000.kv",
 								"hash/states/0000000040-0000000000.kv",
@@ -331,7 +330,7 @@ func TestFetchOutputMapperState(t *testing.T) {
 						WalkFunc:     failWalk(t),
 						WalkFromFunc: failWalkFrom(t),
 						WalkFromToFunc: func(ctx context.Context, prefix, start, end string, f func(string) error) error {
-							assert.Equal(t, "0000000020-", start)
+							assert.Equal(t, "0000000030-", start)
 							assert.Equal(t, "0000000051-", end)
 							return walkFiles([]string{
 								"hash/states/0000000050-0000000040.kv",
@@ -343,14 +342,14 @@ func TestFetchOutputMapperState(t *testing.T) {
 						WalkFunc:     failWalk(t),
 						WalkFromFunc: failWalkFrom(t),
 						WalkFromToFunc: func(ctx context.Context, prefix, start, end string, f func(string) error) error {
-							assert.Equal(t, "0000000020-", start)
+							assert.Equal(t, "0000000030-", start)
 							assert.Equal(t, "0000000051-", end)
 							return nil
 						},
 					}),
 				},
 			},
-			wantStates: `S:CCCCC`, // segments [0-10], [10-20] and [20-30], [30-40], [40-50] are fetched
+			wantStates: `S:NNNNC`, // [40-50] is the resume point
 			wantErr:    false,
 		},
 
@@ -434,7 +433,7 @@ func TestFetchOutputMapperState(t *testing.T) {
 						WalkFunc:     failWalk(t),
 						WalkFromFunc: failWalkFrom(t),
 						WalkFromToFunc: func(ctx context.Context, prefix, start, end string, f func(string) error) error {
-							assert.Equal(t, "0000000030-", start)
+							assert.Equal(t, "0000000040-", start)
 							assert.Equal(t, "0000000061-", end)
 							return walkFiles([]string{
 								"hash/states/0000000060-0000000000.kv", // this one is sufficient
@@ -447,7 +446,7 @@ func TestFetchOutputMapperState(t *testing.T) {
 					"hash/outputs/0000000050-000000060.output",
 				}}),
 			},
-			wantStates: `S:CCCCCC
+			wantStates: `S:NNNNNC
 					M:.....C`,
 			wantErr: false,
 		},
@@ -486,10 +485,9 @@ func TestFetchOutputMapperState(t *testing.T) {
 						WalkFunc:     failWalk(t),
 						WalkFromFunc: failWalkFrom(t),
 						WalkFromToFunc: func(ctx context.Context, prefix, start, end string, f func(string) error) error {
-							assert.Equal(t, "0000000020-", start)
+							assert.Equal(t, "0000000030-", start)
 							assert.Equal(t, "0000000051-", end)
 							return walkFiles([]string{
-								// 0-10 is inferred
 								"hash/states/0000000020-0000000000.kv",
 								"hash/states/0000000030-0000000000.kv",
 								"hash/states/0000000040-0000000000.kv",
@@ -502,13 +500,171 @@ func TestFetchOutputMapperState(t *testing.T) {
 					"hash/outputs/0000000050-000000060.output",
 				}}),
 			},
-			wantStates: `S:CCCC..
+			wantStates: `S:NNNC..
 			M:.....C`,
 			wantErr: false,
 		},
+		{
+			name:          "pruned snapshots resume at the last remaining fullKV",
+			startBlockNum: 60,
+			stages: &Stages{
+				globalSegmenter: segmenter(0, 60),
+				storeSegmenter:  segmenter(0, 60),
+				stages: []*Stage{
+					{
+						segmenter: segmenter(0, 60),
+						storeModuleStates: []*StoreModuleState{
+							{
+								name:      "test_store",
+								segmenter: segmenter(0, 60),
+							},
+						},
+						kind: KindStore,
+					},
+				},
+				storeConfigs: store.ConfigMap{
+					"test_store": testStoreConfig(t, "test_store", 0, "hash", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "value", &dstore.MockStore{
+						Files: map[string][]byte{
+							"hash/states/0000000010-0000000000.kv": nil,
+							"hash/states/0000000040-0000000000.kv": nil,
+							"hash/states/0000000060-0000000050.partial": nil,
+						}},
+					),
+				},
+			},
+			wantStates: `S:NNNC.P`,
+			wantErr:    false,
+		},
+		{
+			name:          "pruned snapshots on two stores resume at their last common fullKV",
+			startBlockNum: 60,
+			stages: &Stages{
+				globalSegmenter: segmenter(0, 60),
+				storeSegmenter:  segmenter(0, 60),
+				stages: []*Stage{
+					{
+						segmenter: segmenter(0, 60),
+						storeModuleStates: []*StoreModuleState{
+							{
+								name:      "test_store",
+								segmenter: segmenter(0, 60),
+							},
+							{
+								name:      "test_store2",
+								segmenter: segmenter(0, 60),
+							},
+						},
+						kind: KindStore,
+					},
+				},
+				storeConfigs: store.ConfigMap{
+					"test_store": testStoreConfig(t, "test_store", 0, "hash", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "value", &dstore.MockStore{
+						Files: map[string][]byte{
+							"hash/states/0000000020-0000000000.kv": nil,
+							"hash/states/0000000040-0000000000.kv": nil,
+						}},
+					),
+					"test_store2": testStoreConfig(t, "test_store2", 0, "hash2", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "value", &dstore.MockStore{
+						Files: map[string][]byte{
+							"hash2/states/0000000020-0000000000.kv": nil,
+							"hash2/states/0000000030-0000000000.kv": nil,
+						}},
+					),
+				},
+			},
+			wantStates: `S:NC`,
+			wantErr:    false,
+		},
+		{
+			name:          "pruned snapshots on two stages resume at the last common fullKV",
+			startBlockNum: 60,
+			stages: &Stages{
+				globalSegmenter: segmenter(0, 60),
+				storeSegmenter:  segmenter(0, 60),
+				stages: []*Stage{
+					{
+						segmenter: segmenter(0, 60),
+						storeModuleStates: []*StoreModuleState{
+							{
+								name:      "test_store",
+								segmenter: segmenter(0, 60),
+							},
+						},
+						kind: KindStore,
+					},
+					{
+						segmenter: segmenter(0, 60),
+						storeModuleStates: []*StoreModuleState{
+							{
+								name:      "test_store2",
+								segmenter: segmenter(0, 60),
+							},
+						},
+						kind: KindStore,
+					},
+				},
+				storeConfigs: store.ConfigMap{
+					"test_store": testStoreConfig(t, "test_store", 0, "hash", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "value", &dstore.MockStore{
+						Files: map[string][]byte{
+							"hash/states/0000000020-0000000000.kv": nil,
+							"hash/states/0000000050-0000000000.kv": nil,
+						}},
+					),
+					"test_store2": testStoreConfig(t, "test_store2", 0, "hash2", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "value", &dstore.MockStore{
+						Files: map[string][]byte{
+							"hash2/states/0000000020-0000000000.kv": nil,
+							"hash2/states/0000000030-0000000000.kv": nil,
+						}},
+					),
+				},
+			},
+			wantStates: `S:NC..C
+			S:NCC..`,
+			wantErr: false,
+		},
+		{
+			name:          "no snapshot at all walks back to the initial block",
+			startBlockNum: 60,
+			stages: &Stages{
+				globalSegmenter: segmenter(0, 60),
+				storeSegmenter:  segmenter(0, 60),
+				stages: []*Stage{
+					{
+						segmenter: segmenter(0, 60),
+						storeModuleStates: []*StoreModuleState{
+							{
+								name:      "test_store",
+								segmenter: segmenter(0, 60),
+							},
+						},
+						kind: KindStore,
+					},
+				},
+				storeConfigs: store.ConfigMap{
+					"test_store": testStoreConfig(t, "test_store", 0, "hash", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "value", &dstore.MockStore{
+						WalkFunc:     failWalk(t),
+						WalkFromFunc: failWalkFrom(t),
+						WalkFromToFunc: func(ctx context.Context, prefix, start, end string, f func(string) error) error {
+							_, found := storePreWalked.Get("test_store")
+							if !found {
+								storePreWalked.Set("test_store", true)
+								assert.Equal(t, "0000000040-", start)
+								assert.Equal(t, "0000000061-", end)
+								return nil
+							}
+							assert.Equal(t, "0000000000-", start)
+							assert.Equal(t, "0000000040-", end)
+							return nil
+						},
+					}),
+				},
+			},
+			wantStates: `S:`,
+			wantErr:    false,
+		},
 	}
 
-	firstPassStoresWalkMaxSegments = 2 // for tests
+	storesWalkWindowSegments = 2 // for tests
 	for _, tt := range tests {
 
 		storePreWalked = cmap.New[bool]() // reset this every pass

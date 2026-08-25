@@ -172,6 +172,9 @@ func (s *FullKV) Load(ctx context.Context, file *FileInfo) error {
 
 	reader, err := loadStoreStream(ctx, s.objStore, file.Filename)
 	if err != nil {
+		if errors.Is(err, dstore.ErrNotFound) {
+			return fmt.Errorf("load store stream: snapshot %q does not exist (it may have been pruned): %w", file.Filename, err)
+		}
 		return fmt.Errorf("load store stream: %w", err)
 	}
 	defer reader.Close()

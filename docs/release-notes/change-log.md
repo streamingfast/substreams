@@ -9,6 +9,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Server
+
+- Store snapshots (fullKV files) can now be pruned to save disk space: tier1 no longer assumes that a fullKV at block
+  `x` implies that every earlier fullKV still exists. At request start it walks backwards from the first segment
+  needing work, in growing listing windows, until it finds the last block where every store module still has a
+  snapshot, and rebuilds the stores from there. Only snapshots actually seen are reused, and a job is only scheduled
+  once the previous segment of every lower stage is done, so a pruned file is never read.
+
+- The initial store lookup no longer falls back to listing a store's whole history when its last snapshot is far
+  behind: it lists at most a handful of bounded windows.
+
 ## v1.22.0
 
 ### Sink

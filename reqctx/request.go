@@ -19,10 +19,13 @@ type RequestDetails struct {
 	ResolvedStartBlockNum uint64
 	ResolvedCursor        string
 
-	LinearHandoffBlockNum         uint64
-	LinearGateBlockNum            uint64
-	StopBlockNum                  uint64
-	MaxParallelJobs               uint64
+	LinearHandoffBlockNum uint64
+	LinearGateBlockNum    uint64
+	StopBlockNum          uint64
+	MaxParallelJobs       uint64
+	// PlanTier is the substreams plan tier reported by the authentication layer, empty
+	// when the request is unauthenticated.
+	PlanTier                      string
 	MaxStageLayerParallelExecutor uint64
 	LimitProcessedBlocks          uint64
 	UpdateInterval                time.Duration

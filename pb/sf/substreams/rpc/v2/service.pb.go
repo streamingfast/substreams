@@ -139,7 +139,9 @@ type Request struct {
 	// If unset, all the outputs are sent.
 	// This allows the user to reduce the payload in dev mode, while still getting some extra debugging information
 	DevOutputModules []string `protobuf:"bytes,13,rep,name=dev_output_modules,json=devOutputModules,proto3" json:"dev_output_modules,omitempty"`
-	// Progress_messages_interval_ms is the interval between progress messages, in milliseconds (minimum: 500, default: start at 500ms and ramp up to 5000ms within 1min)
+	// Interval between progress messages, in milliseconds (minimum: 500). When left at 0, the
+	// interval widens with the age of the request: 1s for the first minute, 10s up to 5 minutes,
+	// 30s up to 10 minutes, 60s beyond that.
 	ProgressMessagesIntervalMs uint64 `protobuf:"varint,14,opt,name=progress_messages_interval_ms,json=progressMessagesIntervalMs,proto3" json:"progress_messages_interval_ms,omitempty"`
 	// If true, blocks close to head will be sent in "partials" as soon as we get them.
 	// This means that you will get different versions of the same block number, each an incomplete increment

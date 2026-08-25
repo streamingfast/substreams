@@ -274,6 +274,7 @@ func (s *Stages) UpdateStats() {
 	reqStats := reqctx.ReqStats(s.ctx)
 	reqStats.RecordStages(out)
 	reqStats.RecordStagesProgress(progress)
+	reqStats.RecordUnitStates(s.StatesString())
 }
 
 // stageStats is what a single pass over the segment matrix yields, per stage.

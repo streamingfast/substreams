@@ -205,6 +205,13 @@ func (s *Stats) RecordBlockSent(elapsed time.Duration, blockCount int) {
 
 // RecordStagesProgress is called by the orchestrator's Stages, at most once per second,
 // with the per-stage, per-module state of the parallel processing.
+// RecordUnitStates keeps the scheduler's segment matrix for the stalled progress log.
+func (s *Stats) RecordUnitStates(states string) {
+	s.Lock()
+	defer s.Unlock()
+	s.unitStates = states
+}
+
 func (s *Stats) RecordStagesProgress(progress []StageProgress) {
 	s.Lock()
 	defer s.Unlock()
@@ -459,7 +466,11 @@ func (s *Stats) progressFields() []zap.Field {
 		}))
 	}
 
-	fields = append(fields, zap.Strings("hints", s.progressHints(stages, calls, sendStats, workers, cachedAhead, linearPhase, measured, jobErrorsInWindow, now)))
+	hints := s.progressHints(stages, calls, sendStats, workers, cachedAhead, linearPhase, measured, jobErrorsInWindow, now)
+	fields = append(fields, zap.Strings("hints", hints))
+	if len(hints) > 0 && s.unitStates != "" {
+		fields = append(fields, zap.String("unit_states", s.unitStates))
+	}
 
 	return fields
 }

@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   snapshot, and rebuilds the stores from there. Only snapshots actually seen are reused, and a job is only scheduled
   once the previous segment of every lower stage is done, so a pruned file is never read.
 
+- A store snapshot deleted while a request that still needs it is running now fails that request with `FailedPrecondition: ... does not exist (it may have been pruned); restart the request` instead of retrying the tier2 job forever. Likewise, a mapper output file deleted after its job completed is re-produced after 30 seconds instead of being waited on forever, and a scheduler deadlock on partials left by an interrupted run (a unit shadowed under one merging a partial from disk) is fixed.
+
 - The initial store lookup no longer falls back to listing a store's whole history when its last snapshot is far
   behind: it lists at most a handful of bounded windows.
 

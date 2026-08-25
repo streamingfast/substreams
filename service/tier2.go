@@ -824,6 +824,12 @@ func toGRPCError(ctx context.Context, err error) error {
 		return grpcError.Err()
 	}
 
+	// A snapshot pruned under a running request: retrying the job cannot help, the
+	// request has to be restarted so that tier1 picks a new resume point.
+	if errors.Is(err, store.ErrSnapshotMissing) {
+		return status.Error(codes.FailedPrecondition, err.Error()+"; restart the request")
+	}
+
 	// GRPC to connect error
 	connectError := &connect.Error{}
 	if errors.As(err, &connectError) {

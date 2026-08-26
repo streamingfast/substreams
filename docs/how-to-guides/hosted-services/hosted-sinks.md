@@ -4,7 +4,7 @@
 **Hosted Sinks is currently in beta.** The service is under active development and changes may occur. To stay up to date with the latest information, join our [Discord Server](https://discord.gg/jZwqxJAvRs) and follow the **#announcements** channel.
 {% endhint %}
 
-**Hosted Sinks** is a managed service on [The Graph Market](https://thegraph.market) that runs your Substreams sink for you. Instead of provisioning servers, managing deployments, or operating sink processes yourself, you configure a sink in the portal and StreamingFast handles the infrastructure.
+**Hosted Sinks** is a managed service on [The Graph Market](https://thegraph.market) that runs your Substreams sink for you. Instead of provisioning servers, managing deployments, or operating sink processes yourself, you configure a sink in the portal and StreamingFast handles the infrastructure. Hosted Sinks is one of the two [Hosted Services](hosted-services.md) offerings; the other is a Hosted Store ([remote feed](hosted-store-remote-feed.md) or [Substreams feed](hosted-store-substreams-feed.md)).
 
 A hosted sink continuously reads data from your Substreams package and writes it to your own Postgres or ClickHouse database.
 
@@ -17,15 +17,15 @@ Hosted Sinks is available to organizations on The Graph Market. Your database mu
 Before creating a sink, you need:
 
 - An account on [The Graph Market](https://thegraph.market) with an active organization.
-- A Substreams package (`.spkg`) that outputs data in Database Changes Mode (a `db_out` module) or Relational Mappings Mode. See [Substreams:SQL](../sql/sql.md) for how to build one.
+- A Substreams package (`.spkg`) that outputs data in Database Changes Mode (a `db_out` module) or Relational Mappings Mode. See [Substreams:SQL](../sinks/sql/sql.md) for how to build one.
 - A running Postgres (default port `5432`) or ClickHouse (default port `9000`) database that is network-accessible from the internet.
-- Your database schema already applied, or a schema that your Substreams package will create automatically. See [Sink Config](../../../references/sql/sink-config.md).
+- Your database schema already applied, or a schema that your Substreams package will create automatically. See [Sink Config](../../references/sql/sink-config.md).
 
 ## Creating a Sink
 
 Navigate to [**Sinks**](https://thegraph.market/sinks) in the sidebar and click **New Sink**.
 
-![](<../../../assets/add-sinks-graph-market.png>)
+![](<../../assets/add-sinks-graph-market.png>)
 
 ### 1. Basics
 
@@ -96,12 +96,12 @@ Click **Deploy sink**. The sink enters the `Deploying` state while the infrastru
 Step-by-step guides for connecting a Hosted Sink to common managed database providers:
 
 **Postgres**
-- [Supabase](./supabase.md) — managed Postgres with a generous free tier.
-- [Neon](./neon.md) — serverless Postgres that scales to zero.
+- [Supabase](../sinks/hosted-sinks/supabase.md) — managed Postgres with a generous free tier.
+- [Neon](../sinks/hosted-sinks/neon.md) — serverless Postgres that scales to zero.
 
 **ClickHouse**
-- [ClickHouse Cloud](./clickhouse-cloud.md) — fully managed ClickHouse from the creators of ClickHouse.
+- [ClickHouse Cloud](../sinks/hosted-sinks/clickhouse-cloud.md) — fully managed ClickHouse from the creators of ClickHouse.
 
 ## Next Steps
 
-- [Monitor and manage your sink](./manage-your-sink.md) — check status, view logs, edit config, stop, or delete.
+- [Monitor and manage your sink](../sinks/hosted-sinks/manage-your-sink.md) — check status, view logs, edit config, stop, or delete.

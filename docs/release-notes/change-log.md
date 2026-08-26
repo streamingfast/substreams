@@ -11,6 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Docs
+
+- Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can
+  hard-delete a batch of keys over gRPC. Missing keys are ignored; later reads return
+  `NOT_FOUND`, not a tombstone.
+- Add a Hosted Services how-to that describes Hosted Sinks and Hosted Stores, with
+  separate Remote Feed and Substreams Feed hosted-store guides. Move the Hosted
+  Sinks how-to under Hosted Services.
+
 ### Server
 
 - Progress messages are sent far less often. The cadence now widens with the age of the request — every second for

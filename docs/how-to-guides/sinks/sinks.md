@@ -8,7 +8,7 @@ Once you find a package that fits your needs, you can choose how you want to con
 **Note**: Some of the sinks are officially supported by StreamingFast (i.e. active support is provided), but other sinks are community-driven and support can’t be guaranteed.
 {% endhint %}
 
-- [Hosted Sinks](./hosted-sinks/hosted-sinks.md): Let StreamingFast run your sink for you — no infrastructure to manage.
+- [Hosted Sinks](../hosted-services/hosted-sinks.md): Let StreamingFast run your sink for you — no infrastructure to manage. See [Hosted Services](../hosted-services/hosted-services.md) for the full hosted offering, including Hosted Stores.
 - [SQL Database](./sql/sql.md): Send the data to a database.
 - [Direct Streaming](./stream/stream.md): Stream data directly from your application.
 - [PubSub](./pubsub.md): Send data to a PubSub topic.

@@ -15,8 +15,8 @@ package tests_e2e
 //	SUBSTREAMS_E2E_THINSTORE_FUZZ_CHAOS       also delete random files while fuzz queries run
 //	SUBSTREAMS_E2E_THINSTORE_QUERY_TIMEOUT    a query still running after this is reported as hung (default 10m)
 //
-// Tier1 and tier2 run in the test process; DLOG=".*=info" shows their logs, including the
-// `substreams request progress` lines that carry the scheduler's unit states on a stall.
+// Tier1 and tier2 run in the test process; DLOG=".*=info" shows their logs, and
+// SUBSTREAMS_DEBUG_SCHEDULER_STATE=true prints the scheduler's unit states.
 //
 // The package under test (thinstore/) only reads the Clock, so it runs on the dummy
 // blockchain and every map_out value is a pure function of the block number: any run is

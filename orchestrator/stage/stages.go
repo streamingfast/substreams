@@ -476,7 +476,7 @@ func (s *Stages) MoveSegmentCompletedForward(stageIdx int) {
 	stage := s.stages[stageIdx]
 	for i := stage.segmentCompleted + 1; i <= stage.segmenter.LastIndex(); i++ {
 		unit := Unit{Stage: stageIdx, Segment: i}
-		if s.getState(unit) == UnitCompleted {
+		if state := s.getState(unit); state == UnitCompleted || state == UnitNoOp {
 			stage.segmentCompleted = i
 		} else {
 			return
@@ -687,8 +687,12 @@ func (s *Stages) markShadowedUnits(segmentIdx int) (someShadowed bool) {
 		unit := Unit{Segment: segmentIdx, Stage: stageIdx}
 		segmentState := s.getState(unit)
 		if segmentState != UnitCompleted && segmentState != UnitNoOp {
+			// A unit can only be shadowed by a job of the stage above that has not run
+			// yet: that job executes this stage too and reports it on success. A unit
+			// above that is Merging or PartialPresent got its partial from disk, no job
+			// will ever come back for the shadowed one.
 			nextState := s.getState(Unit{Segment: segmentIdx, Stage: stageIdx + 1})
-			if nextState == UnitPending || nextState == UnitScheduled || nextState == UnitMerging || nextState == UnitShadowed {
+			if nextState == UnitPending || nextState == UnitScheduled || nextState == UnitShadowed {
 				s.setState(unit, UnitShadowed)
 				someShadowed = true
 			}
@@ -713,17 +717,16 @@ func (s *Stages) dependenciesCompleted(u Unit) bool {
 		return true
 	}
 
-	previousSegmentParent := s.getState(Unit{Segment: u.Segment - 1, Stage: u.Stage - 1})
-
+	// A job loads the lower stages' fullKV at its segment start block, which is only
+	// guaranteed to exist once the previous segment of every lower stage is done. A
+	// completed unit says nothing about the segments before it: snapshots may be pruned.
 	for i := u.Stage - 1; i >= 0; i-- {
+		if !s.previousUnitComplete(Unit{Segment: u.Segment, Stage: i}) {
+			return false
+		}
 		state := s.getState(Unit{Segment: u.Segment, Stage: i})
 		switch state {
-		case UnitCompleted, UnitNoOp:
-		case UnitShadowed, UnitPartialPresent:
-			// if the direct parent stage is shadowed or UnitPartialPresent, we need the previous segment's previous stage to be completed
-			if previousSegmentParent != UnitCompleted && previousSegmentParent != UnitNoOp {
-				return false
-			}
+		case UnitCompleted, UnitNoOp, UnitShadowed, UnitPartialPresent:
 		default:
 			return false
 		}

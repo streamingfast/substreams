@@ -22,6 +22,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Store snapshots (fullKV files) can now be pruned to save disk space: tier1 no longer assumes that a fullKV at block
+  `x` implies that every earlier fullKV still exists. At request start it walks backwards from the first segment
+  needing work, in growing listing windows, until it finds the last block where every store module still has a
+  snapshot, and rebuilds the stores from there. Only snapshots actually seen are reused, and a job is only scheduled
+  once the previous segment of every lower stage is done, so a pruned file is never read.
+
+- A store snapshot deleted while a request that still needs it is running now fails that request with `FailedPrecondition: ... does not exist (it may have been pruned); restart the request` instead of retrying the tier2 job forever. Likewise, a mapper output file deleted after its job completed is re-produced after 30 seconds instead of being waited on forever, and a scheduler deadlock on partials left by an interrupted run (a unit shadowed under one merging a partial from disk) is fixed.
+
+- The initial store lookup no longer falls back to listing a store's whole history when its last snapshot is far
+  behind: it lists at most a handful of bounded windows.
+
 - Progress messages are sent far less often. The cadence now widens with the age of the request — every second for
   the first minute, every 10 seconds up to 5 minutes, every 30 seconds up to 10 minutes, then every minute — and it
   applies to the linear phase too, which previously sent one every 200ms. Progress messages count as egress like any

@@ -104,6 +104,9 @@ func (b *ParallelProcessor) Run(ctx context.Context, checkPendingShutdown func()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	defer b.scheduler.Stages.Close()
+	// Workers of jobs still running when the scheduler quits (an error while other jobs
+	// are in flight) must be handed back before the request releases its session.
+	defer b.scheduler.WorkerPool.ReleaseAll()
 
 	go func() {
 		for {

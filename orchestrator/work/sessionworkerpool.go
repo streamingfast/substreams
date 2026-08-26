@@ -79,17 +79,21 @@ func NewSessionWorkerPool(
 	// Clean up workers on context cancellation
 	go func() {
 		<-ctx.Done()
-		wp.borrowedWorkersMutex.Lock()
-		defer wp.borrowedWorkersMutex.Unlock()
-
-		for key := range wp.borrowedWorkers {
-			logger.Debug("returning worker on context cancel", zap.String("worker_key", key))
-			wp.sessionPool.ReleaseWorker(key)
-			delete(wp.borrowedWorkers, key)
-		}
+		wp.ReleaseAll()
 	}()
 
 	return wp
+}
+
+func (p *SessionWorkerPool) ReleaseAll() {
+	p.borrowedWorkersMutex.Lock()
+	defer p.borrowedWorkersMutex.Unlock()
+
+	for key := range p.borrowedWorkers {
+		p.logger.Debug("returning worker", zap.String("worker_key", key))
+		p.sessionPool.ReleaseWorker(key)
+		delete(p.borrowedWorkers, key)
+	}
 }
 
 func (p *SessionWorkerPool) Borrow(ctx context.Context) (Worker, error) {

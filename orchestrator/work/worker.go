@@ -385,7 +385,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 			}
 			if grpcErr := dgrpc.AsGRPCError(err); grpcErr != nil {
 				switch grpcErr.Code() {
-				case codes.InvalidArgument:
+				case codes.InvalidArgument, codes.FailedPrecondition:
 					return &Result{Error: err}
 				case codes.DeadlineExceeded, codes.ResourceExhausted, codes.Unavailable:
 					return &Result{

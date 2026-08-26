@@ -3,7 +3,7 @@ package tests_e2e
 // Thin store suite: tier1 resuming from the last remaining store snapshot after
 // intermediate snapshots, mapper outputs and index files were deleted.
 //
-// Opt-in, it takes ~15 minutes:
+// Opt-in, it takes ~3 minutes (~10 with chaos):
 //
 //	SUBSTREAMS_E2E_THINSTORE=true go test ./tests_e2e/ -run TestThinstore -v -timeout 2h
 //
@@ -394,7 +394,7 @@ func (s *thinstoreStack) delFiles(module, folder string, from, to uint64) {
 
 func TestThinstore(t *testing.T) {
 	if os.Getenv("SUBSTREAMS_E2E_THINSTORE") != "true" {
-		t.Skip("set SUBSTREAMS_E2E_THINSTORE=true to run the thin store suite (~15 minutes, needs docker)")
+		t.Skip("set SUBSTREAMS_E2E_THINSTORE=true to run the thin store suite (a few minutes, needs docker)")
 	}
 	blocks := uint64(thinstoreEnvInt("SUBSTREAMS_E2E_THINSTORE_BLOCKS", 15000))
 	require.GreaterOrEqual(t, blocks, uint64(15000), "the scenarios punch holes up to block 13000")

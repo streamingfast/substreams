@@ -25,14 +25,10 @@ type RuntimeConfig struct {
 	WorkerPoolFactory      work.WorkerPoolFactory
 	ModuleExecutionTracing bool
 
-	// OperationMode selects the tier1 operating profile, see [OperationMode].
-	OperationMode OperationMode
-}
-
-// IsRollingWindow tells whether store modules must be refused and the first
-// streamable block treated as a moving lower bound.
-func (r RuntimeConfig) IsRollingWindow() bool {
-	return r.OperationMode == OperationModeRollingWindow
+	// RollingWindowMode serves a chain that only keeps a rolling window of blocks: store
+	// modules are refused and the first streamable block is treated as a moving lower
+	// bound rather than a fixed chain property.
+	RollingWindowMode bool
 }
 
 func NewTier1RuntimeConfig(

@@ -13,10 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-- Added a `rolling-window` operation mode for tier1 (`Tier1Config.OperationMode`), for chains that only retain a
-  rolling window of blocks. In this mode store modules are refused, and a module whose initial block sits below the
-  first streamable block is clamped to it instead of being rejected — only an explicit request for blocks below the
-  first streamable block is refused.
+- Added a rolling-window mode for tier1 (`Tier1Config.RollingWindowMode`), for chains that only retain a rolling
+  window of blocks. In this mode store modules are refused, and a module whose initial block sits below the first
+  streamable block is clamped to it instead of being rejected — only an explicit request for blocks below the first
+  streamable block is refused.
 
 - Tier2 no longer validates module initial blocks against the first streamable block. Tier1 dictates the ranges it
   sends to tier2, and those are always within the streamable window.

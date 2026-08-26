@@ -339,8 +339,8 @@ func NewTier1(
 		opt(s)
 	}
 
-	if s.runtimeConfig.OperationMode != config.OperationModeDefault {
-		logger.Info("tier1 operation mode", zap.String("mode", string(s.runtimeConfig.OperationMode)))
+	if s.runtimeConfig.RollingWindowMode {
+		logger.Info("tier1 running in rolling-window mode")
 	}
 
 	return s, nil
@@ -450,7 +450,7 @@ func (s *Tier1Service) BlocksAny(
 	}
 
 	var graphOptions []exec.GraphOption
-	if s.runtimeConfig.IsRollingWindow() {
+	if s.runtimeConfig.RollingWindowMode {
 		graphOptions = append(graphOptions, exec.WithRelaxedFirstStreamableBlock())
 	}
 
@@ -524,7 +524,7 @@ func (s *Tier1Service) BlocksAny(
 		zap.Objects("foundational_stores", fstores()),
 	)
 
-	if hasStores && s.runtimeConfig.IsRollingWindow() {
+	if hasStores && s.runtimeConfig.RollingWindowMode {
 		err := connect.NewError(connect.CodeInvalidArgument, storeModulesUnsupportedError(usedModules))
 		logger.Info("refusing Substreams Blocks request", append(fields, zap.Error(err))...)
 		return nil, err

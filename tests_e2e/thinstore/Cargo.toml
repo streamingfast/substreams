@@ -1,0 +1,16 @@
+[package]
+name = "thinstore-test"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+prost = "0.11"
+substreams = "0.5"
+
+[profile.release]
+lto = true
+opt-level = 's'
+strip = "debuginfo"

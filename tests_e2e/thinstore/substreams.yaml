@@ -1,0 +1,102 @@
+specVersion: v0.1.0
+package:
+  name: thinstore_test
+  version: v0.2.0
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/thinstore_test.wasm
+
+modules:
+  # stage 1
+  - name: index_parity
+    kind: blockIndex
+    inputs:
+      - source: sf.substreams.v1.Clock
+    output:
+      type: proto:sf.substreams.index.v1.Keys
+
+  - name: map_a
+    kind: map
+    inputs:
+      - source: sf.substreams.v1.Clock
+    output:
+      type: proto:sf.substreams.v1.Clock
+
+  - name: store_count
+    kind: store
+    updatePolicy: add
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.Clock
+
+  - name: store_a_max
+    kind: store
+    updatePolicy: max
+    valueType: int64
+    inputs:
+      - map: map_a
+
+  # stage 2
+  - name: store_sum
+    kind: store
+    updatePolicy: add
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - store: store_count
+
+  - name: store_a_last
+    kind: store
+    updatePolicy: set
+    valueType: int64
+    inputs:
+      - map: map_a
+      - store: store_a_max
+
+  - name: map_b
+    kind: map
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - store: store_count
+      - store: store_a_max
+    output:
+      type: proto:sf.substreams.v1.Clock
+
+  # stage 3
+  - name: store_c
+    kind: store
+    updatePolicy: add
+    valueType: int64
+    inputs:
+      - map: map_b
+      - store: store_sum
+
+  - name: map_c
+    kind: map
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - store: store_a_last
+      - store: store_sum
+    blockFilter:
+      module: index_parity
+      query:
+        string: even
+    output:
+      type: proto:sf.substreams.v1.Clock
+
+  # stage 4
+  - name: map_out
+    kind: map
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - store: store_c
+      - store: store_a_max
+      - map: map_c
+      - map: map_b
+      - store: store_count
+      - store: store_c
+        mode: deltas
+    output:
+      type: proto:sf.substreams.v1.Clock

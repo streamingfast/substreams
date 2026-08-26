@@ -83,9 +83,6 @@ type Stats struct {
 
 	// stagesProgress is refreshed by the orchestrator's Stages while parallel processing runs.
 	stagesProgress []StageProgress
-	// unitStates is the scheduler's segment matrix, one line per stage, refreshed with
-	// stagesProgress. Only logged when a hint reports a stall, to tell which unit is stuck.
-	unitStates string
 	// squashBacklogSince records, per stage, when its squash backlog first crossed the
 	// reporting threshold, so only a backlog that holds is reported.
 	squashBacklogSince map[int]time.Time

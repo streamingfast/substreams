@@ -24,6 +24,15 @@ type RuntimeConfig struct {
 	ClientFactory          client.InternalClientFactory
 	WorkerPoolFactory      work.WorkerPoolFactory
 	ModuleExecutionTracing bool
+
+	// OperationMode selects the tier1 operating profile, see [OperationMode].
+	OperationMode OperationMode
+}
+
+// IsRollingWindow tells whether store modules must be refused and the first
+// streamable block treated as a moving lower bound.
+func (r RuntimeConfig) IsRollingWindow() bool {
+	return r.OperationMode == OperationModeRollingWindow
 }
 
 func NewTier1RuntimeConfig(

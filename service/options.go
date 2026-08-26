@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/wasm"
 )
 
@@ -19,6 +20,16 @@ func WithModuleExecutionTracing() Option {
 			s.runtimeConfig.ModuleExecutionTracing = true
 		case *Tier2Service:
 			s.moduleExecutionTracing = true
+		}
+	}
+}
+
+// WithOperationMode selects the tier1 operating profile. Tier2 has a single mode and
+// ignores this option.
+func WithOperationMode(mode config.OperationMode) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.runtimeConfig.OperationMode = mode
 		}
 	}
 }

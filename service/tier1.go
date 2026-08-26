@@ -339,6 +339,10 @@ func NewTier1(
 		opt(s)
 	}
 
+	if s.runtimeConfig.OperationMode != config.OperationModeDefault {
+		logger.Info("tier1 operation mode", zap.String("mode", string(s.runtimeConfig.OperationMode)))
+	}
+
 	return s, nil
 }
 
@@ -445,7 +449,12 @@ func (s *Tier1Service) BlocksAny(
 		return nil, err
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
+	var graphOptions []exec.GraphOption
+	if s.runtimeConfig.IsRollingWindow() {
+		graphOptions = append(graphOptions, exec.WithRelaxedFirstStreamableBlock())
+	}
+
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock, graphOptions...)
 	if err != nil {
 		err := connect.NewError(connect.CodeInvalidArgument, err)
 		fields = append(fields, zap.Error(err))
@@ -514,6 +523,12 @@ func (s *Tier1Service) BlocksAny(
 		zap.Objects("stores", stores()),
 		zap.Objects("foundational_stores", fstores()),
 	)
+
+	if hasStores && s.runtimeConfig.IsRollingWindow() {
+		err := connect.NewError(connect.CodeInvalidArgument, storeModulesUnsupportedError(usedModules))
+		logger.Info("refusing Substreams Blocks request", append(fields, zap.Error(err))...)
+		return nil, err
+	}
 
 	// We need to ensure that the response function is NEVER used after this Blocks handler has returned.
 	// We use a context that will be canceled on defer, and a lock to prevent races. The respFunc is used in various threads
@@ -622,6 +637,19 @@ func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph,
 		}
 	}
 	return nil
+}
+
+// storeModulesUnsupportedError names the store modules that a rolling-window endpoint
+// cannot serve: a rolling window of blocks cannot be walked back far enough to build
+// their state.
+func storeModulesUnsupportedError(usedModules []*pbsubstreams.Module) error {
+	var storeNames []string
+	for _, module := range usedModules {
+		if module.GetKindStore() != nil {
+			storeNames = append(storeNames, module.Name)
+		}
+	}
+	return fmt.Errorf("store modules are not supported on this endpoint: %s", strings.Join(storeNames, ", "))
 }
 
 var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString

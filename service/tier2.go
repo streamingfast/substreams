@@ -313,7 +313,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		return err
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock) //production-mode flag is irrelevant here because it isn't used to calculate the hashes
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock, exec.WithRelaxedFirstStreamableBlock()) //production-mode flag is irrelevant here because it isn't used to calculate the hashes
 	if err != nil {
 		err = bsstream.NewErrInvalidArg("%s", err.Error())
 		fields = append(fields, zap.Error(err))
@@ -392,7 +392,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return err
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock, exec.WithRelaxedFirstStreamableBlock())
 	if err != nil {
 		return stream.NewErrInvalidArg("%s", err.Error())
 	}

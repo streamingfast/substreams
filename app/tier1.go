@@ -26,6 +26,7 @@ import (
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
+	sconfig "github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/wasm"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	"github.com/streamingfast/substreams/wasm/wazero"
@@ -66,6 +67,11 @@ func NewDefaultTier1Config() *Tier1Config {
 
 type Tier1Config struct {
 	MeteringConfig string
+
+	// OperationMode selects the operating profile of the server: "" (or "default") for
+	// the regular behavior, "rolling-window" for a chain that only retains a rolling
+	// window of blocks. See [config.OperationMode].
+	OperationMode string
 
 	FoundationalStoresConfigPath string
 
@@ -281,6 +287,12 @@ func (a *Tier1App) Run() error {
 		opts = append(opts, service.WithLiveBackFillerFinalBlockDelay(a.config.LiveBackFillerFinalBlockDelay))
 	}
 
+	operationMode, err := sconfig.ParseOperationMode(a.config.OperationMode)
+	if err != nil {
+		return err
+	}
+	opts = append(opts, service.WithOperationMode(operationMode))
+
 	// Scratch space and store backend are passed as options (same as tier2) so
 	// both tiers are wired identically.
 	if a.config.StoresScratchSpace != "" {
@@ -433,6 +445,9 @@ func (a *Tier1App) setIsReady(ready bool) {
 // Validate inspects itself to determine if the current config is valid according to
 // substreams rules.
 func (config *Tier1Config) Validate() error {
+	if _, err := sconfig.ParseOperationMode(config.OperationMode); err != nil {
+		return err
+	}
 	return nil
 }
 

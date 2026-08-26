@@ -80,11 +80,34 @@ func (g *Graph) LowestStoresInitBlock() *uint64       { return g.lowestStoresIni
 func (g *Graph) ModulesInitBlocks() map[string]uint64 { return g.modulesInitBlocks }
 func (g *Graph) OutputModuleStageIndex() int          { return len(g.stagedUsedModules) - 1 }
 
-func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64) (out *Graph, err error) {
+// GraphOption tweaks how the execution graph is computed.
+type GraphOption func(*graphOptions)
+
+type graphOptions struct {
+	relaxedFirstStreamableBlock bool
+}
+
+// WithRelaxedFirstStreamableBlock accepts modules whose initial block sits below the
+// first streamable block, clamping them to it instead of refusing the request. Used
+// where the requested ranges are already known to be within the streamable window:
+// tier2 (tier1 dictates the ranges) and tier1 servers running in rolling-window mode,
+// where the first streamable block moves forward as older blocks are pruned.
+func WithRelaxedFirstStreamableBlock() GraphOption {
+	return func(o *graphOptions) {
+		o.relaxedFirstStreamableBlock = true
+	}
+}
+
+func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64, opts ...GraphOption) (out *Graph, err error) {
+	options := &graphOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	out = &Graph{
 		requestModules: modules,
 	}
-	if err := out.computeGraph(outputModule, productionMode, modules, firstStreamableBlock); err != nil {
+	if err := out.computeGraph(outputModule, productionMode, modules, firstStreamableBlock, options); err != nil {
 		return nil, fmt.Errorf("module graph: %w", err)
 	}
 
@@ -177,7 +200,7 @@ func (g *Graph) dedupeModules(mods *pbsubstreams.Modules) (*pbsubstreams.Modules
 	return &pbsubstreams.Modules{Modules: filteredModules}, deduped
 }
 
-func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64) error {
+func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64, options *graphOptions) error {
 	graph, err := manifest.NewModuleGraph(modules.Modules)
 	if err != nil {
 		return fmt.Errorf("compute graph: %w", err)
@@ -220,10 +243,11 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 	g.modulesInitBlocks = map[string]uint64{}
 	for _, mod := range g.usedModules {
 		initialBlock := mod.InitialBlock
-		if initialBlock == 0 {
+		if initialBlock < firstStreamableBlock {
+			if initialBlock != 0 && !options.relaxedFirstStreamableBlock {
+				return fmt.Errorf("module %q has initial block %d smaller than first streamable block %d", mod.Name, initialBlock, firstStreamableBlock)
+			}
 			initialBlock = firstStreamableBlock
-		} else if initialBlock < firstStreamableBlock {
-			return fmt.Errorf("module %q has initial block %d smaller than first streamable block %d", mod.Name, initialBlock, firstStreamableBlock)
 		}
 		g.modulesInitBlocks[mod.Name] = initialBlock
 	}

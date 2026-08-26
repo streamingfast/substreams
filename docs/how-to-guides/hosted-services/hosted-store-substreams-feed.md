@@ -33,7 +33,8 @@ A hosted store is a **key → value** map with a few blockchain‑specific prope
 - **Fork‑aware writes** — because a Substreams package is the source, reorgs are handled for you. (Remote‑feed writes are treated as already final; that is not this path.)
 
 StreamingFast runs the Substreams sink against the chain and lands the output in
-the store. There is no SQL database. You do not call `Feed.Set` or `Feed.SetReady`.
+the store. There is no SQL database. You do not call `Feed.Set`, `Feed.Delete`, or
+`Feed.SetReady`.
 
 While the store is still catching up, a Substreams that queries it **hangs** at
 that block until `block_reached` becomes true. Direct `Get`/`GetFirst` return

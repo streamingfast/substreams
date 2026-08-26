@@ -123,6 +123,9 @@ message SinkEntries {
 ### API Operations
 
 The Foundational Store provides gRPC APIs for data retrieval with block-aware querying.
+Remote-feed ingest additionally exposes `Feed.Set` to write entries and `Feed.Delete` to
+hard-delete keys (missing keys are ignored). See the
+[Remote Feed Hosted Store Guide](../how-to-guides/hosted-services/hosted-store-remote-feed.md).
 
 See [Consuming a Foundational Store](../tutorials/consuming-foundational-store.md) for detailed API usage, response handling, and code examples.
 

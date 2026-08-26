@@ -39,7 +39,7 @@ The create wizard offers two feed modes:
 
 | Mode | Who writes | When to use | How-to |
 |---|---|---|---|
-| **Remote feed** | You (or another service) push entries over gRPC with `Feed.Set` | Off-chain or application-owned data that Substreams should look up | [Remote Feed Hosted Store Guide](hosted-store-remote-feed.md) |
+| **Remote feed** | You (or another service) push and delete entries over gRPC with `Feed.Set` / `Feed.Delete` | Off-chain or application-owned data that Substreams should look up | [Remote Feed Hosted Store Guide](hosted-store-remote-feed.md) |
 | **Substreams feed** | A Substreams package reads the chain and populates the store | On-chain lookups other modules should reuse (the same idea as a [foundational store](../composing-substreams/foundational-stores/foundational-stores.md)) | [Substreams Feed Hosted Store Guide](hosted-store-substreams-feed.md) |
 
 Once deployed, the store is reachable at `<deployment-id>.hs.streamingfast.io:443` and is referenced from a Substreams manifest as `foundational-store: <deployment-id>@<version>`.
@@ -57,7 +57,7 @@ An API key is created automatically for each deployment. Manage keys at [https:/
 ## Related resources
 
 - [Hosted Sinks](hosted-sinks.md) — managed SQL sinks
-- [Remote Feed Hosted Store Guide](hosted-store-remote-feed.md) — write and read a hosted store over gRPC
+- [Remote Feed Hosted Store Guide](hosted-store-remote-feed.md) — write, delete, and read a hosted store over gRPC
 - [Substreams Feed Hosted Store Guide](hosted-store-substreams-feed.md) — populate a hosted store from a Substreams package
 - [Foundational Stores](../composing-substreams/foundational-stores/foundational-stores.md) — chain-specific stores populated by a Substreams package
 - [Consuming Substreams](../sinks/sinks.md) — self-managed sinks (SQL, stream, PubSub, files, and community sinks)

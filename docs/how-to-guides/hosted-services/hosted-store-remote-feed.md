@@ -18,7 +18,7 @@ This guide shows you how to:
 1. Understand what a hosted store is and when to use it
 2. Create one and get its endpoint
 3. Authenticate
-4. Write entries into it (`Feed.Set`)
+4. Write entries into it (`Feed.Set`) and delete them (`Feed.Delete`)
 5. Read entries back, either directly (`Store.Get` / `Store.GetFirst`) or from a Substreams module
 6. Look up the proto reference
 
@@ -33,11 +33,11 @@ A hosted store is a **key → value** map with a few blockchain‑specific prope
 - **Readiness** — a store starts **not ready**. Direct `Get`/`GetFirst` then report the store hasn't reached the requested block yet (even if the keys are already written). A Substreams that queries a not‑ready store **hangs** until you flip it ready with `Feed.SetReady`.
 - **Block‑aware reads** — every read targets a specific block number. The response tells you whether the store has ingested up to that block yet (`block_reached = true`). If `block_reached` is `false`, treat the result as not-yet-final rather than as "key not found".
 
-You populate a hosted store by writing entries directly over gRPC with the `Feed.Set` call
-(the **remote feed** flow). Data written this way is treated as **already final**. You can
-query the same keys directly over gRPC or from a Substreams module — but a Substreams
-**hangs** if the store is not marked ready (see below), while a direct `Get` returns
-immediately with `block_reached = false`.
+You populate a hosted store by writing entries directly over gRPC with `Feed.Set`, and
+remove them with `Feed.Delete` (the **remote feed** flow). Data written or deleted this
+way is treated as **already final**. You can query the same keys directly over gRPC or
+from a Substreams module — but a Substreams **hangs** if the store is not marked ready
+(see below), while a direct `Get` returns immediately with `block_reached = false`.
 
 ---
 
@@ -120,12 +120,12 @@ one yourself beforehand. Manage your keys at
 
 ---
 
-## 4. Write entries — `Feed.Set`
+## 4. Write and delete entries
 
 The remote‑feed ingest service is
 [`sf.substreams.foundational_store.feed.v2.Feed`](https://buf.build/streamingfast/substreams-foundational-store/docs/main:sf.substreams.foundational_store.feed.v2#sf.substreams.foundational_store.feed.v2.Feed).
-Its `Set` method writes a batch of entries. Data written this way is treated as **final** and
-persisted immediately (latest‑value semantics, no fork handling).
+`Set` writes a batch of entries; `Delete` removes a batch of keys. Both are treated as
+**final** and applied immediately (latest‑value semantics, no fork handling).
 
 ### Entry shape
 
@@ -161,6 +161,35 @@ Notes:
 - `key.bytes` is **base64** in JSON (gRPC bytes encoding).
 - `value` is a `google.protobuf.Any`: the `@type` must be the fully‑qualified type URL of your value message, and the remaining fields are that message's fields.
 - Use `"if_not_exist": true` at the `entries` level to avoid overwriting existing keys.
+
+### Deleting keys — `Feed.Delete`
+
+`Delete` removes a batch of keys. Missing keys are ignored. Like `Set`, the delete is
+treated as **final** and applied immediately.
+
+See [`DeleteRequest`](https://buf.build/streamingfast/substreams-foundational-store/docs/main:sf.substreams.foundational_store.feed.v2#sf.substreams.foundational_store.feed.v2.DeleteRequest)
+on the Buf Schema Registry:
+
+```protobuf
+message DeleteRequest {
+  repeated Key keys = 1;  // missing keys are ignored
+}
+```
+
+Send `Delete` from the same Buf Schema Registry explorer for
+[`sf.substreams.foundational_store.feed.v2`](https://buf.build/streamingfast/substreams-foundational-store/docs/main:sf.substreams.foundational_store.feed.v2):
+
+1. Open that page and select **Delete**.
+2. Set the target to `<deployment-id>.hs.streamingfast.io:443`.
+3. Add metadata `x-api-key: <api-key>`.
+4. Fill `keys` with one or more `key.bytes` values.
+
+Notes:
+
+- `key.bytes` is **base64** in JSON (gRPC bytes encoding).
+- An empty `keys` list is a no-op; missing keys are ignored — the call still succeeds.
+- This is a **hard delete**. A later `Get` / `GetFirst` returns `RESPONSE_CODE_NOT_FOUND`.
+  It does not write a tombstone and does not return `RESPONSE_CODE_NOT_FOUND_FINALIZE`.
 
 ### Marking the store ready
 
@@ -224,6 +253,9 @@ Each `QueriedEntry` carries a `code`:
 | `RESPONSE_CODE_NOT_FOUND` (2) | Key does not exist at the requested block. |
 | `RESPONSE_CODE_NOT_FOUND_FINALIZE` (4) | Key was deleted after finality (historical reference). |
 | `RESPONSE_CODE_UNSPECIFIED` (0) | Should not occur. |
+
+`Feed.Delete` is a hard delete: subsequent reads of that key return `NOT_FOUND`, not
+`NOT_FOUND_FINALIZE`.
 
 Always check `block_reached` first: if it's `false`, the store hasn't ingested the block you
 asked about yet (or it isn't marked ready), and a `NOT_FOUND` doesn't mean the key is truly absent.
@@ -329,8 +361,9 @@ substreams run substreams.yaml map_query_test_store \
    (**Hosted Services** → **Hosted Store** → **Remote feed**) → note the **deployment ID**.
 2. **Listen** for a response from the endpoint. The Store is now running.
 3. **Authenticate** with an API key (`x-api-key`).
-4. **Write** your entries with `Feed.Set`, then call `Feed.SetReady`. A Substreams that
-   queries the store before that **hangs** until you mark it ready.
+4. **Write** your entries with `Feed.Set` (and `Feed.Delete` to remove keys), then call
+   `Feed.SetReady`. A Substreams that queries the store before that **hangs** until you
+   mark it ready.
 5. **Read** them either directly with `Store.Get` / `Store.GetFirst`, or by adding
    `foundational-store: <deployment-id>@<version>` to a Substreams module and calling
    `store.get(...)`.

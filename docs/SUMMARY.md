@@ -119,6 +119,7 @@
     * [Proto Annotations](references/sql/proto-annotations.md)
     * [Delta Updates](references/sql/delta-updates.md)
     * [Reorg Handling](references/sql/reorg-handling.md)
+    * [Progress & Performance Output](references/sql/progress-info.md)
 * Operators
   * [Hosting Foundational Stores](./references/foundational-stores/hosting-foundational-stores.md)
 * Development Tools

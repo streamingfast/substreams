@@ -24,6 +24,9 @@ type Sinker struct {
 	rootMessageDescriptor protoreflect.MessageDescriptor
 	lastAppliedBlockNum   uint64
 	lastAppliedBlockTime  time.Time
+	// quotaWaitSoFar is the spool's cumulative held-by-database time as of the last
+	// reading. Touched only on this goroutine, which is the one the quota blocks.
+	quotaWaitSoFar time.Duration
 
 	// directInserts records that the stream reached the chain head and the database was
 	// switched off any buffered write path. It only ever goes from false to true.
@@ -95,7 +98,7 @@ func (s *Sinker) Run(ctx context.Context) error {
 		s.stats.Progress.SetResumeBlock(cursor.Block().Num())
 	}
 
-	s.stats.LastBlockProcessAt = time.Now()
+	s.stats.Start()
 	s.Sinker.Run(ctx, cursor, s)
 
 	return s.Sinker.Err()
@@ -128,6 +131,10 @@ func (s *Sinker) closeDatabase() {
 	if err := s.db.Close(ctx); err != nil {
 		s.logger.Warn("closing the database", zap.Error(err))
 	}
+
+	// Closing drains whatever was still queued, and LogStats runs after this. Without one
+	// last reading the run's final panel stops short by that entire drain.
+	s.recordBuffered()
 }
 
 type Holder struct {
@@ -148,18 +155,19 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 		return fmt.Errorf("received data from wrong output module, expected to received from %q but got module's output for %q", s.OutputModuleName(), output.Name)
 	}
 
+	// The spool holds the stream when its disk quota is full, and that hold happens inside
+	// this handler — under StoreCursor, by way of MaybeSeal. Timing the handler alone would
+	// book it as the cost of processing a block, so what the quota held is measured across
+	// the same span and reported separately.
 	startAt := time.Now()
+	heldAt := s.quotaWaitSoFar
 	defer func() {
-		s.stats.LastBlockProcessAt = time.Now()
-		s.stats.BlockProcessingDuration.Add(time.Since(startAt))
-		s.stats.TotalProcessingDuration += time.Since(startAt)
+		s.stats.RecordBlockProcessed(time.Since(startAt), s.quotaWaitSoFar-heldAt)
 	}()
 
-	if s.stats.BlockCount > 0 {
-		s.stats.WaitDurationBetweenBlocks.Add(time.Since(s.stats.LastBlockProcessAt))
-		s.stats.TotalDurationBetween += time.Since(s.stats.LastBlockProcessAt)
+	if waited, first := s.stats.RecordBlockReceived(); !first {
+		s.stats.WaitDurationBetweenBlocks.Add(waited)
 	}
-	s.stats.BlockCount++
 
 	// The switch happens before this block is held, which is what makes the spool safe
 	// against reorgs: `isLive` here comes from the cursor-based liveness checker the sink
@@ -282,7 +290,7 @@ func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
 		}
 	}
 
-	insertDuration, err := s.decoder.apply(decodedBlocks, s.db)
+	err = s.decoder.apply(decodedBlocks, s.db)
 	if err != nil {
 		if s.useTransaction {
 			s.logger.Error("rolling back transaction", zap.Error(err))
@@ -290,18 +298,20 @@ func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
 		}
 		return fmt.Errorf("applying blocks: %w", err)
 	}
-	s.recordDecodeStats(decodedBlocks, insertDuration)
+	s.recordDecodeStats(decodedBlocks)
 
 	flushDuration, err := s.db.Flush()
 	if err != nil {
 		return fmt.Errorf("flushing: %w", err)
 	}
 
-	var flushDurationPerBlock time.Duration
-	if len(s.holding) > 0 {
-		flushDurationPerBlock = flushDuration / time.Duration(len(s.holding))
+	// Only when the rows really were written here. With a spool, Flush returns before
+	// anything reaches the server, and the timing comes from what the applier committed
+	// instead — see Stats.RecordBuffered.
+	buffered, buffering := s.db.BufferStats()
+	if !buffering && len(s.holding) > 0 {
+		s.stats.FlushDuration.Add(flushDuration / time.Duration(len(s.holding)))
 	}
-	s.stats.FlushDuration.Add(flushDurationPerBlock)
 
 	s.lastAppliedBlockNum = lastClock.Number
 	s.lastAppliedBlockTime = lastClock.Timestamp.AsTime()
@@ -319,10 +329,10 @@ func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
 
 	// With a local buffer the rows are only queued at this point, not durable, so the
 	// applied mark has to come from what the buffer actually committed.
-	if _, _, applied, buffering := s.db.BufferStats(); !buffering {
+	if !buffering {
 		s.stats.Progress.RecordApplied(lastClock.Number)
-	} else if applied > 0 {
-		s.stats.Progress.RecordApplied(applied)
+	} else if buffered.AppliedBlock > 0 {
+		s.stats.Progress.RecordApplied(buffered.AppliedBlock)
 	}
 	s.recordBuffered()
 
@@ -332,26 +342,28 @@ func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
 // recordBuffered reports what sits between the stream and the database: blocks held in
 // memory for the next flush, plus whatever a local buffer has queued on disk.
 func (s *Sinker) recordBuffered() {
-	bufferedBlocks, bufferedBytes, _, buffering := s.db.BufferStats()
-	if !buffering {
-		s.stats.Progress.RecordBuffered(len(s.holding), 0)
-		return
-	}
-
-	s.stats.Progress.RecordBuffered(len(s.holding)+int(bufferedBlocks), bufferedBytes)
+	buffered, buffering := s.db.BufferStats()
+	// Read on this goroutine only, which is also the one the quota blocks, so the handler
+	// can difference it across its own span without a lock.
+	s.quotaWaitSoFar = buffered.QuotaWait
+	s.stats.RecordBuffered(len(s.holding), buffered, buffering)
 }
 
 // recordDecodeStats folds the per-block timings the workers measured back into the
 // shared stats, on this goroutine: Average.Add is not safe for concurrent use.
-func (s *Sinker) recordDecodeStats(results []*decoded, insertDuration time.Duration) {
+//
+// Every duration here is one block's, including the insert. The panel prints the three
+// as one column of averages, so a total added once per batch would sit among them in a
+// different unit and grow with --decode-batch-size rather than with the cost of a block.
+func (s *Sinker) recordDecodeStats(results []*decoded) {
 	for _, result := range results {
 		if result.empty {
 			continue
 		}
 		s.stats.UnmarshallingDuration.Add(result.unmarshalDuration)
 		s.stats.EntitiesInsertDuration.Add(result.walkDuration)
+		s.stats.BlockInsertDuration.Add(result.insertDuration)
 	}
-	s.stats.BlockInsertDuration.Add(insertDuration)
 }
 
 func (s *Sinker) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *sink.Cursor) (err error) {

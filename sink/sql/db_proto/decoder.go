@@ -105,6 +105,11 @@ type decoded struct {
 
 	unmarshalDuration time.Duration
 	walkDuration      time.Duration
+	// insertDuration is what this one block cost on the serial path — the block row plus
+	// replaying its buffered rows into the database or the spool. It is measured per
+	// block rather than per batch so the average reads in the same unit as the two above
+	// it, which is what the stats panel claims of all three.
+	insertDuration time.Duration
 }
 
 // ResolveDecodeWorkers turns a requested worker count into the one that will be used.
@@ -240,9 +245,9 @@ func (d *decoder) decodeOne(holder *Holder, db sql.Database, into *sql.BufferedI
 // apply performs the decoded inserts against the database, in block order. It runs on
 // the caller's goroutine, so the database sees exactly the sequence it would have seen
 // from a serial walk.
-func (d *decoder) apply(results []*decoded, db sql.Database) (time.Duration, error) {
-	insertDuration := time.Duration(0)
-
+// apply replays every decoded block in order, timing each one so the stats can report a
+// per-block cost rather than a per-batch total.
+func (d *decoder) apply(results []*decoded, db sql.Database) error {
 	for _, result := range results {
 		if result.empty {
 			continue
@@ -251,14 +256,14 @@ func (d *decoder) apply(results []*decoded, db sql.Database) (time.Duration, err
 		startAt := time.Now()
 
 		if err := db.InsertBlock(result.blockNum, result.blockHash, result.blockTimestamp); err != nil {
-			return 0, fmt.Errorf("inserting block %d: %w", result.blockNum, err)
+			return fmt.Errorf("inserting block %d: %w", result.blockNum, err)
 		}
 		if err := result.inserts.Replay(db); err != nil {
-			return 0, fmt.Errorf("applying block %d: %w", result.blockNum, err)
+			return fmt.Errorf("applying block %d: %w", result.blockNum, err)
 		}
 
-		insertDuration += time.Since(startAt)
+		result.insertDuration = time.Since(startAt)
 	}
 
-	return insertDuration, nil
+	return nil
 }

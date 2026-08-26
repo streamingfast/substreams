@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -36,13 +37,25 @@ func (b *Spool) recover(ctx context.Context) error {
 	}
 	slices.Sort(dirs)
 
+	// Announced before the first segment is touched, because a summary at the end cannot
+	// be read until the wait it describes is over.
+	//
+	// Recovery runs inside Open, ahead of the sinker and of anything else that logs, and
+	// replaying the spool a killed backfill left behind is minutes of binary COPY. Silence
+	// across those minutes is indistinguishable from a process that has hung.
+	b.logger.Info("recovering the local spool, the stream does not start until this finishes",
+		zap.Int("segments_on_disk", len(dirs)),
+		zap.String("dir", b.options.Dir))
+
+	startedAt := time.Now()
+
 	var (
 		replayed  int
 		discarded int
 		holeFound bool
 	)
 
-	for _, name := range dirs {
+	for index, name := range dirs {
 		dir := filepath.Join(b.options.Dir, name)
 
 		// Segment names carry a sequence number, so the highest one seen tells the next
@@ -87,6 +100,15 @@ func (b *Spool) recover(ctx context.Context) error {
 			continue
 		}
 
+		// Per segment rather than per batch of them: each one is a COPY of tens of
+		// megabytes, so this is the only thing that says the wait is progressing and how
+		// much of it is left.
+		b.logger.Info("replaying a spool segment",
+			zap.String("progress", fmt.Sprintf("%d/%d", index+1, len(dirs))),
+			zap.Uint64("first_block", manifest.FirstBlock),
+			zap.Uint64("last_block", manifest.LastBlock),
+			zap.String("bytes", humanBytes(segmentBytes(manifest))))
+
 		if err := b.applier.Apply(ctx, dir, manifest); err != nil {
 			// Left to fail, because a segment the database refuses says something is wrong
 			// with the rows or the schema, and dropping it quietly would hide that. It
@@ -100,11 +122,10 @@ func (b *Spool) recover(ctx context.Context) error {
 		replayed++
 	}
 
-	if replayed > 0 || discarded > 0 {
-		b.logger.Info("recovered the local spool",
-			zap.Int("segments_replayed", replayed),
-			zap.Int("segments_discarded", discarded))
-	}
+	b.logger.Info("recovered the local spool",
+		zap.Int("segments_replayed", replayed),
+		zap.Int("segments_discarded", discarded),
+		zap.Duration("elapsed", time.Since(startedAt)))
 
 	return nil
 }

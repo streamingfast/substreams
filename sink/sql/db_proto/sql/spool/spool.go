@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"go.uber.org/zap"
 )
 
@@ -96,6 +97,44 @@ type Spool struct {
 	// honest answer to "what is in the database": with a spool, a block reaching the
 	// sinker's flush means it was queued, not stored.
 	appliedBlock atomic.Uint64
+
+	// What the applier has committed, cumulative. The gap the operator watches says how
+	// far behind the database is; these say what it is actually doing to get there, which
+	// is the difference between a database that is slow and one that is not being asked.
+	appliedSegments atomic.Int64
+	appliedBlocks   atomic.Int64
+	appliedRows     atomic.Int64
+	appliedBytes    atomic.Int64
+	applyDuration   atomic.Int64
+
+	// applierBusy and applierIdle split the applier goroutine's wall clock between
+	// working and waiting for a segment. Nothing else here answers whether the database
+	// or the stream is the limit: a gap can be large because the database is slow, or
+	// merely because the stream burst, and only the ratio tells those apart.
+	//
+	// Both only accrue when the activity ends, so the one in progress is tracked
+	// separately and folded in when the snapshot is taken. Without that, a segment that
+	// takes longer than the logging interval contributes to neither side, and an applier
+	// stuck on a degraded database reports itself as doing nothing at all — the exact
+	// inversion of the reading these exist to give.
+	applierBusy   atomic.Int64
+	applierIdle   atomic.Int64
+	applyingSince atomic.Int64
+	waitingSince  atomic.Int64
+
+	// quotaWait is how long the stream has been held because the spool was full. Any
+	// non-zero value means the database is gating download rather than the other way
+	// round, which is otherwise reported once as a warning and then never again. As
+	// above, the hold in progress is folded in at snapshot time: a single hold can last
+	// longer than the logging interval, and reporting zero throughout it says the
+	// opposite of what is happening.
+	quotaWait      atomic.Int64
+	quotaHeldSince atomic.Int64
+
+	// sealed counts segments by what closed them. A run whose segments are mostly sealed
+	// by the idle timer is committing short segments, which is what starves the sizer and
+	// multiplies the per-segment overhead the floor exists to bound.
+	sealed [sealReasonCount]atomic.Int64
 
 	applyErr  atomic.Pointer[error]
 	waitGroup sync.WaitGroup
@@ -208,6 +247,40 @@ func (b *Spool) RecordCursor(cursor string) {
 	b.current.cursor = cursor
 }
 
+// SealReason says what closed a segment. It is counted rather than logged because the
+// mix is the diagnosis: segments sealed at their size target are the intended path, and a
+// run dominated by any other reason is committing short of what the sizer chose.
+type SealReason int
+
+const (
+	// SealBySize is the intended path: the segment reached the size the sizer chose.
+	SealBySize SealReason = iota
+	// SealByIdle is the idle timer, which bounds what a stalled stream leaves unsealed.
+	SealByIdle
+	// SealByDrain is an undo, which has to see everything queued reach the database.
+	SealByDrain
+	// SealByClose is shutdown.
+	SealByClose
+
+	sealReasonCount
+)
+
+// String is what the stats panel labels the count with.
+func (r SealReason) String() string {
+	switch r {
+	case SealBySize:
+		return "size"
+	case SealByIdle:
+		return "idle"
+	case SealByDrain:
+		return "drain"
+	case SealByClose:
+		return "close"
+	}
+
+	return "unknown"
+}
+
 // MaybeSeal hands the current segment to the applier once it is big enough. It is called
 // at every sink flush, so it is also where backpressure is applied.
 func (b *Spool) MaybeSeal(ctx context.Context) error {
@@ -223,12 +296,13 @@ func (b *Spool) MaybeSeal(ctx context.Context) error {
 		return nil
 	}
 
-	return b.Seal(ctx)
+	return b.Seal(ctx, SealBySize)
 }
 
 // Seal closes the current segment and queues it, holding the stream if the disk quota is
-// reached.
-func (b *Spool) Seal(ctx context.Context) error {
+// reached. The reason is only counted, so that the mix of size, idle, drain and shutdown
+// seals is visible without a log line per segment.
+func (b *Spool) Seal(ctx context.Context, reason SealReason) error {
 	// Serialized so segments reach the applier in the order they were written, whichever
 	// goroutine sealed them.
 	b.sealMutex.Lock()
@@ -265,6 +339,7 @@ func (b *Spool) Seal(ctx context.Context) error {
 	b.blocksAhead.Add(manifest.BlockCount())
 
 	b.enqueue(&sealedSegment{dir: pending.dir, manifest: manifest, bytes: bytes})
+	b.sealed[reason].Add(1)
 
 	return nil
 }
@@ -272,6 +347,16 @@ func (b *Spool) Seal(ctx context.Context) error {
 // awaitQuota blocks until the spool has room for the incoming segment.
 func (b *Spool) awaitQuota(ctx context.Context, incoming int64) error {
 	warned := false
+	// Held time is accumulated rather than only warned about once: the warning says the
+	// spool filled, this says how much download the database has cost since.
+	heldFrom := time.Time{}
+	defer func() {
+		if !heldFrom.IsZero() {
+			b.quotaWait.Add(int64(time.Since(heldFrom)))
+			b.quotaHeldSince.Store(0)
+		}
+	}()
+
 	for {
 		onDisk := b.bytesOnDisk.Load()
 		if onDisk+incoming <= b.options.MaxBytes {
@@ -292,6 +377,8 @@ func (b *Spool) awaitQuota(ctx context.Context, incoming int64) error {
 			return err
 		}
 		if !warned {
+			heldFrom = time.Now()
+			b.quotaHeldSince.Store(heldFrom.UnixNano())
 			b.logger.Warn("local spool is full, holding the stream until the database catches up",
 				zap.String("on_disk", humanBytes(onDisk)),
 				zap.String("quota", humanBytes(b.options.MaxBytes)))
@@ -323,7 +410,7 @@ func (b *Spool) startSegmentLocked() error {
 	if err != nil {
 		return err
 	}
-	b.current = &openSegment{dir: dir, writer: writer}
+	b.current = &openSegment{dir: dir, writer: writer, startedAt: time.Now()}
 	b.lastWriteAt = time.Now()
 
 	return nil
@@ -377,7 +464,7 @@ func (b *Spool) setError(err error) {
 // accepted so far. An undo needs that: rows still in flight would otherwise land after
 // the delete that was supposed to remove them.
 func (b *Spool) Drain(ctx context.Context) error {
-	if err := b.Seal(ctx); err != nil {
+	if err := b.Seal(ctx, SealByDrain); err != nil {
 		return err
 	}
 
@@ -393,18 +480,37 @@ func (b *Spool) Drain(ctx context.Context) error {
 }
 
 // Close seals whatever is left, drains the applier and reports the first failure.
+//
+// The drain is bounded by ctx. Sealing is what Close exists for — a segment left unsealed
+// is discarded on the next start and its blocks streamed again — and that happens first,
+// under the same deadline. Waiting for the queue to reach the database is a convenience
+// on top: every segment in it is sealed and on disk, so recovery replays whatever the
+// deadline cut short. Blocking a shutdown indefinitely on a database that has stopped
+// responding buys nothing that the next start does not redo.
 func (b *Spool) Close(ctx context.Context) error {
 	var err error
 	b.closeOnce.Do(func() {
 		close(b.done)
-		err = b.Seal(ctx)
+		err = b.Seal(ctx, SealByClose)
 
 		b.queueMutex.Lock()
 		b.queueDone = true
 		b.queueMutex.Unlock()
 		b.queueCond.Broadcast()
 
-		b.waitGroup.Wait()
+		drained := make(chan struct{})
+		go func() {
+			b.waitGroup.Wait()
+			close(drained)
+		}()
+
+		select {
+		case <-drained:
+		case <-ctx.Done():
+			b.logger.Warn("the local spool did not finish draining before shutdown, its sealed segments are replayed on the next start",
+				zap.Int("segments_left", b.queueDepth()),
+				zap.Error(ctx.Err()))
+		}
 	})
 
 	if err != nil {
@@ -412,6 +518,13 @@ func (b *Spool) Close(ctx context.Context) error {
 	}
 
 	return b.pendingError()
+}
+
+func (b *Spool) queueDepth() int {
+	b.queueMutex.Lock()
+	defer b.queueMutex.Unlock()
+
+	return len(b.queue)
 }
 
 func (b *Spool) enqueue(pending *sealedSegment) {
@@ -481,7 +594,7 @@ func (b *Spool) sealIfIdle(ctx context.Context) {
 		return
 	}
 
-	if err := b.Seal(ctx); err != nil {
+	if err := b.Seal(ctx, SealByIdle); err != nil {
 		b.setError(fmt.Errorf("sealing an idle segment: %w", err))
 	}
 }
@@ -490,7 +603,13 @@ func (b *Spool) applyLoop(ctx context.Context) {
 	defer b.waitGroup.Done()
 
 	for {
+		// The wait is measured, not just endured: an applier that spends its time here is
+		// keeping up and the stream is the limit, one that never waits is the limit.
+		waitFrom := time.Now()
+		b.waitingSince.Store(waitFrom.UnixNano())
 		pending, ok := b.dequeue()
+		b.waitingSince.Store(0)
+		b.applierIdle.Add(int64(time.Since(waitFrom)))
 		if !ok {
 			return
 		}
@@ -507,11 +626,23 @@ func (b *Spool) applyLoop(ctx context.Context) {
 		}
 
 		startAt := time.Now()
-		if err := b.applier.Apply(ctx, pending.dir, pending.manifest); err != nil {
+		b.applyingSince.Store(startAt.UnixNano())
+		err := b.applier.Apply(ctx, pending.dir, pending.manifest)
+		b.applyingSince.Store(0)
+		if err != nil {
 			b.setError(fmt.Errorf("applying segment %s: %w", pending.dir, err))
 			continue
 		}
 		elapsed := time.Since(startAt)
+		b.applierBusy.Add(int64(elapsed))
+		b.appliedBlocks.Add(pending.manifest.BlockCount())
+		b.appliedRows.Add(pending.manifest.RowCount())
+		b.appliedBytes.Add(pending.bytes)
+		b.applyDuration.Add(int64(elapsed))
+		// Counted last, so a snapshot taken mid-update never sees a segment whose blocks,
+		// rows and duration have not landed yet — every ratio derived from it would divide
+		// by a count the numerators had not caught up with.
+		b.appliedSegments.Add(1)
 
 		b.appliedBlock.Store(pending.manifest.LastBlock)
 		b.bytesOnDisk.Add(-pending.bytes)
@@ -528,6 +659,16 @@ func (b *Spool) applyLoop(ctx context.Context) {
 	}
 }
 
+// humanBytes renders a size, clamping a negative to zero rather than printing the 16EiB
+// an unsigned conversion would produce from a corrupt manifest.
+func humanBytes(n int64) string {
+	if n < 0 {
+		n = 0
+	}
+
+	return humanize.IBytes(uint64(n))
+}
+
 func segmentBytes(manifest *Manifest) int64 {
 	bytes := manifest.LogBytes
 	for _, table := range manifest.Tables {
@@ -535,18 +676,6 @@ func segmentBytes(manifest *Manifest) int64 {
 	}
 
 	return bytes
-}
-
-func humanBytes(n int64) string {
-	value := float64(n)
-	for _, unit := range []string{"B", "KiB", "MiB", "GiB"} {
-		if value < 1024 {
-			return fmt.Sprintf("%.1f%s", value, unit)
-		}
-		value /= 1024
-	}
-
-	return fmt.Sprintf("%.1fTiB", value)
 }
 
 // openSegment is the segment being written: the driver's writers plus the block range and
@@ -557,6 +686,9 @@ type openSegment struct {
 	firstBlock uint64
 	lastBlock  uint64
 	cursor     string
+	// startedAt is when the segment was opened, which is how long its rows have been
+	// held without reaching the database — and therefore what a kill right now costs.
+	startedAt time.Time
 }
 
 // blockCount is how many blocks this segment covers so far.

@@ -261,3 +261,9 @@ func TestWithStoresBackend_BothTiersAligned(t *testing.T) {
 		}
 	})
 }
+
+func TestLastUsedFilename(t *testing.T) {
+	assert.Equal(t, "last_used", lastUsedFilename(""))
+	assert.Equal(t, "last_used_pro", lastUsedFilename("PRO"))
+	assert.Equal(t, "last_used_enterprise", lastUsedFilename("ENTERPRISE"))
+}

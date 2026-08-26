@@ -20,7 +20,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   separate Remote Feed and Substreams Feed hosted-store guides. Move the Hosted
   Sinks how-to under Hosted Services.
 
+### Server
+
+- Progress messages are sent far less often. The cadence now widens with the age of the request — every second for
+  the first minute, every 10 seconds up to 5 minutes, every 30 seconds up to 10 minutes, then every minute — and it
+  applies to the linear phase too, which previously sent one every 200ms. Progress messages count as egress like any
+  other response, so a long-running or live request paid for a steady stream of them.
+
+- `Request.progress_messages_interval_ms` is now honoured: it was validated and then ignored. Setting it pins the
+  progress cadence for the whole request instead of using the ramp above; the 500ms minimum is unchanged.
+
+- `substreams-tier1` now names the usage marker it writes in every module cache folder after the request's plan tier: `last_used_<plan>` (lowercase, e.g. `last_used_pro`), still plain `last_used` when unauthenticated. `firecore tools substreams purge` reads the plan back from that name to apply a retention per plan.
+
+## v1.22.0
+
 ### Sink
+
+- Fixed: `substreams sink postgres|clickhouse` in Relational Mappings Mode now waits for the sink to shut down before
+  the process exits. On SIGINT or SIGTERM it returned immediately, so the run's final statistics were lost and — worse
+  — the open spool segment was never sealed, and every block it held was streamed, and paid for, again on the next
+  start. Interrupting a backfill is the normal way one ends, so this affected most runs.
+
+- The periodic statistics now report what the local spool is doing: segments committed and their rate, rows and bytes
+  applied, how long one commit takes, how much of the disk budget is in use, how long the stream has been held waiting
+  for the database, and what share of its time the applier spends working rather than waiting. That last one is what
+  says whether the database or the stream is the limit — a gap on its own never did.
+
+- Fixed: time the sink spends held by a full spool is reported on its own rather than
+  counted as block processing. It happens inside the per-block timer, so a database that
+  cannot keep up used to inflate `Block Processing Duration` and deflate the wait between
+  blocks — saying the sink was busy when it was blocked. The statistics line gains
+  `Held By Database` when there is any.
+
+- Fixed: the statistics windows are no longer appended to and read from two goroutines
+  without synchronisation.
+
+- Spool recovery reports itself while it runs. Replaying the segments a killed backfill left behind happens at startup,
+  before anything else logs, and takes as long as it takes to COPY them; it previously said nothing until it had
+  finished, which read as a hang.
+
+- Statistics panel: durations are reported per 100 blocks rather than as a per-block mean in fractions of a
+  microsecond, and two rows are named for what they measure — `Entities Insert Duration` is now `Message Walk
+  Duration`, and `Block Insert Duration` reads `Spool Write Duration` while a spool is open, since nothing is inserted
+  into a database on that path. The `Flush duration` row is fed by what the applier committed when spooling, where it
+  previously timed a call that returns before anything is written and so reported zero.
+
+- Added: `substreams sink protojson --compression` to write output files compressed with `zstd` or `gzip`, appending the matching `.zst` or `.gz` extension to each file. Defaults to no compression.
 
 - Fixed: **BREAKING** `substreams sink postgres` in Relational Mappings Mode stores `bytes` fields as binary in their
   `BYTEA` columns. Under the default `--bytes-encoding=raw` they were corrupted: a 7-byte value became the 14
@@ -145,6 +190,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - WASM: new `context` host module giving modules an intrinsic they can call at any point during execution: `context::clock(output_ptr)` writes the block clock as an encoded `sf.substreams.v1.Clock`. It writes a `{ptr, len}` pair at `output_ptr`, the same convention the `state` getters use, and is available on the `wasmtime` and `wazero` runtimes (not on the JavaScript/v8 one). Until now the clock was only reachable by declaring `source: sf.substreams.v1.Clock` as a module input. Ergonomic Rust bindings will follow in `substreams-rs`; until then a module declares the import itself with `#[link(wasm_import_module = "context")]`. `context` joins `env`, `state` and `logger` as a namespace WASM extensions cannot register into.
 
 ### CLI
+
+- Changed: `substreams auth` opens a browser so you can pick an organization (if you have more than one) and
+  an API key. The CLI retrieves the selected key over the API — no copy/paste — exchanges it for a JWT, and
+  writes `.substreams.env` (mode 0600, including when the file already exists). The previous paste-a-JWT-or-API-key
+  flow is `--paste`. Login polling keeps going through transport errors, timeouts, and 5xx until the device-code
+  deadline, and fails fast without a usable `http`/`https` verification URL. With `LOCAL_DEVELOPMENT=true`,
+  JWT issue uses the local issuer; if that issuer is unavailable the API key is stored instead of failing.
 
 - `substreams estimate` asks the endpoint for the estimate instead of sampling from the client. The endpoint runs the
   sample on its own workers and only reports the measured sizes, so the estimation costs processed blocks and no

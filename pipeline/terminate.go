@@ -15,7 +15,9 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 )
 
-const progressMessageInterval = time.Millisecond * 200
+// internalProgressMessageInterval is the cadence of the tier2 -> tier1 progress updates.
+// Those never reach the client, so they are not throttled like the tier1 progress messages.
+const internalProgressMessageInterval = time.Millisecond * 200
 
 // OnStreamTerminated performs flush of store and setting trailers when the stream terminated gracefully from our point of view.
 // If the stream terminated gracefully, we return `nil` otherwise, the original is returned.

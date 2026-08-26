@@ -11,6 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Docs
+
+- Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can
+  hard-delete a batch of keys over gRPC. Missing keys are ignored; later reads return
+  `NOT_FOUND`, not a tombstone.
+- Add a Hosted Services how-to that describes Hosted Sinks and Hosted Stores, with
+  separate Remote Feed and Substreams Feed hosted-store guides. Move the Hosted
+  Sinks how-to under Hosted Services.
+
 ### Server
 
 - Store snapshots (fullKV files) can now be pruned to save disk space: tier1 no longer assumes that a fullKV at block
@@ -23,6 +32,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - The initial store lookup no longer falls back to listing a store's whole history when its last snapshot is far
   behind: it lists at most a handful of bounded windows.
+
+- Progress messages are sent far less often. The cadence now widens with the age of the request — every second for
+  the first minute, every 10 seconds up to 5 minutes, every 30 seconds up to 10 minutes, then every minute — and it
+  applies to the linear phase too, which previously sent one every 200ms. Progress messages count as egress like any
+  other response, so a long-running or live request paid for a steady stream of them.
+
+- `Request.progress_messages_interval_ms` is now honoured: it was validated and then ignored. Setting it pins the
+  progress cadence for the whole request instead of using the ramp above; the 500ms minimum is unchanged.
+
+- `substreams-tier1` now names the usage marker it writes in every module cache folder after the request's plan tier: `last_used_<plan>` (lowercase, e.g. `last_used_pro`), still plain `last_used` when unauthenticated. `firecore tools substreams purge` reads the plan back from that name to apply a retention per plan.
 
 ## v1.22.0
 

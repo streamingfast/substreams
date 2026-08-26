@@ -343,6 +343,18 @@ func (s *thinstoreStack) storeModules() []string {
 	return out
 }
 
+// stateFiles lists every snapshot and partial of every store, for before/after comparisons.
+func (s *thinstoreStack) stateFiles() []string {
+	var out []string
+	for _, module := range s.storeModules() {
+		for _, f := range s.files(module, "states") {
+			out = append(out, f.path)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 func (s *thinstoreStack) countFiles(folder string) int {
 	n := 0
 	for name := range s.hashes {
@@ -495,6 +507,18 @@ func (s *thinstoreStack) scenarios(t *testing.T) {
 			t.Logf("[%d,%d) prod=%v took %s", tc.start, tc.stop, tc.prod, time.Since(start).Round(time.Millisecond))
 		})
 	}
+
+	// Store outputs are only a replay shortcut for tier2: with the snapshots intact, losing
+	// them must not send the store segments back to the scheduler nor rewrite any snapshot,
+	// whether the store is read in get mode (store_count) or deltas mode (store_c).
+	t.Run("store_outputs_missing_kv_intact", func(t *testing.T) {
+		s.delFiles("store_count", "outputs", 12000, 13000)
+		s.delFiles("store_c", "outputs", 12000, 13000)
+		s.delFiles("map_out", "outputs", 12000, 13000)
+		before := s.stateFiles()
+		s.check(t, 12300, 12700, true)
+		require.Equal(t, before, s.stateFiles(), "no snapshot or partial written")
+	})
 	t.Logf("after scenarios: %d snapshots, %d outputs, %d index files", s.countFiles("states"), s.countFiles("outputs"), s.countFiles("index"))
 }
 

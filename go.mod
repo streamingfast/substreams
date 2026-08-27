@@ -17,7 +17,7 @@ require (
 	github.com/streamingfast/dstore v0.2.4-0.20260709193311-122163592902
 	github.com/streamingfast/logging v1.2.3-0.20260810132752-360563ac68a9
 	github.com/streamingfast/pbgo v0.0.6-0.20251125204657-0a9c67563b19
-	github.com/stretchr/testify v1.12.0
+	github.com/stretchr/testify v1.12.1
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.28.0
 	google.golang.org/protobuf v1.36.12
@@ -29,10 +29,10 @@ require (
 	buf.build/gen/go/bufbuild/reflect/protocolbuffers/go v1.36.12-20240117202343-bf8f65e8876c.1
 	buf.build/go/hyperpb v0.1.3
 	connectrpc.com/connect v1.20.0
-	github.com/AfterShip/clickhouse-sql-parser v0.5.5
+	github.com/AfterShip/clickhouse-sql-parser v0.5.6
 	github.com/ClickHouse/ch-go v0.74.0
 	github.com/ClickHouse/clickhouse-go/v2 v2.48.0
-	github.com/KimMachineGun/automemlimit v0.7.5
+	github.com/KimMachineGun/automemlimit v1.0.0
 	github.com/RoaringBitmap/roaring v1.9.4
 	github.com/abourget/llerrgroup v0.2.0
 	github.com/alecthomas/chroma v0.10.0
@@ -48,7 +48,7 @@ require (
 	github.com/charmbracelet/huh v1.0.0
 	github.com/charmbracelet/huh/spinner v0.0.0-20240806005253-b7436a76999a
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
-	github.com/charmbracelet/x/ansi v0.11.7
+	github.com/charmbracelet/x/ansi v0.11.8
 	github.com/drone/envsubst v1.0.3
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.19.0
@@ -103,7 +103,7 @@ require (
 	golang.org/x/mod v0.40.0
 	golang.org/x/net v0.58.0
 	golang.org/x/oauth2 v0.36.0
-	google.golang.org/grpc v1.83.0
+	google.golang.org/grpc v1.83.1
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -146,7 +146,7 @@ require (
 	github.com/aws/smithy-go v1.25.1 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
-	github.com/bits-and-blooms/bitset v1.24.4 // indirect
+	github.com/bits-and-blooms/bitset v1.24.6 // indirect
 	github.com/bobg/go-generics/v3 v3.5.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/catppuccin/go v0.3.0 // indirect
@@ -241,7 +241,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.45.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.49.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
@@ -286,7 +286,7 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
-	github.com/mattn/go-runewidth v0.0.27
+	github.com/mattn/go-runewidth v0.0.28
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	github.com/mr-tron/base58 v1.3.0
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6

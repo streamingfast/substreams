@@ -675,21 +675,10 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		stream := response.New(p.respFunc)
 
 		meter := dmetering.GetBytesMeter(ctx)
-		notifyInterval := time.Duration(500 * time.Millisecond)
 
-		count := int64(0)
 		for {
-			count++
-			switch count { // reduce "probably useless" bandwidth consumption after a few minutes.
-			case 120: // after 60 seconds, notify every second
-				notifyInterval = time.Second
-			case 240: // after 3 minutes, notify every 3 seconds
-				notifyInterval = time.Second * 3
-			case 300: // after 6 minutes, notify every 5 seconds
-				notifyInterval = time.Second * 5
-			}
 			select {
-			case <-time.After(notifyInterval):
+			case <-time.After(progressMessageInterval(time.Since(p.startTime), reqDetails.UpdateInterval)):
 				stagesProgress := stats.Stages()
 				jobs := stats.JobsStats()
 				modStats := stats.AggregatedModulesStats()
@@ -798,8 +787,31 @@ func toRPCMapModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrpc.
 	}
 }
 
+// progressMessageInterval returns how long to wait before the next progress message is
+// sent to the client. A non-zero requested interval, from Request.progress_messages_interval_ms,
+// pins the cadence for the whole request. Otherwise the interval widens as the request ages:
+// progress matters most while the client is still waiting for its first data, and every
+// message is billed as egress.
+func progressMessageInterval(elapsed, requested time.Duration) time.Duration {
+	if requested > 0 {
+		return requested
+	}
+
+	switch {
+	case elapsed < time.Minute:
+		return time.Second
+	case elapsed < 5*time.Minute:
+		return 10 * time.Second
+	case elapsed < 10*time.Minute:
+		return 30 * time.Second
+	default:
+		return time.Minute
+	}
+}
+
 func (p *Pipeline) returnRPCModuleProgressOutputs(forceOutput bool) error {
-	if time.Since(p.lastProgressSent) < progressMessageInterval && !forceOutput {
+	interval := progressMessageInterval(time.Since(p.startTime), reqctx.Details(p.ctx).UpdateInterval)
+	if time.Since(p.lastProgressSent) < interval && !forceOutput {
 		return nil
 	}
 	p.lastProgressSent = time.Now()
@@ -878,7 +890,7 @@ func (p *Pipeline) SendProgressSnapshot() error {
 }
 
 func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock, forceOutput bool) error {
-	if time.Since(p.lastProgressSent) < progressMessageInterval && !forceOutput {
+	if time.Since(p.lastProgressSent) < internalProgressMessageInterval && !forceOutput {
 		return nil
 	}
 	p.lastProgressSent = time.Now()

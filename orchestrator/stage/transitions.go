@@ -27,9 +27,11 @@ stateDiagram-v2
     %%NO: Pending --> Merging
     %%  we'll leave the messaging schedule the Squasher and take it from PartialPresent --> Merging
     Pending --> Completed: init storage fetch
-    %%  the initial storage state fetcher found a file with the complete store, and we've
-    %%  scheduled the squasher to load the latest that we found, and marked all the
-    %%  preceding ones as having a complete snapshot on disk (to satisfy any dependent jobs)
+    %%  the initial storage state fetcher found a file with the complete store for this
+    %%  exact segment. Only seen files are marked: older snapshots may have been pruned.
+    Pending --> NoOp: init storage fetch
+    %%  the segment is below the resume segment (a later complete store covers it), so
+    %%  nothing will ever read its files.
 
     %%NO: PartialPresent --> Pending: squasher didn't find partial
     %%  we'll let PartialPresent go to the squasher, and if it doesn't find it
@@ -112,6 +114,29 @@ func (s *Stages) MarkSegmentPending(u Unit) {
 	)
 }
 
+// ReprocessMapSegment sends a map-stage unit back to Pending so its job runs again,
+// when the output file it was supposed to have written cannot be found. Returns false
+// when the unit is not in a done state (a job may already be re-running it).
+func (s *Stages) ReprocessMapSegment(segmentIdx int) bool {
+	stageIdx := len(s.stages) - 1
+	if s.stages[stageIdx].kind != KindMap {
+		return false
+	}
+	u := Unit{Stage: stageIdx, Segment: segmentIdx}
+	switch s.getState(u) {
+	case UnitCompleted, UnitPartialPresent:
+	default:
+		return false
+	}
+	s.setState(u, UnitPending)
+	// NextJob only scans from nextJobCursor; the cursor had moved past this segment
+	// when the unit was done.
+	if segmentIdx < s.nextJobCursor {
+		s.nextJobCursor = segmentIdx
+	}
+	return true
+}
+
 func (s *Stages) MarkJobSuccess(u Unit) (shadowedUnits []Unit) {
 	s.MarkSegmentPartialPresent(u)
 
@@ -143,6 +168,15 @@ func (s *Stages) ReleaseJob(u Unit) {
 func (s *Stages) markSegmentScheduled(u Unit) {
 	s.transition(u, UnitScheduled,
 		UnitPending, // after scheduling some work (NextJob())
+	)
+}
+
+// markSegmentNoOp is used for store segments below the resume segment: a later fullKV
+// covers them and nothing will ever read their (possibly pruned) files.
+func (s *Stages) markSegmentNoOp(u Unit) {
+	s.transition(u, UnitNoOp,
+		UnitPending,
+		UnitNoOp,
 	)
 }
 

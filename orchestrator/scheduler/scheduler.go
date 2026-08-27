@@ -43,10 +43,21 @@ type Scheduler struct {
 	delayedScheduleNextJob bool
 	tracer                 ttrace.Tracer
 
+	// missingFileSegment / missingFileSince track how long the ExecOutWalker has
+	// been waiting for the current segment's output file. A file still missing
+	// after missingExecOutFileTimeout while its unit is marked done was deleted
+	// after being written; the job is re-run instead of waiting forever.
+	missingFileSegment int
+	missingFileSince   time.Time
+
 	// debugState mirrors SUBSTREAMS_DEBUG_SCHEDULER_STATE, read once here instead
 	// of calling os.Getenv (which takes a runtime lock) on every Update message.
 	debugState bool
 }
+
+// missingExecOutFileTimeout is how long the walker tolerates a missing output file
+// for a segment whose job already completed before re-running that job.
+const missingExecOutFileTimeout = 30 * time.Second
 
 func New(ctx context.Context, stream *response.Stream) *Scheduler {
 	logger := reqctx.Logger(ctx).Named("scheduler")
@@ -283,6 +294,17 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			zap.Duration("next_wait", msg.NextWait),
 		)
 		s.ExecOutWalker.MarkNotWorking()
+		if current != s.missingFileSegment || s.missingFileSince.IsZero() {
+			s.missingFileSegment = current
+			s.missingFileSince = time.Now()
+		} else if time.Since(s.missingFileSince) > missingExecOutFileTimeout && s.Stages.ReprocessMapSegment(current) {
+			s.logger.Warn("execout file still missing for a completed segment, re-running its job",
+				zap.Int("segment", current),
+				zap.Duration("missing_for", time.Since(s.missingFileSince)),
+			)
+			s.missingFileSince = time.Now()
+			cmds = append(cmds, work.CmdScheduleNextJob("execout file missing"))
+		}
 		cmds = append(cmds, execout.CmdDownloadSegment(msg.NextWait))
 
 	case execout.MsgFileReadTransientError:

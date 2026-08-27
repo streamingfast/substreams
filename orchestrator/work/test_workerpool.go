@@ -19,6 +19,8 @@ func (t *TestWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 	return t.workerFactory(ctx), nil
 }
 
+func (t *TestWorkerPool) ReleaseAll() {}
+
 func (t *TestWorkerPool) Return(ctx context.Context, worker Worker) {
 	//nada
 }

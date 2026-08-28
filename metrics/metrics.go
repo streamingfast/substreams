@@ -61,6 +61,12 @@ var StoreMmapOperationsTotal *dmetrics.CounterVec
 var Tier1ActiveRequestsHardLimit *dmetrics.Gauge
 var Tier2MaxConcurrentRequests *dmetrics.Gauge
 
+// CPU signals of the tier1 container's own cgroup, sampled by the request shedder
+var Tier1CPUQuotaCores *dmetrics.Gauge
+var Tier1CPUUsageRatio *dmetrics.Gauge
+var Tier1CPUThrottleRatio *dmetrics.Gauge
+var Tier1CPUPressureSomeAvg10 *dmetrics.Gauge
+
 func DeclareTier1Metrics(zlog *zap.Logger) {
 	AppReadinessTier1 = MetricSet.NewAppReadiness("substreams_tier1")
 	Tier1RequestsCounter = MetricSet.NewCounter("substreams_counter", "Total Substreams requests count on tier1")
@@ -80,6 +86,11 @@ func DeclareTier1Metrics(zlog *zap.Logger) {
 	Tier1WorkerRejectedOverloadedCounter = MetricSet.NewCounter("substreams_tier1_worker_rejected_overloaded_counter", "Counter for number of times a worker rejected a request because it was overloaded (included in RetryCounter)")
 	Tier1OutputHeadBlockRelativeTime = MetricSet.NewHeadBlockRelativeTime("substreams_output")
 	Tier1ActiveRequestsHardLimit = MetricSet.NewGauge("substreams_tier1_active_requests_hard_limit", "Hard limit of concurrent active requests on tier1 (0 means unlimited)")
+
+	Tier1CPUQuotaCores = MetricSet.NewGauge("substreams_tier1_cpu_quota_cores", "CPU quota of the tier1 container's cgroup in cores (0 means no limit)")
+	Tier1CPUUsageRatio = MetricSet.NewGauge("substreams_tier1_cpu_usage_ratio", "CPU used by the tier1 container as a fraction of its cgroup quota, over the last shedder evaluation interval")
+	Tier1CPUThrottleRatio = MetricSet.NewGauge("substreams_tier1_cpu_throttle_ratio", "Fraction of CFS periods in which the tier1 container was throttled, over the last shedder evaluation interval")
+	Tier1CPUPressureSomeAvg10 = MetricSet.NewGauge("substreams_tier1_cpu_pressure_some_avg10", "PSI 'some' avg10 of the tier1 container's cgroup, fraction 0..1 of time runnable threads waited for CPU")
 
 	StoreBackendType = MetricSet.NewGaugeVec(
 		"substreams_store_backend_type",

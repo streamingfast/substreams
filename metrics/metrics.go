@@ -66,6 +66,8 @@ var Tier1CPUQuotaCores *dmetrics.Gauge
 var Tier1CPUUsageRatio *dmetrics.Gauge
 var Tier1CPUThrottleRatio *dmetrics.Gauge
 var Tier1CPUPressureSomeAvg10 *dmetrics.Gauge
+var Tier1CPUOverloaded *dmetrics.Gauge
+var Tier1ShedRequestsCounter *dmetrics.CounterVec
 
 func DeclareTier1Metrics(zlog *zap.Logger) {
 	AppReadinessTier1 = MetricSet.NewAppReadiness("substreams_tier1")
@@ -91,6 +93,12 @@ func DeclareTier1Metrics(zlog *zap.Logger) {
 	Tier1CPUUsageRatio = MetricSet.NewGauge("substreams_tier1_cpu_usage_ratio", "CPU used by the tier1 container as a fraction of its cgroup quota, over the last shedder evaluation interval")
 	Tier1CPUThrottleRatio = MetricSet.NewGauge("substreams_tier1_cpu_throttle_ratio", "Fraction of CFS periods in which the tier1 container was throttled, over the last shedder evaluation interval")
 	Tier1CPUPressureSomeAvg10 = MetricSet.NewGauge("substreams_tier1_cpu_pressure_some_avg10", "PSI 'some' avg10 of the tier1 container's cgroup, fraction 0..1 of time runnable threads waited for CPU")
+	Tier1CPUOverloaded = MetricSet.NewGauge("substreams_tier1_cpu_overloaded", "1 while the tier1 pod considers itself CPU-overloaded (unready, may shed requests), 0 otherwise")
+	Tier1ShedRequestsCounter = MetricSet.NewCounterVec(
+		"substreams_tier1_shed_requests_counter",
+		[]string{"class", "action"},
+		"Requests the CPU shedder selected, by class (dev, prod-catchup, prod-live) and action (cancelled, or observed in observe mode)",
+	)
 
 	StoreBackendType = MetricSet.NewGaugeVec(
 		"substreams_store_backend_type",

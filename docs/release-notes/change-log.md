@@ -43,6 +43,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - `substreams-tier1` now names the usage marker it writes in every module cache folder after the request's plan tier: `last_used_<plan>` (lowercase, e.g. `last_used_pro`), still plain `last_used` when unauthenticated. `firecore tools substreams purge` reads the plan back from that name to apply a retention per plan.
 
+### Tests
+
+- The `tests_e2e/dummy` package gains three modules for exercising Hosted Stores against a
+  staging environment. `map_hosted_store_feed`, packed into `e2e-v0.3.0.spkg`, emits
+  `SinkEntries` and can be given to a Substreams Feed Hosted Store as its output module; it
+  writes a `block:<height>` key plus a `latest` key that moves every block. The two readers
+  get a manifest each -- `substreams.substreams-feed.yaml` and `substreams.remote-feed.yaml`
+  -- taking their store id from `$SUBSTREAMS_FEED_STORE_ID` or `$REMOTE_FEED_STORE_ID`, so
+  each is run straight from its yaml rather than packed. `hosted-store.sh` seeds a Remote
+  Feed store and marks it ready over gRPC via `buf curl`.
+
+- The dummy package's descriptor sets are pinned to a buf commit. Unpinned sets resolve to
+  latest, which disables the `substreams build` protobuf cache and regenerates the bindings
+  on every build.
+
 ## v1.22.0
 
 ### Sink

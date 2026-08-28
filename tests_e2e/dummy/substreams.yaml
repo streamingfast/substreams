@@ -1,17 +1,23 @@
 specVersion: v0.1.0
 package:
   name: e2e
-  version: v0.2.0
+  version: v0.3.0
 
 protobuf:
   descriptorSets:
-    - module: buf.build/streamingfast/firehose-acme
+    # Both sets are pinned to a commit: an unpinned set resolves to latest, which
+    # disables the `substreams build` protobuf cache and makes every build regenerate.
+    - module: buf.build/streamingfast/firehose-acme@f6b2cc014e9d46059938734205759dce
+    # Provides sf.substreams.foundational_store.model.v2.SinkEntries, the only
+    # output shape a Substreams Feed Hosted Store ingests. Not a system proto.
+    - module: buf.build/streamingfast/substreams-foundational-store@61de8e7fccf94d3392779e4502b08240
   files:
     - contract.proto
   importPaths:
     - ./proto
   excludePaths:
     - sf/substreams
+    - sf/firehose
     - google
 
 binaries:
@@ -86,5 +92,17 @@ modules:
       - map: map_filtered
     output:
       type: proto:test.output.Events
+
+  # Producer for a Substreams Feed Hosted Store. Point the store's "Package" at
+  # the packed e2e-v0.3.0.spkg and its "Output module" at this module. Writes two
+  # entries per block: `block:<height>`, which never changes once written, and
+  # `latest`, which is overwritten every block.
+  - name: map_hosted_store_feed
+    kind: map
+    initialBlock: 0
+    inputs:
+      - source: sf.acme.type.v1.Block
+    output:
+      type: proto:sf.substreams.foundational_store.model.v2.SinkEntries
 
 network: dummy

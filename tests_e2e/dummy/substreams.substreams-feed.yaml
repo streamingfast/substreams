@@ -1,0 +1,48 @@
+# Consumer of a Substreams Feed Hosted Store -- one fed by map_hosted_store_feed, which
+# lives in substreams.yaml because that is the manifest that gets packed.
+#
+# Kept out of substreams.yaml on purpose: a `foundational-store` identifier is expanded
+# when the manifest is *read*, and `substreams pack` freezes whatever it read into the
+# module hashes. A deployment id only exists once the store does, so this module is run
+# straight from the yaml rather than packed:
+#
+#   SUBSTREAMS_FEED_STORE_ID=dep... substreams run substreams.substreams-feed.yaml \
+#     map_query_substreams_feed_store -e <endpoint>
+#
+# An unset variable is an error rather than an empty string.
+specVersion: v0.1.0
+package:
+  name: e2e_substreams_feed
+  version: v0.1.0
+
+protobuf:
+  descriptorSets:
+    - module: buf.build/streamingfast/firehose-acme@f6b2cc014e9d46059938734205759dce
+    - module: buf.build/streamingfast/substreams-foundational-store@61de8e7fccf94d3392779e4502b08240
+  files:
+    - contract.proto
+  importPaths:
+    - ./proto
+  excludePaths:
+    - sf/substreams
+    - sf/firehose
+    - google
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams.wasm
+
+modules:
+  # Reads back what map_hosted_store_feed wrote. Run it against the same dummy chain the
+  # store was fed from and every block should report RESPONSE_CODE_FOUND for both keys.
+  - name: map_query_substreams_feed_store
+    kind: map
+    initialBlock: 0
+    inputs:
+      - source: sf.acme.type.v1.Block
+      - foundational-store: ${SUBSTREAMS_FEED_STORE_ID}@v0.1.0
+    output:
+      type: proto:test.output.StoreQuery
+
+network: dummy

@@ -23,6 +23,7 @@ RUN --mount=target=. \
       CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
       GOWORK=off go build -ldflags="-X 'main.version=${VERSION}'" -o /app/substreams ./cmd/substreams
 
+# Runtime stage: minimal Ubuntu base carrying only the built binary.
 FROM ubuntu:24.04
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \

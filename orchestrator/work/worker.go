@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -101,6 +102,8 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 
 var workerMaxRetries = 5
 var workerMaxTimeoutRetries = 2
+var workerOverloadedRetryDelay = 300 * time.Millisecond
+var workerOverloadedRetryJitter = 100 * time.Millisecond
 
 func init() {
 	if val := os.Getenv("SUBSTREAMS_WORKER_MAX_RETRIES"); val != "" {
@@ -113,6 +116,49 @@ func init() {
 		if parsed, err := strconv.Atoi(val); err == nil {
 			workerMaxTimeoutRetries = parsed
 		}
+	}
+
+	if val := os.Getenv("SUBSTREAMS_WORKER_OVERLOADED_RETRY_DELAY"); val != "" {
+		if parsed, err := time.ParseDuration(val); err == nil {
+			workerOverloadedRetryDelay = parsed
+		}
+	}
+
+	if val := os.Getenv("SUBSTREAMS_WORKER_OVERLOADED_RETRY_JITTER"); val != "" {
+		if parsed, err := time.ParseDuration(val); err == nil {
+			workerOverloadedRetryJitter = parsed
+		}
+	}
+}
+
+// isInstanceOverloadedErr reports whether a tier2 refused the job because it was at its
+// concurrent-request limit. The job did no work, so another instance can take it right away.
+func isInstanceOverloadedErr(err error) bool {
+	if strings.Contains(err.Error(), "service currently overloaded") { // previous tier2 behavior, for backward compatibility, replaced by codes.ResourceExhausted
+		return true
+	}
+
+	grpcError := dgrpc.AsGRPCError(err)
+	return grpcError != nil && grpcError.Code() == codes.ResourceExhausted
+}
+
+// waitBeforeRetryOverloaded sleeps workerOverloadedRetryDelay plus or minus
+// workerOverloadedRetryJitter, returning the context error if the request goes away
+// while waiting.
+func waitBeforeRetryOverloaded(ctx context.Context) error {
+	delay := workerOverloadedRetryDelay
+	if workerOverloadedRetryJitter > 0 {
+		delay += time.Duration(rand.Int63n(int64(workerOverloadedRetryJitter)*2)) - workerOverloadedRetryJitter
+	}
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
 }
 
@@ -134,69 +180,83 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 
 		var previousError error
 		err := derr.RetryContext(ctx, math.MaxUint64, func(ctx context.Context) error {
-			w.logger.Info("launching remote worker",
-				zap.Uint64("segment", request.SegmentNumber),
-				zap.Uint32("stage", request.Stage),
-				zap.String("output_module", request.OutputModule),
-				zap.Int("attempt", retryIdx+1),
-				zap.Int("execution_timeouts", executionTimeouts),
-				zap.NamedError("previous_error", previousError),
-			)
+			for {
+				w.logger.Info("launching remote worker",
+					zap.Uint64("segment", request.SegmentNumber),
+					zap.Uint32("stage", request.Stage),
+					zap.String("output_module", request.OutputModule),
+					zap.Int("attempt", retryIdx+1),
+					zap.Int("execution_timeouts", executionTimeouts),
+					zap.NamedError("previous_error", previousError),
+				)
 
-			res = w.work(ctx, request, moduleNames, upstream, jobIdx)
-			err := res.Error
-			// Keep the reason around: the request progress log reports failure counts, but
-			// only the error text says whether jobs die on an unreachable RPC endpoint, a
-			// module panic or an overloaded tier2.
-			stats.RecordJobError(jobIdx, err)
-			switch err.(type) {
-			case *RetryableErr:
-				previousError = err
-				if strings.Contains(err.Error(), "service currently overloaded") || // previous tier2 behavior, for backward compatibility, replaced by codes.ResourceExhausted
-					errors.Is(err, ErrConnectionRefused) { // tier2 unavailable
+				res = w.work(ctx, request, moduleNames, upstream, jobIdx)
+				err := res.Error
+				// Keep the reason around: the request progress log reports failure counts, but
+				// only the error text says whether jobs die on an unreachable RPC endpoint, a
+				// module panic or an overloaded tier2.
+				stats.RecordJobError(jobIdx, err)
+
+				if _, ok := err.(*RetryableErr); ok && isInstanceOverloadedErr(err) {
+					// The retry is looking for a different instance rather than waiting on this
+					// one, so it runs on a short fixed delay instead of the growing backoff, and
+					// does not count towards maxRetries.
+					previousError = err
 					stats.RecordJobDelayed(jobIdx)
 					metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
-					// don't count towards maxRetries, retry immediately
-					return err
-
-				}
-				if grpcError := dgrpc.AsGRPCError(err); grpcError != nil && (grpcError.Code() == codes.ResourceExhausted || (grpcError.Code() == codes.Unavailable && strings.Contains(err.Error(), "no healthy upstream"))) {
-					stats.RecordJobDelayed(jobIdx)
-					metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
-					// don't count towards maxRetries, retry immediately
-					return err
-				}
-
-				if streamOutput && upstream.DataSent() {
-					// never retry for jobs that stream blocks and have already sent some data
-					segmentStart := request.SegmentNumber * request.SegmentSize
-					return derr.NewFatalError(fmt.Errorf("segment [%d-%d] failed while streaming data: %w", segmentStart, segmentStart+request.SegmentSize, err))
-				}
-				metrics.Tier1WorkerRetryCounter.Inc()
-				stats.RecordJobRetried(jobIdx)
-
-				grpcError := dgrpc.AsGRPCError(err)
-				if (grpcError != nil && grpcError.Code() == codes.DeadlineExceeded) || strings.Contains(err.Error(), "DeadlineExceeded") {
-					executionTimeouts++
-					if executionTimeouts >= maxExecutionTimeouts {
-						segmentStart := request.SegmentNumber * request.SegmentSize
-						return derr.NewFatalError(fmt.Errorf("segment [%d-%d] timed out %d times, giving up. Last error from worker: %s", segmentStart, segmentStart+request.SegmentSize, executionTimeouts, err))
+					if err := waitBeforeRetryOverloaded(ctx); err != nil {
+						return derr.NewFatalError(err)
 					}
+					continue
+				}
+
+				switch err.(type) {
+				case *RetryableErr:
+					previousError = err
+					if errors.Is(err, ErrConnectionRefused) { // tier2 unavailable
+						stats.RecordJobDelayed(jobIdx)
+						metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
+						// don't count towards maxRetries
+						return err
+					}
+					if grpcError := dgrpc.AsGRPCError(err); grpcError != nil && grpcError.Code() == codes.Unavailable && strings.Contains(err.Error(), "no healthy upstream") {
+						stats.RecordJobDelayed(jobIdx)
+						metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
+						// don't count towards maxRetries
+						return err
+					}
+
+					if streamOutput && upstream.DataSent() {
+						// never retry for jobs that stream blocks and have already sent some data
+						segmentStart := request.SegmentNumber * request.SegmentSize
+						return derr.NewFatalError(fmt.Errorf("segment [%d-%d] failed while streaming data: %w", segmentStart, segmentStart+request.SegmentSize, err))
+					}
+					metrics.Tier1WorkerRetryCounter.Inc()
+					stats.RecordJobRetried(jobIdx)
+
+					grpcError := dgrpc.AsGRPCError(err)
+					if (grpcError != nil && grpcError.Code() == codes.DeadlineExceeded) || strings.Contains(err.Error(), "DeadlineExceeded") {
+						executionTimeouts++
+						if executionTimeouts >= maxExecutionTimeouts {
+							segmentStart := request.SegmentNumber * request.SegmentSize
+							return derr.NewFatalError(fmt.Errorf("segment [%d-%d] timed out %d times, giving up. Last error from worker: %s", segmentStart, segmentStart+request.SegmentSize, executionTimeouts, err))
+						}
+						return err
+					}
+
+					retryIdx++
+					if retryIdx >= maxRetries {
+						segmentStart := request.SegmentNumber * request.SegmentSize
+						return derr.NewFatalError(fmt.Errorf("segment [%d-%d] failed %d times, giving up. Last error from worker: %s", segmentStart, segmentStart+request.SegmentSize, retryIdx, err))
+					}
+
 					return err
+				default:
+					if err != nil {
+						return derr.NewFatalError(err)
+					}
+					return nil
 				}
-
-				retryIdx++
-				if retryIdx >= maxRetries {
-					segmentStart := request.SegmentNumber * request.SegmentSize
-					return derr.NewFatalError(fmt.Errorf("segment [%d-%d] failed %d times, giving up. Last error from worker: %s", segmentStart, segmentStart+request.SegmentSize, retryIdx, err))
-				}
-
-				return err
-			default:
-				if err != nil {
-					return derr.NewFatalError(err)
-				}
-				return nil
 			}
 		})
 

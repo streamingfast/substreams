@@ -12,3 +12,31 @@ message Event {
   uint64 evt_block_number = 4;
   uint64 fee = 5;
 }
+
+// StoreValue is the value type `map_hosted_store_feed` writes into a Hosted Store.
+// It is carried inside a google.protobuf.Any, so its fully-qualified name --
+// `test.output.StoreValue` -- is what you give as the store's "Type URL" when
+// creating the service.
+message StoreValue {
+  uint64 block_number = 1;
+  string block_hash = 2;
+  uint64 transaction_count = 3;
+}
+
+// StoreQuery is what the two consumer modules emit: the block they ran on, plus
+// one result per key they looked up.
+message StoreQuery {
+  uint64 block_number = 1;
+  repeated StoreQueryEntry entry = 2;
+}
+
+message StoreQueryEntry {
+  string key = 1;
+  // Name of the sf.substreams.foundational_store.model.v2.ResponseCode the store
+  // answered with, so a miss stays visibly distinct from a decode failure.
+  string code = 2;
+  // Type URL the entry's Any carried, kept so a Type URL mismatch is visible.
+  string type_url = 3;
+  // Set only when the entry was found and decoded as a StoreValue.
+  StoreValue value = 4;
+}

@@ -123,6 +123,7 @@ type Tier1Service struct {
 	storeResolver            dregistry.Resolver
 	sessionPool              dsession.SessionPool
 	activeRequestsManager    *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
+	shedder                  *active_requests.Shedder               // nil unless CPU shedding is enabled and cgroup CPU signals are readable
 	execOutMessageBufferSize int
 
 	// liveBackFillerFinalBlockDelay overrides the default 120-block delay the
@@ -195,6 +196,7 @@ func NewTier1(
 	enforceCompression bool,
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
+	shedderConfig active_requests.ShedderConfig,
 	sharedCacheSize uint64,
 	outputBufferSize uint64,
 	sessionPool dsession.SessionPool,
@@ -271,6 +273,27 @@ func NewTier1(
 	s.OnTerminating(func(_ error) {
 		s.activeRequestsWG.Wait()
 	})
+
+	if shedderConfig.Mode != active_requests.SheddingOff {
+		if reader, err := active_requests.NewCPUReader(); err != nil {
+			logger.Warn("CPU shedding disabled: cannot read cgroup CPU signals", zap.Error(err))
+		} else if reader.QuotaCores() == 0 {
+			logger.Warn("CPU shedding disabled: no CPU quota set on the cgroup")
+		} else {
+			shedder := active_requests.NewShedder(shedderConfig, s.activeRequestsManager, reader, logger)
+			shedder.OnOverloadChange(func(overloaded bool) {
+				if overloaded {
+					s.appSetIsReadyState(false)
+					return
+				}
+				if status := s.getOverloadedStatus(); status.canAcceptUpcomingRequests() {
+					s.appSetIsReadyState(true)
+				}
+			})
+			s.shedder = shedder
+			go shedder.Run(s.Terminating())
+		}
+	}
 
 	metrics.Tier1ActiveRequestsHardLimit.SetFloat64(float64(activeRequestsHardLimit))
 
@@ -1446,20 +1469,27 @@ type overloadingStatus struct {
 	activeRequestCount int
 	softLimit          int
 	hardLimit          int
+	// cpuOverloaded is set while the CPU shedder considers the pod overloaded,
+	// independently of the request-count limits
+	cpuOverloaded bool
 }
 
 // softLimitWouldBeReached returns true if the soft limit would be reached if one more request was added.
 func (s *overloadingStatus) softLimitWouldBeReached() bool {
-	return s.softLimit > 0 && s.activeRequestCount+1 >= s.softLimit
+	return s.cpuOverloaded || (s.softLimit > 0 && s.activeRequestCount+1 >= s.softLimit)
 }
 
 // hardLimitReached returns true if the hard limit is actually reached from the active request count.
 func (s *overloadingStatus) hardLimitReached() bool {
-	return s.hardLimit > 0 && s.activeRequestCount >= s.hardLimit
+	return s.cpuOverloaded || (s.hardLimit > 0 && s.activeRequestCount >= s.hardLimit)
 }
 
 // canAcceptUpcomingRequests returns true if the service can accept upcoming new requests.
 func (s *overloadingStatus) canAcceptUpcomingRequests() bool {
+	if s.cpuOverloaded {
+		return false
+	}
+
 	if s.softLimit <= 0 && s.hardLimit <= 0 {
 		return true
 	}
@@ -1476,18 +1506,17 @@ func (s *overloadingStatus) canAcceptUpcomingRequests() bool {
 }
 
 func (s *Tier1Service) getOverloadedStatus() (status overloadingStatus) {
-	// Never overloaded if both soft & hard limit are 0, -1 or anything less
+	status.cpuOverloaded = s.shedder != nil && s.shedder.IsOverloaded()
+
+	// request-count limits only apply when either soft or hard limit is > 0
 	if s.activeRequestsSoftLimit <= 0 && s.activeRequestsHardLimit <= 0 {
-		return
+		return status
 	}
 
-	activeRequestCount := s.getActiveRequestCount()
-
-	return overloadingStatus{
-		activeRequestCount: activeRequestCount,
-		softLimit:          s.activeRequestsSoftLimit,
-		hardLimit:          s.activeRequestsHardLimit,
-	}
+	status.activeRequestCount = s.getActiveRequestCount()
+	status.softLimit = s.activeRequestsSoftLimit
+	status.hardLimit = s.activeRequestsHardLimit
+	return status
 }
 
 func (s *Tier1Service) listActiveRecords() string {

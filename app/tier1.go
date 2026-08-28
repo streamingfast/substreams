@@ -26,6 +26,7 @@ import (
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
+	"github.com/streamingfast/substreams/service/active_requests"
 	"github.com/streamingfast/substreams/wasm"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	"github.com/streamingfast/substreams/wasm/wazero"
@@ -338,6 +339,7 @@ func (a *Tier1App) Run() error {
 		a.config.EnforceCompression,
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
+		active_requests.DefaultShedderConfig(),
 		a.config.SharedCacheSize,
 		a.config.OutputBufferSize,
 		a.modules.SessionPool,

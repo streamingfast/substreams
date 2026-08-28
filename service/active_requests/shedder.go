@@ -74,9 +74,9 @@ func DefaultShedderConfig() ShedderConfig {
 type shedClass int
 
 const (
-	classDev shedClass = iota // dev-mode requests, cancelled first
-	classProdCatchup          // production-mode requests still catching up from files
-	classProdLive             // production-mode requests streaming live blocks, cancelled last
+	classDev         shedClass = iota // dev-mode requests, cancelled first
+	classProdCatchup                  // production-mode requests still catching up from files
+	classProdLive                     // production-mode requests streaming live blocks, cancelled last
 )
 
 func (c shedClass) String() string {

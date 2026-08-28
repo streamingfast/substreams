@@ -61,6 +61,7 @@ func newTestShedder(cfg ShedderConfig) *Shedder {
 
 func TestClassify_SustainAndRecovery(t *testing.T) {
 	cfg := DefaultShedderConfig()
+	cfg.Mode = SheddingFull // IsOverloaded only reports in an enforcing mode
 	sh := newTestShedder(cfg)
 	t0 := time.Now()
 
@@ -125,4 +126,23 @@ func TestShedderConfig_WithDefaults(t *testing.T) {
 	assert.Equal(t, 0.6, custom.TargetRatio)
 	assert.Equal(t, time.Second, custom.Interval)
 	assert.Equal(t, def.SoftThreshold, custom.SoftThreshold)
+}
+
+func TestObserveModeDoesNotEnforce(t *testing.T) {
+	cfg := DefaultShedderConfig()
+	cfg.Mode = SheddingObserve
+	sh := newTestShedder(cfg)
+	t0 := time.Now()
+
+	var callbackFired bool
+	sh.OnOverloadChange(func(bool) { callbackFired = true })
+
+	clear := CPUSignals{QuotaCores: 4, UsageRatio: 0.97, ThrottleRatio: 0.5}
+	sh.classify(clear, t0)
+	assert.Equal(t, levelClear, sh.classify(clear, t0.Add(cfg.HardSustain)))
+
+	// internal state tracks the overload, but nothing visible to routing/admission
+	assert.True(t, sh.overloaded.Load())
+	assert.False(t, sh.IsOverloaded())
+	assert.False(t, callbackFired)
 }

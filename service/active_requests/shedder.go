@@ -170,10 +170,17 @@ func NewShedder(cfg ShedderConfig, manager *ActiveRequestsManager, reader *CPURe
 	}
 }
 
+// enforcing reports whether the shedder is allowed to act (flip readiness,
+// refuse admission, cancel requests); in observe mode it only watches and logs.
+func (sh *Shedder) enforcing() bool {
+	return sh.cfg.Mode == SheddingDevOnly || sh.cfg.Mode == SheddingFull
+}
+
 // IsOverloaded reports whether the pod is CPU-overloaded; the tier1 health
 // check and admission path treat this like the active-requests soft limit.
+// Always false in observe mode, which must not affect routing or admission.
 func (sh *Shedder) IsOverloaded() bool {
-	return sh.overloaded.Load()
+	return sh.enforcing() && sh.overloaded.Load()
 }
 
 // OnOverloadChange registers a callback fired on every overloaded-state edge,
@@ -293,22 +300,24 @@ func (sh *Shedder) classify(signals CPUSignals, now time.Time) overloadLevel {
 	if level != levelOK && !sh.overloaded.Load() {
 		sh.overloaded.Store(true)
 		sh.unreadyAt = now
-		sh.logger.Warn("pod is CPU-overloaded, advertising unready",
+		sh.logger.Warn("pod is CPU-overloaded",
+			zap.Bool("enforced", sh.enforcing()),
 			zap.Float64("cpu_usage_ratio", signals.UsageRatio),
 			zap.Float64("cpu_throttle_ratio", signals.ThrottleRatio),
 			zap.Float64("cpu_pressure_some_avg10", signals.PressureAvg10),
 		)
-		if sh.onOverloadChange != nil {
+		if sh.onOverloadChange != nil && sh.enforcing() {
 			sh.onOverloadChange(true)
 		}
 	}
 	if sh.overloaded.Load() && !sh.recoverSince.IsZero() && now.Sub(sh.recoverSince) >= sh.cfg.RecoverSustain {
 		sh.overloaded.Store(false)
 		sh.unreadyAt = time.Time{}
-		sh.logger.Info("pod CPU recovered, advertising ready again",
+		sh.logger.Info("pod CPU recovered",
+			zap.Bool("enforced", sh.enforcing()),
 			zap.Float64("cpu_usage_ratio", signals.UsageRatio),
 		)
-		if sh.onOverloadChange != nil {
+		if sh.onOverloadChange != nil && sh.enforcing() {
 			sh.onOverloadChange(false)
 		}
 	}

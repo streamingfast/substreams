@@ -20,4 +20,44 @@ pub struct Event {
     #[prost(uint64, tag="5")]
     pub fee: u64,
 }
+/// StoreValue is the value type `map_hosted_store_feed` writes into a Hosted Store.
+/// It is carried inside a google.protobuf.Any, so its fully-qualified name --
+/// `test.output.StoreValue` -- is what you give as the store's "Type URL" when
+/// creating the service.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StoreValue {
+    #[prost(uint64, tag="1")]
+    pub block_number: u64,
+    #[prost(string, tag="2")]
+    pub block_hash: ::prost::alloc::string::String,
+    #[prost(uint64, tag="3")]
+    pub transaction_count: u64,
+}
+/// StoreQuery is what the two consumer modules emit: the block they ran on, plus
+/// one result per key they looked up.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StoreQuery {
+    #[prost(uint64, tag="1")]
+    pub block_number: u64,
+    #[prost(message, repeated, tag="2")]
+    pub entry: ::prost::alloc::vec::Vec<StoreQueryEntry>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StoreQueryEntry {
+    #[prost(string, tag="1")]
+    pub key: ::prost::alloc::string::String,
+    /// Name of the sf.substreams.foundational_store.model.v2.ResponseCode the store
+    /// answered with, so a miss stays visibly distinct from a decode failure.
+    #[prost(string, tag="2")]
+    pub code: ::prost::alloc::string::String,
+    /// Type URL the entry's Any carried, kept so a Type URL mismatch is visible.
+    #[prost(string, tag="3")]
+    pub type_url: ::prost::alloc::string::String,
+    /// Set only when the entry was found and decoded as a StoreValue.
+    #[prost(message, optional, tag="4")]
+    pub value: ::core::option::Option<StoreValue>,
+}
 // @@protoc_insertion_point(module)

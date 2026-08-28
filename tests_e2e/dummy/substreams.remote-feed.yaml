@@ -1,0 +1,50 @@
+# Consumer of a Remote Feed Hosted Store -- one you populate yourself over gRPC with
+# hosted-store.sh, rather than from the chain.
+#
+# Kept out of substreams.yaml on purpose: a `foundational-store` identifier is expanded
+# when the manifest is *read*, and `substreams pack` freezes whatever it read into the
+# module hashes. A deployment id only exists once the store does, so this module is run
+# straight from the yaml rather than packed:
+#
+#   ./hosted-store.sh seed && ./hosted-store.sh ready
+#   REMOTE_FEED_STORE_ID=dep... substreams run substreams.remote-feed.yaml \
+#     map_query_remote_feed_store -e <endpoint>
+#
+# An unset variable is an error rather than an empty string.
+specVersion: v0.1.0
+package:
+  name: e2e_remote_feed
+  version: v0.1.0
+
+protobuf:
+  descriptorSets:
+    - module: buf.build/streamingfast/firehose-acme@f6b2cc014e9d46059938734205759dce
+    - module: buf.build/streamingfast/substreams-foundational-store@61de8e7fccf94d3392779e4502b08240
+  files:
+    - contract.proto
+  importPaths:
+    - ./proto
+  excludePaths:
+    - sf/substreams
+    - sf/firehose
+    - google
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams.wasm
+
+modules:
+  # Reads the two fixed keys hosted-store.sh seeds. Nothing populates them from the chain,
+  # so the store stays empty -- and unready -- until you run `hosted-store.sh seed`
+  # followed by `hosted-store.sh ready`. Querying before that hangs rather than erroring.
+  - name: map_query_remote_feed_store
+    kind: map
+    initialBlock: 0
+    inputs:
+      - source: sf.acme.type.v1.Block
+      - foundational-store: ${REMOTE_FEED_STORE_ID}@v0.1.0
+    output:
+      type: proto:test.output.StoreQuery
+
+network: dummy

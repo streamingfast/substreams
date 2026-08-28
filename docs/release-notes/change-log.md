@@ -22,6 +22,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- `substreams-tier1` can now shed requests when its CPU is saturated. It reads its own cgroup (usage vs quota,
+  throttling, pressure) and, when overloaded, advertises itself unready to the load balancer, refuses new requests,
+  waits for the balancer to drain, then cancels the heaviest requests with `Unavailable` so their clients reconnect
+  to a less busy pod — dev-mode requests first, then production requests still catching up, live production last. A
+  clear overload (CPU throttled) sheds a whole batch at once; a mild one sheds a single request per cooldown. Off by
+  default; enable and tune it through the tier1 app's `CPUShedding` config (modes: `observe` logs what would be cut
+  without cancelling, `dev-only`, `full`). New metrics: `substreams_tier1_cpu_*` gauges and
+  `substreams_tier1_shed_requests_counter`.
+
 - A tier2 that refuses a job because it is at its concurrent-request limit (`ResourceExhausted: service currently
   overloaded`) is now retried after 300ms +/- 100ms instead of on the growing 1s-to-5s backoff shared with real
   failures. The retry dials again and can land on a different instance, so waiting seconds on a busy fleet only

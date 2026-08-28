@@ -97,11 +97,16 @@ type Tier1Config struct {
 	ActiveRequestsSoftLimit int    // maximum number of active requests a tier1 app can have with external clients before starting to advertise itself as unready in the health check
 
 	ActiveRequestsHardLimit int // maximum number of active requests a tier1 app can have with external clients, refuse with CodeUnavailable if reached
-	MaxSubrequests          uint64
-	SubrequestsEndpoint     string
-	SubrequestsInsecure     bool
-	SubrequestsPlaintext    bool
-	SubrequestsSecret       string
+
+	// CPUShedding configures the CPU-based request shedder; the zero value
+	// (mode off) disables it, unset tunables take their defaults.
+	CPUShedding active_requests.ShedderConfig
+
+	MaxSubrequests       uint64
+	SubrequestsEndpoint  string
+	SubrequestsInsecure  bool
+	SubrequestsPlaintext bool
+	SubrequestsSecret    string
 
 	SharedCacheSize  uint64
 	OutputBufferSize uint64 // Used to bundle execout messages within 'BlockScopedDatas' when using protocol V4
@@ -339,7 +344,7 @@ func (a *Tier1App) Run() error {
 		a.config.EnforceCompression,
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
-		active_requests.DefaultShedderConfig(),
+		a.config.CPUShedding.WithDefaults(),
 		a.config.SharedCacheSize,
 		a.config.OutputBufferSize,
 		a.modules.SessionPool,

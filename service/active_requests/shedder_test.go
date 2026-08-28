@@ -109,3 +109,20 @@ func TestHoldSince(t *testing.T) {
 	assert.Equal(t, t0, holdSince(t0, true, t0.Add(time.Minute)))
 	assert.True(t, holdSince(t0, false, t0.Add(time.Minute)).IsZero())
 }
+
+func TestShedderConfig_WithDefaults(t *testing.T) {
+	def := DefaultShedderConfig()
+
+	// zero config gets every tunable filled, mode stays off
+	filled := ShedderConfig{}.WithDefaults()
+	assert.Equal(t, SheddingOff, filled.Mode)
+	filled.Mode = def.Mode
+	assert.Equal(t, def, filled)
+
+	// explicit values are kept
+	custom := ShedderConfig{Mode: SheddingFull, TargetRatio: 0.6, Interval: time.Second}.WithDefaults()
+	assert.Equal(t, SheddingFull, custom.Mode)
+	assert.Equal(t, 0.6, custom.TargetRatio)
+	assert.Equal(t, time.Second, custom.Interval)
+	assert.Equal(t, def.SoftThreshold, custom.SoftThreshold)
+}

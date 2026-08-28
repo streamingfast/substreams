@@ -50,6 +50,42 @@ type ShedderConfig struct {
 	MaxProdFraction float64       // maximum fraction of production requests cancelled in a single event
 }
 
+// WithDefaults returns the config with every unset (zero) tunable replaced by
+// its default, so operators only need to set the mode and the values they want
+// to override.
+func (c ShedderConfig) WithDefaults() ShedderConfig {
+	def := DefaultShedderConfig()
+	if c.Mode == "" {
+		c.Mode = SheddingOff
+	}
+	setFloat := func(v *float64, d float64) {
+		if *v == 0 {
+			*v = d
+		}
+	}
+	setDuration := func(v *time.Duration, d time.Duration) {
+		if *v == 0 {
+			*v = d
+		}
+	}
+	setFloat(&c.TargetRatio, def.TargetRatio)
+	setFloat(&c.SoftThreshold, def.SoftThreshold)
+	setFloat(&c.HardThreshold, def.HardThreshold)
+	setFloat(&c.ThrottleGate, def.ThrottleGate)
+	setFloat(&c.PressureGate, def.PressureGate)
+	setFloat(&c.RecoverThreshold, def.RecoverThreshold)
+	setDuration(&c.SoftSustain, def.SoftSustain)
+	setDuration(&c.HardSustain, def.HardSustain)
+	setDuration(&c.RecoverSustain, def.RecoverSustain)
+	setDuration(&c.Interval, def.Interval)
+	setDuration(&c.Cooldown, def.Cooldown)
+	setDuration(&c.DrainDelay, def.DrainDelay)
+	setDuration(&c.MinAge, def.MinAge)
+	setFloat(&c.MinBurnCores, def.MinBurnCores)
+	setFloat(&c.MaxProdFraction, def.MaxProdFraction)
+	return c
+}
+
 func DefaultShedderConfig() ShedderConfig {
 	return ShedderConfig{
 		Mode:             SheddingOff,

@@ -1,0 +1,49 @@
+# ClickHouse sink fixture. Same events as map_events in substreams.yaml, emitted
+# as test.clickhouse.Events, whose message carries the table annotations the
+# ClickHouse sink needs: it has no default ordering and refuses to create a table
+# without an ORDER BY.
+#
+#   substreams sink clickhouse e2e-clickhouse-v0.1.0.spkg map_events_clickhouse \
+#     --dsn "clickhouse://default:@localhost:9000/default"
+#
+# Kept out of substreams.yaml so the annotations do not land on test.output.Event,
+# which the other e2e modules emit and whose module hashes would change.
+specVersion: v0.1.0
+package:
+  name: e2e_clickhouse
+  version: v0.1.0
+
+protobuf:
+  descriptorSets:
+    - module: buf.build/streamingfast/firehose-acme@f6b2cc014e9d46059938734205759dce
+  files:
+    - clickhouse.proto
+    # Imported by clickhouse.proto. Listed so it lands in the package descriptor:
+    # a proto reached only through importPaths is parsed but not embedded, and
+    # the sink then fails to read the package. Vendored under ./proto because
+    # buf.build/streamingfast/substreams-sink-sql is deprecated.
+    - sf/substreams/sink/sql/schema/v1/schema.proto
+  importPaths:
+    - ./proto
+  excludePaths:
+    - sf/substreams/rpc
+    - sf/substreams/v1
+    - sf/substreams/index
+    - sf/firehose
+    - google
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams.wasm
+
+modules:
+  - name: map_events_clickhouse
+    kind: map
+    initialBlock: 0
+    inputs:
+      - source: sf.acme.type.v1.Block
+    output:
+      type: proto:test.clickhouse.Events
+
+network: dummy

@@ -1,6 +1,7 @@
 mod pb;
 use crate::pb::sf::acme::r#type::v1 as acme;
 use hex_literal::hex;
+use pb::test::clickhouse as pbclickhouse;
 use pb::test::output as pbtest;
 use substreams::Hex;
 
@@ -313,4 +314,30 @@ fn query(block_number: u64, store: &FoundationalStore, keys: &[String]) -> pbtes
         block_number,
         entry,
     }
+}
+
+// Same events as map_events, emitted as test.clickhouse.Events so the message
+// carries the ClickHouse table annotations. Output module for the
+// substreams.clickhouse.yaml manifest.
+#[substreams::handlers::map]
+fn map_events_clickhouse(blk: acme::Block) -> Result<pbclickhouse::Events, substreams::errors::Error> {
+    let mut events = pbclickhouse::Events::default();
+
+    for transaction in blk.transactions {
+        events.event.push(pbclickhouse::Event {
+            evt_tx_hash: transaction.hash,
+            evt_from: transaction.sender,
+            evt_to: transaction.receiver,
+            evt_block_number: blk.header.as_ref().map_or(0, |h| h.height),
+            fee: transaction.fee.as_ref().map_or(0, |f| {
+                f.bytes
+                    .iter()
+                    .take(8)
+                    .enumerate()
+                    .fold(0u64, |acc, (i, &b)| acc | ((b as u64) << (i * 8)))
+            }),
+        });
+    }
+
+    Ok(events)
 }

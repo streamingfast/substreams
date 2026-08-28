@@ -931,6 +931,8 @@ func (s *Tier1Service) blocks(
 			0, // not used on tier1
 			0,
 			0,
+			requestDetails.ProductionMode,
+			reqStats,
 		)
 		defer func() {
 			s.activeRequestsManager.Remove(activeReqHandler)

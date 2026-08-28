@@ -18,11 +18,6 @@ protobuf:
     - module: buf.build/streamingfast/firehose-acme@f6b2cc014e9d46059938734205759dce
   files:
     - clickhouse.proto
-    # Imported by clickhouse.proto. Listed so it lands in the package descriptor:
-    # a proto reached only through importPaths is parsed but not embedded, and
-    # the sink then fails to read the package. Vendored under ./proto because
-    # buf.build/streamingfast/substreams-sink-sql is deprecated.
-    - sf/substreams/sink/sql/schema/v1/schema.proto
   importPaths:
     - ./proto
   excludePaths:

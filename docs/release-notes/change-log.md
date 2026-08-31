@@ -30,6 +30,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- A tier2 that refuses a job because it is at its concurrent-request limit (`ResourceExhausted: service currently
+  overloaded`) is now retried after 300ms +/- 100ms instead of on the growing 1s-to-5s backoff shared with real
+  failures. The retry dials again and can land on a different instance, so waiting seconds on a busy fleet only
+  slowed the search down. Tunable with `SUBSTREAMS_WORKER_OVERLOADED_RETRY_DELAY` and
+  `SUBSTREAMS_WORKER_OVERLOADED_RETRY_JITTER`. A refused connection or an `Unavailable: no healthy upstream` from
+  the load balancer means no instance is reachable at all, so those keep the growing backoff.
+
 - Store snapshots (fullKV files) can now be pruned to save disk space: tier1 no longer assumes that a fullKV at block
   `x` implies that every earlier fullKV still exists. At request start it walks backwards from the first segment
   needing work, in growing listing windows, until it finds the last block where every store module still has a

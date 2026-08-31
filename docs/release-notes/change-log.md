@@ -22,21 +22,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-- `substreams-tier1` can now shed requests when its CPU is saturated. It reads its own cgroup (usage vs quota,
+- `substreams-tier1` can now evict requests when its CPU is saturated. It reads its own cgroup (usage vs quota,
   throttling, pressure) and, when overloaded, advertises itself unready to the load balancer, refuses new requests,
   waits for the balancer to drain, then cancels the heaviest requests with `Unavailable` so their clients reconnect
   to a less busy pod — dev-mode requests first, then production requests still catching up, live production last. A
-  clear overload (CPU throttled) sheds a whole batch at once; a mild one sheds a single request per cooldown. Off by
-  default; enable and tune it through the tier1 app's `CPUShedding` config (modes: `observe` logs what would be cut
+  clear overload (CPU throttled) evicts a whole batch at once; a mild one evicts a single request per cooldown. Off by
+  default; enable and tune it through the tier1 app's `CPUEviction` config (modes: `observe` logs what would be cut
   without cancelling, `dev-only`, `full`). New metrics: `substreams_tier1_cpu_*` gauges and
-  `substreams_tier1_shed_requests_counter`.
+  `substreams_tier1_evicted_requests_counter`.
 
 - New `substreams_tier1_effective_active_requests` gauge, meant to replace `substreams_active_requests` as the
   horizontal autoscaler input on tier1: the higher of the plain active-request count and the number of requests the
-  CPU budget is being spent at (`nominal_capacity * cpu_usage_ratio / cpu_shedding_target_ratio`). A pod full of
-  expensive requests, or one holding its CPU down by shedding, reports itself at capacity rather than reporting the
-  few requests it has left — scaling on the plain count makes shedding shrink the fleet just when it needs to grow.
-  `CPUShedding.NominalCapacity` should be set to the autoscaler's per-pod request target; it defaults to the
+  CPU budget is being spent at (`nominal_capacity * cpu_usage_ratio / cpu_eviction_target_ratio`). A pod full of
+  expensive requests, or one holding its CPU down by eviction, reports itself at capacity rather than reporting the
+  few requests it has left — scaling on the plain count makes eviction shrink the fleet just when it needs to grow.
+  `CPUEviction.NominalCapacity` should be set to the autoscaler's per-pod request target; it defaults to the
   active-requests soft limit.
 
 - A tier2 that refuses a job because it is at its concurrent-request limit (`ResourceExhausted: service currently

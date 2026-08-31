@@ -98,9 +98,9 @@ type Tier1Config struct {
 
 	ActiveRequestsHardLimit int // maximum number of active requests a tier1 app can have with external clients, refuse with CodeUnavailable if reached
 
-	// CPUShedding configures the CPU-based request shedder; the zero value
+	// CPUEviction configures the CPU-based request evictor; the zero value
 	// (mode off) disables it, unset tunables take their defaults.
-	CPUShedding active_requests.ShedderConfig
+	CPUEviction active_requests.EvictorConfig
 
 	MaxSubrequests       uint64
 	SubrequestsEndpoint  string
@@ -344,7 +344,7 @@ func (a *Tier1App) Run() error {
 		a.config.EnforceCompression,
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
-		a.config.CPUShedding.WithDefaults(),
+		a.config.CPUEviction.WithDefaults(),
 		a.config.SharedCacheSize,
 		a.config.OutputBufferSize,
 		a.modules.SessionPool,

@@ -123,7 +123,7 @@ type Tier1Service struct {
 	storeResolver            dregistry.Resolver
 	sessionPool              dsession.SessionPool
 	activeRequestsManager    *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
-	shedder                  *active_requests.Shedder               // nil unless CPU shedding is enabled and cgroup CPU signals are readable
+	evictor                  *active_requests.Evictor               // nil unless CPU eviction is enabled and cgroup CPU signals are readable
 	execOutMessageBufferSize int
 
 	// liveBackFillerFinalBlockDelay overrides the default 120-block delay the
@@ -196,7 +196,7 @@ func NewTier1(
 	enforceCompression bool,
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
-	shedderConfig active_requests.ShedderConfig,
+	evictorConfig active_requests.EvictorConfig,
 	sharedCacheSize uint64,
 	outputBufferSize uint64,
 	sessionPool dsession.SessionPool,
@@ -274,17 +274,17 @@ func NewTier1(
 		s.activeRequestsWG.Wait()
 	})
 
-	if shedderConfig.Mode != active_requests.SheddingOff {
-		if shedderConfig.NominalCapacity == 0 {
-			shedderConfig.NominalCapacity = float64(activeRequestsSoftLimit)
+	if evictorConfig.Mode != active_requests.EvictionOff {
+		if evictorConfig.NominalCapacity == 0 {
+			evictorConfig.NominalCapacity = float64(activeRequestsSoftLimit)
 		}
 		if reader, err := active_requests.NewCPUReader(); err != nil {
-			logger.Warn("CPU shedding disabled: cannot read cgroup CPU signals", zap.Error(err))
+			logger.Warn("CPU eviction disabled: cannot read cgroup CPU signals", zap.Error(err))
 		} else if reader.QuotaCores() == 0 {
-			logger.Warn("CPU shedding disabled: no CPU quota set on the cgroup")
+			logger.Warn("CPU eviction disabled: no CPU quota set on the cgroup")
 		} else {
-			shedder := active_requests.NewShedder(shedderConfig, s.activeRequestsManager, reader, logger)
-			shedder.OnOverloadChange(func(overloaded bool) {
+			evictor := active_requests.NewEvictor(evictorConfig, s.activeRequestsManager, reader, logger)
+			evictor.OnOverloadChange(func(overloaded bool) {
 				if overloaded {
 					s.appSetIsReadyState(false)
 					return
@@ -293,8 +293,8 @@ func NewTier1(
 					s.appSetIsReadyState(true)
 				}
 			})
-			s.shedder = shedder
-			go shedder.Run(s.Terminating())
+			s.evictor = evictor
+			go evictor.Run(s.Terminating())
 		}
 	}
 
@@ -1472,7 +1472,7 @@ type overloadingStatus struct {
 	activeRequestCount int
 	softLimit          int
 	hardLimit          int
-	// cpuOverloaded is set while the CPU shedder considers the pod overloaded,
+	// cpuOverloaded is set while the CPU evictor considers the pod overloaded,
 	// independently of the request-count limits
 	cpuOverloaded bool
 }
@@ -1509,7 +1509,7 @@ func (s *overloadingStatus) canAcceptUpcomingRequests() bool {
 }
 
 func (s *Tier1Service) getOverloadedStatus() (status overloadingStatus) {
-	status.cpuOverloaded = s.shedder != nil && s.shedder.IsOverloaded()
+	status.cpuOverloaded = s.evictor != nil && s.evictor.IsOverloaded()
 
 	// request-count limits only apply when either soft or hard limit is > 0
 	if s.activeRequestsSoftLimit <= 0 && s.activeRequestsHardLimit <= 0 {

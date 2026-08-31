@@ -103,15 +103,15 @@ type activeRequestRecord struct {
 	Stage                  uint32
 	FullKVStoreMemoryBytes uint64
 
-	// ProductionMode and Live classify the request for CPU shedding: dev-mode
-	// requests are shed before production ones, and production requests still
+	// ProductionMode and Live classify the request for CPU eviction: dev-mode
+	// requests are evicted before production ones, and production requests still
 	// catching up before those streaming live blocks. Live is only ever flipped
 	// from false to true, under the manager's lock.
 	ProductionMode bool
 	Live           bool
 	// BurnCores is the CPU consumed by this request's wasm execution over the
-	// last shedder evaluation interval, in cores; refreshed under the manager's
-	// lock by the shedder.
+	// last evictor evaluation interval, in cores; refreshed under the manager's
+	// lock by the evictor.
 	BurnCores float64
 
 	stats ComputeStats

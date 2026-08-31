@@ -12,27 +12,27 @@ import (
 	"go.uber.org/zap"
 )
 
-type SheddingMode string
+type EvictionMode string
 
 const (
-	SheddingOff     SheddingMode = "off"
-	SheddingObserve SheddingMode = "observe"  // evaluate and log, never cancel
-	SheddingDevOnly SheddingMode = "dev-only" // only dev-mode requests may be cancelled
-	SheddingFull    SheddingMode = "full"     // production requests may be cancelled too
+	EvictionOff     EvictionMode = "off"
+	EvictionObserve EvictionMode = "observe"  // evaluate and log, never cancel
+	EvictionDevOnly EvictionMode = "dev-only" // only dev-mode requests may be cancelled
+	EvictionFull    EvictionMode = "full"     // production requests may be cancelled too
 )
 
-func ParseSheddingMode(s string) (SheddingMode, error) {
-	switch SheddingMode(s) {
-	case SheddingOff, SheddingObserve, SheddingDevOnly, SheddingFull:
-		return SheddingMode(s), nil
+func ParseEvictionMode(s string) (EvictionMode, error) {
+	switch EvictionMode(s) {
+	case EvictionOff, EvictionObserve, EvictionDevOnly, EvictionFull:
+		return EvictionMode(s), nil
 	}
-	return "", fmt.Errorf("invalid shedding mode %q (accepted: off, observe, dev-only, full)", s)
+	return "", fmt.Errorf("invalid eviction mode %q (accepted: off, observe, dev-only, full)", s)
 }
 
-type ShedderConfig struct {
-	Mode SheddingMode
+type EvictorConfig struct {
+	Mode EvictionMode
 
-	TargetRatio      float64 // batch shedding cuts until the projected CPU usage fits under this fraction of quota
+	TargetRatio      float64 // batch eviction cuts until the projected CPU usage fits under this fraction of quota
 	SoftThreshold    float64 // usage ratio above which the pod is mildly overloaded
 	HardThreshold    float64 // usage ratio above which the pod is clearly overloaded (with ThrottleGate or PressureGate)
 	ThrottleGate     float64 // throttle ratio confirming clear overload
@@ -43,7 +43,7 @@ type ShedderConfig struct {
 	HardSustain    time.Duration // clear condition must hold this long before triggering
 	RecoverSustain time.Duration // recovery condition must hold this long before the pod is ready again
 	Interval       time.Duration // evaluation tick
-	Cooldown       time.Duration // minimum delay between two shedding events
+	Cooldown       time.Duration // minimum delay between two eviction events
 	DrainDelay     time.Duration // delay between going unready and the first cancellation, covering the LB routing lag
 
 	MinAge          time.Duration // requests younger than this are never cancelled
@@ -61,10 +61,10 @@ type ShedderConfig struct {
 // WithDefaults returns the config with every unset (zero) tunable replaced by
 // its default, so operators only need to set the mode and the values they want
 // to override.
-func (c ShedderConfig) WithDefaults() ShedderConfig {
-	def := DefaultShedderConfig()
+func (c EvictorConfig) WithDefaults() EvictorConfig {
+	def := DefaultEvictorConfig()
 	if c.Mode == "" {
-		c.Mode = SheddingOff
+		c.Mode = EvictionOff
 	}
 	setFloat := func(v *float64, d float64) {
 		if *v == 0 {
@@ -94,9 +94,9 @@ func (c ShedderConfig) WithDefaults() ShedderConfig {
 	return c
 }
 
-func DefaultShedderConfig() ShedderConfig {
-	return ShedderConfig{
-		Mode:             SheddingOff,
+func DefaultEvictorConfig() EvictorConfig {
+	return EvictorConfig{
+		Mode:             EvictionOff,
 		TargetRatio:      0.75,
 		SoftThreshold:    0.85,
 		HardThreshold:    0.95,
@@ -115,15 +115,15 @@ func DefaultShedderConfig() ShedderConfig {
 	}
 }
 
-type shedClass int
+type evictClass int
 
 const (
-	classDev         shedClass = iota // dev-mode requests, cancelled first
-	classProdCatchup                  // production-mode requests still catching up from files
-	classProdLive                     // production-mode requests streaming live blocks, cancelled last
+	classDev         evictClass = iota // dev-mode requests, cancelled first
+	classProdCatchup                   // production-mode requests still catching up from files
+	classProdLive                      // production-mode requests streaming live blocks, cancelled last
 )
 
-func (c shedClass) String() string {
+func (c evictClass) String() string {
 	switch c {
 	case classDev:
 		return "dev"
@@ -143,13 +143,13 @@ const (
 	levelClear
 )
 
-// Shedder detects CPU overload of the tier1 pod from its cgroup and cancels
+// Evictor detects CPU overload of the tier1 pod from its cgroup and cancels
 // the most expensive / least important requests so their clients reconnect
 // through the load balancer to a less busy pod. It flips the pod unready
 // (IsOverloaded, checked by the health check) before cancelling anything and
 // keeps it unready until CPU recovers.
-type Shedder struct {
-	cfg     ShedderConfig
+type Evictor struct {
+	cfg     EvictorConfig
 	manager *ActiveRequestsManager
 	reader  *CPUReader
 	logger  *zap.Logger
@@ -162,14 +162,14 @@ type Shedder struct {
 	hardSince    time.Time
 	recoverSince time.Time
 	unreadyAt    time.Time
-	lastShedAt   time.Time
+	lastEvictAt  time.Time
 
 	// uniqueID -> cumulative wasm compute at the previous tick
 	prevCompute map[string]time.Duration
 }
 
-func NewShedder(cfg ShedderConfig, manager *ActiveRequestsManager, reader *CPUReader, logger *zap.Logger) *Shedder {
-	return &Shedder{
+func NewEvictor(cfg EvictorConfig, manager *ActiveRequestsManager, reader *CPUReader, logger *zap.Logger) *Evictor {
+	return &Evictor{
 		cfg:         cfg,
 		manager:     manager,
 		reader:      reader,
@@ -178,71 +178,71 @@ func NewShedder(cfg ShedderConfig, manager *ActiveRequestsManager, reader *CPURe
 	}
 }
 
-// enforcing reports whether the shedder is allowed to act (flip readiness,
+// enforcing reports whether the evictor is allowed to act (flip readiness,
 // refuse admission, cancel requests); in observe mode it only watches and logs.
-func (sh *Shedder) enforcing() bool {
-	return sh.cfg.Mode == SheddingDevOnly || sh.cfg.Mode == SheddingFull
+func (ev *Evictor) enforcing() bool {
+	return ev.cfg.Mode == EvictionDevOnly || ev.cfg.Mode == EvictionFull
 }
 
 // IsOverloaded reports whether the pod is CPU-overloaded; the tier1 health
 // check and admission path treat this like the active-requests soft limit.
 // Always false in observe mode, which must not affect routing or admission.
-func (sh *Shedder) IsOverloaded() bool {
-	return sh.enforcing() && sh.overloaded.Load()
+func (ev *Evictor) IsOverloaded() bool {
+	return ev.enforcing() && ev.overloaded.Load()
 }
 
 // OnOverloadChange registers a callback fired on every overloaded-state edge,
-// from the shedder's own goroutine. Must be called before Run.
-func (sh *Shedder) OnOverloadChange(fn func(overloaded bool)) {
-	sh.onOverloadChange = fn
+// from the evictor's own goroutine. Must be called before Run.
+func (ev *Evictor) OnOverloadChange(fn func(overloaded bool)) {
+	ev.onOverloadChange = fn
 }
 
-// Run evaluates the shedding policy every Interval until stop is closed.
-func (sh *Shedder) Run(stop <-chan struct{}) {
-	sh.logger.Info("CPU shedder starting",
-		zap.String("mode", string(sh.cfg.Mode)),
-		zap.Float64("quota_cores", sh.reader.QuotaCores()),
+// Run evaluates the eviction policy every Interval until stop is closed.
+func (ev *Evictor) Run(stop <-chan struct{}) {
+	ev.logger.Info("CPU evictor starting",
+		zap.String("mode", string(ev.cfg.Mode)),
+		zap.Float64("quota_cores", ev.reader.QuotaCores()),
 	)
 	if metrics.Tier1CPUQuotaCores != nil {
-		metrics.Tier1CPUQuotaCores.SetFloat64(sh.reader.QuotaCores())
+		metrics.Tier1CPUQuotaCores.SetFloat64(ev.reader.QuotaCores())
 	}
-	ticker := time.NewTicker(sh.cfg.Interval)
+	ticker := time.NewTicker(ev.cfg.Interval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-stop:
 			return
 		case <-ticker.C:
-			sh.tick(time.Now())
+			ev.tick(time.Now())
 		}
 	}
 }
 
-func (sh *Shedder) tick(now time.Time) {
-	signals, err := sh.reader.Read()
+func (ev *Evictor) tick(now time.Time) {
+	signals, err := ev.reader.Read()
 	if err != nil {
-		sh.logger.Warn("cannot read cgroup CPU signals", zap.Error(err))
+		ev.logger.Warn("cannot read cgroup CPU signals", zap.Error(err))
 		return
 	}
-	candidates, totalProd, totalActive := sh.sampleBurnRates(now)
-	level := sh.classify(signals, now)
-	sh.publishMetrics(signals, totalActive)
+	candidates, totalProd, totalActive := ev.sampleBurnRates(now)
+	level := ev.classify(signals, now)
+	ev.publishMetrics(signals, totalActive)
 
-	if !sh.overloaded.Load() {
+	if !ev.overloaded.Load() {
 		return
 	}
-	if now.Sub(sh.unreadyAt) < sh.cfg.DrainDelay {
+	if now.Sub(ev.unreadyAt) < ev.cfg.DrainDelay {
 		return
 	}
-	if !sh.lastShedAt.IsZero() && now.Sub(sh.lastShedAt) < sh.cfg.Cooldown {
+	if !ev.lastEvictAt.IsZero() && now.Sub(ev.lastEvictAt) < ev.cfg.Cooldown {
 		return
 	}
 	if level == levelOK {
-		// overloaded (not yet recovered) but no condition currently firing: hold, don't shed
+		// overloaded (not yet recovered) but no condition currently firing: hold, do not evict
 		return
 	}
 
-	if sh.cfg.Mode == SheddingDevOnly {
+	if ev.cfg.Mode == EvictionDevOnly {
 		onlyDev := candidates[:0]
 		for _, c := range candidates {
 			if c.class == classDev {
@@ -253,10 +253,10 @@ func (sh *Shedder) tick(now time.Time) {
 	}
 
 	usedCores := signals.UsageRatio * signals.QuotaCores
-	targetCores := sh.cfg.TargetRatio * signals.QuotaCores
+	targetCores := ev.cfg.TargetRatio * signals.QuotaCores
 	excessCores := usedCores - targetCores
 
-	victims := selectVictims(candidates, excessCores, level == levelClear, sh.cfg.MaxProdFraction, totalProd)
+	victims := selectVictims(candidates, excessCores, level == levelClear, ev.cfg.MaxProdFraction, totalProd)
 	if len(victims) == 0 {
 		return
 	}
@@ -272,60 +272,60 @@ func (sh *Shedder) tick(now time.Time) {
 			zap.Float64("cpu_throttle_ratio", signals.ThrottleRatio),
 			zap.String("level", map[overloadLevel]string{levelMild: "mild", levelClear: "clear"}[level]),
 		}
-		if sh.cfg.Mode == SheddingObserve {
-			sh.logger.Info("CPU overloaded: would cancel request (observe mode)", fields...)
-			recordShed(v.class, "observed")
+		if ev.cfg.Mode == EvictionObserve {
+			ev.logger.Info("CPU overloaded: would cancel request (observe mode)", fields...)
+			recordEviction(v.class, "observed")
 			continue
 		}
-		sh.logger.Warn("CPU overloaded: cancelling request", fields...)
-		recordShed(v.class, "cancelled")
+		ev.logger.Warn("CPU overloaded: cancelling request", fields...)
+		recordEviction(v.class, "cancelled")
 		v.cancel(connect.NewError(connect.CodeUnavailable, fmt.Errorf("server CPU overloaded, please reconnect")))
 	}
-	sh.lastShedAt = now
+	ev.lastEvictAt = now
 }
 
 // classify updates the sustain windows and the overloaded flag, and returns
 // the overload level currently firing.
-func (sh *Shedder) classify(signals CPUSignals, now time.Time) overloadLevel {
-	softCond := signals.UsageRatio >= sh.cfg.SoftThreshold
-	hardCond := signals.UsageRatio >= sh.cfg.HardThreshold &&
-		(signals.ThrottleRatio >= sh.cfg.ThrottleGate || signals.PressureAvg10 >= sh.cfg.PressureGate)
-	recoverCond := signals.UsageRatio < sh.cfg.RecoverThreshold
+func (ev *Evictor) classify(signals CPUSignals, now time.Time) overloadLevel {
+	softCond := signals.UsageRatio >= ev.cfg.SoftThreshold
+	hardCond := signals.UsageRatio >= ev.cfg.HardThreshold &&
+		(signals.ThrottleRatio >= ev.cfg.ThrottleGate || signals.PressureAvg10 >= ev.cfg.PressureGate)
+	recoverCond := signals.UsageRatio < ev.cfg.RecoverThreshold
 
-	sh.softSince = holdSince(sh.softSince, softCond, now)
-	sh.hardSince = holdSince(sh.hardSince, hardCond, now)
-	sh.recoverSince = holdSince(sh.recoverSince, recoverCond, now)
+	ev.softSince = holdSince(ev.softSince, softCond, now)
+	ev.hardSince = holdSince(ev.hardSince, hardCond, now)
+	ev.recoverSince = holdSince(ev.recoverSince, recoverCond, now)
 
 	level := levelOK
-	if !sh.softSince.IsZero() && now.Sub(sh.softSince) >= sh.cfg.SoftSustain {
+	if !ev.softSince.IsZero() && now.Sub(ev.softSince) >= ev.cfg.SoftSustain {
 		level = levelMild
 	}
-	if !sh.hardSince.IsZero() && now.Sub(sh.hardSince) >= sh.cfg.HardSustain {
+	if !ev.hardSince.IsZero() && now.Sub(ev.hardSince) >= ev.cfg.HardSustain {
 		level = levelClear
 	}
 
-	if level != levelOK && !sh.overloaded.Load() {
-		sh.overloaded.Store(true)
-		sh.unreadyAt = now
-		sh.logger.Warn("pod is CPU-overloaded",
-			zap.Bool("enforced", sh.enforcing()),
+	if level != levelOK && !ev.overloaded.Load() {
+		ev.overloaded.Store(true)
+		ev.unreadyAt = now
+		ev.logger.Warn("pod is CPU-overloaded",
+			zap.Bool("enforced", ev.enforcing()),
 			zap.Float64("cpu_usage_ratio", signals.UsageRatio),
 			zap.Float64("cpu_throttle_ratio", signals.ThrottleRatio),
 			zap.Float64("cpu_pressure_some_avg10", signals.PressureAvg10),
 		)
-		if sh.onOverloadChange != nil && sh.enforcing() {
-			sh.onOverloadChange(true)
+		if ev.onOverloadChange != nil && ev.enforcing() {
+			ev.onOverloadChange(true)
 		}
 	}
-	if sh.overloaded.Load() && !sh.recoverSince.IsZero() && now.Sub(sh.recoverSince) >= sh.cfg.RecoverSustain {
-		sh.overloaded.Store(false)
-		sh.unreadyAt = time.Time{}
-		sh.logger.Info("pod CPU recovered",
-			zap.Bool("enforced", sh.enforcing()),
+	if ev.overloaded.Load() && !ev.recoverSince.IsZero() && now.Sub(ev.recoverSince) >= ev.cfg.RecoverSustain {
+		ev.overloaded.Store(false)
+		ev.unreadyAt = time.Time{}
+		ev.logger.Info("pod CPU recovered",
+			zap.Bool("enforced", ev.enforcing()),
 			zap.Float64("cpu_usage_ratio", signals.UsageRatio),
 		)
-		if sh.onOverloadChange != nil && sh.enforcing() {
-			sh.onOverloadChange(false)
+		if ev.onOverloadChange != nil && ev.enforcing() {
+			ev.onOverloadChange(false)
 		}
 	}
 	return level
@@ -341,10 +341,10 @@ func holdSince(since time.Time, condition bool, now time.Time) time.Time {
 	return since
 }
 
-type shedCandidate struct {
+type evictCandidate struct {
 	uniqueID     string
 	traceID      string
-	class        shedClass
+	class        evictClass
 	burnCores    float64
 	startTime    time.Time
 	currentBlock uint64
@@ -352,16 +352,16 @@ type shedCandidate struct {
 }
 
 // sampleBurnRates computes each request's CPU burn rate (in cores) since the
-// previous tick and returns the shedding candidates: old enough, burning
+// previous tick and returns the eviction candidates: old enough, burning
 // enough to be worth cancelling. It also refreshes BurnCores on the records
 // for the debug API listing.
-func (sh *Shedder) sampleBurnRates(now time.Time) (candidates []shedCandidate, totalProd int, totalActive int) {
-	sh.manager.Lock()
-	defer sh.manager.Unlock()
+func (ev *Evictor) sampleBurnRates(now time.Time) (candidates []evictCandidate, totalProd int, totalActive int) {
+	ev.manager.Lock()
+	defer ev.manager.Unlock()
 
-	seen := make(map[string]bool, len(sh.manager.reqs))
-	totalActive = len(sh.manager.reqs)
-	for uniqueID, req := range sh.manager.reqs {
+	seen := make(map[string]bool, len(ev.manager.reqs))
+	totalActive = len(ev.manager.reqs)
+	for uniqueID, req := range ev.manager.reqs {
 		seen[uniqueID] = true
 		if req.ProductionMode {
 			totalProd++
@@ -370,16 +370,16 @@ func (sh *Shedder) sampleBurnRates(now time.Time) (candidates []shedCandidate, t
 			continue
 		}
 		compute := req.stats.LocalWasmComputeDuration()
-		prev, sampled := sh.prevCompute[uniqueID]
-		sh.prevCompute[uniqueID] = compute
+		prev, sampled := ev.prevCompute[uniqueID]
+		ev.prevCompute[uniqueID] = compute
 
 		var burn float64
 		if sampled && compute > prev {
-			burn = float64(compute-prev) / float64(sh.cfg.Interval)
+			burn = float64(compute-prev) / float64(ev.cfg.Interval)
 		}
 		req.BurnCores = burn
 
-		if !sampled || now.Sub(req.StartTime) < sh.cfg.MinAge || burn < sh.cfg.MinBurnCores {
+		if !sampled || now.Sub(req.StartTime) < ev.cfg.MinAge || burn < ev.cfg.MinBurnCores {
 			continue
 		}
 		class := classDev
@@ -389,7 +389,7 @@ func (sh *Shedder) sampleBurnRates(now time.Time) (candidates []shedCandidate, t
 				class = classProdLive
 			}
 		}
-		candidates = append(candidates, shedCandidate{
+		candidates = append(candidates, evictCandidate{
 			uniqueID:     uniqueID,
 			traceID:      req.TraceID,
 			class:        class,
@@ -399,9 +399,9 @@ func (sh *Shedder) sampleBurnRates(now time.Time) (candidates []shedCandidate, t
 			cancel:       req.cancelFunc,
 		})
 	}
-	for uniqueID := range sh.prevCompute {
+	for uniqueID := range ev.prevCompute {
 		if !seen[uniqueID] {
-			delete(sh.prevCompute, uniqueID)
+			delete(ev.prevCompute, uniqueID)
 		}
 	}
 	return candidates, totalProd, totalActive
@@ -413,8 +413,8 @@ func (sh *Shedder) sampleBurnRates(now time.Time) (candidates []shedCandidate, t
 // single victim. At most maxProdFraction of the totalProd production requests
 // are cut in one event, which also protects a lone production request from
 // ever being cancelled.
-func selectVictims(candidates []shedCandidate, excessCores float64, batch bool, maxProdFraction float64, totalProd int) []shedCandidate {
-	sorted := make([]shedCandidate, len(candidates))
+func selectVictims(candidates []evictCandidate, excessCores float64, batch bool, maxProdFraction float64, totalProd int) []evictCandidate {
+	sorted := make([]evictCandidate, len(candidates))
 	copy(sorted, candidates)
 	sort.Slice(sorted, func(i, j int) bool {
 		if sorted[i].class != sorted[j].class {
@@ -424,19 +424,19 @@ func selectVictims(candidates []shedCandidate, excessCores float64, batch bool, 
 	})
 
 	maxProd := int(maxProdFraction * float64(totalProd))
-	var out []shedCandidate
-	var shedCores float64
-	var shedProd int
+	var out []evictCandidate
+	var evictedCores float64
+	var evictedProd int
 	for _, c := range sorted {
 		if c.class != classDev {
-			if shedProd >= maxProd {
+			if evictedProd >= maxProd {
 				continue
 			}
-			shedProd++
+			evictedProd++
 		}
 		out = append(out, c)
-		shedCores += c.burnCores
-		if !batch || shedCores >= excessCores {
+		evictedCores += c.burnCores
+		if !batch || evictedCores >= excessCores {
 			break
 		}
 	}
@@ -447,35 +447,35 @@ func selectVictims(candidates []shedCandidate, excessCores float64, batch bool, 
 // horizontal autoscaler: the plain active-request count, or the number of
 // requests the CPU budget is actually being spent at, whichever is higher.
 // Requests are not equally expensive, so a pod can be full at five of them; and
-// since shedding holds CPU at TargetRatio, a shedding pod reports exactly
+// since eviction holds CPU at TargetRatio, a eviction pod reports exactly
 // NominalCapacity instead of looking idle once it has cancelled its way back
 // under the threshold.
-func (sh *Shedder) effectiveActiveRequests(signals CPUSignals, activeRequests int) float64 {
-	if sh.cfg.NominalCapacity <= 0 || sh.cfg.TargetRatio <= 0 {
+func (ev *Evictor) effectiveActiveRequests(signals CPUSignals, activeRequests int) float64 {
+	if ev.cfg.NominalCapacity <= 0 || ev.cfg.TargetRatio <= 0 {
 		return float64(activeRequests)
 	}
-	cpuEquivalentRequests := sh.cfg.NominalCapacity * (signals.UsageRatio / sh.cfg.TargetRatio)
+	cpuEquivalentRequests := ev.cfg.NominalCapacity * (signals.UsageRatio / ev.cfg.TargetRatio)
 	return math.Max(float64(activeRequests), cpuEquivalentRequests)
 }
 
-func (sh *Shedder) publishMetrics(signals CPUSignals, activeRequests int) {
+func (ev *Evictor) publishMetrics(signals CPUSignals, activeRequests int) {
 	if metrics.Tier1CPUUsageRatio == nil {
 		return
 	}
 	metrics.Tier1CPUUsageRatio.SetFloat64(signals.UsageRatio)
 	metrics.Tier1CPUThrottleRatio.SetFloat64(signals.ThrottleRatio)
 	metrics.Tier1CPUPressureSomeAvg10.SetFloat64(signals.PressureAvg10)
-	metrics.Tier1EffectiveActiveRequests.SetFloat64(sh.effectiveActiveRequests(signals, activeRequests))
-	if sh.overloaded.Load() {
+	metrics.Tier1EffectiveActiveRequests.SetFloat64(ev.effectiveActiveRequests(signals, activeRequests))
+	if ev.overloaded.Load() {
 		metrics.Tier1CPUOverloaded.SetUint64(1)
 	} else {
 		metrics.Tier1CPUOverloaded.SetUint64(0)
 	}
 }
 
-func recordShed(class shedClass, action string) {
-	if metrics.Tier1ShedRequestsCounter == nil {
+func recordEviction(class evictClass, action string) {
+	if metrics.Tier1EvictedRequestsCounter == nil {
 		return
 	}
-	metrics.Tier1ShedRequestsCounter.Inc(class.String(), action)
+	metrics.Tier1EvictedRequestsCounter.Inc(class.String(), action)
 }

@@ -10,17 +10,7 @@ pub mod sf {
         }
     }
 }
-// @@protoc_insertion_point(attribute:schema)
-pub mod schema {
-    include!("schema.rs");
-    // @@protoc_insertion_point(schema)
-}
 pub mod test {
-    // @@protoc_insertion_point(attribute:test.clickhouse)
-    pub mod clickhouse {
-        include!("test.clickhouse.rs");
-        // @@protoc_insertion_point(test.clickhouse)
-    }
     // @@protoc_insertion_point(attribute:test.output)
     pub mod output {
         include!("test.output.rs");

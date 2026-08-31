@@ -46,9 +46,8 @@ type EvictorConfig struct {
 	Cooldown       time.Duration // minimum delay between two eviction events
 	DrainDelay     time.Duration // delay between going unready and the first cancellation, covering the LB routing lag
 
-	MinAge          time.Duration // requests younger than this are never cancelled
-	MinBurnCores    float64       // requests consuming less CPU than this are never cancelled (cutting them would not help)
-	MaxProdFraction float64       // maximum fraction of production requests cancelled in a single event
+	MinAge       time.Duration // requests younger than this are never cancelled
+	MinBurnCores float64       // requests consuming less CPU than this are never cancelled (cutting them would not help)
 
 	// NominalCapacity is how many requests a pod carries when it is full, used
 	// only to scale substreams_tier1_effective_active_requests. Set it to the
@@ -90,7 +89,6 @@ func (c EvictorConfig) WithDefaults() EvictorConfig {
 	setDuration(&c.DrainDelay, def.DrainDelay)
 	setDuration(&c.MinAge, def.MinAge)
 	setFloat(&c.MinBurnCores, def.MinBurnCores)
-	setFloat(&c.MaxProdFraction, def.MaxProdFraction)
 	return c
 }
 
@@ -111,7 +109,6 @@ func DefaultEvictorConfig() EvictorConfig {
 		DrainDelay:       8 * time.Second,
 		MinAge:           90 * time.Second,
 		MinBurnCores:     0.05,
-		MaxProdFraction:  0.5,
 	}
 }
 
@@ -224,7 +221,7 @@ func (ev *Evictor) tick(now time.Time) {
 		ev.logger.Warn("cannot read cgroup CPU signals", zap.Error(err))
 		return
 	}
-	candidates, totalProd, totalActive := ev.sampleBurnRates(now)
+	candidates, totalActive := ev.sampleBurnRates(now)
 	level := ev.classify(signals, now)
 	ev.publishMetrics(signals, totalActive)
 
@@ -256,7 +253,7 @@ func (ev *Evictor) tick(now time.Time) {
 	targetCores := ev.cfg.TargetRatio * signals.QuotaCores
 	excessCores := usedCores - targetCores
 
-	victims := selectVictims(candidates, excessCores, level == levelClear, ev.cfg.MaxProdFraction, totalProd)
+	victims := selectVictims(candidates, excessCores, level == levelClear)
 	if len(victims) == 0 {
 		return
 	}
@@ -355,7 +352,7 @@ type evictCandidate struct {
 // previous tick and returns the eviction candidates: old enough, burning
 // enough to be worth cancelling. It also refreshes BurnCores on the records
 // for the debug API listing.
-func (ev *Evictor) sampleBurnRates(now time.Time) (candidates []evictCandidate, totalProd int, totalActive int) {
+func (ev *Evictor) sampleBurnRates(now time.Time) (candidates []evictCandidate, totalActive int) {
 	ev.manager.Lock()
 	defer ev.manager.Unlock()
 
@@ -363,9 +360,6 @@ func (ev *Evictor) sampleBurnRates(now time.Time) (candidates []evictCandidate, 
 	totalActive = len(ev.manager.reqs)
 	for uniqueID, req := range ev.manager.reqs {
 		seen[uniqueID] = true
-		if req.ProductionMode {
-			totalProd++
-		}
 		if req.stats == nil {
 			continue
 		}
@@ -404,16 +398,14 @@ func (ev *Evictor) sampleBurnRates(now time.Time) (candidates []evictCandidate, 
 			delete(ev.prevCompute, uniqueID)
 		}
 	}
-	return candidates, totalProd, totalActive
+	return candidates, totalActive
 }
 
 // selectVictims picks which candidates to cancel: least important class first,
 // highest burn first within a class. In batch mode (clear overload) it keeps
 // cutting until the cancelled burn covers excessCores; otherwise it returns a
-// single victim. At most maxProdFraction of the totalProd production requests
-// are cut in one event, which also protects a lone production request from
-// ever being cancelled.
-func selectVictims(candidates []evictCandidate, excessCores float64, batch bool, maxProdFraction float64, totalProd int) []evictCandidate {
+// single victim.
+func selectVictims(candidates []evictCandidate, excessCores float64, batch bool) []evictCandidate {
 	sorted := make([]evictCandidate, len(candidates))
 	copy(sorted, candidates)
 	sort.Slice(sorted, func(i, j int) bool {
@@ -423,17 +415,9 @@ func selectVictims(candidates []evictCandidate, excessCores float64, batch bool,
 		return sorted[i].burnCores > sorted[j].burnCores
 	})
 
-	maxProd := int(maxProdFraction * float64(totalProd))
 	var out []evictCandidate
 	var evictedCores float64
-	var evictedProd int
 	for _, c := range sorted {
-		if c.class != classDev {
-			if evictedProd >= maxProd {
-				continue
-			}
-			evictedProd++
-		}
 		out = append(out, c)
 		evictedCores += c.burnCores
 		if !batch || evictedCores >= excessCores {

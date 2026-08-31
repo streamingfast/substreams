@@ -24,7 +24,7 @@ Priority order for cancellation (least important first):
 
 1. dev-mode requests, highest CPU burn first
 2. production-mode requests not yet live (catchup/backfill), highest burn first
-3. production-mode live requests, highest burn first (capped per event)
+3. production-mode live requests, highest burn first
 
 Two aggressiveness tiers:
 
@@ -81,7 +81,6 @@ Goroutine owned by `ActiveRequestsManager`. Each tick: read signals, classify
 
 - always: unready first, wait `drain-delay`, then cancel
 - skip requests younger than `min-age` (startup/store-load bursts look hot)
-- at most `max-prod-fraction` of production requests per event
 - cancel cause: `CodeUnavailable`, "server overloaded, please reconnect"
 - counter metric for eviction events labeled by class + structured log per victim
   (trace_id, burn, class, block distance)
@@ -110,7 +109,6 @@ Tunables (defaults):
 | cpu-eviction-cooldown | 15s | wait after an eviction before re-evaluating |
 | cpu-eviction-drain-delay | 8s | unready → first cancel (LB drain lag) |
 | cpu-eviction-min-age | 90s | never cancel requests younger than this |
-| cpu-eviction-max-prod-fraction | 0.5 | max share of prod requests cut per event |
 | cpu-eviction-recover-threshold | 0.75 | below this → ready again |
 | cpu-eviction-nominal-capacity | soft limit | requests a full pod carries, scales the autoscaler metric |
 
@@ -214,7 +212,7 @@ CPU drops and the metric drops with it, which is the behaviour we want.
 1. `plans/2026-08-28-cpu-request-cutoff.md` — the plan, including the autoscaling and deployment changes (`substreams_tier1_effective_active_requests` as the HPA input, scale-down stabilization, LB slow-start, alerting on the eviction counter).
 2. **cgroup CPU reader** (`service/active_requests/cpu.go`) — usage vs quota, throttle ratio, PSI `some avg10`, all scoped to the container's own cgroup; exported as `substreams_tier1_cpu_*` gauges.
 3. **Per-request accounting** — each active request records production mode, whether it reached live blocks (first `StepNew` from the hub), and its wasm compute time excluding external-call waits (`Stats.LocalWasmComputeDuration`), sampled into a per-request burn rate in cores (visible in the debug API listing).
-4. **Evictor** (`service/active_requests/evictor.go`) — two tiers: *clear* overload (≥95% + throttled/PSI, 10s sustain) cancels a batch sized to bring usage back under 75% of quota in one shot; *mild* (≥85%, 20s sustain) cancels one victim per 15s cooldown. Victim order: dev by burn desc → prod-catchup → prod-live, with a 90s min-age, a 0.05-core min-burn floor, and at most half the prod requests per event (a lone prod request is never cut). It always flips unready first and waits the 8s drain delay so evicted clients don't reconnect into the same pod. Cancellation is `CodeUnavailable` so clients retry elsewhere.
+4. **Evictor** (`service/active_requests/evictor.go`) — two tiers: *clear* overload (≥95% + throttled/PSI, 10s sustain) cancels a batch sized to bring usage back under 75% of quota in one shot; *mild* (≥85%, 20s sustain) cancels one victim per 15s cooldown. Victim order: dev by burn desc → prod-catchup → prod-live, with a 90s min-age and a 0.05-core min-burn floor. It always flips unready first and waits the 8s drain delay so evicted clients don't reconnect into the same pod. Cancellation is `CodeUnavailable` so clients retry elsewhere.
 5. **Readiness/admission** — while overloaded the pod is unready and refuses new `Blocks` requests; ready again after CPU stays under 75% for 30s.
 6. **Config** — `Tier1Config.CPUEviction`: mode `off` (default) / `observe` / `dev-only` / `full`, every threshold tunable, unset values take defaults. `observe` logs would-be victims and publishes metrics but never touches routing (that had a bug initially; fixed and pinned by a test).
 

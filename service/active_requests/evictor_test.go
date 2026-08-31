@@ -18,41 +18,35 @@ func TestSelectVictims_ClassThenBurnOrder(t *testing.T) {
 	}
 
 	// single-victim mode: least important class wins even against a bigger burner
-	victims := selectVictims(candidates, 10, false, 0.5, 4)
+	victims := selectVictims(candidates, 10, false)
 	require.Len(t, victims, 1)
 	assert.Equal(t, "dev-big", victims[0].traceID)
 
 	// batch mode: cut in class order until the evicted burn covers the excess
-	victims = selectVictims(candidates, 3.0, true, 0.5, 4)
+	victims = selectVictims(candidates, 3.0, true)
 	require.Len(t, victims, 3)
 	assert.Equal(t, "dev-big", victims[0].traceID)
 	assert.Equal(t, "dev-small", victims[1].traceID)
 	assert.Equal(t, "catchup", victims[2].traceID)
 }
 
-func TestSelectVictims_ProdFractionCap(t *testing.T) {
+func TestSelectVictims_BatchCutsProductionRequests(t *testing.T) {
 	candidates := []evictCandidate{
 		{traceID: "catchup-1", class: classProdCatchup, burnCores: 2.0},
 		{traceID: "catchup-2", class: classProdCatchup, burnCores: 1.8},
 		{traceID: "live-1", class: classProdLive, burnCores: 1.5},
 	}
 
-	// 4 production requests total, cap 0.5 => at most 2 cut, even with excess left to cover
-	victims := selectVictims(candidates, 100, true, 0.5, 4)
-	require.Len(t, victims, 2)
+	// an excess nothing can cover takes every candidate, catchup before live
+	victims := selectVictims(candidates, 100, true)
+	require.Len(t, victims, 3)
 	assert.Equal(t, "catchup-1", victims[0].traceID)
 	assert.Equal(t, "catchup-2", victims[1].traceID)
+	assert.Equal(t, "live-1", victims[2].traceID)
 
-	// a lone production request is never cancelled: floor(0.5 * 1) = 0
-	lone := []evictCandidate{{traceID: "lone", class: classProdCatchup, burnCores: 4.0}}
-	assert.Empty(t, selectVictims(lone, 100, true, 0.5, 1))
-}
-
-func TestSelectVictims_SingleModeSkipsCappedProd(t *testing.T) {
-	// dev-only filtering happens upstream; with no dev candidate and prod capped
-	// out, nothing is selected
-	candidates := []evictCandidate{{traceID: "live", class: classProdLive, burnCores: 2.0}}
-	assert.Empty(t, selectVictims(candidates, 1, false, 0.5, 1))
+	// batch stops as soon as the evicted burn covers the excess
+	victims = selectVictims(candidates, 3.0, true)
+	require.Len(t, victims, 2)
 }
 
 func newTestEvictor(cfg EvictorConfig) *Evictor {

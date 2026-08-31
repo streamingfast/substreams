@@ -112,31 +112,112 @@ Tunables (defaults):
 | cpu-shedding-min-age | 90s | never cancel requests younger than this |
 | cpu-shedding-max-prod-fraction | 0.5 | max share of prod requests cut per event |
 | cpu-shedding-recover-threshold | 0.75 | below this → ready again |
+| cpu-shedding-nominal-capacity | soft limit | requests a full pod carries, scales the autoscaler metric |
 
 Config lands on `app/tier1.go` Config; `--substreams-tier1-...` flag
 registration lives in firehose-core (companion PR).
 
-## Deployment changes (HPA / k8s)
+## Autoscaling
 
-- **HPA**: add a CPU utilization target (~70%) alongside the existing
-  requests-per-pod target (14). Today one hot pod barely moves fleet-average
-  CPU, so a CPU HPA would sleep through the incident; once shedding spreads
-  heavy requests across pods, fleet-average CPU becomes a meaningful scaling
-  signal and the two mechanisms reinforce each other: shedding fixes
-  distribution, the CPU target adds capacity. With `autoscaling/v2`, keep both
-  metrics in one HPA (it scales on whichever demands more replicas). Consider
-  `behavior.scaleDown` stabilization (~5–10 min) so post-shed dips don't flap
-  the fleet.
+`substreams_active_requests` stops working as the HPA input once shedding is
+on, because it measures what the pod is *serving*, and shedding exists to
+reduce that. The harder a pod sheds, the lower the fleet average, the fewer
+replicas the HPA asks for: overload makes the autoscaler shrink the fleet.
+Unready pods make it worse — for a `Pods`-type metric the HPA puts them in the
+ignored set and assumes zero usage when scaling up, so a shedding pod actively
+drags the average down while still counting as a replica.
+
+CPU utilization is not a sufficient replacement either. The shedder is a
+controller holding CPU at `target-ratio`, so an autoscaler watching CPU is
+watching a regulated variable: it reads ~0.75 no matter how much demand is
+being turned away, and it goes quiet entirely once shedding has done its job.
+
+### The metric
+
+`substreams_tier1_effective_active_requests`, published by the shedder every
+tick:
+
+    cpuEquivalentRequests   = nominalCapacity * (usageRatio / targetRatio)
+    effectiveActiveRequests = max(activeRequests, cpuEquivalentRequests)
+
+`nominalCapacity` should be set to the HPA's per-pod request target, so that a
+pod sitting at `target-ratio` reports exactly "full". It defaults to the
+active-requests soft limit, which is the only capacity figure the pod knows on
+its own. With capacity 14 and target ratio 0.75:
+
+| state | active | cpu ratio | reported |
+|---|---|---|---|
+| fresh pod | 0 | ~0 | 0 |
+| 5 cheap requests | 5 | 0.30 | 5.6 |
+| 5 heavy requests, post-shed | 5 | 0.75 | 14 |
+| spike before shedding fires | 8 | 0.95 | 17.7 |
+
+Row 3 is the point: a shedding pod reports itself full while serving five
+requests, with no shed-event bookkeeping, no decay window and no double
+counting when a shed client reconnects elsewhere — shedding pins CPU at the
+target by construction. Row 4 shows it does not clip: a pod past its target
+reports over capacity and pulls scale-up harder. When demand genuinely leaves,
+CPU drops and the metric drops with it, which is the behaviour we want.
+
+### HPA config
+
+- Scale on `substreams_tier1_effective_active_requests` as an External metric
+  with `AverageValue` (`desiredReplicas = ceil(sum / target)`), target **12**.
+  Targeting below the nominal capacity of 14 reserves ~2 slots per pod, so
+  fleet headroom is `2 × replicas` rather than a fixed count — HPA has no way
+  to express a fleet-wide additive constant.
+- Keep the existing `substreams_active_requests` metric in the same
+  `autoscaling/v2` HPA. It governs the normal regime and the HPA scales on
+  whichever metric demands more replicas, so adding the new one can't regress
+  current behaviour.
+- `behavior.scaleUp`: fast (100% or +4 pods / 15s, no stabilization).
+  `behavior.scaleDown`: 900s stabilization and small steps. Long-lived streams
+  make every removed pod expensive, and post-shed dips must not flap the fleet.
+- Note the default 10% HPA tolerance: a target of 12 doesn't act until ~13.2.
+- **Scale-down picks unready pods first.** The ReplicaSet controller's deletion
+  ranking checks readiness (3rd) before `pod-deletion-cost` (4th), so a
+  CPU-overloaded pod — the one holding the most expensive long-lived streams —
+  is the preferred kill target during any scale-down. The long `scaleDown`
+  stabilization window above is the mitigation; keeping overload episodes short
+  (the batch tier clears the excess in one shot) is the other.
+
+### Deployment changes (k8s)
+
 - **Rollout pile-up**: enable slow-start on the GCP backend service (or ramp
   the internal soft limit for the first few minutes after boot) so freshly
   ready pods don't absorb the whole reconnect wave in catchup mode.
 - **Alerting**: alert on the new shed-event counter (any `full`-mode prod shed
-  is worth eyes) and on sustained throttle ratio.
+  is worth eyes) and on sustained throttle ratio. Add one on
+  `substreams_tier1_cpu_overloaded == 1` across a large share of pods for
+  several minutes: that means the fleet is under-provisioned, not that one pod
+  drew a bad request.
+- **Blackout backstop (optional)**: if every pod goes unready at once, no
+  in-pod metric sees the demand piling up at the LB. Cloud Monitoring's
+  frontend `loadbalancing.googleapis.com|https|request_count` filtered on
+  `response_code_class = 500` does — use the frontend series, not
+  `backend_request_count`, which never sees requests that found no backend.
+  It's minutes-delayed and silent whenever at least one pod is ready, so it's
+  an emergency floor, not a scaling signal. Bounding how long a pod may stay
+  unready is the cheaper fix for the same failure.
 
 ## Rollout
 
 1. Deploy in `observe`: gauges + "would have cancelled" logs.
 2. pprof trace_id-label comparison on one hot pod to validate attribution.
 3. `dev-only`, watch for a week.
-4. `full`, with HPA CPU target in place first (shedding without added
-   capacity just moves the pain around).
+4. `full`, with the HPA switched to `effective_active_requests` first
+   (shedding without added capacity just moves the pain around).
+
+
+**What's on the branch:**
+
+1. `plans/2026-08-28-cpu-request-cutoff.md` — the plan, including the autoscaling and deployment changes (`substreams_tier1_effective_active_requests` as the HPA input, scale-down stabilization, LB slow-start, alerting on the shed counter).
+2. **cgroup CPU reader** (`service/active_requests/cpu.go`) — usage vs quota, throttle ratio, PSI `some avg10`, all scoped to the container's own cgroup; exported as `substreams_tier1_cpu_*` gauges.
+3. **Per-request accounting** — each active request records production mode, whether it reached live blocks (first `StepNew` from the hub), and its wasm compute time excluding external-call waits (`Stats.LocalWasmComputeDuration`), sampled into a per-request burn rate in cores (visible in the debug API listing).
+4. **Shedder** (`service/active_requests/shedder.go`) — two tiers: *clear* overload (≥95% + throttled/PSI, 10s sustain) cancels a batch sized to bring usage back under 75% of quota in one shot; *mild* (≥85%, 20s sustain) cancels one victim per 15s cooldown. Victim order: dev by burn desc → prod-catchup → prod-live, with a 90s min-age, a 0.05-core min-burn floor, and at most half the prod requests per event (a lone prod request is never cut). It always flips unready first and waits the 8s drain delay so shed clients don't reconnect into the same pod. Cancellation is `CodeUnavailable` so clients retry elsewhere.
+5. **Readiness/admission** — while overloaded the pod is unready and refuses new `Blocks` requests; ready again after CPU stays under 75% for 30s.
+6. **Config** — `Tier1Config.CPUShedding`: mode `off` (default) / `observe` / `dev-only` / `full`, every threshold tunable, unset values take defaults. `observe` logs would-be victims and publishes metrics but never touches routing (that had a bug initially; fixed and pinned by a test).
+
+**Tests:** everything builds; `active_requests`, `metrics`, `service`, `app` suites pass. `./pipeline` shows a hanging `Test_resolveStartBlockNum` — I verified it hangs identically on plain `develop` (`go test ./pipeline/ -run Test_resolveStartBlockNum -count=3` stuck in `resolveStartBlockNum`, `pipeline/resolve.go:200`), so it's a pre-existing flake, not from this branch.
+
+**Not done here:** flag registration (`--substreams-tier1-cpu-shedding-*`) is a firehose-core companion change, and the HPA/Tanka changes live in your deploy repo. The CHANGELOG entry is in. Suggested first rollout step per the plan: deploy with mode `observe` and watch the new gauges plus the "would cancel" logs.

@@ -275,6 +275,9 @@ func NewTier1(
 	})
 
 	if shedderConfig.Mode != active_requests.SheddingOff {
+		if shedderConfig.NominalCapacity == 0 {
+			shedderConfig.NominalCapacity = float64(activeRequestsSoftLimit)
+		}
 		if reader, err := active_requests.NewCPUReader(); err != nil {
 			logger.Warn("CPU shedding disabled: cannot read cgroup CPU signals", zap.Error(err))
 		} else if reader.QuotaCores() == 0 {

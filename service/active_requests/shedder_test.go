@@ -146,3 +146,35 @@ func TestObserveModeDoesNotEnforce(t *testing.T) {
 	assert.False(t, sh.IsOverloaded())
 	assert.False(t, callbackFired)
 }
+
+func TestEffectiveActiveRequests(t *testing.T) {
+	cfg := DefaultShedderConfig()
+	cfg.NominalCapacity = 14
+	cfg.TargetRatio = 0.75
+	sh := newTestShedder(cfg)
+
+	tests := []struct {
+		name           string
+		activeRequests int
+		usageRatio     float64
+		expect         float64
+	}{
+		{"idle pod reports nothing", 0, 0, 0},
+		{"cheap requests report their own count", 5, 0.10, 5},
+		{"expensive requests report what they cost", 5, 0.30, 5.6},
+		{"pod held at the shedding target reports full", 5, 0.75, 14},
+		{"pod over the target reports more than full", 8, 0.95, 17.733333333333334},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sh.effectiveActiveRequests(CPUSignals{QuotaCores: 4, UsageRatio: tt.usageRatio}, tt.activeRequests)
+			assert.InDelta(t, tt.expect, got, 0.0001)
+		})
+	}
+}
+
+func TestEffectiveActiveRequests_NoNominalCapacity(t *testing.T) {
+	cfg := DefaultShedderConfig()
+	sh := newTestShedder(cfg)
+	assert.Equal(t, 6.0, sh.effectiveActiveRequests(CPUSignals{QuotaCores: 4, UsageRatio: 0.9}, 6))
+}

@@ -31,6 +31,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   without cancelling, `dev-only`, `full`). New metrics: `substreams_tier1_cpu_*` gauges and
   `substreams_tier1_shed_requests_counter`.
 
+- New `substreams_tier1_effective_active_requests` gauge, meant to replace `substreams_active_requests` as the
+  horizontal autoscaler input on tier1: the higher of the plain active-request count and the number of requests the
+  CPU budget is being spent at (`nominal_capacity * cpu_usage_ratio / cpu_shedding_target_ratio`). A pod full of
+  expensive requests, or one holding its CPU down by shedding, reports itself at capacity rather than reporting the
+  few requests it has left — scaling on the plain count makes shedding shrink the fleet just when it needs to grow.
+  `CPUShedding.NominalCapacity` should be set to the autoscaler's per-pod request target; it defaults to the
+  active-requests soft limit.
+
 - A tier2 that refuses a job because it is at its concurrent-request limit (`ResourceExhausted: service currently
   overloaded`) is now retried after 300ms +/- 100ms instead of on the growing 1s-to-5s backoff shared with real
   failures. The retry dials again and can land on a different instance, so waiting seconds on a busy fleet only

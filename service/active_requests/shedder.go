@@ -2,6 +2,7 @@ package active_requests
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"time"
 
@@ -48,6 +49,13 @@ type ShedderConfig struct {
 	MinAge          time.Duration // requests younger than this are never cancelled
 	MinBurnCores    float64       // requests consuming less CPU than this are never cancelled (cutting them would not help)
 	MaxProdFraction float64       // maximum fraction of production requests cancelled in a single event
+
+	// NominalCapacity is how many requests a pod carries when it is full, used
+	// only to scale substreams_tier1_effective_active_requests. Set it to the
+	// per-pod request target of the horizontal autoscaler, so that a pod held
+	// at TargetRatio reports exactly that target. Zero disables the adjustment
+	// and the metric reports the plain active-request count.
+	NominalCapacity float64
 }
 
 // WithDefaults returns the config with every unset (zero) tunable replaced by
@@ -216,10 +224,9 @@ func (sh *Shedder) tick(now time.Time) {
 		sh.logger.Warn("cannot read cgroup CPU signals", zap.Error(err))
 		return
 	}
-	sh.publishMetrics(signals)
-
-	candidates, totalProd := sh.sampleBurnRates(now)
+	candidates, totalProd, totalActive := sh.sampleBurnRates(now)
 	level := sh.classify(signals, now)
+	sh.publishMetrics(signals, totalActive)
 
 	if !sh.overloaded.Load() {
 		return
@@ -348,11 +355,12 @@ type shedCandidate struct {
 // previous tick and returns the shedding candidates: old enough, burning
 // enough to be worth cancelling. It also refreshes BurnCores on the records
 // for the debug API listing.
-func (sh *Shedder) sampleBurnRates(now time.Time) (candidates []shedCandidate, totalProd int) {
+func (sh *Shedder) sampleBurnRates(now time.Time) (candidates []shedCandidate, totalProd int, totalActive int) {
 	sh.manager.Lock()
 	defer sh.manager.Unlock()
 
 	seen := make(map[string]bool, len(sh.manager.reqs))
+	totalActive = len(sh.manager.reqs)
 	for uniqueID, req := range sh.manager.reqs {
 		seen[uniqueID] = true
 		if req.ProductionMode {
@@ -396,7 +404,7 @@ func (sh *Shedder) sampleBurnRates(now time.Time) (candidates []shedCandidate, t
 			delete(sh.prevCompute, uniqueID)
 		}
 	}
-	return candidates, totalProd
+	return candidates, totalProd, totalActive
 }
 
 // selectVictims picks which candidates to cancel: least important class first,
@@ -435,13 +443,29 @@ func selectVictims(candidates []shedCandidate, excessCores float64, batch bool, 
 	return out
 }
 
-func (sh *Shedder) publishMetrics(signals CPUSignals) {
+// effectiveActiveRequests expresses the pod's load in request units, for the
+// horizontal autoscaler: the plain active-request count, or the number of
+// requests the CPU budget is actually being spent at, whichever is higher.
+// Requests are not equally expensive, so a pod can be full at five of them; and
+// since shedding holds CPU at TargetRatio, a shedding pod reports exactly
+// NominalCapacity instead of looking idle once it has cancelled its way back
+// under the threshold.
+func (sh *Shedder) effectiveActiveRequests(signals CPUSignals, activeRequests int) float64 {
+	if sh.cfg.NominalCapacity <= 0 || sh.cfg.TargetRatio <= 0 {
+		return float64(activeRequests)
+	}
+	cpuEquivalentRequests := sh.cfg.NominalCapacity * (signals.UsageRatio / sh.cfg.TargetRatio)
+	return math.Max(float64(activeRequests), cpuEquivalentRequests)
+}
+
+func (sh *Shedder) publishMetrics(signals CPUSignals, activeRequests int) {
 	if metrics.Tier1CPUUsageRatio == nil {
 		return
 	}
 	metrics.Tier1CPUUsageRatio.SetFloat64(signals.UsageRatio)
 	metrics.Tier1CPUThrottleRatio.SetFloat64(signals.ThrottleRatio)
 	metrics.Tier1CPUPressureSomeAvg10.SetFloat64(signals.PressureAvg10)
+	metrics.Tier1EffectiveActiveRequests.SetFloat64(sh.effectiveActiveRequests(signals, activeRequests))
 	if sh.overloaded.Load() {
 		metrics.Tier1CPUOverloaded.SetUint64(1)
 	} else {

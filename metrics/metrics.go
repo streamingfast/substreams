@@ -67,6 +67,7 @@ var Tier1CPUUsageRatio *dmetrics.Gauge
 var Tier1CPUThrottleRatio *dmetrics.Gauge
 var Tier1CPUPressureSomeAvg10 *dmetrics.Gauge
 var Tier1CPUOverloaded *dmetrics.Gauge
+var Tier1EffectiveActiveRequests *dmetrics.Gauge
 var Tier1ShedRequestsCounter *dmetrics.CounterVec
 
 func DeclareTier1Metrics(zlog *zap.Logger) {
@@ -94,6 +95,10 @@ func DeclareTier1Metrics(zlog *zap.Logger) {
 	Tier1CPUThrottleRatio = MetricSet.NewGauge("substreams_tier1_cpu_throttle_ratio", "Fraction of CFS periods in which the tier1 container was throttled, over the last shedder evaluation interval")
 	Tier1CPUPressureSomeAvg10 = MetricSet.NewGauge("substreams_tier1_cpu_pressure_some_avg10", "PSI 'some' avg10 of the tier1 container's cgroup, fraction 0..1 of time runnable threads waited for CPU")
 	Tier1CPUOverloaded = MetricSet.NewGauge("substreams_tier1_cpu_overloaded", "1 while the tier1 pod considers itself CPU-overloaded (unready, may shed requests), 0 otherwise")
+	Tier1EffectiveActiveRequests = MetricSet.NewGauge(
+		"substreams_tier1_effective_active_requests",
+		"Active requests on tier1 adjusted for what they cost: the higher of substreams_active_requests and the number of requests the CPU budget is being spent at. Meant as the horizontal autoscaler input, since it stays at capacity while the pod sheds instead of dropping with the requests it cancelled",
+	)
 	Tier1ShedRequestsCounter = MetricSet.NewCounterVec(
 		"substreams_tier1_shed_requests_counter",
 		[]string{"class", "action"},

@@ -40,7 +40,12 @@ type CPUReader struct {
 // NewCPUReader resolves the process's cgroup v2 directory and validates that
 // CPU accounting is readable. It returns an error on hosts without cgroup v2
 // (macOS, cgroup v1 nodes); callers treat that as "CPU signals unavailable".
+// SUBSTREAMS_CGROUP_DIR overrides the directory, for testing the shedder on
+// hosts without cgroups by feeding cpu.max/cpu.stat/cpu.pressure files.
 func NewCPUReader() (*CPUReader, error) {
+	if dir := os.Getenv("SUBSTREAMS_CGROUP_DIR"); dir != "" {
+		return newCPUReaderAt(dir)
+	}
 	dir, err := resolveCgroupDir("/sys/fs/cgroup", "/proc/self/cgroup")
 	if err != nil {
 		return nil, err

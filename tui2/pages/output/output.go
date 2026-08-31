@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -46,6 +48,7 @@ type Output struct {
 
 	blocksPerModule     map[string][]uint64
 	payloads            map[common.BlockContext]*pbsubstreamsrpc.AnyModuleOutput
+	partialPayloads     map[string]*pbsubstreamsrpc.AnyModuleOutput // stores partial blocks using "module:blocknum:partialindex" as key
 	bytesRepresentation dynamic.BytesRepresentation
 
 	blockIDs map[uint64]string
@@ -184,6 +187,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		o.blocksPerModule = make(map[string][]uint64)
 		o.payloads = make(map[common.BlockContext]*pbsubstreamsrpc.AnyModuleOutput)
+		o.partialPayloads = make(map[string]*pbsubstreamsrpc.AnyModuleOutput)
 		o.blockIDs = make(map[uint64]string)
 		o.blockSelector.Update(blockselect.NewRequestInstanceMsg{})
 
@@ -251,6 +255,67 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			o.payloads[blockCtx] = output
+			o.setOutputViewContent(forceRedraw)
+		}
+
+	case *pbsubstreamsrpc.PartialBlockData:
+		blockNum := msg.Clock.Number
+
+		if o.lowBlock == nil {
+			o.lowBlock = &blockNum
+		}
+		if o.highBlock < blockNum {
+			o.highBlock = blockNum
+		}
+		o.blockSelector.StretchBounds(*o.lowBlock, o.highBlock)
+
+		// Handle partial block data similar to BlockScopedData
+		if o.moduleSelector != nil && o.moduleSelector.AddModule(o.outputModule) {
+			cmds = append(cmds, func() tea.Msg { return common.UpdateSeenModulesMsg(o.moduleSelector.Modules) })
+			o.active.Module = o.outputModule
+			o.active.BlockNum = blockNum
+		}
+
+		o.blockIDs[msg.Clock.Number] = msg.Clock.Id
+
+		// Handle the partial block output
+		if msg.Output != nil && !msg.Output.IsEmpty() {
+			modName := msg.Output.Name()
+			blockCtx := common.BlockContext{
+				Module:   modName,
+				BlockNum: blockNum,
+			}
+
+			forceRedraw := false
+			if _, found := o.payloads[blockCtx]; !found {
+				if o.moduleSelector != nil && modName != "" && o.moduleSelector.AddModule(modName) {
+					cmds = append(cmds, func() tea.Msg { return common.UpdateSeenModulesMsg(o.moduleSelector.Modules) })
+				}
+				if o.active.Module == "" {
+					o.active.Module = modName
+					o.active.BlockNum = blockNum
+				}
+				if o.active.Module == modName && len(o.blocksPerModule[modName]) == 0 {
+					forceRedraw = true
+					o.active.BlockNum = blockNum
+				}
+				o.blocksPerModule[modName] = append(o.blocksPerModule[modName], blockNum)
+				if modName == o.active.Module {
+					o.blockSelector.SetAvailableBlocks(o.blocksPerModule[modName])
+				}
+
+				if o.keywordToSearchFor != "" {
+					if hasKeyword := o.searchIncomingBlockInModule(o.active.Module, blockNum); hasKeyword {
+						cmds = append(cmds, func() tea.Msg {
+							return search.AddMatchingBlock(blockNum)
+						})
+					}
+				}
+			}
+			// Store partial block data separately from regular blocks
+			// Create composite key for partial block storage: "module:blocknum:partialindex"
+			partialKey := fmt.Sprintf("%s:%d:%d", modName, blockNum, msg.PartialIndex)
+			o.partialPayloads[partialKey] = msg.Output
 			o.setOutputViewContent(forceRedraw)
 		}
 
@@ -359,22 +424,52 @@ type displayContext struct {
 	payload           *pbsubstreamsrpc.AnyModuleOutput
 	searchJQMode      bool
 	errReceived       error
+	isPartialBlock    bool
+	partialIndex      uint32
 }
 
 func (o *Output) setOutputViewContent(forcedRender bool) {
+	// Check if there are partial blocks for the current active context
+	var payload *pbsubstreamsrpc.AnyModuleOutput
+	var isPartialBlock bool
+	var partialIndex uint32
+	
+	// First, look for partial blocks matching the current module:blocknum
+	for key, partialPayload := range o.partialPayloads {
+		if strings.HasPrefix(key, fmt.Sprintf("%s:%d:", o.active.Module, o.active.BlockNum)) {
+			payload = partialPayload
+			isPartialBlock = true
+			// Extract partial index from key "module:blocknum:partialindex"
+			parts := strings.Split(key, ":")
+			if len(parts) == 3 {
+				if idx, err := strconv.ParseUint(parts[2], 10, 32); err == nil {
+					partialIndex = uint32(idx)
+				}
+			}
+			break // Use the first partial block found (could be enhanced to show latest or allow selection)
+		}
+	}
+	
+	// If no partial blocks found, use regular payload
+	if !isPartialBlock {
+		payload = o.payloads[o.active]
+	}
+
 	displayCtx := &displayContext{
 		logsEnabled:       o.logsEnabled,
 		blockCtx:          o.active,
 		searchViewEnabled: o.searchEnabled,
 		searchQuery:       o.searchCtx.Current.Query,
 		searchJQMode:      o.searchCtx.Current.JQMode,
-		payload:           o.payloads[o.active],
+		payload:           payload,
 		errReceived:       o.errReceived,
+		isPartialBlock:    isPartialBlock,
+		partialIndex:      partialIndex,
 	}
 
 	if forcedRender {
 		vals := o.renderedOutput(displayCtx.payload, true)
-		content := o.renderPayload(vals)
+		content := o.renderPayload(vals, displayCtx)
 		if displayCtx.searchViewEnabled {
 			var matchCount int
 			var positions []int

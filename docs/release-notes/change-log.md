@@ -36,12 +36,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   racing each other for whatever instance has room. A job asks a per-request launch queue for its turn before every
   request it sends to a tier2, first attempt and retries alike, and leaves the queue the moment a tier2 takes it. The
   queue holds the jobs waiting to get in, ordered by lowest segment first and, within a segment, by highest stage.
-  Only the first 20% of that queue may dial at all, at least two jobs; the ones behind them send nothing until a job
-  ahead gets in and moves the window up. So with 10 workers and every job turned away, the two lowest segments redial
-  every 100ms while the other eight stay silent, and a job the scheduler creates late for a low segment goes to the
-  front of the queue and dials right away. A job with nothing queued ahead of it dials immediately, so a fleet with
-  room is paced no differently than before. Without this, the segment the client reads first was no more likely to
-  land than one it would only read minutes later, and a whole request could idle behind a single unlucky low segment.
+  Only the first 20% of that queue may dial at all, at least two jobs and at most 15; the ones behind them send
+  nothing until a job ahead gets in and moves the window up. So with 10 workers and every job turned away, the two
+  lowest segments redial every 100ms while the other eight stay silent, and a job the scheduler creates late for a
+  low segment goes to the front of the queue and dials right away. A job with nothing queued ahead of it dials
+  immediately, so a fleet with room is paced no differently than before. Without this, the segment the client reads
+  first was no more likely to land than one it would only read minutes later, and a whole request could idle behind
+  a single unlucky low segment.
 
 - A tier2 job that fails is no longer retried on a growing 1s-to-5s backoff of its own. Every reason to dial again
   now goes through the same queue, so retries keep the request's reading order: a job that could not get in at all
@@ -49,8 +50,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   waits 100ms, and a job that got in and then failed waits 5 seconds once — if a tier2 then turns it away for
   capacity, it is back on the 100ms delay with its failure already counted. The counters that end a hopeless request
   are unchanged: five failures, or two execution timeouts, and neither is charged for a job that never got in.
-  Tunable with `SUBSTREAMS_WORKER_LAUNCH_WINDOW_PERCENT` (default 20), `SUBSTREAMS_WORKER_OVERLOADED_RETRY_DELAY`
-  (default 100ms, was 300ms), `SUBSTREAMS_WORKER_FAILED_RETRY_DELAY` (default 5s) and
+  Tunable with `SUBSTREAMS_WORKER_LAUNCH_WINDOW_PERCENT` (default 20), `SUBSTREAMS_WORKER_LAUNCH_WINDOW_MAX`
+  (default 15), `SUBSTREAMS_WORKER_OVERLOADED_RETRY_DELAY` (default 100ms, was 300ms),
+  `SUBSTREAMS_WORKER_FAILED_RETRY_DELAY` (default 5s) and
   `SUBSTREAMS_WORKER_OVERLOADED_RETRY_JITTER` (default 100ms, added to a wait so jobs turned away at the same instant
   do not redial in lockstep).
 

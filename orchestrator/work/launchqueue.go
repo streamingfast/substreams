@@ -41,10 +41,13 @@ type launchWaiter struct {
 }
 
 // launchWindowPercent is how much of a request's worker count may be dialing tier2
-// instances while the fleet has no room, as a percentage.
+// instances while the fleet has no room, as a percentage. maxLaunchWindow caps it: past a
+// few tens of workers, a wider window only spreads the fleet's free slots over more jobs
+// without getting the client its first segments any sooner. minLaunchWindow keeps a small
+// request from serializing onto a single job.
 var launchWindowPercent = 20
+var maxLaunchWindow = 15
 
-// minLaunchWindow keeps a small request from serializing onto a single job.
 const minLaunchWindow = 2
 
 func init() {
@@ -53,10 +56,19 @@ func init() {
 			launchWindowPercent = parsed
 		}
 	}
+
+	if val := os.Getenv("SUBSTREAMS_WORKER_LAUNCH_WINDOW_MAX"); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil && parsed > 0 {
+			maxLaunchWindow = parsed
+		}
+	}
 }
 
 func NewLaunchQueue(maxWorkers int) *LaunchQueue {
 	windowSize := maxWorkers * launchWindowPercent / 100
+	if windowSize > maxLaunchWindow {
+		windowSize = maxLaunchWindow
+	}
 	if windowSize < minLaunchWindow {
 		windowSize = minLaunchWindow
 	}

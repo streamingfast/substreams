@@ -19,7 +19,8 @@ func testLaunchDelays(t *testing.T, delay, jitter time.Duration) {
 
 func TestLaunchQueue_WindowSize(t *testing.T) {
 	assert.Equal(t, 2, NewLaunchQueue(10).windowSize)
-	assert.Equal(t, 40, NewLaunchQueue(200).windowSize)
+	assert.Equal(t, 10, NewLaunchQueue(50).windowSize)
+	assert.Equal(t, 15, NewLaunchQueue(200).windowSize, "the window is capped, a wider one only spreads the fleet thinner")
 	assert.Equal(t, 2, NewLaunchQueue(1).windowSize, "a small request never serializes onto one job")
 	assert.Equal(t, 2, NewLaunchQueue(0).windowSize)
 }

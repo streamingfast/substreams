@@ -50,7 +50,7 @@ func TestLaunchQueue_HeadRedialsOnTheRetryDelay(t *testing.T) {
 
 	q := NewLaunchQueue(10)
 	head := stage.Unit{Segment: 1}
-	q.Refused(head)
+	q.Retry(head, workerOverloadedRetryDelay)
 
 	start := time.Now()
 	require.NoError(t, q.WaitTurn(context.Background(), head))
@@ -66,8 +66,8 @@ func TestLaunchQueue_OutsideWindowDoesNotDial(t *testing.T) {
 
 	q := NewLaunchQueue(10) // window of 2
 	first, second := stage.Unit{Segment: 1}, stage.Unit{Segment: 2}
-	q.Refused(first)
-	q.Refused(second)
+	q.Retry(first, workerOverloadedRetryDelay)
+	q.Retry(second, workerOverloadedRetryDelay)
 
 	third := stage.Unit{Segment: 3}
 	done := make(chan struct{})
@@ -98,7 +98,7 @@ func TestLaunchQueue_LowSegmentGoesFirst(t *testing.T) {
 
 	q := NewLaunchQueue(10)
 	for segment := 10; segment < 20; segment++ {
-		q.Refused(stage.Unit{Segment: segment})
+		q.Retry(stage.Unit{Segment: segment}, workerOverloadedRetryDelay)
 	}
 
 	start := time.Now()
@@ -110,8 +110,8 @@ func TestLaunchQueue_ContextCanceled(t *testing.T) {
 	testLaunchDelays(t, 10*time.Second, 0)
 
 	q := NewLaunchQueue(10)
-	q.Refused(stage.Unit{Segment: 1})
-	q.Refused(stage.Unit{Segment: 2})
+	q.Retry(stage.Unit{Segment: 1}, workerOverloadedRetryDelay)
+	q.Retry(stage.Unit{Segment: 2}, workerOverloadedRetryDelay)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

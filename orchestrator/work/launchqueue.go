@@ -18,11 +18,12 @@ import (
 // land than the one it reads last, and a whole request can idle behind one unlucky low
 // segment.
 //
-// The queue holds the jobs a tier2 turned away, plus the ones held back behind them,
-// ordered by what the client reads first: lowest segment, then highest stage, the job that
-// also produces the partials of the stages under it. Only the first windowSize jobs of
-// that queue may dial at all; the ones behind them send nothing and wait. A job leaves the
-// queue as soon as a tier2 takes it, which lets exactly one more job start dialing.
+// The queue holds the jobs waiting to get into a tier2 — turned away for capacity, waiting
+// out a failure, or held back behind those — ordered by what the client reads first:
+// lowest segment, then highest stage, the job that also produces the partials of the
+// stages under it. Only the first windowSize jobs of that queue may dial at all; the ones
+// behind them send nothing and wait. A job leaves the queue the moment a tier2 takes it,
+// which lets exactly one more job start dialing.
 //
 // A job with nothing queued ahead of it dials immediately and never joins, so a fleet with
 // room is paced no differently than without the queue.
@@ -34,8 +35,9 @@ type LaunchQueue struct {
 }
 
 type launchWaiter struct {
-	refusedAt time.Time // zero until a tier2 turns the job away
-	jitter    time.Duration
+	// nextAttempt is when the job may dial again; zero means as soon as the window
+	// reaches it.
+	nextAttempt time.Time
 }
 
 // launchWindowPercent is how much of a request's worker count may be dialing tier2
@@ -72,11 +74,6 @@ func (q *LaunchQueue) WaitTurn(ctx context.Context, unit stage.Unit) error {
 		if wait <= 0 {
 			return nil
 		}
-		// Look again at least once per retry delay: the job's place in the queue moves on
-		// its own as the jobs ahead of it get in.
-		if wait > workerOverloadedRetryDelay {
-			wait = workerOverloadedRetryDelay
-		}
 
 		timer := time.NewTimer(wait)
 		select {
@@ -88,8 +85,9 @@ func (q *LaunchQueue) WaitTurn(ctx context.Context, unit stage.Unit) error {
 	}
 }
 
-// Refused records that a tier2 turned the job away. The job keeps its place in the queue.
-func (q *LaunchQueue) Refused(unit stage.Unit) {
+// Retry holds the job back for at least the given delay before it dials again. It keeps
+// its place in the queue, ahead of the jobs the client reads after it.
+func (q *LaunchQueue) Retry(unit stage.Unit, after time.Duration) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -97,8 +95,7 @@ func (q *LaunchQueue) Refused(unit stage.Unit) {
 	if !queued {
 		waiter = q.joinLocked(unit)
 	}
-	waiter.refusedAt = time.Now()
-	waiter.jitter = newJitter()
+	waiter.nextAttempt = time.Now().Add(after + newJitter())
 }
 
 // Leave takes the job out of the queue, moving up every job behind it. It is called once
@@ -137,14 +134,11 @@ func (q *LaunchQueue) waitFor(unit stage.Unit) time.Duration {
 		// this one sends nothing at all. Come back when the queue has moved.
 		return workerOverloadedRetryDelay
 	}
-	if waiter.refusedAt.IsZero() {
-		return 0
-	}
-	return time.Until(waiter.refusedAt.Add(workerOverloadedRetryDelay + waiter.jitter))
+	return time.Until(waiter.nextAttempt)
 }
 
 func (q *LaunchQueue) joinLocked(unit stage.Unit) *launchWaiter {
-	waiter := &launchWaiter{jitter: newJitter()}
+	waiter := &launchWaiter{}
 	q.waiting[unit] = waiter
 	return waiter
 }

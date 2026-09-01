@@ -20,32 +20,43 @@ While overloaded, the pod also advertises unready and refuses new requests,
 and it always drains from the LB *before* cancelling so evicted clients don't
 reconnect into the same pod.
 
-Priority order for cancellation (least important first):
+One overload state: `cpuRatio ≥ threshold` held for `sustain`. The pod goes
+unready, waits `drain-delay` for the LB to stop sending it traffic, then
+cancels a batch in one shot — victims in priority order until the summed burn
+rate of the survivors fits under `target-ratio × quota`. Cutting one request
+per cooldown was the alternative and it means customers lag for minutes while
+the pod works its way down; cut once, deep enough, and be done.
+
+Only requests burning real CPU are candidates: below `min-burn-cores`,
+cancelling one frees nothing and costs a reconnect. Among those, priority
+order for cancellation is:
 
 1. dev-mode requests, highest CPU burn first
-2. production-mode requests not yet live (catchup/backfill), highest burn first
-3. production-mode live requests, highest burn first
+2. production live requests, highest burn first
+3. production requests still catching up from files, highest burn first
 
-Two aggressiveness tiers:
-
-- **Clear overload** (cpuRatio ≥ hard-threshold AND throttled/PSI, short
-  sustain): go unready, wait drain-delay, then cancel a *batch* in one shot —
-  cut victims in priority order until the summed burn rate of survivors fits
-  under target × quota. Rip the bandaid; don't make customers lag for minutes
-  while we evict one victim at a time.
-- **Mild overload** (cpuRatio ≥ soft-threshold, longer sustain): go unready,
-  evict the single top victim per cooldown.
+Live before catchup is deliberate. A live request burning 2 cores keeps
+burning 2 cores for as long as it stays connected — it is a permanent tax on
+whichever pod holds it, and moving it is the only thing that helps. A catchup
+request burning 2 cores is spending them on work that ends: it will reach the
+head and go cheap on its own, and cancelling it throws away the segment
+progress it has to redo elsewhere.
 
 ## Signals
 
-All read from the container's own cgroup v2 (per-container, unaffected by
-neighbor pods on the same GKE node):
+One signal drives the decision: **CPU usage as a fraction of quota**, from
+the container's own cgroup v2 (`cpu.stat` `usage_usec` delta between ticks,
+divided by elapsed time and by the `cpu.max` quota in cores). Per-container,
+so neighbor pods on the same GKE node do not move it.
 
-- `cpu.stat`: `usage_usec` (usage vs quota), `nr_throttled`/`throttled_usec`
-  (we are being capped at our own limit)
-- `cpu.pressure`: `some avg10` (PSI — our runnable threads waited for CPU,
-  catches neighbor contention too)
-- `cpu.max`: quota (cores)
+Two more cgroup values are published as gauges but gate nothing:
+`nr_throttled`/`nr_periods` from `cpu.stat` (the fraction of CFS periods the
+kernel actually capped us in) and `cpu.pressure` `some avg10` (PSI — time at
+least one of our threads sat runnable waiting for a core, which also catches
+node-level contention). They are how you tell, from a dashboard, whether an
+overload episode was our own quota or the node; they are not inputs, because
+adding them to the trigger means the pod's behaviour depends on three
+correlated numbers and nobody can predict when it fires.
 
 Per-request CPU burn: `pipeline/exec/module_executor.go` already wraps every
 module execution in `RecordModuleWasmBlockBegin/End` on the request's
@@ -76,8 +87,8 @@ ratio, PSI some avg10 — observable in Prometheus before anything enforces.
 
 ### 3. Evictor loop
 
-Goroutine owned by `ActiveRequestsManager`. Each tick: read signals, classify
-(ok / mild / clear), apply the tier policies above. Rules:
+Goroutine owned by `ActiveRequestsManager`. Each tick: read the usage ratio,
+update the sustain window, and if the overload is firing, cut a batch. Rules:
 
 - always: unready first, wait `drain-delay`, then cancel
 - skip requests younger than `min-age` (startup/store-load bursts look hot)
@@ -100,16 +111,16 @@ Tunables (defaults):
 | flag | default | meaning |
 |---|---|---|
 | cpu-eviction-mode | off | off / observe / dev-only / full |
-| cpu-eviction-target-ratio | 0.75 | post-eviction CPU target (× quota) |
-| cpu-eviction-soft-threshold | 0.85 | mild overload trigger |
-| cpu-eviction-hard-threshold | 0.95 | clear overload trigger (with throttle/PSI) |
-| cpu-eviction-soft-sustain | 20s | mild trigger must hold this long |
-| cpu-eviction-hard-sustain | 10s | clear trigger must hold this long |
+| cpu-eviction-threshold | 0.90 | usage ratio that puts the pod in overload |
+| cpu-eviction-sustain | 15s | trigger must hold this long |
+| cpu-eviction-target-ratio | 0.75 | post-eviction CPU target (× quota), sizes the batch |
 | cpu-eviction-interval | 5s | evaluation tick |
 | cpu-eviction-cooldown | 15s | wait after an eviction before re-evaluating |
 | cpu-eviction-drain-delay | 8s | unready → first cancel (LB drain lag) |
 | cpu-eviction-min-age | 90s | never cancel requests younger than this |
+| cpu-eviction-min-burn-cores | 0.05 | never cancel requests burning less than this |
 | cpu-eviction-recover-threshold | 0.75 | below this → ready again |
+| cpu-eviction-recover-sustain | 30s | recovery must hold this long |
 | cpu-eviction-nominal-capacity | soft limit | requests a full pod carries, scales the autoscaler metric |
 
 Config lands on `app/tier1.go` Config; `--substreams-tier1-...` flag
@@ -177,7 +188,7 @@ CPU drops and the metric drops with it, which is the behaviour we want.
   CPU-overloaded pod — the one holding the most expensive long-lived streams —
   is the preferred kill target during any scale-down. The long `scaleDown`
   stabilization window above is the mitigation; keeping overload episodes short
-  (the batch tier clears the excess in one shot) is the other.
+  (one batch clears the excess in one shot) is the other.
 
 ### Deployment changes (k8s)
 

@@ -17,35 +17,35 @@ func TestSelectVictims_ClassThenBurnOrder(t *testing.T) {
 		{traceID: "catchup", class: classProdCatchup, burnCores: 2.0},
 	}
 
-	// single-victim mode: least important class wins even against a bigger burner
-	victims := selectVictims(candidates, 10, false)
+	// a small excess is covered by the least important class, even against a bigger burner
+	victims := selectVictims(candidates, 1.0)
 	require.Len(t, victims, 1)
 	assert.Equal(t, "dev-big", victims[0].traceID)
 
-	// batch mode: cut in class order until the evicted burn covers the excess
-	victims = selectVictims(candidates, 3.0, true)
+	// cutting continues in class order until the evicted burn covers the excess
+	victims = selectVictims(candidates, 3.0)
 	require.Len(t, victims, 3)
 	assert.Equal(t, "dev-big", victims[0].traceID)
 	assert.Equal(t, "dev-small", victims[1].traceID)
-	assert.Equal(t, "catchup", victims[2].traceID)
+	assert.Equal(t, "prod-live-big", victims[2].traceID)
 }
 
-func TestSelectVictims_BatchCutsProductionRequests(t *testing.T) {
+func TestSelectVictims_CutsLiveBeforeCatchup(t *testing.T) {
 	candidates := []evictCandidate{
 		{traceID: "catchup-1", class: classProdCatchup, burnCores: 2.0},
 		{traceID: "catchup-2", class: classProdCatchup, burnCores: 1.8},
 		{traceID: "live-1", class: classProdLive, burnCores: 1.5},
 	}
 
-	// an excess nothing can cover takes every candidate, catchup before live
-	victims := selectVictims(candidates, 100, true)
+	// an excess nothing can cover takes every candidate, live before catchup
+	victims := selectVictims(candidates, 100)
 	require.Len(t, victims, 3)
-	assert.Equal(t, "catchup-1", victims[0].traceID)
-	assert.Equal(t, "catchup-2", victims[1].traceID)
-	assert.Equal(t, "live-1", victims[2].traceID)
+	assert.Equal(t, "live-1", victims[0].traceID)
+	assert.Equal(t, "catchup-1", victims[1].traceID)
+	assert.Equal(t, "catchup-2", victims[2].traceID)
 
-	// batch stops as soon as the evicted burn covers the excess
-	victims = selectVictims(candidates, 3.0, true)
+	// cutting stops as soon as the evicted burn covers the excess
+	victims = selectVictims(candidates, 3.0)
 	require.Len(t, victims, 2)
 }
 
@@ -60,41 +60,36 @@ func TestClassify_SustainAndRecovery(t *testing.T) {
 	t0 := time.Now()
 
 	calm := CPUSignals{QuotaCores: 4, UsageRatio: 0.5}
-	mild := CPUSignals{QuotaCores: 4, UsageRatio: 0.9}
-	clear := CPUSignals{QuotaCores: 4, UsageRatio: 0.97, ThrottleRatio: 0.5}
+	hot := CPUSignals{QuotaCores: 4, UsageRatio: 0.95}
 
-	assert.Equal(t, levelOK, ev.classify(calm, t0))
+	assert.False(t, ev.classify(calm, t0))
 	assert.False(t, ev.IsOverloaded())
 
-	// mild condition fires only after SoftSustain
-	assert.Equal(t, levelOK, ev.classify(mild, t0))
-	assert.Equal(t, levelOK, ev.classify(mild, t0.Add(cfg.SoftSustain/2)))
+	// the overload fires only once the condition has held for Sustain
+	assert.False(t, ev.classify(hot, t0))
+	assert.False(t, ev.classify(hot, t0.Add(cfg.Sustain/2)))
 	assert.False(t, ev.IsOverloaded())
-	assert.Equal(t, levelMild, ev.classify(mild, t0.Add(cfg.SoftSustain)))
+	assert.True(t, ev.classify(hot, t0.Add(cfg.Sustain)))
 	assert.True(t, ev.IsOverloaded())
 
 	// a dip resets the sustain window
-	assert.Equal(t, levelOK, ev.classify(calm, t0.Add(cfg.SoftSustain+time.Second)))
-	assert.Equal(t, levelOK, ev.classify(mild, t0.Add(cfg.SoftSustain+2*time.Second)))
+	assert.False(t, ev.classify(calm, t0.Add(cfg.Sustain+time.Second)))
+	assert.False(t, ev.classify(hot, t0.Add(cfg.Sustain+2*time.Second)))
 
 	// still overloaded until the recovery condition holds RecoverSustain
 	assert.True(t, ev.IsOverloaded())
-	assert.Equal(t, levelOK, ev.classify(calm, t0.Add(time.Minute)))
+	assert.False(t, ev.classify(calm, t0.Add(time.Minute)))
 	assert.True(t, ev.IsOverloaded())
-	assert.Equal(t, levelOK, ev.classify(calm, t0.Add(time.Minute+cfg.RecoverSustain)))
+	assert.False(t, ev.classify(calm, t0.Add(time.Minute+cfg.RecoverSustain)))
 	assert.False(t, ev.IsOverloaded())
 
-	// clear condition has its own (shorter) sustain and needs throttle or PSI
+	// usage between RecoverThreshold and Threshold neither fires nor recovers
 	ev = newTestEvictor(cfg)
-	assert.Equal(t, levelOK, ev.classify(clear, t0))
-	assert.Equal(t, levelClear, ev.classify(clear, t0.Add(cfg.HardSustain)))
+	tepid := CPUSignals{QuotaCores: 4, UsageRatio: 0.85}
+	assert.False(t, ev.classify(hot, t0))
+	assert.True(t, ev.classify(hot, t0.Add(cfg.Sustain)))
+	assert.False(t, ev.classify(tepid, t0.Add(time.Minute)))
 	assert.True(t, ev.IsOverloaded())
-
-	// 97% usage without throttling or pressure is not "clear", only building toward mild
-	ev = newTestEvictor(cfg)
-	quiet97 := CPUSignals{QuotaCores: 4, UsageRatio: 0.97}
-	assert.Equal(t, levelOK, ev.classify(quiet97, t0))
-	assert.Equal(t, levelMild, ev.classify(quiet97, t0.Add(cfg.SoftSustain)))
 }
 
 func TestHoldSince(t *testing.T) {
@@ -119,7 +114,7 @@ func TestEvictorConfig_WithDefaults(t *testing.T) {
 	assert.Equal(t, EvictionFull, custom.Mode)
 	assert.Equal(t, 0.6, custom.TargetRatio)
 	assert.Equal(t, time.Second, custom.Interval)
-	assert.Equal(t, def.SoftThreshold, custom.SoftThreshold)
+	assert.Equal(t, def.Threshold, custom.Threshold)
 }
 
 func TestObserveModeDoesNotEnforce(t *testing.T) {
@@ -131,9 +126,9 @@ func TestObserveModeDoesNotEnforce(t *testing.T) {
 	var callbackFired bool
 	ev.OnOverloadChange(func(bool) { callbackFired = true })
 
-	clear := CPUSignals{QuotaCores: 4, UsageRatio: 0.97, ThrottleRatio: 0.5}
-	ev.classify(clear, t0)
-	assert.Equal(t, levelClear, ev.classify(clear, t0.Add(cfg.HardSustain)))
+	hot := CPUSignals{QuotaCores: 4, UsageRatio: 0.97, ThrottleRatio: 0.5}
+	ev.classify(hot, t0)
+	assert.True(t, ev.classify(hot, t0.Add(cfg.Sustain)))
 
 	// internal state tracks the overload, but nothing visible to routing/admission
 	assert.True(t, ev.overloaded.Load())

@@ -32,15 +32,11 @@ func ParseEvictionMode(s string) (EvictionMode, error) {
 type EvictorConfig struct {
 	Mode EvictionMode
 
-	TargetRatio      float64 // batch eviction cuts until the projected CPU usage fits under this fraction of quota
-	SoftThreshold    float64 // usage ratio above which the pod is mildly overloaded
-	HardThreshold    float64 // usage ratio above which the pod is clearly overloaded (with ThrottleGate or PressureGate)
-	ThrottleGate     float64 // throttle ratio confirming clear overload
-	PressureGate     float64 // PSI some avg10 confirming clear overload
+	Threshold        float64 // usage ratio above which the pod is CPU-overloaded
 	RecoverThreshold float64 // usage ratio under which the pod recovers
+	TargetRatio      float64 // eviction cuts until the projected CPU usage fits under this fraction of quota
 
-	SoftSustain    time.Duration // mild condition must hold this long before triggering
-	HardSustain    time.Duration // clear condition must hold this long before triggering
+	Sustain        time.Duration // the overload condition must hold this long before triggering
 	RecoverSustain time.Duration // recovery condition must hold this long before the pod is ready again
 	Interval       time.Duration // evaluation tick
 	Cooldown       time.Duration // minimum delay between two eviction events
@@ -75,14 +71,10 @@ func (c EvictorConfig) WithDefaults() EvictorConfig {
 			*v = d
 		}
 	}
-	setFloat(&c.TargetRatio, def.TargetRatio)
-	setFloat(&c.SoftThreshold, def.SoftThreshold)
-	setFloat(&c.HardThreshold, def.HardThreshold)
-	setFloat(&c.ThrottleGate, def.ThrottleGate)
-	setFloat(&c.PressureGate, def.PressureGate)
+	setFloat(&c.Threshold, def.Threshold)
 	setFloat(&c.RecoverThreshold, def.RecoverThreshold)
-	setDuration(&c.SoftSustain, def.SoftSustain)
-	setDuration(&c.HardSustain, def.HardSustain)
+	setFloat(&c.TargetRatio, def.TargetRatio)
+	setDuration(&c.Sustain, def.Sustain)
 	setDuration(&c.RecoverSustain, def.RecoverSustain)
 	setDuration(&c.Interval, def.Interval)
 	setDuration(&c.Cooldown, def.Cooldown)
@@ -95,14 +87,10 @@ func (c EvictorConfig) WithDefaults() EvictorConfig {
 func DefaultEvictorConfig() EvictorConfig {
 	return EvictorConfig{
 		Mode:             EvictionOff,
-		TargetRatio:      0.75,
-		SoftThreshold:    0.85,
-		HardThreshold:    0.95,
-		ThrottleGate:     0.25,
-		PressureGate:     0.25,
+		Threshold:        0.90,
 		RecoverThreshold: 0.75,
-		SoftSustain:      20 * time.Second,
-		HardSustain:      10 * time.Second,
+		TargetRatio:      0.75,
+		Sustain:          15 * time.Second,
 		RecoverSustain:   30 * time.Second,
 		Interval:         5 * time.Second,
 		Cooldown:         15 * time.Second,
@@ -114,31 +102,28 @@ func DefaultEvictorConfig() EvictorConfig {
 
 type evictClass int
 
+// Eviction order. A dev-mode request is a developer iterating and is always
+// cut first. Between the two production classes, a live request burning a lot
+// of CPU keeps burning it for as long as it stays connected, while a catching
+// up request is spending CPU on work it will finish and then stop needing;
+// cutting the catchup one throws away progress that has to be redone.
 const (
 	classDev         evictClass = iota // dev-mode requests, cancelled first
-	classProdCatchup                   // production-mode requests still catching up from files
-	classProdLive                      // production-mode requests streaming live blocks, cancelled last
+	classProdLive                      // production-mode requests streaming live blocks
+	classProdCatchup                   // production-mode requests still catching up from files, cancelled last
 )
 
 func (c evictClass) String() string {
 	switch c {
 	case classDev:
 		return "dev"
-	case classProdCatchup:
-		return "prod-catchup"
 	case classProdLive:
 		return "prod-live"
+	case classProdCatchup:
+		return "prod-catchup"
 	}
 	return "unknown"
 }
-
-type overloadLevel int
-
-const (
-	levelOK overloadLevel = iota
-	levelMild
-	levelClear
-)
 
 // Evictor detects CPU overload of the tier1 pod from its cgroup and cancels
 // the most expensive / least important requests so their clients reconnect
@@ -155,11 +140,10 @@ type Evictor struct {
 	onOverloadChange func(overloaded bool)
 
 	// zero time = condition not currently holding
-	softSince    time.Time
-	hardSince    time.Time
-	recoverSince time.Time
-	unreadyAt    time.Time
-	lastEvictAt  time.Time
+	overloadSince time.Time
+	recoverSince  time.Time
+	unreadyAt     time.Time
+	lastEvictAt   time.Time
 
 	// uniqueID -> cumulative wasm compute at the previous tick
 	prevCompute map[string]time.Duration
@@ -222,7 +206,7 @@ func (ev *Evictor) tick(now time.Time) {
 		return
 	}
 	candidates, totalActive := ev.sampleBurnRates(now)
-	level := ev.classify(signals, now)
+	firing := ev.classify(signals, now)
 	ev.publishMetrics(signals, totalActive)
 
 	if !ev.overloaded.Load() {
@@ -234,8 +218,8 @@ func (ev *Evictor) tick(now time.Time) {
 	if !ev.lastEvictAt.IsZero() && now.Sub(ev.lastEvictAt) < ev.cfg.Cooldown {
 		return
 	}
-	if level == levelOK {
-		// overloaded (not yet recovered) but no condition currently firing: hold, do not evict
+	if !firing {
+		// overloaded (not yet recovered) but usage is back under the threshold: hold, do not evict
 		return
 	}
 
@@ -253,7 +237,7 @@ func (ev *Evictor) tick(now time.Time) {
 	targetCores := ev.cfg.TargetRatio * signals.QuotaCores
 	excessCores := usedCores - targetCores
 
-	victims := selectVictims(candidates, excessCores, level == levelClear)
+	victims := selectVictims(candidates, excessCores)
 	if len(victims) == 0 {
 		return
 	}
@@ -267,7 +251,6 @@ func (ev *Evictor) tick(now time.Time) {
 			zap.Uint64("current_block", v.currentBlock),
 			zap.Float64("cpu_usage_ratio", signals.UsageRatio),
 			zap.Float64("cpu_throttle_ratio", signals.ThrottleRatio),
-			zap.String("level", map[overloadLevel]string{levelMild: "mild", levelClear: "clear"}[level]),
 		}
 		if ev.cfg.Mode == EvictionObserve {
 			ev.logger.Info("CPU overloaded: would cancel request (observe mode)", fields...)
@@ -281,27 +264,17 @@ func (ev *Evictor) tick(now time.Time) {
 	ev.lastEvictAt = now
 }
 
-// classify updates the sustain windows and the overloaded flag, and returns
-// the overload level currently firing.
-func (ev *Evictor) classify(signals CPUSignals, now time.Time) overloadLevel {
-	softCond := signals.UsageRatio >= ev.cfg.SoftThreshold
-	hardCond := signals.UsageRatio >= ev.cfg.HardThreshold &&
-		(signals.ThrottleRatio >= ev.cfg.ThrottleGate || signals.PressureAvg10 >= ev.cfg.PressureGate)
-	recoverCond := signals.UsageRatio < ev.cfg.RecoverThreshold
+// classify updates the sustain windows and the overloaded flag, and reports
+// whether the overload condition is currently firing. The decision rests on
+// the usage ratio alone; throttling and PSI are published as gauges for
+// diagnosis but do not gate anything.
+func (ev *Evictor) classify(signals CPUSignals, now time.Time) bool {
+	ev.overloadSince = holdSince(ev.overloadSince, signals.UsageRatio >= ev.cfg.Threshold, now)
+	ev.recoverSince = holdSince(ev.recoverSince, signals.UsageRatio < ev.cfg.RecoverThreshold, now)
 
-	ev.softSince = holdSince(ev.softSince, softCond, now)
-	ev.hardSince = holdSince(ev.hardSince, hardCond, now)
-	ev.recoverSince = holdSince(ev.recoverSince, recoverCond, now)
+	firing := !ev.overloadSince.IsZero() && now.Sub(ev.overloadSince) >= ev.cfg.Sustain
 
-	level := levelOK
-	if !ev.softSince.IsZero() && now.Sub(ev.softSince) >= ev.cfg.SoftSustain {
-		level = levelMild
-	}
-	if !ev.hardSince.IsZero() && now.Sub(ev.hardSince) >= ev.cfg.HardSustain {
-		level = levelClear
-	}
-
-	if level != levelOK && !ev.overloaded.Load() {
+	if firing && !ev.overloaded.Load() {
 		ev.overloaded.Store(true)
 		ev.unreadyAt = now
 		ev.logger.Warn("pod is CPU-overloaded",
@@ -325,7 +298,7 @@ func (ev *Evictor) classify(signals CPUSignals, now time.Time) overloadLevel {
 			ev.onOverloadChange(false)
 		}
 	}
-	return level
+	return firing
 }
 
 func holdSince(since time.Time, condition bool, now time.Time) time.Time {
@@ -402,10 +375,9 @@ func (ev *Evictor) sampleBurnRates(now time.Time) (candidates []evictCandidate, 
 }
 
 // selectVictims picks which candidates to cancel: least important class first,
-// highest burn first within a class. In batch mode (clear overload) it keeps
-// cutting until the cancelled burn covers excessCores; otherwise it returns a
-// single victim.
-func selectVictims(candidates []evictCandidate, excessCores float64, batch bool) []evictCandidate {
+// highest burn first within a class, cutting until the cancelled burn covers
+// excessCores.
+func selectVictims(candidates []evictCandidate, excessCores float64) []evictCandidate {
 	sorted := make([]evictCandidate, len(candidates))
 	copy(sorted, candidates)
 	sort.Slice(sorted, func(i, j int) bool {
@@ -420,7 +392,7 @@ func selectVictims(candidates []evictCandidate, excessCores float64, batch bool)
 	for _, c := range sorted {
 		out = append(out, c)
 		evictedCores += c.burnCores
-		if !batch || evictedCores >= excessCores {
+		if evictedCores >= excessCores {
 			break
 		}
 	}

@@ -22,14 +22,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-- `substreams-tier1` can now evict requests when its CPU is saturated. It reads its own cgroup (usage vs quota,
-  throttling, pressure) and, when overloaded, advertises itself unready to the load balancer, refuses new requests,
-  waits for the balancer to drain, then cancels the heaviest requests with `Unavailable` so their clients reconnect
-  to a less busy pod — dev-mode requests first, then production requests still catching up, live production last. A
-  clear overload (CPU throttled) evicts a whole batch at once; a mild one evicts a single request per cooldown. Off by
-  default; enable and tune it through the tier1 app's `CPUEviction` config (modes: `observe` logs what would be cut
-  without cancelling, `dev-only`, `full`). New metrics: `substreams_tier1_cpu_*` gauges and
-  `substreams_tier1_evicted_requests_counter`.
+- `substreams-tier1` can now evict requests when its CPU is saturated. When its own cgroup reports CPU usage above
+  90% of quota for 15 seconds, the pod advertises itself unready to the load balancer, refuses new requests, waits
+  for the balancer to drain, then cancels enough of the heaviest requests with `Unavailable` to bring usage back
+  under 75% of quota, so their clients reconnect to a less busy pod. Order: dev-mode requests first, then production
+  requests on live blocks, then production requests still catching up from files (those finish their catchup and go
+  cheap on their own, and cancelling one throws away progress). Off by default; enable and tune it through the tier1
+  app's `CPUEviction` config (modes: `observe` logs what would be cut without cancelling, `dev-only`, `full`). New
+  metrics: `substreams_tier1_cpu_*` gauges and `substreams_tier1_evicted_requests_counter`.
 
 - New `substreams_tier1_effective_active_requests` gauge, meant to replace `substreams_active_requests` as the
   horizontal autoscaler input on tier1: the higher of the plain active-request count and the number of requests the

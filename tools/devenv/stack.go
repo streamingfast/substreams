@@ -33,6 +33,7 @@ import (
 	// Registers the "local" session pool plugin StartTier1 asks for.
 	_ "github.com/streamingfast/dsession/local"
 	"github.com/streamingfast/substreams/app"
+	"github.com/streamingfast/substreams/service/active_requests"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"go.uber.org/zap"
@@ -263,6 +264,10 @@ type Tier1Config struct {
 	// HostedStoreRegistryAddress is the control-plane gRPC address used to resolve
 	// hosted foundational stores that are not in the JSON file.
 	HostedStoreRegistryAddress string
+	// CPUEviction configures the CPU-based request evictor. The zero value leaves it off.
+	// Point SUBSTREAMS_CGROUP_DIR at hand-written cpu.max/cpu.stat files to drive it on a
+	// host without cgroups.
+	CPUEviction active_requests.EvictorConfig
 }
 
 func orDefault(value, fallback time.Duration) time.Duration {
@@ -324,6 +329,7 @@ func StartTier1(ctx context.Context, config Tier1Config, logger *zap.Logger) (*a
 		SubrequestsSecret:             config.Tier2Secret,
 		MaxSubrequests:                maxSubrequests,
 		LiveBackFillerFinalBlockDelay: config.LiveBackFillerFinalBlockDelay,
+		CPUEviction:                   config.CPUEviction,
 	}
 
 	// Tier1 is configured with "logger://" metering below, and tier2 inherits the choice through

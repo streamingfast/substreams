@@ -48,6 +48,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   still do not count towards the retry limit, while a refused connection or an `Unavailable: no healthy upstream` from
   the load balancer means no instance is reachable at all, so those keep the growing 1s-to-5s backoff.
 
+- Jobs are now scheduled up to twice the request's worker count ahead of the blocks the client is reading, instead of
+  1.5 times, so a client that reads slowly still keeps the workers busy.
+
 - Store snapshots (fullKV files) can now be pruned to save disk space: tier1 no longer assumes that a fullKV at block
   `x` implies that every earlier fullKV still exists. At request start it walks backwards from the first segment
   needing work, in growing listing windows, until it finds the last block where every store module still has a

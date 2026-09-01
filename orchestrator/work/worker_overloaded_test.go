@@ -40,12 +40,12 @@ func newScriptedWorker(errs ...error) (*RemoteWorker, *scriptedSubstreamsClient)
 	factory := func() (pbssinternal.SubstreamsClient, func() error, []grpc.CallOption, client.Headers, error) {
 		return fake, func() error { return nil }, nil, client.Headers{}, nil
 	}
-	return NewRemoteWorker(factory, "test-worker", zap.NewNop()), fake
+	return NewRemoteWorker(factory, "test-worker", zap.NewNop(), NewLaunchQueue(1)), fake
 }
 
 // TestWork_OverloadedRetriesFastAndDoesNotCount validates that a tier2 refusing the job at
-// its concurrent-request limit is redialed on the short fixed delay rather than the growing
-// Fibonacci backoff, and that those attempts are not charged against workerMaxRetries.
+// its concurrent-request limit is redialed on the launch queue's short delay rather than the
+// growing Fibonacci backoff, and that those attempts are not charged against workerMaxRetries.
 func TestWork_OverloadedRetriesFastAndDoesNotCount(t *testing.T) {
 	prevRetries, prevDelay, prevJitter := workerMaxRetries, workerOverloadedRetryDelay, workerOverloadedRetryJitter
 	workerMaxRetries, workerOverloadedRetryDelay, workerOverloadedRetryJitter = 2, 10*time.Millisecond, 5*time.Millisecond
@@ -64,19 +64,6 @@ func TestWork_OverloadedRetriesFastAndDoesNotCount(t *testing.T) {
 	require.True(t, ok, "expected MsgJobSucceeded, got %T (%v)", msg, msg)
 	assert.Equal(t, 4, fake.calls, "3 refusals then a successful attempt, none charged to workerMaxRetries")
 	assert.Less(t, time.Since(start), time.Second, "refusals must not fall back to the Fibonacci backoff")
-}
-
-// TestWaitBeforeRetryOverloaded_ContextCanceled validates that a job whose request goes
-// away while it waits for a free tier2 stops instead of dialing again.
-func TestWaitBeforeRetryOverloaded_ContextCanceled(t *testing.T) {
-	prevDelay := workerOverloadedRetryDelay
-	workerOverloadedRetryDelay = 10 * time.Second
-	defer func() { workerOverloadedRetryDelay = prevDelay }()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	assert.ErrorIs(t, waitBeforeRetryOverloaded(ctx), context.Canceled)
 }
 
 func TestIsInstanceOverloadedErr(t *testing.T) {

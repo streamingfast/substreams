@@ -76,7 +76,7 @@ func newFakeWorker(streamErr error) (*RemoteWorker, *fakeSubstreamsClient) {
 	factory := func() (pbssinternal.SubstreamsClient, func() error, []grpc.CallOption, client.Headers, error) {
 		return fake, func() error { return nil }, nil, client.Headers{}, nil
 	}
-	return NewRemoteWorker(factory, "test-worker", zap.NewNop()), fake
+	return NewRemoteWorker(factory, "test-worker", zap.NewNop(), NewLaunchQueue(1)), fake
 }
 
 // TestWork_FoundationalStoreFatalIsRetryable validates how tier1 classifies the

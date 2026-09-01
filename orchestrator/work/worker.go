@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -53,15 +52,22 @@ type RemoteWorker struct {
 	tracer        ttrace.Tracer
 	logger        *zap.Logger
 	id            string
+	// launchQueue is shared by every worker of the request: it decides which job gets to
+	// send its request to a tier2 first when the fleet has no room.
+	launchQueue *LaunchQueue
 }
 
-func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, logger *zap.Logger) *RemoteWorker {
+func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, logger *zap.Logger, launchQueue *LaunchQueue) *RemoteWorker {
 	logger = logger.Named("remote-worker")
+	if launchQueue == nil {
+		launchQueue = NewLaunchQueue(1)
+	}
 	return &RemoteWorker{
 		clientFactory: clientFactory,
 		tracer:        otel.GetTracerProvider().Tracer("worker"),
 		logger:        logger,
 		id:            id,
+		launchQueue:   launchQueue,
 	}
 }
 
@@ -102,7 +108,7 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 
 var workerMaxRetries = 5
 var workerMaxTimeoutRetries = 2
-var workerOverloadedRetryDelay = 300 * time.Millisecond
+var workerOverloadedRetryDelay = 100 * time.Millisecond
 var workerOverloadedRetryJitter = 100 * time.Millisecond
 
 func init() {
@@ -142,26 +148,6 @@ func isInstanceOverloadedErr(err error) bool {
 	return grpcError != nil && grpcError.Code() == codes.ResourceExhausted
 }
 
-// waitBeforeRetryOverloaded sleeps workerOverloadedRetryDelay plus or minus
-// workerOverloadedRetryJitter, returning the context error if the request goes away
-// while waiting.
-func waitBeforeRetryOverloaded(ctx context.Context) error {
-	delay := workerOverloadedRetryDelay
-	if workerOverloadedRetryJitter > 0 {
-		delay += time.Duration(rand.Int63n(int64(workerOverloadedRetryJitter)*2)) - workerOverloadedRetryJitter
-	}
-
-	timer := time.NewTimer(delay)
-	defer timer.Stop()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
-}
-
 func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream, streamOutput bool) loop.Cmd {
 	request := NewRequest(ctx, reqctx.Details(ctx), unit.Stage, startBlock, streamOutput)
 	logger := reqctx.Logger(ctx)
@@ -178,9 +164,19 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 		startBlock := request.SegmentNumber * request.SegmentSize
 		jobIdx := stats.RecordNewSubrequest(request.Stage, startBlock, startBlock+request.SegmentSize)
 
+		// Whatever ends this job, it stops competing for a tier2, so the jobs still
+		// waiting move up a position.
+		defer w.launchQueue.Leave(unit)
+
 		var previousError error
 		err := derr.RetryContext(ctx, math.MaxUint64, func(ctx context.Context) error {
 			for {
+				// Every request sent to a tier2, first attempt included, waits for the jobs
+				// the client reads before this one.
+				if err := w.launchQueue.WaitTurn(ctx, unit); err != nil {
+					return derr.NewFatalError(err)
+				}
+
 				w.logger.Info("launching remote worker",
 					zap.Uint64("segment", request.SegmentNumber),
 					zap.Uint32("stage", request.Stage),
@@ -199,16 +195,18 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 
 				if _, ok := err.(*RetryableErr); ok && isInstanceOverloadedErr(err) {
 					// The retry is looking for a different instance rather than waiting on this
-					// one, so it runs on a short fixed delay instead of the growing backoff, and
-					// does not count towards maxRetries.
+					// one, so it goes back to the launch queue instead of the growing backoff,
+					// and does not count towards maxRetries.
 					previousError = err
 					stats.RecordJobDelayed(jobIdx)
 					metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
-					if err := waitBeforeRetryOverloaded(ctx); err != nil {
-						return derr.NewFatalError(err)
-					}
+					w.launchQueue.Refused(unit)
 					continue
 				}
+
+				// The job is through to a tier2, or failed for a reason redialing will not
+				// fix: either way it stops holding back the jobs behind it.
+				w.launchQueue.Leave(unit)
 
 				switch err.(type) {
 				case *RetryableErr:

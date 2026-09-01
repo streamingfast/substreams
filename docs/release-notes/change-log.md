@@ -22,6 +22,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Trimmed tier2's per-segment logging: a large backfill fans out into tens of thousands of `ProcessRange` calls,
+  and each one was logging ~10 `Info` lines with no steady-state diagnostic value, which could spike a pod's log
+  volume by an order of magnitude. Removed the duplicate auth-info log in the tier2 response handler (already
+  logged once per segment on the incoming request), and demoted the store-size and exec-output-file-open logs to
+  `Debug`. Also suppressed the benign `http2: server: error reading preface ...: connection reset by peer` error
+  logged whenever a client drops a connection mid-handshake against the plaintext/h2c tier2 port, mirroring the
+  existing TLS-handshake suppressions. The bigger source of the same spike was `dmetering`'s per-request event
+  emitter, opened and torn down on every `ProcessRange` call; its 4 shutdown-lifecycle logs are now `Debug` too
+  (bumped to `github.com/streamingfast/dmetering@v0.0.0-20260901152443-1ff4cd0d617d`).
+
 - A tier2 that refuses a job because it is at its concurrent-request limit (`ResourceExhausted: service currently
   overloaded`) is now retried after 300ms +/- 100ms instead of on the growing 1s-to-5s backoff shared with real
   failures. The retry dials again and can land on a different instance, so waiting seconds on a busy fleet only

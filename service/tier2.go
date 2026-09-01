@@ -752,14 +752,10 @@ func canSkipBlockSource(existingExecOuts map[string]execout.FileReader, required
 }
 
 func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbssinternal.Substreams_ProcessRangeServer) substreams.ResponseFunc {
-	var userID, apiKeyID, ip string
+	var userID, apiKeyID string
 	if auth := dauth.FromContext(ctx); auth != nil {
 		userID = auth.UserID()
 		apiKeyID = auth.APIKeyID()
-		ip = auth.RealIP()
-		logger.Info("auth information available in tier2 response handler", zap.String("user_id", userID), zap.String("key_id", apiKeyID), zap.String("ip_address", ip))
-	} else {
-		logger.Warn("no auth information available in tier2 response handler")
 	}
 
 	// Progress snapshots are emitted from a ticker goroutine while the block loop keeps

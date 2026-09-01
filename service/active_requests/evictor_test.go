@@ -126,7 +126,7 @@ func TestObserveModeDoesNotEnforce(t *testing.T) {
 	var callbackFired bool
 	ev.OnOverloadChange(func(bool) { callbackFired = true })
 
-	hot := CPUSignals{QuotaCores: 4, UsageRatio: 0.97, ThrottleRatio: 0.5}
+	hot := CPUSignals{QuotaCores: 4, UsageRatio: 0.97}
 	ev.classify(hot, t0)
 	assert.True(t, ev.classify(hot, t0.Add(cfg.Sustain)))
 

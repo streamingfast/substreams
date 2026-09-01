@@ -250,7 +250,6 @@ func (ev *Evictor) tick(now time.Time) {
 			zap.Duration("age", now.Sub(v.startTime)),
 			zap.Uint64("current_block", v.currentBlock),
 			zap.Float64("cpu_usage_ratio", signals.UsageRatio),
-			zap.Float64("cpu_throttle_ratio", signals.ThrottleRatio),
 		}
 		if ev.cfg.Mode == EvictionObserve {
 			ev.logger.Info("CPU overloaded: would cancel request (observe mode)", fields...)
@@ -265,9 +264,7 @@ func (ev *Evictor) tick(now time.Time) {
 }
 
 // classify updates the sustain windows and the overloaded flag, and reports
-// whether the overload condition is currently firing. The decision rests on
-// the usage ratio alone; throttling and PSI are published as gauges for
-// diagnosis but do not gate anything.
+// whether the overload condition is currently firing.
 func (ev *Evictor) classify(signals CPUSignals, now time.Time) bool {
 	ev.overloadSince = holdSince(ev.overloadSince, signals.UsageRatio >= ev.cfg.Threshold, now)
 	ev.recoverSince = holdSince(ev.recoverSince, signals.UsageRatio < ev.cfg.RecoverThreshold, now)
@@ -280,8 +277,6 @@ func (ev *Evictor) classify(signals CPUSignals, now time.Time) bool {
 		ev.logger.Warn("pod is CPU-overloaded",
 			zap.Bool("enforced", ev.enforcing()),
 			zap.Float64("cpu_usage_ratio", signals.UsageRatio),
-			zap.Float64("cpu_throttle_ratio", signals.ThrottleRatio),
-			zap.Float64("cpu_pressure_some_avg10", signals.PressureAvg10),
 		)
 		if ev.onOverloadChange != nil && ev.enforcing() {
 			ev.onOverloadChange(true)
@@ -419,8 +414,6 @@ func (ev *Evictor) publishMetrics(signals CPUSignals, activeRequests int) {
 		return
 	}
 	metrics.Tier1CPUUsageRatio.SetFloat64(signals.UsageRatio)
-	metrics.Tier1CPUThrottleRatio.SetFloat64(signals.ThrottleRatio)
-	metrics.Tier1CPUPressureSomeAvg10.SetFloat64(signals.PressureAvg10)
 	metrics.Tier1EffectiveActiveRequests.SetFloat64(ev.effectiveActiveRequests(signals, activeRequests))
 	if ev.overloaded.Load() {
 		metrics.Tier1CPUOverloaded.SetUint64(1)

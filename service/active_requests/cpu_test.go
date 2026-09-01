@@ -35,7 +35,7 @@ func TestReadQuotaCores(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestReadCPUStat(t *testing.T) {
+func TestReadUsageUsec(t *testing.T) {
 	dir := t.TempDir()
 	writeCgroupFiles(t, dir, map[string]string{"cpu.stat": `usage_usec 1000000
 user_usec 800000
@@ -45,53 +45,34 @@ nr_throttled 50
 throttled_usec 123456
 `})
 
-	usage, periods, throttled, err := readCPUStat(filepath.Join(dir, "cpu.stat"))
+	usage, err := readUsageUsec(filepath.Join(dir, "cpu.stat"))
 	require.NoError(t, err)
 	assert.Equal(t, uint64(1000000), usage)
-	assert.Equal(t, uint64(500), periods)
-	assert.Equal(t, uint64(50), throttled)
+
+	writeCgroupFiles(t, dir, map[string]string{"cpu.stat": "nr_periods 500\n"})
+	_, err = readUsageUsec(filepath.Join(dir, "cpu.stat"))
+	require.Error(t, err)
 }
 
-func TestReadPressureSomeAvg10(t *testing.T) {
-	dir := t.TempDir()
-	writeCgroupFiles(t, dir, map[string]string{"cpu.pressure": `some avg10=1.50 avg60=0.80 avg300=0.20 total=12345
-full avg10=0.10 avg60=0.05 avg300=0.01 total=678
-`})
-
-	psi, err := readPressureSomeAvg10(filepath.Join(dir, "cpu.pressure"))
-	require.NoError(t, err)
-	assert.InDelta(t, 0.015, psi, 1e-9)
-}
-
-func TestComputeRatios(t *testing.T) {
+func TestComputeUsageRatio(t *testing.T) {
 	t0 := time.Now()
-	prev := &cpuSample{at: t0, usageUsec: 1_000_000, nrPeriods: 100, nrThrottled: 10}
-	// 10s elapsed, 38s of CPU consumed on a 4-core quota => 95% usage; 45/50 periods throttled
-	cur := &cpuSample{at: t0.Add(10 * time.Second), usageUsec: 39_000_000, nrPeriods: 150, nrThrottled: 55}
+	prev := &cpuSample{at: t0, usageUsec: 1_000_000}
+	// 10s elapsed, 38s of CPU consumed on a 4-core quota => 95% usage
+	cur := &cpuSample{at: t0.Add(10 * time.Second), usageUsec: 39_000_000}
 
-	usage, throttle := computeRatios(prev, cur, 4.0)
-	assert.InDelta(t, 0.95, usage, 1e-9)
-	assert.InDelta(t, 0.9, throttle, 1e-9)
-
-	usage, throttle = computeRatios(nil, cur, 4.0)
-	assert.Zero(t, usage)
-	assert.Zero(t, throttle)
-
-	// counter reset (container restart of a shared reader): ratios stay at 0 rather than going negative
-	usage, throttle = computeRatios(cur, prev, 4.0)
-	assert.Zero(t, usage)
-	assert.Zero(t, throttle)
+	assert.InDelta(t, 0.95, computeUsageRatio(prev, cur, 4.0), 1e-9)
+	assert.Zero(t, computeUsageRatio(nil, cur, 4.0))
+	// counter reset (container restart of a shared reader): the ratio stays at 0 rather than going negative
+	assert.Zero(t, computeUsageRatio(cur, prev, 4.0))
+	// no quota set
+	assert.Zero(t, computeUsageRatio(prev, cur, 0))
 }
 
 func TestNewCPUReaderAt(t *testing.T) {
 	dir := t.TempDir()
 	writeCgroupFiles(t, dir, map[string]string{
-		"cpu.max": "350000 100000\n",
-		"cpu.stat": `usage_usec 1000000
-nr_periods 500
-nr_throttled 50
-`,
-		"cpu.pressure": "some avg10=2.00 avg60=1.00 avg300=0.50 total=999\n",
+		"cpu.max":  "350000 100000\n",
+		"cpu.stat": "usage_usec 1000000\n",
 	})
 
 	reader, err := newCPUReaderAt(dir)
@@ -102,7 +83,6 @@ nr_throttled 50
 	require.NoError(t, err)
 	assert.Equal(t, 3.5, signals.QuotaCores)
 	assert.Zero(t, signals.UsageRatio) // first read has no previous sample
-	assert.InDelta(t, 0.02, signals.PressureAvg10, 1e-9)
 
 	_, err = newCPUReaderAt(t.TempDir()) // no cgroup files at all
 	require.Error(t, err)

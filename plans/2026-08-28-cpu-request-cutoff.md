@@ -44,19 +44,10 @@ progress it has to redo elsewhere.
 
 ## Signals
 
-One signal drives the decision: **CPU usage as a fraction of quota**, from
-the container's own cgroup v2 (`cpu.stat` `usage_usec` delta between ticks,
-divided by elapsed time and by the `cpu.max` quota in cores). Per-container,
-so neighbor pods on the same GKE node do not move it.
-
-Two more cgroup values are published as gauges but gate nothing:
-`nr_throttled`/`nr_periods` from `cpu.stat` (the fraction of CFS periods the
-kernel actually capped us in) and `cpu.pressure` `some avg10` (PSI — time at
-least one of our threads sat runnable waiting for a core, which also catches
-node-level contention). They are how you tell, from a dashboard, whether an
-overload episode was our own quota or the node; they are not inputs, because
-adding them to the trigger means the pod's behaviour depends on three
-correlated numbers and nobody can predict when it fires.
+One signal: **CPU usage as a fraction of quota**, from the container's own
+cgroup v2 — the `cpu.stat` `usage_usec` delta between ticks, divided by
+elapsed time and by the `cpu.max` quota in cores. Per-container, so neighbor
+pods on the same GKE node do not move it.
 
 Per-request CPU burn: `pipeline/exec/module_executor.go` already wraps every
 module execution in `RecordModuleWasmBlockBegin/End` on the request's
@@ -72,8 +63,8 @@ trace_id goroutine labels on one hot pod, compare rankings.
 ### 1. CPU signal reader (`service/active_requests/cpu.go`)
 
 Cgroup v2 reader for the values above (same package already reads cgroup
-memory via `memlimit.FromCgroup()`). New dmetrics gauges: cpu ratio, throttle
-ratio, PSI some avg10 — observable in Prometheus before anything enforces.
+memory via `memlimit.FromCgroup()`). New dmetrics gauges: quota cores, usage
+ratio, overloaded flag — observable in Prometheus before anything enforces.
 
 ### 2. Per-request accounting
 
@@ -195,11 +186,10 @@ CPU drops and the metric drops with it, which is the behaviour we want.
 - **Rollout pile-up**: enable slow-start on the GCP backend service (or ramp
   the internal soft limit for the first few minutes after boot) so freshly
   ready pods don't absorb the whole reconnect wave in catchup mode.
-- **Alerting**: alert on the new eviction counter (any `full`-mode production eviction
-  is worth eyes) and on sustained throttle ratio. Add one on
-  `substreams_tier1_cpu_overloaded == 1` across a large share of pods for
-  several minutes: that means the fleet is under-provisioned, not that one pod
-  drew a bad request.
+- **Alerting**: alert on the new eviction counter (any `full`-mode production
+  eviction is worth eyes). Add one on `substreams_tier1_cpu_overloaded == 1`
+  across a large share of pods for several minutes: that means the fleet is
+  under-provisioned, not that one pod drew a bad request.
 - **Blackout backstop (optional)**: if every pod goes unready at once, no
   in-pod metric sees the demand piling up at the LB. Cloud Monitoring's
   frontend `loadbalancing.googleapis.com|https|request_count` filtered on
@@ -221,9 +211,9 @@ CPU drops and the metric drops with it, which is the behaviour we want.
 **What's on the branch:**
 
 1. `plans/2026-08-28-cpu-request-cutoff.md` — the plan, including the autoscaling and deployment changes (`substreams_tier1_effective_active_requests` as the HPA input, scale-down stabilization, LB slow-start, alerting on the eviction counter).
-2. **cgroup CPU reader** (`service/active_requests/cpu.go`) — usage vs quota, throttle ratio, PSI `some avg10`, all scoped to the container's own cgroup; exported as `substreams_tier1_cpu_*` gauges.
+2. **cgroup CPU reader** (`service/active_requests/cpu.go`) — CPU usage as a fraction of the container's own cgroup quota; exported as `substreams_tier1_cpu_*` gauges.
 3. **Per-request accounting** — each active request records production mode, whether it reached live blocks (first `StepNew` from the hub), and its wasm compute time excluding external-call waits (`Stats.LocalWasmComputeDuration`), sampled into a per-request burn rate in cores (visible in the debug API listing).
-4. **Evictor** (`service/active_requests/evictor.go`) — two tiers: *clear* overload (≥95% + throttled/PSI, 10s sustain) cancels a batch sized to bring usage back under 75% of quota in one shot; *mild* (≥85%, 20s sustain) cancels one victim per 15s cooldown. Victim order: dev by burn desc → prod-catchup → prod-live, with a 90s min-age and a 0.05-core min-burn floor. It always flips unready first and waits the 8s drain delay so evicted clients don't reconnect into the same pod. Cancellation is `CodeUnavailable` so clients retry elsewhere.
+4. **Evictor** (`service/active_requests/evictor.go`) — usage ≥90% of quota held for 15s cancels one batch, sized to bring usage back under 75%. Victim order: dev by burn desc → prod-live → prod-catchup, with a 90s min-age and a 0.05-core min-burn floor. It always flips unready first and waits the 8s drain delay so evicted clients don't reconnect into the same pod. Cancellation is `CodeUnavailable` so clients retry elsewhere.
 5. **Readiness/admission** — while overloaded the pod is unready and refuses new `Blocks` requests; ready again after CPU stays under 75% for 30s.
 6. **Config** — `Tier1Config.CPUEviction`: mode `off` (default) / `observe` / `dev-only` / `full`, every threshold tunable, unset values take defaults. `observe` logs would-be victims and publishes metrics but never touches routing (that had a bug initially; fixed and pinned by a test).
 

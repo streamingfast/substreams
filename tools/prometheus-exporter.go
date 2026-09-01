@@ -3,18 +3,20 @@ package tools
 import (
 	"context"
 	"fmt"
+	"maps"
+	"math"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
-	"github.com/streamingfast/dgrpc"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -24,14 +26,10 @@ import (
 
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
+	pbsubstreamsrpcv4 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
-
-var lastStatus = map[string]bool{}
-var lock = &sync.Mutex{}
 
 var prometheusCmd = &cobra.Command{
 	Use:   "prometheus-exporter <endpoint[,endpoint[,endpoint[@<block_height>]],[,...]]> <manifest> <module_name>",
@@ -54,24 +52,48 @@ func init() {
 	prometheusCmd.Flags().String("substreams-api-key-envvar", "SUBSTREAMS_API_KEY", "Name of variable containing Substreams Api Key")
 	prometheusCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	prometheusCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
-	prometheusCmd.Flags().Int("force-protocol-version", 0, "Force the use of a specific protocol version (0=unset/auto, 2=v2, 3=v3)")
+	prometheusCmd.Flags().Int("force-protocol-version", 0, "Force the use of a specific protocol version (0=unset, 4=v4), only v4 is accepted for now, the flag is kept for the next protocol versions")
 	prometheusCmd.Flags().Int64("block-height", -1, "Block number to request (defaults to -1, which means the HEAD)")
 	prometheusCmd.Flags().Duration("max-freshness", time.Minute*2, "(only used if block-height is relative, i.e. below 0) check the age of the received blocks, fail an endpoint if it is older than this duration")
 	prometheusCmd.Flags().Duration("interval", time.Second*20, "endpoints will be polled at this interval")
-	prometheusCmd.Flags().Duration("timeout", time.Second*10, "endpoints will be considered 'failing' if they don't complete in that duration")
+	prometheusCmd.Flags().Duration("connect-timeout", time.Second*10, "endpoints will be considered 'failing' (with reason 'connect_timeout') if the gRPC connection does not become ready in that duration, this budget is separate from --timeout")
+	prometheusCmd.Flags().Duration("timeout", time.Second*10, "endpoints will be considered 'failing' if the Blocks request does not complete in that duration, this excludes the time spent establishing the connection (see --connect-timeout)")
 
 	Cmd.AddCommand(prometheusCmd)
 }
 
-var status *prometheus.GaugeVec
-var requestDurationMs *prometheus.GaugeVec
-var blockAgeMs *prometheus.GaugeVec
 var endpointMap = make(map[string]endpointSpecs)
 
 type endpointSpecs struct {
 	url        string
 	startBlock *int
-	labels     prometheus.Labels
+	// labelValues holds one value per metric label name, in the same order. Prometheus
+	// requires a value for every declared label, so an endpoint given fewer query parameters
+	// than another one gets an empty value for the labels it is missing.
+	labelValues []string
+}
+
+// endpointState tracks what we already reported about an endpoint so that we can log
+// both the state transitions and the individual failures, with enough context to tell a
+// single hiccup apart from a sustained outage.
+type endpointState struct {
+	known               bool
+	available           bool
+	since               time.Time
+	consecutiveFailures int
+}
+
+var endpointStates = map[string]*endpointState{}
+var lock = &sync.Mutex{}
+
+// stateFor must be called with `lock` held.
+func stateFor(endpoint string) *endpointState {
+	state, found := endpointStates[endpoint]
+	if !found {
+		state = &endpointState{since: time.Now()}
+		endpointStates[endpoint] = state
+	}
+	return state
 }
 
 func extractStartblock(in string) (prefix string, startBlock *int, err error) {
@@ -99,7 +121,7 @@ func extractParams(in string) (params map[string]string, err error) {
 	}
 
 	params = make(map[string]string)
-	for _, part := range strings.Split(in, "&") {
+	for part := range strings.SplitSeq(in, "&") {
 		parts := strings.SplitN(part, "=", 2)
 		switch len(parts) {
 		case 0:
@@ -174,13 +196,28 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 	insecure := sflags.MustGetBool(cmd, "insecure")
 	plaintext := sflags.MustGetBool(cmd, "plaintext")
 	interval := sflags.MustGetDuration(cmd, "interval")
+	connectTimeout := sflags.MustGetDuration(cmd, "connect-timeout")
 	timeout := sflags.MustGetDuration(cmd, "timeout")
+
 	protocolVersionFlag := sflags.MustGetInt(cmd, "force-protocol-version")
 	forceProtocolVersion, err := client.ParseProtocolVersion(protocolVersionFlag)
+	if err != nil {
+		return fmt.Errorf("invalid --force-protocol-version: %w", err)
+	}
+	if !forceProtocolVersion.IsUnset() && !forceProtocolVersion.IsV4() {
+		return fmt.Errorf("invalid --force-protocol-version %d: the prometheus exporter only speaks %s for now", protocolVersionFlag, client.ProtocolVersionV4)
+	}
 
 	maxFreshness := sflags.MustGetDuration(cmd, "max-freshness")
 
-	allLabels := map[string]bool{"endpoint": true}
+	type parsedEndpoint struct {
+		url        string
+		startBlock *int
+		params     map[string]string
+	}
+
+	allLabels := map[string]bool{endpointLabel: true}
+	parsed := make([]parsedEndpoint, 0, len(endpoints))
 
 	for _, endpoint := range endpoints {
 		url, startBlock, params, err := parseEndpoint(endpoint)
@@ -188,22 +225,21 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("invalid endpoint %q: %w", endpoint, err)
 		}
 
-		labels := prometheus.Labels{"endpoint": url}
-		for k, v := range params {
-			labels[k] = v
+		for k := range params {
 			allLabels[k] = true
 		}
-		endpointMap[url] = endpointSpecs{url: url, startBlock: startBlock, labels: labels}
+		parsed = append(parsed, parsedEndpoint{url: url, startBlock: startBlock, params: params})
 	}
 
-	allLabelsSlice := make([]string, 0, len(allLabels))
-	for k := range allLabels {
-		allLabelsSlice = append(allLabelsSlice, k)
-	}
+	labelNames := slices.Sorted(maps.Keys(allLabels))
 
-	status = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "substreams_healthcheck_status", Help: "Either 1 for successful subtreams request, or 0 for failure"}, allLabelsSlice)
-	requestDurationMs = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "substreams_healthcheck_duration_ms", Help: "Request full processing time in millisecond"}, allLabelsSlice)
-	blockAgeMs = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "substreams_healthcheck_block_age_ms", Help: "Age of returned block"}, allLabelsSlice)
+	for _, endpoint := range parsed {
+		endpointMap[endpoint.url] = endpointSpecs{
+			url:         endpoint.url,
+			startBlock:  endpoint.startBlock,
+			labelValues: endpointLabelValues(endpoint.url, endpoint.params, labelNames),
+		}
+	}
 
 	for endpoint := range endpointMap {
 		startBlock := blockNum
@@ -225,13 +261,13 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 			fresh = &maxFreshness
 		}
 
-		go launchSubstreamsPoller(endpoint, substreamsClientConfig, pkgBundle.Package, outputStreamName, startBlock, interval, timeout, fresh)
+		go launchSubstreamsPoller(endpoint, substreamsClientConfig, pkgBundle.Package, outputStreamName, startBlock, interval, connectTimeout, timeout, fresh)
 	}
 
+	// The exporter serves only its own metrics, so the collectors go to a dedicated registry
+	// instead of the global one that `dmetrics.Set.Register` would use.
 	promReg := prometheus.NewRegistry()
-	promReg.MustRegister(status)
-	promReg.MustRegister(requestDurationMs)
-	promReg.MustRegister(blockAgeMs)
+	promReg.MustRegister(initHealthcheckMetrics(labelNames)...)
 
 	handler := promhttp.HandlerFor(
 		promReg,
@@ -247,170 +283,247 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func markSuccess(endpoint string, begin time.Time) {
+func markSuccess(endpoint string, result *pollResult) {
 	lock.Lock()
 	defer lock.Unlock()
-	if !lastStatus[endpoint] {
-		zlog.Info("endpoint now marked as available", zap.String("endpoint", endpoint))
+
+	state := stateFor(endpoint)
+	if !state.known || !state.available {
+		fields := []zap.Field{
+			zap.String("endpoint", endpoint),
+			zap.Duration("connect_duration", result.connectDuration),
+			zap.Duration("stream_duration", result.streamDuration),
+		}
+		if state.known {
+			fields = append(fields,
+				zap.Duration("unavailable_for", time.Since(state.since)),
+				zap.Int("failed_polls", state.consecutiveFailures),
+			)
+		}
+		zlog.Info("endpoint now marked as available", fields...)
+
+		state.known = true
+		state.available = true
+		state.since = time.Now()
 	}
-	lastStatus[endpoint] = true
-	status.With(endpointMap[endpoint].labels).Set(1)
-	requestDurationMs.With(endpointMap[endpoint].labels).Set(float64(time.Since(begin).Milliseconds()))
+	state.consecutiveFailures = 0
+
+	labelValues := endpointMap[endpoint].labelValues
+	status.SetInt(1, labelValues...)
+	consecutiveFailures.SetInt(0, labelValues...)
+	requestDurationMs.SetInt64(result.totalDuration().Milliseconds(), labelValues...)
+	connectDurationMs.SetInt64(result.connectDuration.Milliseconds(), labelValues...)
+	streamDurationMs.SetInt64(result.streamDuration.Milliseconds(), labelValues...)
+	if result.blockAge != nil {
+		blockAgeMs.SetInt64(result.blockAge.Milliseconds(), labelValues...)
+	}
 }
 
-func markFailure(endpoint string, begin time.Time, err error) {
+func markFailure(endpoint string, result *pollResult) {
 	lock.Lock()
 	defer lock.Unlock()
-	if val, ok := lastStatus[endpoint]; !ok || val {
-		zlog.Info("endpoint now marked as unavailable", zap.String("endpoint", endpoint), zap.Error(err))
-		lastStatus[endpoint] = false
+
+	state := stateFor(endpoint)
+	state.consecutiveFailures++
+
+	grpcCode := grpcCodeOf(result.err)
+	fields := []zap.Field{
+		zap.String("endpoint", endpoint),
+		zap.String("reason", string(result.reason)),
+		zap.String("grpc_code", grpcCode),
+		zap.Duration("connect_duration", result.connectDuration),
+		zap.Duration("stream_duration", result.streamDuration),
+		zap.Error(result.err),
 	}
-	status.With(endpointMap[endpoint].labels).Set(0)
-	requestDurationMs.With(endpointMap[endpoint].labels).Set(float64(time.Since(begin).Milliseconds()))
+
+	if !state.known || state.available {
+		if state.known {
+			fields = append(fields, zap.Duration("available_for", time.Since(state.since)))
+		}
+		zlog.Info("endpoint now marked as unavailable", fields...)
+
+		state.known = true
+		state.available = false
+		state.since = time.Now()
+	} else {
+		// Logged on every single failure, not only on the transition: an endpoint that fails
+		// repeatedly, or one that flaps between two scrapes, is otherwise invisible in the logs.
+		fields = append(fields,
+			zap.Int("consecutive_failures", state.consecutiveFailures),
+			zap.Duration("unavailable_for", time.Since(state.since)),
+		)
+		zlog.Info("endpoint poll failed", fields...)
+	}
+
+	labelValues := endpointMap[endpoint].labelValues
+	status.SetInt(0, labelValues...)
+	consecutiveFailures.SetInt(state.consecutiveFailures, labelValues...)
+	requestDurationMs.SetInt64(result.totalDuration().Milliseconds(), labelValues...)
+	connectDurationMs.SetInt64(result.connectDuration.Milliseconds(), labelValues...)
+	streamDurationMs.SetInt64(result.streamDuration.Milliseconds(), labelValues...)
+	failureCount.Inc(failureLabelValues(endpoint, result.reason, grpcCode)...)
+
+	if result.blockAge != nil {
+		blockAgeMs.SetInt64(result.blockAge.Milliseconds(), labelValues...)
+	} else {
+		// Without this, the gauge keeps reporting the age of the last block we ever saw, which
+		// silently gets younger than reality the longer the endpoint stays broken.
+		blockAgeMs.SetFloat64(math.NaN(), labelValues...)
+	}
 }
 
-func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.SubstreamsClientConfig, pkg *pbsubstreams.Package, outputStreamName string, blockNum int64, pollingInterval, pollingTimeout time.Duration, maxFreshness *time.Duration) {
+// pollResult is the outcome of a single poll, `err` being nil means the endpoint is healthy.
+type pollResult struct {
+	connectDuration time.Duration
+	streamDuration  time.Duration
+	blockAge        *time.Duration
+	blockNum        uint64
+	reason          failureReason
+	err             error
+}
 
+func (r *pollResult) totalDuration() time.Duration {
+	return r.connectDuration + r.streamDuration
+}
+
+// waitForConnReady blocks until the gRPC channel is usable. gRPC dials lazily, so without
+// this the DNS resolution, the TLS handshake and the load-balancer setup would all be
+// charged to the Blocks request budget, and every slow connection would be reported as an
+// endpoint failure ("waiting for new LB policy update: context deadline exceeded").
+func waitForConnReady(ctx context.Context, conn *grpc.ClientConn) error {
+	conn.Connect()
+	for {
+		state := conn.GetState()
+		switch state {
+		case connectivity.Ready:
+			return nil
+		case connectivity.Shutdown:
+			return fmt.Errorf("connection shut down before becoming ready")
+		}
+
+		if !conn.WaitForStateChange(ctx, state) {
+			return fmt.Errorf("connection stuck in state %q: %w", state, context.Cause(ctx))
+		}
+	}
+}
+
+func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.SubstreamsClientConfig, pkg *pbsubstreams.Package, outputStreamName string, blockNum int64, pollingInterval, connectTimeout, pollingTimeout time.Duration, maxFreshness *time.Duration) {
 	sleep := time.Duration(0)
 	for {
 		time.Sleep(sleep)
 		sleep = pollingInterval
 
-		ctx, cancel := context.WithTimeout(context.Background(), pollingTimeout)
-		begin := time.Now()
-		conn, connClose, callOpts, headers, err := client.NewSubstreamsClientConn(substreamsClientConfig)
+		result := pollEndpoint(endpoint, substreamsClientConfig, pkg, outputStreamName, blockNum, connectTimeout, pollingTimeout, maxFreshness)
+		if result.err != nil {
+			markFailure(endpoint, result)
+			continue
+		}
+		markSuccess(endpoint, result)
+	}
+}
+
+func pollEndpoint(endpoint string, substreamsClientConfig *client.SubstreamsClientConfig, pkg *pbsubstreams.Package, outputStreamName string, blockNum int64, connectTimeout, pollingTimeout time.Duration, maxFreshness *time.Duration) (result *pollResult) {
+	result = &pollResult{}
+
+	connectBegin := time.Now()
+	conn, connClose, callOpts, headers, err := client.NewSubstreamsClientConn(substreamsClientConfig)
+	if err != nil {
+		result.connectDuration = time.Since(connectBegin)
+		result.reason, result.err = reasonConnect, err
+		return
+	}
+	defer connClose()
+
+	connectCtx, cancelConnect := context.WithTimeoutCause(context.Background(), connectTimeout, fmt.Errorf("connect timeout of %s reached", connectTimeout))
+	defer cancelConnect()
+
+	if err := waitForConnReady(connectCtx, conn); err != nil {
+		result.connectDuration = time.Since(connectBegin)
+		result.reason, result.err = reasonConnectTimeout, err
+		return
+	}
+	result.connectDuration = time.Since(connectBegin)
+
+	streamBegin := time.Now()
+	defer func() { result.streamDuration = time.Since(streamBegin) }()
+
+	ctx, cancel := context.WithTimeoutCause(context.Background(), pollingTimeout, fmt.Errorf("request timeout of %s reached", pollingTimeout))
+	defer cancel()
+
+	if headers.IsSet() {
+		ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
+	}
+
+	var stopBlockNum uint64
+	if blockNum > 0 {
+		stopBlockNum = uint64(blockNum + 1)
+	}
+
+	// `sf.substreams.rpc.v4.Stream/Blocks` takes a v3 request and answers with v4 responses.
+	subReq := &pbsubstreamsrpcv3.Request{
+		StartBlockNum: blockNum,
+		StopBlockNum:  stopBlockNum,
+		Package:       pkg,
+		OutputModule:  outputStreamName,
+	}
+
+	if err := subReq.Validate(); err != nil {
+		result.reason, result.err = reasonInvalidRequest, err
+		return
+	}
+
+	// The connection is already READY, so a failure here is the endpoint refusing us, never
+	// a connection still being established.
+	callOpts = append(callOpts, grpc.WaitForReady(false))
+	zlog.Debug("calling sf.substreams.rpc.v4.Stream/Blocks", zap.String("endpoint", endpoint), zap.String("output_module", outputStreamName), zap.Int64("start_block", blockNum), zap.Uint64("stop_block", stopBlockNum), zap.Duration("connect_duration", result.connectDuration))
+
+	streamClient, err := pbsubstreamsrpcv4.NewStreamClient(conn).Blocks(ctx, subReq, callOpts...)
+	if err != nil {
+		result.reason, result.err = classifyStreamError(err), err
+		return
+	}
+
+	for {
+		resp, err := streamClient.Recv()
 		if err != nil {
-			zlog.Error("substreams client connection setup", zap.Error(err))
-			markFailure(endpoint, begin, err)
-			cancel()
+			result.reason, result.err = classifyStreamError(err), err
+			return
+		}
+
+		data, ok := resp.Message.(*pbsubstreamsrpcv4.Response_BlockScopedDatas)
+		if !ok || len(data.BlockScopedDatas.Items) == 0 {
 			continue
 		}
 
-		ssClientV2 := pbsubstreamsrpcv2.NewStreamClient(conn)
-		ssClientV3 := pbsubstreamsrpcv3.NewStreamClient(conn)
-
-		if headers.IsSet() {
-			ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
+		// Items are ordered by block number ascending, the last one is the freshest, which is
+		// what a HEAD healthcheck cares about.
+		clock := data.BlockScopedDatas.Items[len(data.BlockScopedDatas.Items)-1].Clock
+		result.blockNum = clock.Number
+		if maxFreshness == nil {
+			zlog.Debug("marking endpoint with success", zap.String("endpoint", endpoint), zap.Uint64("block_num", clock.Number))
+			return
 		}
 
-		var stopBlockNum uint64
-		if blockNum > 0 {
-			stopBlockNum = uint64(blockNum + 1)
-		}
-		subReq := &pbsubstreamsrpcv3.Request{
-			StartBlockNum: blockNum,
-			StopBlockNum:  stopBlockNum,
-			Package:       pkg,
-			OutputModule:  outputStreamName,
+		age := time.Since(clock.Timestamp.AsTime())
+		result.blockAge = &age
+		if age > *maxFreshness {
+			result.reason = reasonStaleBlock
+			result.err = fmt.Errorf("block %d is too old: %s, above the %s max freshness", clock.Number, age, *maxFreshness)
+			return
 		}
 
-		if err := subReq.Validate(); err != nil {
-			zlog.Error("validate request", zap.Error(err))
-			markFailure(endpoint, begin, err)
-			connClose()
-			cancel()
-			continue
-		}
-		callOpts = append(callOpts, grpc.WaitForReady(false))
-		zlog.Debug("calling sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.String("output_module", outputStreamName), zap.Int64("start_block", blockNum), zap.Uint64("stop_block", stopBlockNum))
-
-		var isRunningV2 bool
-		var cli grpc.ServerStreamingClient[pbsubstreamsrpc.Response]
-		if substreamsClientConfig.ForceProtocolVersion().IsV2() {
-			reqV2, err := subReq.ToV2()
-			if err != nil {
-				zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.Error(err))
-				markFailure(endpoint, begin, err)
-				connClose()
-				cancel()
-				continue
-			}
-			cli, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
-			if err != nil {
-				zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.Error(err))
-				markFailure(endpoint, begin, err)
-				connClose()
-				cancel()
-				continue
-			}
-			isRunningV2 = true
-		} else {
-			cli, err = ssClientV3.Blocks(ctx, subReq, callOpts...)
-			if err != nil {
-				zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.Error(err))
-				markFailure(endpoint, begin, err)
-				connClose()
-				cancel()
-				continue
-			}
+		// A block age climbing towards the threshold is what precedes a `stale_block`
+		// failure, reporting it here is what makes an alert on `block_age_ms` explainable.
+		if age > *maxFreshness/2 {
+			zlog.Info("endpoint block age is above half of the max freshness",
+				zap.String("endpoint", endpoint),
+				zap.Uint64("block_num", clock.Number),
+				zap.Duration("block_age", age),
+				zap.Duration("max_freshness", *maxFreshness),
+			)
 		}
 
-	forloop:
-		for {
-			resp, err := cli.Recv()
-			if resp != nil {
-				switch resp.Message.(type) {
-				case *pbsubstreamsrpc.Response_BlockScopedData:
-					if maxFreshness == nil {
-						zlog.Debug("marking endpoint with success",
-							zap.String("endpoint", endpoint),
-							zap.Duration("duration", time.Since(begin)),
-							zap.Uint64("block_num", resp.Message.(*pbsubstreamsrpc.Response_BlockScopedData).BlockScopedData.Clock.Number),
-						)
-						markSuccess(endpoint, begin)
-						break forloop
-					}
-					blockTime := resp.Message.(*pbsubstreamsrpc.Response_BlockScopedData).BlockScopedData.Clock.Timestamp.AsTime()
-					blockAgeMs.With(endpointMap[endpoint].labels).Set(float64(time.Since(blockTime).Milliseconds()))
-					if age := time.Since(blockTime); age > *maxFreshness {
-						markFailure(endpoint, begin, fmt.Errorf("block is too old: %s", age))
-						zlog.Debug("marking endpoint with failure because of freshness", zap.String("endpoint", endpoint), zap.Duration("duration", time.Since(begin)), zap.Duration("block_age", time.Since(blockTime)))
-					} else {
-						markSuccess(endpoint, begin)
-						zlog.Debug("marking endpoint with success",
-							zap.String("endpoint", endpoint),
-							zap.Duration("duration", time.Since(begin)),
-							zap.Duration("block_age", time.Since(blockTime)),
-							zap.Uint64("block_num", resp.Message.(*pbsubstreamsrpc.Response_BlockScopedData).BlockScopedData.Clock.Number),
-						)
-					}
-					break forloop
-				}
-			}
-			if err != nil {
-				if substreamsClientConfig.ForceProtocolVersion().IsUnset() && !isRunningV2 {
-					if dgrpcError := dgrpc.AsGRPCError(err); dgrpcError != nil {
-						switch dgrpcError.Code() {
-						case codes.Unimplemented, codes.NotFound:
-
-							zlog.Debug("server does not implement sf.substreams.rpc.v3.Stream/Blocks, trying v2")
-							reqV2, err := subReq.ToV2()
-							if err != nil {
-								zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.Error(err))
-								markFailure(endpoint, begin, err)
-								connClose()
-								cancel()
-								break
-							}
-							cli, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
-							if err != nil {
-								zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.Error(err))
-								markFailure(endpoint, begin, err)
-								connClose()
-								cancel()
-								continue
-							}
-							isRunningV2 = true
-						}
-					}
-				}
-
-				markFailure(endpoint, begin, err)
-				break
-			}
-		}
-
-		connClose()
-		cancel()
+		zlog.Debug("marking endpoint with success", zap.String("endpoint", endpoint), zap.Uint64("block_num", clock.Number), zap.Duration("block_age", age))
+		return
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
@@ -76,7 +77,7 @@ func newFakeWorker(streamErr error) (*RemoteWorker, *fakeSubstreamsClient) {
 	factory := func() (pbssinternal.SubstreamsClient, func() error, []grpc.CallOption, client.Headers, error) {
 		return fake, func() error { return nil }, nil, client.Headers{}, nil
 	}
-	return NewRemoteWorker(factory, "test-worker", zap.NewNop()), fake
+	return NewRemoteWorker(factory, "test-worker", zap.NewNop(), NewLaunchQueue(1)), fake
 }
 
 // TestWork_FoundationalStoreFatalIsRetryable validates how tier1 classifies the
@@ -89,7 +90,7 @@ func TestWork_FoundationalStoreFatalIsRetryable(t *testing.T) {
 
 	t.Run("internal (foundational store fatal) is retryable", func(t *testing.T) {
 		w, _ := newFakeWorker(status.Error(codes.Internal, "module \"m\": foundational store request failed: store unreachable: connection refused"))
-		res := w.work(testWorkerCtx(), request, nil, upstream, 0)
+		res := w.work(testWorkerCtx(), request, nil, upstream, 0, func() {})
 
 		var retryable *RetryableErr
 		require.True(t, errors.As(res.Error, &retryable), "codes.Internal must be retryable, got: %v", res.Error)
@@ -97,7 +98,7 @@ func TestWork_FoundationalStoreFatalIsRetryable(t *testing.T) {
 
 	t.Run("invalid argument (deterministic) is not retryable", func(t *testing.T) {
 		w, _ := newFakeWorker(status.Error(codes.InvalidArgument, "module \"m\": boom (deterministic error)"))
-		res := w.work(testWorkerCtx(), request, nil, upstream, 0)
+		res := w.work(testWorkerCtx(), request, nil, upstream, 0, func() {})
 
 		var retryable *RetryableErr
 		require.False(t, errors.As(res.Error, &retryable), "codes.InvalidArgument must NOT be retryable, got: %v", res.Error)
@@ -107,12 +108,12 @@ func TestWork_FoundationalStoreFatalIsRetryable(t *testing.T) {
 
 // TestWork_RetriesThenBubblesUp validates that a foundational store fatal error
 // (arriving as codes.Internal) is retried exactly workerMaxRetries times before
-// it gives up and bubbles up to the user as a failed job. workerMaxRetries is
-// lowered here to keep the test fast (the real default is 5).
+// it gives up and bubbles up to the user as a failed job. workerMaxRetries and the
+// between-attempts wait are lowered here to keep the test fast.
 func TestWork_RetriesThenBubblesUp(t *testing.T) {
-	prev := workerMaxRetries
-	workerMaxRetries = 2
-	defer func() { workerMaxRetries = prev }()
+	prevRetries, prevDelay := workerMaxRetries, workerFailedRetryDelay
+	workerMaxRetries, workerFailedRetryDelay = 2, 10*time.Millisecond
+	defer func() { workerMaxRetries, workerFailedRetryDelay = prevRetries, prevDelay }()
 
 	w, fake := newFakeWorker(status.Error(codes.Internal, "module \"m\": foundational store request failed: organization id mismatch"))
 

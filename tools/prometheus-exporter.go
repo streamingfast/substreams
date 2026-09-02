@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -65,7 +66,6 @@ func init() {
 var endpointMap = make(map[string]endpointSpecs)
 
 type endpointSpecs struct {
-	url        string
 	startBlock *int
 	// labelValues holds one value per metric label name, in the same order. Prometheus
 	// requires a value for every declared label, so an endpoint given fewer query parameters
@@ -81,6 +81,8 @@ type endpointState struct {
 	available           bool
 	since               time.Time
 	consecutiveFailures int
+	blockAgeAboveHalf   bool
+	blockAgeStreak      int
 }
 
 var endpointStates = map[string]*endpointState{}
@@ -199,13 +201,17 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 	connectTimeout := sflags.MustGetDuration(cmd, "connect-timeout")
 	timeout := sflags.MustGetDuration(cmd, "timeout")
 
+	// Checked before `ParseProtocolVersion` so that an operator passing 2 or 3 reads the one
+	// message that applies here, rather than being told v2 and v3 are supported and then
+	// refused them on the next line.
 	protocolVersionFlag := sflags.MustGetInt(cmd, "force-protocol-version")
+	if protocolVersionFlag != 0 && protocolVersionFlag != int(client.ProtocolVersionV4) {
+		return fmt.Errorf("invalid --force-protocol-version %d: the prometheus exporter only speaks %s for now, leave the flag unset or pass 4", protocolVersionFlag, client.ProtocolVersionV4)
+	}
+
 	forceProtocolVersion, err := client.ParseProtocolVersion(protocolVersionFlag)
 	if err != nil {
 		return fmt.Errorf("invalid --force-protocol-version: %w", err)
-	}
-	if !forceProtocolVersion.IsUnset() && !forceProtocolVersion.IsV4() {
-		return fmt.Errorf("invalid --force-protocol-version %d: the prometheus exporter only speaks %s for now", protocolVersionFlag, client.ProtocolVersionV4)
 	}
 
 	maxFreshness := sflags.MustGetDuration(cmd, "max-freshness")
@@ -235,11 +241,15 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 
 	for _, endpoint := range parsed {
 		endpointMap[endpoint.url] = endpointSpecs{
-			url:         endpoint.url,
 			startBlock:  endpoint.startBlock,
 			labelValues: endpointLabelValues(endpoint.url, endpoint.params, labelNames),
 		}
 	}
+
+	// Declared before the pollers start: a poller that fails on its very first attempt reports
+	// through these, and a nil one is both a data race and a nil dereference that takes the
+	// whole process down.
+	collectors := initHealthcheckMetrics(labelNames)
 
 	for endpoint := range endpointMap {
 		startBlock := blockNum
@@ -267,7 +277,7 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 	// The exporter serves only its own metrics, so the collectors go to a dedicated registry
 	// instead of the global one that `dmetrics.Set.Register` would use.
 	promReg := prometheus.NewRegistry()
-	promReg.MustRegister(initHealthcheckMetrics(labelNames)...)
+	promReg.MustRegister(collectors...)
 
 	handler := promhttp.HandlerFor(
 		promReg,
@@ -307,6 +317,7 @@ func markSuccess(endpoint string, result *pollResult) {
 		state.since = time.Now()
 	}
 	state.consecutiveFailures = 0
+	trackBlockAge(endpoint, state, result)
 
 	labelValues := endpointMap[endpoint].labelValues
 	status.SetInt(1, labelValues...)
@@ -346,14 +357,16 @@ func markFailure(endpoint string, result *pollResult) {
 		state.available = false
 		state.since = time.Now()
 	} else {
-		// Logged on every single failure, not only on the transition: an endpoint that fails
-		// repeatedly, or one that flaps between two scrapes, is otherwise invisible in the logs.
+		// An endpoint that fails repeatedly, or one that flaps between two Prometheus scrapes,
+		// stays invisible in the logs unless every failure is reported, not just the first one.
 		fields = append(fields,
 			zap.Int("consecutive_failures", state.consecutiveFailures),
 			zap.Duration("unavailable_for", time.Since(state.since)),
 		)
 		zlog.Info("endpoint poll failed", fields...)
 	}
+
+	trackBlockAge(endpoint, state, result)
 
 	labelValues := endpointMap[endpoint].labelValues
 	status.SetInt(0, labelValues...)
@@ -372,12 +385,56 @@ func markFailure(endpoint string, result *pollResult) {
 	}
 }
 
+// blockAgeFlipPolls is how many consecutive polls must agree before the block-age report
+// flips. A chain whose block interval straddles half of --max-freshness crosses the threshold
+// on almost every poll, so a bare edge trigger reports a healthy endpoint forever, just in
+// pairs of lines instead of one. Requiring a streak reports only a drift that persists.
+const blockAgeFlipPolls = 3
+
+// trackBlockAge reports the block age on the crossings rather than on every poll, the way the
+// availability transitions are reported: an age sitting just above the threshold is the normal
+// state of a chain whose block interval is close to it, and saying so once per poll drowns the
+// signal. Must be called with `lock` held.
+func trackBlockAge(endpoint string, state *endpointState, result *pollResult) {
+	if result.blockAge == nil || result.maxFreshness == nil {
+		return
+	}
+
+	aboveHalf := *result.blockAge > *result.maxFreshness/2
+	if aboveHalf == state.blockAgeAboveHalf {
+		state.blockAgeStreak = 0
+		return
+	}
+
+	state.blockAgeStreak++
+	if state.blockAgeStreak < blockAgeFlipPolls {
+		return
+	}
+
+	state.blockAgeAboveHalf = aboveHalf
+	state.blockAgeStreak = 0
+
+	message := "endpoint block age fell back below half of the max freshness"
+	if aboveHalf {
+		// This is what precedes a `stale_block` failure, and what makes an alert on
+		// `block_age_ms` explainable.
+		message = "endpoint block age climbed above half of the max freshness"
+	}
+
+	zlog.Info(message,
+		zap.String("endpoint", endpoint),
+		zap.Duration("block_age", *result.blockAge),
+		zap.Duration("max_freshness", *result.maxFreshness),
+		zap.Int("confirmed_over_polls", blockAgeFlipPolls),
+	)
+}
+
 // pollResult is the outcome of a single poll, `err` being nil means the endpoint is healthy.
 type pollResult struct {
 	connectDuration time.Duration
 	streamDuration  time.Duration
 	blockAge        *time.Duration
-	blockNum        uint64
+	maxFreshness    *time.Duration
 	reason          failureReason
 	err             error
 }
@@ -386,10 +443,19 @@ func (r *pollResult) totalDuration() time.Duration {
 	return r.connectDuration + r.streamDuration
 }
 
+// errConnFailedFast reports that the channel reached TRANSIENT_FAILURE: the dial failed
+// outright rather than being slow. The connectivity API never hands over the dial error, so
+// the caller issues the request anyway and lets gRPC answer with it.
+var errConnFailedFast = errors.New("connection failed to establish")
+
 // waitForConnReady blocks until the gRPC channel is usable. gRPC dials lazily, so without
 // this the DNS resolution, the TLS handshake and the load-balancer setup would all be
 // charged to the Blocks request budget, and every slow connection would be reported as an
 // endpoint failure ("waiting for new LB policy update: context deadline exceeded").
+//
+// It only ever waits on a connection that is still making progress. gRPC re-dials on its own
+// backoff, so waiting through TRANSIENT_FAILURE would burn the whole connect budget on an
+// endpoint that answered "connection refused" in a microsecond, and report it as a timeout.
 func waitForConnReady(ctx context.Context, conn *grpc.ClientConn) error {
 	conn.Connect()
 	for {
@@ -397,6 +463,8 @@ func waitForConnReady(ctx context.Context, conn *grpc.ClientConn) error {
 		switch state {
 		case connectivity.Ready:
 			return nil
+		case connectivity.TransientFailure:
+			return errConnFailedFast
 		case connectivity.Shutdown:
 			return fmt.Errorf("connection shut down before becoming ready")
 		}
@@ -423,13 +491,13 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 }
 
 func pollEndpoint(endpoint string, substreamsClientConfig *client.SubstreamsClientConfig, pkg *pbsubstreams.Package, outputStreamName string, blockNum int64, connectTimeout, pollingTimeout time.Duration, maxFreshness *time.Duration) (result *pollResult) {
-	result = &pollResult{}
+	result = &pollResult{maxFreshness: maxFreshness}
 
 	connectBegin := time.Now()
 	conn, connClose, callOpts, headers, err := client.NewSubstreamsClientConn(substreamsClientConfig)
 	if err != nil {
 		result.connectDuration = time.Since(connectBegin)
-		result.reason, result.err = reasonConnect, err
+		result.reason, result.err = reasonInvalidConfig, err
 		return
 	}
 	defer connClose()
@@ -437,10 +505,18 @@ func pollEndpoint(endpoint string, substreamsClientConfig *client.SubstreamsClie
 	connectCtx, cancelConnect := context.WithTimeoutCause(context.Background(), connectTimeout, fmt.Errorf("connect timeout of %s reached", connectTimeout))
 	defer cancelConnect()
 
+	var connectFailedFast bool
 	if err := waitForConnReady(connectCtx, conn); err != nil {
-		result.connectDuration = time.Since(connectBegin)
-		result.reason, result.err = reasonConnectTimeout, err
-		return
+		if !errors.Is(err, errConnFailedFast) {
+			result.connectDuration = time.Since(connectBegin)
+			result.reason, result.err = reasonConnectTimeout, err
+			return
+		}
+
+		// The dial failed, and only the request will say why: gRPC answers it immediately with
+		// the dial error it is holding ("connection refused", "no such host"), which is exactly
+		// the information an operator needs and which the connectivity API does not expose.
+		connectFailedFast = true
 	}
 	result.connectDuration = time.Since(connectBegin)
 
@@ -472,21 +548,21 @@ func pollEndpoint(endpoint string, substreamsClientConfig *client.SubstreamsClie
 		return
 	}
 
-	// The connection is already READY, so a failure here is the endpoint refusing us, never
-	// a connection still being established.
+	// Fail fast: the connection is either READY or known-broken by now, so waiting for it here
+	// would only re-do what the connect phase already decided.
 	callOpts = append(callOpts, grpc.WaitForReady(false))
 	zlog.Debug("calling sf.substreams.rpc.v4.Stream/Blocks", zap.String("endpoint", endpoint), zap.String("output_module", outputStreamName), zap.Int64("start_block", blockNum), zap.Uint64("stop_block", stopBlockNum), zap.Duration("connect_duration", result.connectDuration))
 
 	streamClient, err := pbsubstreamsrpcv4.NewStreamClient(conn).Blocks(ctx, subReq, callOpts...)
 	if err != nil {
-		result.reason, result.err = classifyStreamError(err), err
+		result.reason, result.err = streamFailure(ctx, connectFailedFast, err)
 		return
 	}
 
 	for {
 		resp, err := streamClient.Recv()
 		if err != nil {
-			result.reason, result.err = classifyStreamError(err), err
+			result.reason, result.err = streamFailure(ctx, connectFailedFast, err)
 			return
 		}
 
@@ -498,7 +574,14 @@ func pollEndpoint(endpoint string, substreamsClientConfig *client.SubstreamsClie
 		// Items are ordered by block number ascending, the last one is the freshest, which is
 		// what a HEAD healthcheck cares about.
 		clock := data.BlockScopedDatas.Items[len(data.BlockScopedDatas.Items)-1].Clock
-		result.blockNum = clock.Number
+		if clock == nil {
+			// Nothing recovers a poller, so an unguarded dereference here would take down the
+			// exporter for every other endpoint too.
+			result.reason = reasonInvalidResponse
+			result.err = fmt.Errorf("endpoint returned block data without a clock")
+			return
+		}
+
 		if maxFreshness == nil {
 			zlog.Debug("marking endpoint with success", zap.String("endpoint", endpoint), zap.Uint64("block_num", clock.Number))
 			return
@@ -510,17 +593,6 @@ func pollEndpoint(endpoint string, substreamsClientConfig *client.SubstreamsClie
 			result.reason = reasonStaleBlock
 			result.err = fmt.Errorf("block %d is too old: %s, above the %s max freshness", clock.Number, age, *maxFreshness)
 			return
-		}
-
-		// A block age climbing towards the threshold is what precedes a `stale_block`
-		// failure, reporting it here is what makes an alert on `block_age_ms` explainable.
-		if age > *maxFreshness/2 {
-			zlog.Info("endpoint block age is above half of the max freshness",
-				zap.String("endpoint", endpoint),
-				zap.Uint64("block_num", clock.Number),
-				zap.Duration("block_age", age),
-				zap.Duration("max_freshness", *maxFreshness),
-			)
 		}
 
 		zlog.Debug("marking endpoint with success", zap.String("endpoint", endpoint), zap.Uint64("block_num", clock.Number), zap.Duration("block_age", age))

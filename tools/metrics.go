@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"slices"
 
@@ -22,25 +23,15 @@ import (
 type failureReason string
 
 const (
-	// reasonConnect means the gRPC client could not even be constructed.
-	reasonConnect failureReason = "connect"
-	// reasonConnectTimeout means the gRPC channel never reached the READY state within
-	// the connect timeout: DNS, TCP, TLS or load-balancer resolution is the problem, the
-	// Substreams backend was never reached.
-	reasonConnectTimeout failureReason = "connect_timeout"
-	// reasonInvalidRequest means the request could not be built or validated, this is a
-	// configuration problem on our side, never an endpoint problem.
-	reasonInvalidRequest failureReason = "invalid_request"
-	// reasonRequestTimeout means the endpoint accepted the request but did not deliver a
-	// block within the request timeout.
-	reasonRequestTimeout failureReason = "request_timeout"
-	// reasonStreamError means the endpoint returned a gRPC error, see the `grpc_code` label.
-	reasonStreamError failureReason = "stream_error"
-	// reasonStaleBlock means the endpoint answered correctly but the block it returned is
-	// older than --max-freshness.
-	reasonStaleBlock failureReason = "stale_block"
-	// reasonNoData means the stream completed without ever returning block data.
-	reasonNoData failureReason = "no_data"
+	reasonInvalidConfig   failureReason = "invalid_config"
+	reasonConnectFailed   failureReason = "connect_failed"
+	reasonConnectTimeout  failureReason = "connect_timeout"
+	reasonInvalidRequest  failureReason = "invalid_request"
+	reasonRequestTimeout  failureReason = "request_timeout"
+	reasonStreamError     failureReason = "stream_error"
+	reasonStaleBlock      failureReason = "stale_block"
+	reasonInvalidResponse failureReason = "invalid_response"
+	reasonNoData          failureReason = "no_data"
 )
 
 // noGRPCCode is the value of the `grpc_code` label for failures that did not carry a gRPC status.
@@ -110,6 +101,29 @@ func grpcCodeOf(err error) string {
 		return grpcError.Code().String()
 	}
 	return noGRPCCode
+}
+
+// streamFailure attributes an error returned by the Blocks call. `connect_failed` means the
+// dial itself failed, `connect_timeout` (set by the caller) means it was merely slow and the
+// backend was never reached at all. When the channel never
+// became ready, gRPC answers with the dial error it was holding, so the failure belongs to
+// the connection rather than to the endpoint's own answer.
+func streamFailure(ctx context.Context, connectFailedFast bool, err error) (failureReason, error) {
+	err = withDeadlineCause(ctx, err)
+	if connectFailedFast {
+		return reasonConnectFailed, err
+	}
+	return classifyStreamError(err), err
+}
+
+// withDeadlineCause appends the reason ctx was cut short. gRPC answers a request that
+// outlived its deadline with its own "context deadline exceeded" status and drops the cause
+// attached to the context, so without this the error never names which budget expired.
+func withDeadlineCause(ctx context.Context, err error) error {
+	if cause := context.Cause(ctx); cause != nil {
+		return fmt.Errorf("%w: %s", err, cause)
+	}
+	return err
 }
 
 // classifyStreamError maps an error returned while talking to the endpoint onto a

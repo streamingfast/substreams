@@ -8,6 +8,7 @@ import (
 	"maps"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -122,4 +123,43 @@ func TestEndpointLabelValues(t *testing.T) {
 	for _, labelValues := range values {
 		assert.NotPanics(t, func() { gauge.WithLabelValues(labelValues...).Set(1) })
 	}
+}
+
+func TestWithDeadlineCause(t *testing.T) {
+	streamErr := grpcstatus.Error(codes.DeadlineExceeded, "context deadline exceeded")
+
+	t.Run("live context leaves the error alone", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		assert.Equal(t, streamErr, withDeadlineCause(ctx, streamErr))
+	})
+
+	t.Run("expired context names the budget that ran out", func(t *testing.T) {
+		ctx, cancel := context.WithTimeoutCause(context.Background(), time.Nanosecond, errors.New("request timeout of 15s reached"))
+		defer cancel()
+		<-ctx.Done()
+
+		err := withDeadlineCause(ctx, streamErr)
+		assert.ErrorContains(t, err, "request timeout of 15s reached")
+		assert.ErrorIs(t, err, streamErr)
+	})
+}
+
+func TestStreamFailure(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// A dial that failed fast answers through the request, so the gRPC error carries the dial
+	// message and belongs to the connection, not to the endpoint's own answer.
+	refused := grpcstatus.Error(codes.Unavailable, `connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:19999: connect: connection refused"`)
+	reason, err := streamFailure(ctx, true, refused)
+	assert.Equal(t, reasonConnectFailed, reason)
+	assert.ErrorContains(t, err, "connection refused")
+
+	reason, _ = streamFailure(ctx, false, refused)
+	assert.Equal(t, reasonStreamError, reason)
+
+	reason, _ = streamFailure(ctx, false, grpcstatus.Error(codes.DeadlineExceeded, "context deadline exceeded"))
+	assert.Equal(t, reasonRequestTimeout, reason)
 }

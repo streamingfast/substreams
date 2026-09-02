@@ -30,6 +30,7 @@ package tests_e2e
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -39,6 +40,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/pprof"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -277,8 +279,8 @@ func (s *thinstoreStack) expect(t *testing.T, got map[uint64]string, start, stop
 			extra = append(extra, b)
 		}
 	}
-	sort.Slice(missing, func(i, j int) bool { return missing[i] < missing[j] })
-	sort.Slice(differing, func(i, j int) bool { return differing[i] < differing[j] })
+	slices.Sort(missing)
+	slices.Sort(differing)
 	if len(missing)+len(extra)+len(differing) == 0 {
 		return
 	}
@@ -318,7 +320,7 @@ func (s *thinstoreStack) files(module, folder string) []cacheFile {
 		block, _ := strconv.ParseUint(m[1], 10, 64)
 		out = append(out, cacheFile{path: filepath.Join(dir, entry.Name()), block: block, kind: m[3]})
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].block < out[j].block })
+	slices.SortFunc(out, func(a, b cacheFile) int { return cmp.Compare(a.block, b.block) })
 	return out
 }
 

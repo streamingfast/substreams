@@ -1,13 +1,14 @@
 package clickhouse
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
 	"os"
 	"path"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/ClickHouse/ch-go"
@@ -588,8 +589,8 @@ func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) error {
 	tables := d.dialect.GetTables()
 
 	// Sort tables in descending order based on their Ordinal field
-	sort.Slice(tables, func(i, j int) bool {
-		return tables[i].Ordinal > tables[j].Ordinal
+	slices.SortFunc(tables, func(a, b *schema.Table) int {
+		return cmp.Compare(b.Ordinal, a.Ordinal)
 	})
 
 	client, err := d.client()

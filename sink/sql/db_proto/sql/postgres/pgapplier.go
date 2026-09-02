@@ -1,11 +1,12 @@
 package postgres
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -54,8 +55,8 @@ func (a *pgApplier) copyOrder(tables []spool.TableRecord) []spool.TableRecord {
 		return len(a.copyRanks)
 	}
 
-	sort.SliceStable(ordered, func(i, j int) bool {
-		return rank(ordered[i]) < rank(ordered[j])
+	slices.SortStableFunc(ordered, func(a, b spool.TableRecord) int {
+		return cmp.Compare(rank(a), rank(b))
 	})
 
 	return ordered

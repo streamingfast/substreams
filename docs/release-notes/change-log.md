@@ -137,9 +137,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Breaking** The exporter now speaks `sf.substreams.rpc.v4.Stream/Blocks` only. The v3-to-v2 fallback is gone --
   it closed the connection and then kept reading from it, double-counting the failure -- and
   `--force-protocol-version` accepts only `4` (or `0`), the flag being kept for the protocol versions to come. An
-  invalid value used to be parsed and then silently ignored, it is now rejected at startup, which means a deployment
-  currently passing `--force-protocol-version 2` or `3` will refuse to start: **unset the flag before rolling the
-  new image**, otherwise the exporter crash-loops and the fleet loses its healthcheck metrics entirely.
+  invalid value used to be parsed and then silently ignored, it is now rejected at startup, so an invocation passing
+  `--force-protocol-version 2` or `3` must drop the flag.
 
 ### Dependencies
 

@@ -26,9 +26,14 @@ type cpuSample struct {
 // UsageRatio is a delta between consecutive Read calls, so the first Read
 // returns it as 0.
 type CPUReader struct {
-	cgroupDir  string
+	cgroupDir string
+	// quotaCores is the denominator of UsageRatio: the override when one is
+	// configured, otherwise what cpu.max reports.
 	quotaCores float64
-	prev       *cpuSample
+	// cgroupQuotaCores is what cpu.max reports, kept even when an override wins
+	// so callers can warn about an override above the limit the kernel enforces.
+	cgroupQuotaCores float64
+	prev             *cpuSample
 }
 
 // NewCPUReader resolves the process's cgroup v2 directory and validates that
@@ -36,26 +41,36 @@ type CPUReader struct {
 // (macOS, cgroup v1 nodes); callers treat that as "CPU signals unavailable".
 // SUBSTREAMS_CGROUP_DIR overrides the directory, for testing the evictor on
 // hosts without cgroups by feeding cpu.max and cpu.stat files.
-func NewCPUReader() (*CPUReader, error) {
+//
+// quotaCoresOverride, when above 0, is used as the quota instead of cpu.max.
+// Usage still comes from the cgroup's cpu.stat: the override supplies the
+// denominator on a pod whose cgroup accounts CPU but carries no limit, it does
+// not remove the cgroup dependency.
+func NewCPUReader(quotaCoresOverride float64) (*CPUReader, error) {
 	if dir := os.Getenv("SUBSTREAMS_CGROUP_DIR"); dir != "" {
-		return newCPUReaderAt(dir)
+		return newCPUReaderAt(dir, quotaCoresOverride)
 	}
 	dir, err := resolveCgroupDir("/sys/fs/cgroup", "/proc/self/cgroup")
 	if err != nil {
 		return nil, err
 	}
-	return newCPUReaderAt(dir)
+	return newCPUReaderAt(dir, quotaCoresOverride)
 }
 
-func newCPUReaderAt(dir string) (*CPUReader, error) {
-	quota, err := readQuotaCores(filepath.Join(dir, "cpu.max"))
-	if err != nil {
+func newCPUReaderAt(dir string, quotaCoresOverride float64) (*CPUReader, error) {
+	cgroupQuota, err := readQuotaCores(filepath.Join(dir, "cpu.max"))
+	if err != nil && quotaCoresOverride <= 0 {
 		return nil, fmt.Errorf("reading cpu.max: %w", err)
 	}
 	if _, err := readUsageUsec(filepath.Join(dir, "cpu.stat")); err != nil {
 		return nil, fmt.Errorf("reading cpu.stat: %w", err)
 	}
-	return &CPUReader{cgroupDir: dir, quotaCores: quota}, nil
+
+	quota := cgroupQuota
+	if quotaCoresOverride > 0 {
+		quota = quotaCoresOverride
+	}
+	return &CPUReader{cgroupDir: dir, quotaCores: quota, cgroupQuotaCores: cgroupQuota}, nil
 }
 
 // resolveCgroupDir finds the cgroup v2 directory of the current process.
@@ -82,7 +97,12 @@ func resolveCgroupDir(mountPoint, procSelfCgroup string) (string, error) {
 	return "", fmt.Errorf("no readable cgroup v2 cpu.stat found under %s", mountPoint)
 }
 
+// QuotaCores is the quota UsageRatio is measured against.
 func (r *CPUReader) QuotaCores() float64 { return r.quotaCores }
+
+// CgroupQuotaCores is the limit cpu.max reports, 0 when the cgroup has none.
+// It differs from QuotaCores only when an override is configured.
+func (r *CPUReader) CgroupQuotaCores() float64 { return r.cgroupQuotaCores }
 
 func (r *CPUReader) Read() (CPUSignals, error) {
 	usageUsec, err := readUsageUsec(filepath.Join(r.cgroupDir, "cpu.stat"))

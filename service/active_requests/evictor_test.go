@@ -1,6 +1,8 @@
 package active_requests
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -123,9 +125,6 @@ func TestObserveModeDoesNotEnforce(t *testing.T) {
 	ev := newTestEvictor(cfg)
 	t0 := time.Now()
 
-	var callbackFired bool
-	ev.OnOverloadChange(func(bool) { callbackFired = true })
-
 	hot := CPUSignals{QuotaCores: 4, UsageRatio: 0.97}
 	ev.classify(hot, t0)
 	assert.True(t, ev.classify(hot, t0.Add(cfg.Sustain)))
@@ -133,7 +132,6 @@ func TestObserveModeDoesNotEnforce(t *testing.T) {
 	// internal state tracks the overload, but nothing visible to routing/admission
 	assert.True(t, ev.overloaded.Load())
 	assert.False(t, ev.IsOverloaded())
-	assert.False(t, callbackFired)
 }
 
 func TestEffectiveActiveRequests(t *testing.T) {
@@ -166,4 +164,44 @@ func TestEffectiveActiveRequests_NoNominalCapacity(t *testing.T) {
 	cfg := DefaultEvictorConfig()
 	ev := newTestEvictor(cfg)
 	assert.Equal(t, 6.0, ev.effectiveActiveRequests(CPUSignals{QuotaCores: 4, UsageRatio: 0.9}, 6))
+}
+
+func TestTick_UnreadableCgroupClearsOverload(t *testing.T) {
+	dir := t.TempDir()
+	writeCgroupFiles(t, dir, map[string]string{
+		"cpu.max":  "400000 100000\n",
+		"cpu.stat": "usage_usec 0\n",
+	})
+	reader, err := newCPUReaderAt(dir, 0)
+	require.NoError(t, err)
+
+	cfg := DefaultEvictorConfig()
+	cfg.Mode = EvictionFull
+	ev := NewEvictor(cfg, NewActiveRequestsManager(zap.NewNop()), reader, zap.NewNop())
+
+	var evaluations int
+	ev.OnEvaluate(func() { evaluations++ })
+
+	t0 := time.Now()
+	hot := CPUSignals{QuotaCores: 4, UsageRatio: 0.95}
+	ev.classify(hot, t0)
+	require.True(t, ev.classify(hot, t0.Add(cfg.Sustain)))
+	require.True(t, ev.IsOverloaded())
+
+	// the signal the overload was built from goes away: the pod cannot confirm it
+	// is still overloaded, so it must go back to ready and accepting requests
+	require.NoError(t, os.Remove(filepath.Join(dir, "cpu.stat")))
+	ev.tick(t0.Add(cfg.Sustain + cfg.Interval))
+
+	assert.False(t, ev.IsOverloaded())
+	assert.Equal(t, 1, evaluations)
+	assert.True(t, ev.overloadSince.IsZero())
+	assert.True(t, ev.recoverSince.IsZero())
+	assert.True(t, ev.unreadyAt.IsZero())
+
+	// the readiness the host derives from IsOverloaded is re-asserted on every
+	// tick, including while the signal stays missing
+	ev.tick(t0.Add(cfg.Sustain + 2*cfg.Interval))
+	assert.False(t, ev.IsOverloaded())
+	assert.Equal(t, 2, evaluations)
 }

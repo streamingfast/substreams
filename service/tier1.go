@@ -110,7 +110,10 @@ type Tier1Service struct {
 
 	// You can call this function to switch the parent app to be ready or not ready influencing the health check,
 	// it's provided by [app.Tier1App] and tied to the health check endpoint.
-	appSetIsReadyState  func(isReady bool)
+	appSetIsReadyState func(isReady bool)
+	// readinessLock serializes the readiness reads and writes of refreshReadiness,
+	// which the request path and the CPU evictor both drive.
+	readinessLock       sync.Mutex
 	getRecentFinalBlock func() (uint64, error)
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
@@ -278,21 +281,19 @@ func NewTier1(
 		if evictorConfig.NominalCapacity == 0 {
 			evictorConfig.NominalCapacity = float64(activeRequestsSoftLimit)
 		}
-		if reader, err := active_requests.NewCPUReader(); err != nil {
+		if reader, err := active_requests.NewCPUReader(evictorConfig.QuotaCoresOverride); err != nil {
 			logger.Warn("CPU eviction disabled: cannot read cgroup CPU signals", zap.Error(err))
 		} else if reader.QuotaCores() == 0 {
-			logger.Warn("CPU eviction disabled: no CPU quota set on the cgroup")
+			logger.Warn("CPU eviction disabled: no CPU quota set on the cgroup, set QuotaCoresOverride to pick the budget yourself")
 		} else {
+			if limit := reader.CgroupQuotaCores(); limit > 0 && reader.QuotaCores() > limit {
+				logger.Warn("CPU quota override is above the cgroup limit: the kernel throttles the pod before the evictor fires",
+					zap.Float64("quota_cores", reader.QuotaCores()),
+					zap.Float64("cgroup_limit_cores", limit),
+				)
+			}
 			evictor := active_requests.NewEvictor(evictorConfig, s.activeRequestsManager, reader, logger)
-			evictor.OnOverloadChange(func(overloaded bool) {
-				if overloaded {
-					s.appSetIsReadyState(false)
-					return
-				}
-				if status := s.getOverloadedStatus(); status.canAcceptUpcomingRequests() {
-					s.appSetIsReadyState(true)
-				}
-			})
+			evictor.OnEvaluate(s.refreshReadiness)
 			s.evictor = evictor
 			go evictor.Run(s.Terminating())
 		}
@@ -566,10 +567,7 @@ func (s *Tier1Service) BlocksAny(
 	metrics.Tier1ActiveRequests.Inc()
 	defer func() {
 		metrics.Tier1ActiveRequests.Dec()
-
-		if status := s.getOverloadedStatus(); status.canAcceptUpcomingRequests() {
-			s.appSetIsReadyState(true)
-		}
+		s.refreshReadiness()
 	}()
 
 	// On app shutdown, we cancel the running '.blocks()' command,
@@ -1520,6 +1518,17 @@ func (s *Tier1Service) getOverloadedStatus() (status overloadingStatus) {
 	status.softLimit = s.activeRequestsSoftLimit
 	status.hardLimit = s.activeRequestsHardLimit
 	return status
+}
+
+// refreshReadiness re-derives the readiness flag from the current overload
+// status. The lock covers the read and the write together, so two callers
+// evaluating at once cannot apply their answers out of order and leave the flag
+// disagreeing with the status.
+func (s *Tier1Service) refreshReadiness() {
+	s.readinessLock.Lock()
+	defer s.readinessLock.Unlock()
+	status := s.getOverloadedStatus()
+	s.appSetIsReadyState(status.canAcceptUpcomingRequests())
 }
 
 func (s *Tier1Service) listActiveRecords() string {

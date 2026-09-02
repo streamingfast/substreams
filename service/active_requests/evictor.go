@@ -45,6 +45,15 @@ type EvictorConfig struct {
 	MinAge       time.Duration // requests younger than this are never cancelled
 	MinBurnCores float64       // requests consuming less CPU than this are never cancelled (cutting them would not help)
 
+	// QuotaCoresOverride is the CPU budget, in cores, to measure usage against
+	// instead of the cgroup's cpu.max. Set it on a pod whose cgroup accounts CPU
+	// but carries no limit, where cpu.max reads "max" and the evictor would
+	// otherwise stay off. Usage still comes from the cgroup's cpu.stat, so this
+	// does not make the evictor work without cgroup v2. Keep it at or under the
+	// limit the kernel actually enforces, if there is one: set higher, the pod
+	// is throttled before the evictor ever fires. Zero means use cpu.max.
+	QuotaCoresOverride float64
+
 	// NominalCapacity is how many requests a pod carries when it is full, used
 	// only to scale substreams_tier1_effective_active_requests. Set it to the
 	// per-pod request target of the horizontal autoscaler, so that a pod held
@@ -136,8 +145,8 @@ type Evictor struct {
 	reader  *CPUReader
 	logger  *zap.Logger
 
-	overloaded       atomic.Bool
-	onOverloadChange func(overloaded bool)
+	overloaded atomic.Bool
+	onEvaluate func()
 
 	// zero time = condition not currently holding
 	overloadSince time.Time
@@ -145,8 +154,11 @@ type Evictor struct {
 	unreadyAt     time.Time
 	lastEvictAt   time.Time
 
-	// uniqueID -> cumulative wasm compute at the previous tick
-	prevCompute map[string]time.Duration
+	// uniqueID -> cumulative wasm compute at the previous tick, and when that
+	// tick ran: burn rates divide by the real interval between two samples, which
+	// under CPU pressure is not the configured one.
+	prevCompute  map[string]time.Duration
+	prevSampleAt time.Time
 }
 
 func NewEvictor(cfg EvictorConfig, manager *ActiveRequestsManager, reader *CPUReader, logger *zap.Logger) *Evictor {
@@ -172,10 +184,19 @@ func (ev *Evictor) IsOverloaded() bool {
 	return ev.enforcing() && ev.overloaded.Load()
 }
 
-// OnOverloadChange registers a callback fired on every overloaded-state edge,
-// from the evictor's own goroutine. Must be called before Run.
-func (ev *Evictor) OnOverloadChange(fn func(overloaded bool)) {
-	ev.onOverloadChange = fn
+// OnEvaluate registers a callback fired at the end of every evaluation, from
+// the evictor's own goroutine. Must be called before Run. It is level-triggered
+// on purpose: the host re-derives its state from IsOverloaded each time rather
+// than tracking edges, so a state the host lost to a concurrent writer is put
+// back within one Interval.
+func (ev *Evictor) OnEvaluate(fn func()) {
+	ev.onEvaluate = fn
+}
+
+func (ev *Evictor) notify() {
+	if ev.onEvaluate != nil {
+		ev.onEvaluate()
+	}
 }
 
 // Run evaluates the eviction policy every Interval until stop is closed.
@@ -203,11 +224,13 @@ func (ev *Evictor) tick(now time.Time) {
 	signals, err := ev.reader.Read()
 	if err != nil {
 		ev.logger.Warn("cannot read cgroup CPU signals", zap.Error(err))
+		ev.clearOverload()
 		return
 	}
 	candidates, totalActive := ev.sampleBurnRates(now)
 	firing := ev.classify(signals, now)
 	ev.publishMetrics(signals, totalActive)
+	ev.notify()
 
 	if !ev.overloaded.Load() {
 		return
@@ -278,9 +301,6 @@ func (ev *Evictor) classify(signals CPUSignals, now time.Time) bool {
 			zap.Bool("enforced", ev.enforcing()),
 			zap.Float64("cpu_usage_ratio", signals.UsageRatio),
 		)
-		if ev.onOverloadChange != nil && ev.enforcing() {
-			ev.onOverloadChange(true)
-		}
 	}
 	if ev.overloaded.Load() && !ev.recoverSince.IsZero() && now.Sub(ev.recoverSince) >= ev.cfg.RecoverSustain {
 		ev.overloaded.Store(false)
@@ -289,11 +309,26 @@ func (ev *Evictor) classify(signals CPUSignals, now time.Time) bool {
 			zap.Bool("enforced", ev.enforcing()),
 			zap.Float64("cpu_usage_ratio", signals.UsageRatio),
 		)
-		if ev.onOverloadChange != nil && ev.enforcing() {
-			ev.onOverloadChange(false)
-		}
 	}
 	return firing
+}
+
+// clearOverload drops the overload state and both sustain windows. Without CPU
+// signals the pod has no evidence it is still overloaded, and the overloaded
+// flag is only ever cleared from classify, which a failed read never reaches:
+// leaving it set would keep the pod unready and refusing every request until it
+// restarts. An unreadable signal must fail open.
+func (ev *Evictor) clearOverload() {
+	ev.overloadSince = time.Time{}
+	ev.recoverSince = time.Time{}
+	ev.unreadyAt = time.Time{}
+	if metrics.Tier1CPUOverloaded != nil {
+		metrics.Tier1CPUOverloaded.SetUint64(0)
+	}
+	if ev.overloaded.Swap(false) {
+		ev.logger.Warn("clearing the CPU overload: no CPU signals to confirm it", zap.Bool("enforced", ev.enforcing()))
+	}
+	ev.notify()
 }
 
 func holdSince(since time.Time, condition bool, now time.Time) time.Time {
@@ -324,6 +359,9 @@ func (ev *Evictor) sampleBurnRates(now time.Time) (candidates []evictCandidate, 
 	ev.manager.Lock()
 	defer ev.manager.Unlock()
 
+	elapsed := now.Sub(ev.prevSampleAt)
+	ev.prevSampleAt = now
+
 	seen := make(map[string]bool, len(ev.manager.reqs))
 	totalActive = len(ev.manager.reqs)
 	for uniqueID, req := range ev.manager.reqs {
@@ -336,8 +374,8 @@ func (ev *Evictor) sampleBurnRates(now time.Time) (candidates []evictCandidate, 
 		ev.prevCompute[uniqueID] = compute
 
 		var burn float64
-		if sampled && compute > prev {
-			burn = float64(compute-prev) / float64(ev.cfg.Interval)
+		if sampled && compute > prev && elapsed > 0 {
+			burn = float64(compute-prev) / float64(elapsed)
 		}
 		req.BurnCores = burn
 

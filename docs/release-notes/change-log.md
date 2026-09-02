@@ -29,6 +29,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   requests on live blocks, then production requests still catching up from files. 
   Off by default; enable and tune it through the tier1 app's `CPUEviction` config 
   modes: `observe` (log only), `dev-only`, `full`
+  Needs cgroup v2 CPU accounting. A pod whose cgroup carries no CPU limit (`cpu.max` reads `max`) has no quota to
+  measure usage against and leaves the evictor off; set `CPUEviction.QuotaCoresOverride` to name the budget yourself.
   New metrics: `substreams_tier1_cpu_*` gauges and `substreams_tier1_evicted_requests_counter`.
 
 - New `substreams_tier1_effective_active_requests` gauge, meant to replace `substreams_active_requests` as the

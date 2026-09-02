@@ -75,16 +75,55 @@ func TestNewCPUReaderAt(t *testing.T) {
 		"cpu.stat": "usage_usec 1000000\n",
 	})
 
-	reader, err := newCPUReaderAt(dir)
+	reader, err := newCPUReaderAt(dir, 0)
 	require.NoError(t, err)
 	assert.Equal(t, 3.5, reader.QuotaCores())
+	assert.Equal(t, 3.5, reader.CgroupQuotaCores())
 
 	signals, err := reader.Read()
 	require.NoError(t, err)
 	assert.Equal(t, 3.5, signals.QuotaCores)
 	assert.Zero(t, signals.UsageRatio) // first read has no previous sample
 
-	_, err = newCPUReaderAt(t.TempDir()) // no cgroup files at all
+	_, err = newCPUReaderAt(t.TempDir(), 0) // no cgroup files at all
+	require.Error(t, err)
+}
+
+func TestNewCPUReaderAt_QuotaCoresOverride(t *testing.T) {
+	dir := t.TempDir()
+	writeCgroupFiles(t, dir, map[string]string{
+		"cpu.max":  "max 100000\n", // cgroup accounts CPU but enforces no limit
+		"cpu.stat": "usage_usec 1000000\n",
+	})
+
+	// without an override the evictor has no denominator and tier1 leaves it off
+	reader, err := newCPUReaderAt(dir, 0)
+	require.NoError(t, err)
+	assert.Zero(t, reader.QuotaCores())
+
+	// the override supplies one, and the cgroup limit stays visible as 0
+	reader, err = newCPUReaderAt(dir, 6)
+	require.NoError(t, err)
+	assert.Equal(t, 6.0, reader.QuotaCores())
+	assert.Zero(t, reader.CgroupQuotaCores())
+
+	// it also wins over a limit that is set, which is how a pod is held to a
+	// budget under the one the kernel enforces
+	writeCgroupFiles(t, dir, map[string]string{"cpu.max": "800000 100000\n"})
+	reader, err = newCPUReaderAt(dir, 6)
+	require.NoError(t, err)
+	assert.Equal(t, 6.0, reader.QuotaCores())
+	assert.Equal(t, 8.0, reader.CgroupQuotaCores())
+
+	// an unreadable cpu.max is survivable with an override, an unreadable
+	// cpu.stat never is: usage still comes from the cgroup
+	require.NoError(t, os.Remove(filepath.Join(dir, "cpu.max")))
+	reader, err = newCPUReaderAt(dir, 6)
+	require.NoError(t, err)
+	assert.Equal(t, 6.0, reader.QuotaCores())
+
+	require.NoError(t, os.Remove(filepath.Join(dir, "cpu.stat")))
+	_, err = newCPUReaderAt(dir, 6)
 	require.Error(t, err)
 }
 

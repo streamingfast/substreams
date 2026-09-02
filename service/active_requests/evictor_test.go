@@ -205,3 +205,14 @@ func TestTick_UnreadableCgroupClearsOverload(t *testing.T) {
 	assert.False(t, ev.IsOverloaded())
 	assert.Equal(t, 2, evaluations)
 }
+
+func TestActiveRequests_PrefersTheHostCount(t *testing.T) {
+	ev := newTestEvictor(DefaultEvictorConfig())
+
+	// without an override the manager's own count is used
+	assert.Equal(t, 3, ev.activeRequests(3))
+
+	// the host counts requests still setting up, which the manager does not hold yet
+	ev.CountActiveRequestsWith(func() int { return 7 })
+	assert.Equal(t, 7, ev.activeRequests(3))
+}

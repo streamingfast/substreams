@@ -37,8 +37,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   horizontal autoscaler input on tier1: the higher of the plain active-request count and the number of requests the
   CPU budget is being spent at (`nominal_capacity * cpu_usage_ratio / cpu_eviction_target_ratio`). A pod full of
   expensive requests, or one holding its CPU down by eviction, reports itself at capacity, so the autoscaler will
-  add more pods. `CPUEviction.NominalCapacity` should be set to the autoscaler's per-pod request target; it defaults
-  to the active-requests soft limit.
+  add more pods. Its active-request count is the one admission uses, so it includes requests still setting up and
+  never reads below `substreams_active_requests`. `CPUEviction.NominalCapacity` should be set to the autoscaler's
+  per-pod request target; it defaults to the active-requests soft limit.
 
 - Trimmed tier2's per-segment logging: a large backfill fans out into tens of thousands of `ProcessRange` calls,
   and each one was logging ~10 `Info` lines with no steady-state diagnostic value, which could spike a pod's log

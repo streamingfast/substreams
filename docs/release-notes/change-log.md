@@ -98,6 +98,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - `substreams-tier1` now names the usage marker it writes in every module cache folder after the request's plan tier: `last_used_<plan>` (lowercase, e.g. `last_used_pro`), still plain `last_used` when unauthenticated. `firecore tools substreams purge` reads the plan back from that name to apply a retention per plan.
 
+### Dependencies
+
+- `google.golang.org/grpc` is at v1.83.1, which clears GHSA-vp52-pcj8-j9qc, reported as HIGH: a peer could exhaust
+  server heap by fragmenting HTTP/2 DATA frames.
+
 ### Tests
 
 - The `tests_e2e/dummy` package gains three modules for exercising Hosted Stores against a

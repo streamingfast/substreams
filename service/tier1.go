@@ -128,6 +128,7 @@ type Tier1Service struct {
 	activeRequestsManager    *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
 	evictor                  *active_requests.Evictor               // nil unless CPU eviction is enabled and cgroup CPU signals are readable
 	execOutMessageBufferSize int
+	execOutPrefetch          execout.PrefetchConfig
 
 	// liveBackFillerFinalBlockDelay overrides the default 120-block delay the
 	// live backfiller waits past a segment end before concluding merged blocks
@@ -839,6 +840,7 @@ func (s *Tier1Service) blocks(
 	if s.getHeadBlock != nil {
 		opts = append(opts, pipeline.WithHeadBlockGetter(s.getHeadBlock))
 	}
+	opts = append(opts, pipeline.WithExecOutPrefetch(s.execOutPrefetch))
 
 	ctx, resolvedEndpoints, err := s.resolveFoundationalStores(ctx, execGraph, reqStats)
 	if err != nil {

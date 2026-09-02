@@ -22,6 +22,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- `substreams-tier1` now downloads the next cached execution output files while it streams the current one to a
+  production-mode client. Before, each 1000-block segment was opened, decompressed and sent before the next one
+  was even requested from the object store, so every segment paid a full store round trip on the critical path.
+  Prefetching is bounded per request by `Tier1Config.ExecOutPrefetch`: at most `Depth` segments ahead (default
+  and hard cap 4) holding at most `BudgetBytes` of decompressed data (default 64 MiB). No size is ever asked of
+  the store: the first segment is downloaded alone against the whole budget and, if it overflows, prefetching is
+  turned off for the rest of the request; otherwise its decompressed size is the estimate for the next ones, and
+  as many segments download concurrently as that estimate says fit. Missing files are left to the walker's
+  existing retry loop, and the prefetcher stops looking ahead until the walker reaches them. Setting either bound
+  to zero turns prefetching off.
+
 - `substreams-tier1` can now evict requests when its CPU is saturated. When its own cgroup reports CPU usage above
   90% of quota for 15 seconds, the pod advertises itself unready to the load balancer, refuses new requests, waits
   for the balancer to drain, then cancels enough of the heaviest requests with `Unavailable` to bring usage back

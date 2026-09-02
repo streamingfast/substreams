@@ -39,12 +39,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `CPUEviction.NominalCapacity` should be set to the autoscaler's per-pod request target; it defaults to the
   active-requests soft limit.
 
-- A tier2 that refuses a job because it is at its concurrent-request limit (`ResourceExhausted: service currently
-  overloaded`) is now retried after 300ms +/- 100ms instead of on the growing 1s-to-5s backoff shared with real
-  failures. The retry dials again and can land on a different instance, so waiting seconds on a busy fleet only
-  slowed the search down. Tunable with `SUBSTREAMS_WORKER_OVERLOADED_RETRY_DELAY` and
-  `SUBSTREAMS_WORKER_OVERLOADED_RETRY_JITTER`. A refused connection or an `Unavailable: no healthy upstream` from
-  the load balancer means no instance is reachable at all, so those keep the growing backoff.
+- Trimmed tier2's per-segment logging: a large backfill fans out into tens of thousands of `ProcessRange` calls,
+  and each one was logging ~10 `Info` lines with no steady-state diagnostic value, which could spike a pod's log
+  volume by an order of magnitude. Removed the duplicate auth-info log in the tier2 response handler (already
+  logged once per segment on the incoming request), and demoted the store-size and exec-output-file-open logs to
+  `Debug`. Also suppressed the benign `http2: server: error reading preface ...: connection reset by peer` error
+  logged whenever a client drops a connection mid-handshake against the plaintext/h2c tier2 port, mirroring the
+  existing TLS-handshake suppressions. The bigger source of the same spike was `dmetering`'s per-request event
+  emitter, opened and torn down on every `ProcessRange` call; its 4 shutdown-lifecycle logs are now `Debug` too
+  (bumped to `github.com/streamingfast/dmetering@v0.0.0-20260901152443-1ff4cd0d617d`).
+
+- Jobs of a tier1 request now reach the tier2 fleet in the order the client will read their output, instead of
+  racing each other for whatever instance has room. A job asks a per-request launch queue for its turn before every
+  request it sends to a tier2, first attempt and retries alike, and leaves the queue the moment a tier2 takes it. The
+  queue holds the jobs waiting to get in, ordered by lowest segment first and, within a segment, by highest stage.
+  Only the first 20% of that queue may dial at all, at least two jobs and at most 15; the ones behind them send
+  nothing until a job ahead gets in and moves the window up. So with 10 workers and every job turned away, the two
+  lowest segments redial every 100ms while the other eight stay silent, and a job the scheduler creates late for a
+  low segment goes to the front of the queue and dials right away. A job with nothing queued ahead of it dials
+  immediately, so a fleet with room is paced no differently than before. Without this, the segment the client reads
+  first was no more likely to land than one it would only read minutes later, and a whole request could idle behind
+  a single unlucky low segment.
+
+- A tier2 job that fails is no longer retried on a growing 1s-to-5s backoff of its own. Every reason to dial again
+  now goes through the same queue, so retries keep the request's reading order: a job that could not get in at all
+  (`ResourceExhausted: service currently overloaded`, a refused connection, `Unavailable: no healthy upstream`)
+  waits 100ms, and a job that got in and then failed waits 5 seconds once — if a tier2 then turns it away for
+  capacity, it is back on the 100ms delay with its failure already counted. The counters that end a hopeless request
+  are unchanged: five failures, or two execution timeouts, and neither is charged for a job that never got in.
+  Tunable with `SUBSTREAMS_WORKER_LAUNCH_WINDOW_PERCENT` (default 20), `SUBSTREAMS_WORKER_LAUNCH_WINDOW_MAX`
+  (default 15), `SUBSTREAMS_WORKER_OVERLOADED_RETRY_DELAY` (default 100ms, was 300ms),
+  `SUBSTREAMS_WORKER_FAILED_RETRY_DELAY` (default 5s) and
+  `SUBSTREAMS_WORKER_OVERLOADED_RETRY_JITTER` (default 100ms, added to a wait so jobs turned away at the same instant
+  do not redial in lockstep).
+
+- Jobs are now scheduled up to twice the request's worker count ahead of the blocks the client is reading, instead of
+  1.5 times, so a client that reads slowly still keeps the workers busy.
 
 - Store snapshots (fullKV files) can now be pruned to save disk space: tier1 no longer assumes that a fullKV at block
   `x` implies that every earlier fullKV still exists. At request start it walks backwards from the first segment

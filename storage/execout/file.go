@@ -89,7 +89,7 @@ func NewFileWriter(ctx context.Context, store dstore.Store, logger *zap.Logger, 
 	}
 
 	filename := fw.Filename()
-	fw.logger.Info("begin writing execution output file", zap.String("filename", filename))
+	fw.logger.Debug("begin writing execution output file", zap.String("filename", filename))
 	r, w := io.Pipe()
 	fw.writer = w
 	fw.writeError = make(chan error, 1)

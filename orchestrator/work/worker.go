@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
-	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -14,7 +12,6 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dauth"
-	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
@@ -53,15 +50,22 @@ type RemoteWorker struct {
 	tracer        ttrace.Tracer
 	logger        *zap.Logger
 	id            string
+	// launchQueue is shared by every worker of the request: it decides which job gets to
+	// send its request to a tier2 first when the fleet has no room.
+	launchQueue *LaunchQueue
 }
 
-func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, logger *zap.Logger) *RemoteWorker {
+func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, logger *zap.Logger, launchQueue *LaunchQueue) *RemoteWorker {
 	logger = logger.Named("remote-worker")
+	if launchQueue == nil {
+		launchQueue = NewLaunchQueue(1)
+	}
 	return &RemoteWorker{
 		clientFactory: clientFactory,
 		tracer:        otel.GetTracerProvider().Tracer("worker"),
 		logger:        logger,
 		id:            id,
+		launchQueue:   launchQueue,
 	}
 }
 
@@ -102,7 +106,13 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 
 var workerMaxRetries = 5
 var workerMaxTimeoutRetries = 2
-var workerOverloadedRetryDelay = 300 * time.Millisecond
+
+// workerOverloadedRetryDelay is how long a job waits before dialing again when it could
+// not get into a tier2 at all. workerFailedRetryDelay is the one-time wait after a job
+// that did get in came back with a failure; a capacity refusal on the way back in is
+// again on the short delay.
+var workerOverloadedRetryDelay = 100 * time.Millisecond
+var workerFailedRetryDelay = 5 * time.Second
 var workerOverloadedRetryJitter = 100 * time.Millisecond
 
 func init() {
@@ -124,6 +134,12 @@ func init() {
 		}
 	}
 
+	if val := os.Getenv("SUBSTREAMS_WORKER_FAILED_RETRY_DELAY"); val != "" {
+		if parsed, err := time.ParseDuration(val); err == nil {
+			workerFailedRetryDelay = parsed
+		}
+	}
+
 	if val := os.Getenv("SUBSTREAMS_WORKER_OVERLOADED_RETRY_JITTER"); val != "" {
 		if parsed, err := time.ParseDuration(val); err == nil {
 			workerOverloadedRetryJitter = parsed
@@ -142,24 +158,25 @@ func isInstanceOverloadedErr(err error) bool {
 	return grpcError != nil && grpcError.Code() == codes.ResourceExhausted
 }
 
-// waitBeforeRetryOverloaded sleeps workerOverloadedRetryDelay plus or minus
-// workerOverloadedRetryJitter, returning the context error if the request goes away
-// while waiting.
-func waitBeforeRetryOverloaded(ctx context.Context) error {
-	delay := workerOverloadedRetryDelay
-	if workerOverloadedRetryJitter > 0 {
-		delay += time.Duration(rand.Int63n(int64(workerOverloadedRetryJitter)*2)) - workerOverloadedRetryJitter
+// isJobRejectedErr reports whether the job never got into a tier2: refused at its
+// concurrent-request limit, the dial failed, or the load balancer had no instance to send
+// it to. Nothing ran, so another instance can take it right away.
+func isJobRejectedErr(err error) bool {
+	if isInstanceOverloadedErr(err) || errors.Is(err, ErrConnectionRefused) {
+		return true
 	}
 
-	timer := time.NewTimer(delay)
-	defer timer.Stop()
+	grpcError := dgrpc.AsGRPCError(err)
+	return grpcError != nil && grpcError.Code() == codes.Unavailable && strings.Contains(err.Error(), "no healthy upstream")
+}
 
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
+// isExecutionTimeoutErr reports whether the tier2 was still running the job when the
+// deadline passed.
+func isExecutionTimeoutErr(err error) bool {
+	if grpcError := dgrpc.AsGRPCError(err); grpcError != nil && grpcError.Code() == codes.DeadlineExceeded {
+		return true
 	}
+	return strings.Contains(err.Error(), "DeadlineExceeded")
 }
 
 func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream, streamOutput bool) loop.Cmd {
@@ -178,9 +195,23 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 		startBlock := request.SegmentNumber * request.SegmentSize
 		jobIdx := stats.RecordNewSubrequest(request.Stage, startBlock, startBlock+request.SegmentSize)
 
+		// Whatever ends this job, it stops competing for a tier2, so the jobs still
+		// waiting move up a position.
+		defer w.launchQueue.Leave(unit)
+
+		// The job stops competing for capacity the moment a tier2 takes it, not when it is
+		// done: the jobs behind it move up right away.
+		admitted := func() { w.launchQueue.Leave(unit) }
+
 		var previousError error
-		err := derr.RetryContext(ctx, math.MaxUint64, func(ctx context.Context) error {
+		err := func() error {
 			for {
+				// Every request sent to a tier2, first attempt included, waits for the jobs
+				// the client reads before this one.
+				if err := w.launchQueue.WaitTurn(ctx, unit); err != nil {
+					return err
+				}
+
 				w.logger.Info("launching remote worker",
 					zap.Uint64("segment", request.SegmentNumber),
 					zap.Uint32("stage", request.Stage),
@@ -190,75 +221,55 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 					zap.NamedError("previous_error", previousError),
 				)
 
-				res = w.work(ctx, request, moduleNames, upstream, jobIdx)
+				res = w.work(ctx, request, moduleNames, upstream, jobIdx, admitted)
 				err := res.Error
 				// Keep the reason around: the request progress log reports failure counts, but
 				// only the error text says whether jobs die on an unreachable RPC endpoint, a
 				// module panic or an overloaded tier2.
 				stats.RecordJobError(jobIdx, err)
 
-				if _, ok := err.(*RetryableErr); ok && isInstanceOverloadedErr(err) {
-					// The retry is looking for a different instance rather than waiting on this
-					// one, so it runs on a short fixed delay instead of the growing backoff, and
-					// does not count towards maxRetries.
-					previousError = err
+				if _, ok := err.(*RetryableErr); !ok {
+					// The job is done, or it failed for a reason no retry will fix.
+					return err
+				}
+				previousError = err
+
+				if isJobRejectedErr(err) {
+					// Nothing ran on the tier2. Another instance may have room right now, so the
+					// job goes back to the queue on the short delay, and this does not count
+					// towards maxRetries.
 					stats.RecordJobDelayed(jobIdx)
 					metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
-					if err := waitBeforeRetryOverloaded(ctx); err != nil {
-						return derr.NewFatalError(err)
-					}
+					w.launchQueue.Retry(unit, workerOverloadedRetryDelay)
 					continue
 				}
 
-				switch err.(type) {
-				case *RetryableErr:
-					previousError = err
-					if errors.Is(err, ErrConnectionRefused) { // tier2 unavailable
-						stats.RecordJobDelayed(jobIdx)
-						metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
-						// don't count towards maxRetries
-						return err
-					}
-					if grpcError := dgrpc.AsGRPCError(err); grpcError != nil && grpcError.Code() == codes.Unavailable && strings.Contains(err.Error(), "no healthy upstream") {
-						stats.RecordJobDelayed(jobIdx)
-						metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
-						// don't count towards maxRetries
-						return err
-					}
+				if streamOutput && upstream.DataSent() {
+					// never retry for jobs that stream blocks and have already sent some data
+					segmentStart := request.SegmentNumber * request.SegmentSize
+					return fmt.Errorf("segment [%d-%d] failed while streaming data: %w", segmentStart, segmentStart+request.SegmentSize, err)
+				}
 
-					if streamOutput && upstream.DataSent() {
-						// never retry for jobs that stream blocks and have already sent some data
-						segmentStart := request.SegmentNumber * request.SegmentSize
-						return derr.NewFatalError(fmt.Errorf("segment [%d-%d] failed while streaming data: %w", segmentStart, segmentStart+request.SegmentSize, err))
-					}
-					metrics.Tier1WorkerRetryCounter.Inc()
-					stats.RecordJobRetried(jobIdx)
+				metrics.Tier1WorkerRetryCounter.Inc()
+				stats.RecordJobRetried(jobIdx)
 
-					grpcError := dgrpc.AsGRPCError(err)
-					if (grpcError != nil && grpcError.Code() == codes.DeadlineExceeded) || strings.Contains(err.Error(), "DeadlineExceeded") {
-						executionTimeouts++
-						if executionTimeouts >= maxExecutionTimeouts {
-							segmentStart := request.SegmentNumber * request.SegmentSize
-							return derr.NewFatalError(fmt.Errorf("segment [%d-%d] timed out %d times, giving up. Last error from worker: %s", segmentStart, segmentStart+request.SegmentSize, executionTimeouts, err))
-						}
-						return err
+				segmentStart := request.SegmentNumber * request.SegmentSize
+				if isExecutionTimeoutErr(err) {
+					executionTimeouts++
+					if executionTimeouts >= maxExecutionTimeouts {
+						return fmt.Errorf("segment [%d-%d] timed out %d times, giving up. Last error from worker: %s", segmentStart, segmentStart+request.SegmentSize, executionTimeouts, err)
 					}
-
+				} else {
 					retryIdx++
 					if retryIdx >= maxRetries {
-						segmentStart := request.SegmentNumber * request.SegmentSize
-						return derr.NewFatalError(fmt.Errorf("segment [%d-%d] failed %d times, giving up. Last error from worker: %s", segmentStart, segmentStart+request.SegmentSize, retryIdx, err))
+						return fmt.Errorf("segment [%d-%d] failed %d times, giving up. Last error from worker: %s", segmentStart, segmentStart+request.SegmentSize, retryIdx, err)
 					}
-
-					return err
-				default:
-					if err != nil {
-						return derr.NewFatalError(err)
-					}
-					return nil
 				}
+
+				// The job ran and failed: it waits once, then goes back in line like any other.
+				w.launchQueue.Retry(unit, workerFailedRetryDelay)
 			}
-		})
+		}()
 
 		timeTook := time.Since(startTime)
 		if err != nil {
@@ -313,7 +324,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 
 var ErrConnectionRefused = errors.New("connection refused")
 
-func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, _ []string, upstream *response.Stream, jobIdx uint64) (res *Result) {
+func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, _ []string, upstream *response.Stream, jobIdx uint64, admitted func()) (res *Result) {
 	metrics.Tier1ActiveWorkerRequest.Inc()
 	metrics.Tier1WorkerRequestCounter.Inc()
 	defer metrics.Tier1ActiveWorkerRequest.Dec()
@@ -375,8 +386,17 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 
 	stats := reqctx.ReqStats(ctx)
 	var processedBlocks uint64
+	firstResponse := true
 	for {
 		resp, err := stream.Recv()
+
+		if firstResponse {
+			firstResponse = false
+			if err == nil || !isJobRejectedErr(err) {
+				// The tier2 did not turn the job away, so it is running it.
+				admitted()
+			}
+		}
 
 		if err := ctx.Err(); err != nil {
 			if err == context.Canceled {

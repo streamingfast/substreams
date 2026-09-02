@@ -1275,6 +1275,46 @@ func aggregateWasmExtensionCallMetricsByExtension(byModule []*wasmExtensionCallM
 	return out
 }
 
+// LocalWasmComputeDuration returns the cumulative wall time this request spent
+// executing wasm modules locally, including executions still in progress and
+// excluding time spent waiting on external calls (e.g. eth_call). Wasm execution
+// does not otherwise block on I/O, so this approximates the CPU time consumed by
+// the request's module work.
+func (s *Stats) LocalWasmComputeDuration() time.Duration {
+	s.Lock()
+	defer s.Unlock()
+
+	var out time.Duration
+	for _, m := range s.modulesStats {
+		out += m.processingTime
+		for _, since := range m.inprocessSince {
+			out += time.Since(since)
+		}
+		for _, call := range m.externalCallMetrics {
+			out -= call.time
+		}
+		for _, call := range m.inprocessCallMetrics {
+			out -= time.Since(call.startTime)
+		}
+	}
+	if out < 0 {
+		out = 0
+	}
+	return out
+}
+
+// CurrentBlock returns the last block the request processed through the linear
+// pipeline, falling back to the last block sent to the client while parallel
+// processing runs.
+func (s *Stats) CurrentBlock() uint64 {
+	s.Lock()
+	defer s.Unlock()
+	if s.lastProcessedBlockNum != 0 {
+		return s.lastProcessedBlockNum
+	}
+	return s.lastSentBlockNum
+}
+
 // moduleExecDuration should be called while Stats is locked
 func (s *Stats) moduleExecDuration() (out time.Duration) {
 	for _, m := range s.modulesStats {

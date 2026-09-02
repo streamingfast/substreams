@@ -173,6 +173,13 @@ func (p *Pipeline) processBlock(
 		}
 	case bstream.StepNew:
 		p.blockStepMap[bstream.StepNew]++
+		if p.blockStepMap[bstream.StepNew] == 1 {
+			// StepNew blocks only come from the hub: the request left the
+			// file-based catchup section and is now streaming live.
+			if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
+				reqHandler.SetLive()
+			}
+		}
 
 		// legacy metering
 		//todo: (deprecated)

@@ -26,6 +26,7 @@ import (
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
+	"github.com/streamingfast/substreams/service/active_requests"
 	"github.com/streamingfast/substreams/wasm"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	"github.com/streamingfast/substreams/wasm/wazero"
@@ -96,11 +97,16 @@ type Tier1Config struct {
 	ActiveRequestsSoftLimit int    // maximum number of active requests a tier1 app can have with external clients before starting to advertise itself as unready in the health check
 
 	ActiveRequestsHardLimit int // maximum number of active requests a tier1 app can have with external clients, refuse with CodeUnavailable if reached
-	MaxSubrequests          uint64
-	SubrequestsEndpoint     string
-	SubrequestsInsecure     bool
-	SubrequestsPlaintext    bool
-	SubrequestsSecret       string
+
+	// CPUEviction configures the CPU-based request evictor; the zero value
+	// (mode off) disables it, unset tunables take their defaults.
+	CPUEviction active_requests.EvictorConfig
+
+	MaxSubrequests       uint64
+	SubrequestsEndpoint  string
+	SubrequestsInsecure  bool
+	SubrequestsPlaintext bool
+	SubrequestsSecret    string
 
 	SharedCacheSize  uint64
 	OutputBufferSize uint64 // Used to bundle execout messages within 'BlockScopedDatas' when using protocol V4
@@ -338,6 +344,7 @@ func (a *Tier1App) Run() error {
 		a.config.EnforceCompression,
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
+		a.config.CPUEviction.WithDefaults(),
 		a.config.SharedCacheSize,
 		a.config.OutputBufferSize,
 		a.modules.SessionPool,

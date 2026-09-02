@@ -22,6 +22,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- `substreams-tier1` can now evict requests when its CPU is saturated. When its own cgroup reports CPU usage above
+  90% of quota for 15 seconds, the pod advertises itself unready to the load balancer, refuses new requests, waits
+  for the balancer to drain, then cancels enough of the heaviest requests with `Unavailable` to bring usage back
+  under 75% of quota, so their clients reconnect to a less busy pod. Order: dev-mode requests first, then production
+  requests on live blocks, then production requests still catching up from files. 
+  Off by default; enable and tune it through the tier1 app's `CPUEviction` config 
+  modes: `observe` (log only), `dev-only`, `full`
+  Needs cgroup v2 CPU accounting. A pod whose cgroup carries no CPU limit (`cpu.max` reads `max`) has no quota to
+  measure usage against and leaves the evictor off; set `CPUEviction.QuotaCoresOverride` to name the budget yourself.
+  New metrics: `substreams_tier1_cpu_*` gauges and `substreams_tier1_evicted_requests_counter`.
+
+- New `substreams_tier1_effective_active_requests` gauge, meant to replace `substreams_active_requests` as the
+  horizontal autoscaler input on tier1: the higher of the plain active-request count and the number of requests the
+  CPU budget is being spent at (`nominal_capacity * cpu_usage_ratio / cpu_eviction_target_ratio`). A pod full of
+  expensive requests, or one holding its CPU down by eviction, reports itself at capacity, so the autoscaler will
+  add more pods. `CPUEviction.NominalCapacity` should be set to the autoscaler's per-pod request target; it defaults
+  to the active-requests soft limit.
+
 - Trimmed tier2's per-segment logging: a large backfill fans out into tens of thousands of `ProcessRange` calls,
   and each one was logging ~10 `Info` lines with no steady-state diagnostic value, which could spike a pod's log
   volume by an order of magnitude. Removed the duplicate auth-info log in the tier2 response handler (already
@@ -79,6 +97,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   progress cadence for the whole request instead of using the ramp above; the 500ms minimum is unchanged.
 
 - `substreams-tier1` now names the usage marker it writes in every module cache folder after the request's plan tier: `last_used_<plan>` (lowercase, e.g. `last_used_pro`), still plain `last_used` when unauthenticated. `firecore tools substreams purge` reads the plan back from that name to apply a retention per plan.
+
+### Dependencies
+
+- `google.golang.org/grpc` is at v1.83.1, which clears GHSA-vp52-pcj8-j9qc, reported as HIGH: a peer could exhaust
+  server heap by fragmenting HTTP/2 DATA frames.
 
 ### Tests
 

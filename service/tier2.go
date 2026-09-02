@@ -345,6 +345,8 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		request.SegmentNumber,
 		request.SegmentSize,
 		request.Stage,
+		true, // tier2 jobs only exist for production-mode work
+		reqStats,
 	)
 
 	defer func() {

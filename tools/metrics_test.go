@@ -150,8 +150,8 @@ func TestStreamFailure(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// A dial that failed fast answers through the request, so the gRPC error carries the dial
-	// message and belongs to the connection, not to the endpoint's own answer.
+	// A channel that never became ready answers through the request, so the gRPC error carries
+	// the dial message and belongs to the connection, not to the endpoint's own answer.
 	refused := grpcstatus.Error(codes.Unavailable, `connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:19999: connect: connection refused"`)
 	reason, err := streamFailure(ctx, true, refused)
 	assert.Equal(t, reasonConnectFailed, reason)

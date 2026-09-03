@@ -442,33 +442,40 @@ func (r *pollResult) totalDuration() time.Duration {
 	return r.connectDuration + r.streamDuration
 }
 
-// errConnFailedFast reports that the channel reached TRANSIENT_FAILURE: the dial failed
-// outright rather than being slow. The connectivity API never hands over the dial error, so
-// the caller issues the request anyway and lets gRPC answer with it.
-var errConnFailedFast = errors.New("connection failed to establish")
+// errConnDialFailed reports that the channel failed a dial before the connect budget ran out.
+// The connectivity API never hands over the dial error, so the caller issues the request
+// anyway and lets gRPC answer with it.
+var errConnDialFailed = errors.New("connection failed to establish")
 
 // waitForConnReady blocks until the gRPC channel is usable. gRPC dials lazily, so without
 // this the DNS resolution, the TLS handshake and the load-balancer setup would all be
 // charged to the Blocks request budget, and every slow connection would be reported as an
 // endpoint failure ("waiting for new LB policy update: context deadline exceeded").
 //
-// It only ever waits on a connection that is still making progress. gRPC re-dials on its own
-// backoff, so waiting through TRANSIENT_FAILURE would burn the whole connect budget on an
-// endpoint that answered "connection refused" in a microsecond, and report it as a timeout.
+// A failed dial does not end the attempt. gRPC re-dials on its own backoff and the connect
+// budget exists to cover a backend that is restarting, so an endpoint that comes back inside
+// the budget is healthy and must be reported as such. What the failed dial does change is how
+// the timeout is described: `errConnDialFailed` says the endpoint refused us rather than
+// being slow, which the caller turns into the real dial error.
 func waitForConnReady(ctx context.Context, conn *grpc.ClientConn) error {
 	conn.Connect()
+
+	dialFailed := false
 	for {
 		state := conn.GetState()
 		switch state {
 		case connectivity.Ready:
 			return nil
-		case connectivity.TransientFailure:
-			return errConnFailedFast
 		case connectivity.Shutdown:
 			return fmt.Errorf("connection shut down before becoming ready")
+		case connectivity.TransientFailure:
+			dialFailed = true
 		}
 
 		if !conn.WaitForStateChange(ctx, state) {
+			if dialFailed {
+				return errConnDialFailed
+			}
 			return fmt.Errorf("connection stuck in state %q: %w", state, context.Cause(ctx))
 		}
 	}
@@ -504,9 +511,9 @@ func pollEndpoint(endpoint string, substreamsClientConfig *client.SubstreamsClie
 	connectCtx, cancelConnect := context.WithTimeoutCause(context.Background(), connectTimeout, fmt.Errorf("connect timeout of %s reached", connectTimeout))
 	defer cancelConnect()
 
-	var connectFailedFast bool
+	var connectFailed bool
 	if err := waitForConnReady(connectCtx, conn); err != nil {
-		if !errors.Is(err, errConnFailedFast) {
+		if !errors.Is(err, errConnDialFailed) {
 			result.connectDuration = time.Since(connectBegin)
 			result.reason, result.err = reasonConnectTimeout, err
 			return
@@ -515,7 +522,7 @@ func pollEndpoint(endpoint string, substreamsClientConfig *client.SubstreamsClie
 		// The dial failed, and only the request will say why: gRPC answers it immediately with
 		// the dial error it is holding ("connection refused", "no such host"), which is exactly
 		// the information an operator needs and which the connectivity API does not expose.
-		connectFailedFast = true
+		connectFailed = true
 	}
 	result.connectDuration = time.Since(connectBegin)
 
@@ -554,14 +561,14 @@ func pollEndpoint(endpoint string, substreamsClientConfig *client.SubstreamsClie
 
 	streamClient, err := pbsubstreamsrpcv4.NewStreamClient(conn).Blocks(ctx, subReq, callOpts...)
 	if err != nil {
-		result.reason, result.err = streamFailure(ctx, connectFailedFast, err)
+		result.reason, result.err = streamFailure(ctx, connectFailed, err)
 		return
 	}
 
 	for {
 		resp, err := streamClient.Recv()
 		if err != nil {
-			result.reason, result.err = streamFailure(ctx, connectFailedFast, err)
+			result.reason, result.err = streamFailure(ctx, connectFailed, err)
 			return
 		}
 

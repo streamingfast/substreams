@@ -106,9 +106,9 @@ func grpcCodeOf(err error) string {
 // streamFailure attributes an error returned by the Blocks call. A channel that never became
 // ready makes gRPC answer with the dial error it was holding, so the failure belongs to the
 // connection rather than to the endpoint's own answer, and `connect_failed` says so.
-func streamFailure(ctx context.Context, connectFailedFast bool, err error) (failureReason, error) {
+func streamFailure(ctx context.Context, connectFailed bool, err error) (failureReason, error) {
 	err = withDeadlineCause(ctx, err)
-	if connectFailedFast {
+	if connectFailed {
 		return reasonConnectFailed, err
 	}
 	return classifyStreamError(err), err

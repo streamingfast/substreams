@@ -132,6 +132,23 @@ func TestSendItems_SendErrorStopsTheSegment(t *testing.T) {
 	assert.LessOrEqual(t, messages, 2, "nothing is sent after the failed message")
 }
 
+func TestSendItems_PanicInSendFailsTheSegment(t *testing.T) {
+	calls := 0
+	panicking := func(substreams.ResponseFromAnyTier) error {
+		calls++
+		if calls == 2 {
+			panic("stream is gone")
+		}
+		return nil
+	}
+	module := &pbsubstreams.Module{Name: "map", Output: &pbsubstreams.Module_Output{Type: "proto:x.Y"}}
+	w := NewWalker(context.Background(), module, nil, block.NewRange(0, 1000), response.New(panicking), false, 10, true)
+
+	err := w.sendItems(&itemsReader{items: newItems(0, 250)})
+	require.ErrorContains(t, err, "panic while sending execout data: stream is gone")
+	assert.Equal(t, 2, calls, "nothing is sent after the panic")
+}
+
 func TestSendItems_StopsAtExclusiveEndBlock(t *testing.T) {
 	s := &sink{failAt: -1}
 	w := newTestWalker(t, s, true, 10)

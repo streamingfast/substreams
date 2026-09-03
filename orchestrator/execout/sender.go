@@ -1,6 +1,8 @@
 package execout
 
 import (
+	"fmt"
+
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv4 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4"
 )
@@ -36,8 +38,16 @@ func newAsyncStream(out dataStream) *asyncStream {
 	return s
 }
 
+// run sends until the channel is closed or a send fails. A panic in a send is
+// turned into an error, so it fails the request the same way it did when the
+// walker's own goroutine sent and recovered.
 func (s *asyncStream) run() {
 	defer close(s.done)
+	defer func() {
+		if rec := recover(); rec != nil {
+			s.err = fmt.Errorf("panic while sending execout data: %v", rec)
+		}
+	}()
 	for send := range s.jobs {
 		if err := send(); err != nil {
 			s.err = err

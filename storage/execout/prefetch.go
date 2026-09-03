@@ -188,12 +188,10 @@ func (p *prefetcher) run(ctx context.Context, from int) {
 		seg, limit := p.reserveLocked(segment)
 		next++
 
-		p.mu.Unlock()
 		go func() {
 			data, err := p.download(ctx, rng, limit)
 			p.complete(segment, seg, data, err)
 		}()
-		p.mu.Lock()
 	}
 }
 

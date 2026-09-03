@@ -38,16 +38,22 @@ func (c PrefetchConfig) enabled() bool {
 // the prefetcher does not hold (never reached, skipped, or failed) is opened
 // directly by the walker.
 //
-// It never asks the store for a file's size. The first segment it downloads is
-// read alone against the whole budget; if that overflows, prefetching is turned
-// off for the rest of the request. Otherwise the decompressed size of the last
-// completed download is the estimate for the next ones, and as many segments run
-// ahead, concurrently, as that estimate says fit in the budget, up to Depth.
+// It never asks the store for a file's size. The decompressed size of the last
+// completed download is the estimate for the next ones, and as many downloads run
+// at once as estimate-sized files fit in the budget, at least one and at most
+// Depth. The budget is split evenly between them: each in-flight download reserves
+// its share and may read no more than that, so in-flight reads and held segments
+// never add up to more than the budget. Until a first download completes there is
+// no estimate, so that one runs alone against the whole budget.
+//
+// A file bigger than its share is dropped and left to the walker, and the estimate
+// doubles so fewer downloads share the budget next time. A file bigger than the
+// whole budget turns prefetching off for the rest of the request.
 //
 // A download that fails, including on a file tier2 has not written yet, is simply
 // dropped: the walker's own retry loop owns waiting for files to appear. The
 // prefetcher stops launching further segments until the walker has reached the
-// failed one, then resumes right after it.
+// dropped one, then resumes right after it.
 type prefetcher struct {
 	cfg    PrefetchConfig
 	config *Config
@@ -58,8 +64,8 @@ type prefetcher struct {
 	cond     *sync.Cond
 	started  bool
 	segments map[int]*prefetchedSegment
-	held     uint64 // bytes reserved by in-flight downloads plus bytes held by completed ones
-	estimate uint64 // decompressed size of the last completed download, 0 until one completes
+	held     uint64 // shares reserved by in-flight downloads plus bytes held by completed ones, never above the budget
+	estimate uint64 // decompressed size of the last completed download, raised by overflows, 0 until one completes
 	consumed int    // highest segment index the walker has asked for
 	failed   int    // lowest segment whose download failed and the walker has not reached, -1 if none
 	disabled bool   // a download overflowed the budget: no further segment is started
@@ -214,26 +220,35 @@ func (p *prefetcher) launchableLocked(next *int, last int) bool {
 	return p.canStartLocked()
 }
 
-// canStartLocked says whether one more download may begin. Until a first download
-// has completed there is no size estimate, so that one runs alone.
-func (p *prefetcher) canStartLocked() bool {
+// concurrencyLocked is how many downloads may run at once: as many estimate-sized
+// files as fit in the budget, at least one, at most Depth. Without an estimate,
+// one.
+func (p *prefetcher) concurrencyLocked() int {
 	if p.estimate == 0 {
-		return len(p.segments) == 0
+		return 1
 	}
-	return len(p.segments) < p.cfg.Depth && p.held+p.estimate <= p.cfg.BudgetBytes
+	return int(max(1, min(uint64(p.cfg.Depth), p.cfg.BudgetBytes/p.estimate)))
 }
 
-// reserveLocked registers the segment as in flight and returns how many bytes its
-// download may read: whatever is left of the budget.
+// shareLocked is the most one download may read: the budget split evenly between
+// the downloads allowed to run at once.
+func (p *prefetcher) shareLocked() uint64 {
+	return p.cfg.BudgetBytes / uint64(p.concurrencyLocked())
+}
+
+// canStartLocked says whether one more download may begin: a slot is free and its
+// full share still fits next to what is held.
+func (p *prefetcher) canStartLocked() bool {
+	return len(p.segments) < p.concurrencyLocked() && p.held+p.shareLocked() <= p.cfg.BudgetBytes
+}
+
+// reserveLocked registers the segment as in flight, holding its whole share until
+// the download completes, and returns that share as the read limit.
 func (p *prefetcher) reserveLocked(segment int) (seg *prefetchedSegment, limit uint64) {
-	limit = p.cfg.BudgetBytes - p.held
-	reserved := p.estimate
-	if reserved == 0 {
-		reserved = limit
-	}
-	seg = &prefetchedSegment{reserved: reserved, ready: make(chan struct{})}
+	limit = p.shareLocked()
+	seg = &prefetchedSegment{reserved: limit, ready: make(chan struct{})}
 	p.segments[segment] = seg
-	p.held += reserved
+	p.held += limit
 	return seg, limit
 }
 
@@ -248,12 +263,20 @@ func (p *prefetcher) complete(segment int, seg *prefetchedSegment, data []byte, 
 		p.held -= seg.reserved
 		seg.reserved = uint64(len(data))
 		p.held += seg.reserved
-		p.estimate = uint64(len(data))
-	case errors.Is(err, errPrefetchOverflow):
+		p.estimate = max(seg.reserved, 1)
+	case errors.Is(err, errPrefetchOverflow) && seg.reserved >= p.cfg.BudgetBytes:
 		p.releaseLocked(segment)
 		p.disabled = true
 		p.logger.Info("execout prefetching turned off for this request: a file exceeds the budget",
 			zap.Int("segment", segment), zap.Uint64("budget", p.cfg.BudgetBytes))
+	case errors.Is(err, errPrefetchOverflow):
+		p.releaseLocked(segment)
+		p.estimate = max(p.estimate, min(2*seg.reserved, p.cfg.BudgetBytes))
+		if p.failed < 0 || segment < p.failed {
+			p.failed = segment
+		}
+		p.logger.Debug("execout file exceeds its share of the prefetch budget, walker will open it directly",
+			zap.Int("segment", segment), zap.Uint64("share", seg.reserved), zap.Uint64("new_estimate", p.estimate))
 	default:
 		p.releaseLocked(segment)
 		if p.failed < 0 || segment < p.failed {

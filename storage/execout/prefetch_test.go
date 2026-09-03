@@ -226,6 +226,64 @@ func TestPrefetch_OverflowTurnsPrefetchingOff(t *testing.T) {
 	assertNothingHeld(t, p)
 }
 
+// Files jump from small to big mid-range. Small files set a small estimate, so the
+// prefetcher launches Depth downloads with a quarter of the budget each; the big
+// files overflow their share, go to the walker, and raise the estimate until one
+// download at a time gets the whole budget and fits. Held bytes never pass the
+// budget at any point.
+func TestPrefetch_FileOverItsShareShrinksConcurrency(t *testing.T) {
+	store := newPrefetchStore(t)
+	segmenter := block.NewSegmenter(10, 0, 100)
+	for i := 0; i < 10; i++ {
+		payload := 8
+		if i >= 2 && i <= 8 {
+			payload = 100
+		}
+		store.writeSegment(t, segmenter.Range(i), payload)
+	}
+	small := uint64(len(store.Files[filename(segmenter, 0)]))
+	big := uint64(len(store.Files[filename(segmenter, 2)]))
+	budget := big + big/2 // one big file fits, two do not, and a quarter share is far too small
+	require.Greater(t, budget/4, small)
+	require.Less(t, budget/2, big)
+	walker := newPrefetchWalker(store, segmenter, PrefetchConfig{Depth: 4, BudgetBytes: budget})
+	p := walker.prefetch
+
+	stop := make(chan struct{})
+	var maxHeld uint64
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			p.mu.Lock()
+			maxHeld = max(maxHeld, p.held)
+			p.mu.Unlock()
+			time.Sleep(50 * time.Microsecond)
+		}
+	}()
+
+	blocks := walkAll(t, context.Background(), walker)
+	close(stop)
+
+	assert.Equal(t, blockNums(0, 100), blocks)
+	p.mu.Lock()
+	assert.False(t, p.disabled, "a big file fits the whole budget, so prefetching stays on")
+	p.mu.Unlock()
+	assert.LessOrEqual(t, maxHeld, budget)
+	opened := store.openedFiles()
+	prefetchedBig := 0
+	for i := 2; i <= 8; i++ {
+		if countOf(opened, filename(segmenter, i)) == 1 {
+			prefetchedBig++
+		}
+	}
+	assert.GreaterOrEqual(t, prefetchedBig, 2, "once the estimate caught up, big files were prefetched in one read")
+	assertNothingHeld(t, p)
+}
+
 func TestPrefetch_MissingSegmentIsLeftToTheWalker(t *testing.T) {
 	store := newPrefetchStore(t)
 	segmenter := block.NewSegmenter(10, 0, 80)

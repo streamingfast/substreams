@@ -635,6 +635,10 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 	return nil
 }
 
+// cacheMarkerWriteTimeout bounds the detached package and last_used writes so they
+// can never outlive a request by more than this.
+const cacheMarkerWriteTimeout = 30 * time.Second
+
 // lastUsedFilename names the usage marker written in every module's cache folder:
 // `last_used` for unauthenticated requests, `last_used_<plan>` (lowercase) otherwise.
 // `firecore tools substreams purge` reads the plan back from that name to apply a
@@ -797,13 +801,23 @@ func (s *Tier1Service) blocks(
 		cacheStore = cloned
 	}
 
-	if err := s.writePackage(ctx, request, execGraph, cacheStore); err != nil {
-		logger.Warn("cannot write package", zap.Error(err))
-	}
-
-	if err := s.writeLastUsed(ctx, execGraph, cacheStore); err != nil {
-		logger.Warn("cannot write 'last_used' file", zap.Error(err))
-	}
+	// Both writes are best effort and nothing in this request reads them back, so
+	// they run off the critical path and the request only waits for them on its
+	// way out. The context is detached from the request so a client that
+	// disconnects early still leaves its usage marker behind.
+	markersWritten := make(chan struct{})
+	go func() {
+		defer close(markersWritten)
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cacheMarkerWriteTimeout)
+		defer cancel()
+		if err := s.writePackage(ctx, request, execGraph, cacheStore); err != nil {
+			logger.Warn("cannot write package", zap.Error(err))
+		}
+		if err := s.writeLastUsed(ctx, execGraph, cacheStore); err != nil {
+			logger.Warn("cannot write 'last_used' file", zap.Error(err))
+		}
+	}()
+	defer func() { <-markersWritten }()
 
 	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), segmentSize, chainFirstStreamableBlock, logger)
 	if err != nil {

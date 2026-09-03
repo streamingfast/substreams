@@ -42,6 +42,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `substreams-tier1` no longer copies each cached execution output payload once more while decoding it: the item
   now aliases the buffer it was read into instead of copying out of it.
 
+- `substreams-tier1` now writes the `substreams.spkg` and `last_used` cache markers in the background instead of
+  before the pipeline starts, so those object store round trips no longer delay the first block sent. The request
+  waits for them on its way out, and they run on a detached context with a 30 second timeout so a client that
+  disconnects early still leaves its usage marker behind.
+
 - `substreams-tier1` can now evict requests when its CPU is saturated. When its own cgroup reports CPU usage above
   90% of quota for 15 seconds, the pod advertises itself unready to the load balancer, refuses new requests, waits
   for the balancer to drain, then cancels enough of the heaviest requests with `Unavailable` to bring usage back

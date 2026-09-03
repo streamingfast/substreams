@@ -84,7 +84,6 @@ type Stages struct {
 	// candidateSegments.
 	pendingFrom     []int
 	completedPrefix []int
-	candidates      []int // scratch for candidateSegments
 }
 type stageStates []UnitState
 
@@ -615,7 +614,7 @@ func (s *Stages) rewindNextJobCursor(u Unit) {
 // Everything else is either done, in flight, or blocked on a lower stage, and
 // walking it would only re-check dependencies that cannot have changed.
 func (s *Stages) candidateSegments(from, lastSegment int) []int {
-	out := s.candidates[:0]
+	var out []int
 
 	if len(s.stages) >= 2 {
 		windowEnd := min(lastSegment, s.shadowableSegment+len(s.stages)-1)
@@ -636,8 +635,7 @@ func (s *Stages) candidateSegments(from, lastSegment int) []int {
 	}
 
 	slices.Sort(out)
-	s.candidates = slices.Compact(out)
-	return s.candidates
+	return slices.Compact(out)
 }
 
 // advancePendingFrom moves pendingFrom[stageIdx] up to the first Pending unit at or

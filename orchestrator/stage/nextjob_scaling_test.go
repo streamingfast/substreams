@@ -94,7 +94,7 @@ func TestNextJob_CursorFollowsTheJobFrontierNotTheSquasher(t *testing.T) {
 	_, r, _ := stages.NextJob(math.MaxInt)
 	require.Nil(t, r)
 	require.GreaterOrEqual(t, stages.pendingFrom[0], segments-1, "stage 0 cursor stuck behind the unsquashed backlog")
-	require.LessOrEqual(t, len(stages.candidates), len(stages.stages)*2, "a call visits a bounded number of segments")
+	require.LessOrEqual(t, len(stages.candidateSegments(stages.nextJobCursor, segments-1)), len(stages.stages)*2, "a call visits a bounded number of segments")
 
 	// A squash that finds no partial sends the unit back to Pending, and the cursor
 	// must come back with it or the job would never be re-scheduled.

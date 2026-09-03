@@ -397,6 +397,8 @@ const blockAgeFlipPolls = 3
 // signal. Must be called with `lock` held.
 func trackBlockAge(endpoint string, state *endpointState, result *pollResult) {
 	if result.blockAge == nil || result.maxFreshness == nil {
+		// A poll that carries no age agrees with nothing, so a streak cannot span it.
+		state.blockAgeStreak = 0
 		return
 	}
 

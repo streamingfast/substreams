@@ -61,7 +61,7 @@ type prefetcher struct {
 	logger *zap.Logger
 
 	mu       sync.Mutex
-	cond     *sync.Cond
+	wake     chan struct{} // one pending wake-up for the launcher, see notify
 	started  bool
 	segments map[int]*prefetchedSegment
 	held     uint64 // shares reserved by in-flight downloads plus bytes held by completed ones, never above the budget
@@ -89,10 +89,10 @@ func newPrefetcher(cfg PrefetchConfig, walker *FileWalker) *prefetcher {
 		walker:   walker,
 		logger:   walker.logger.Named("execout_prefetch"),
 		segments: make(map[int]*prefetchedSegment),
+		wake:     make(chan struct{}, 1),
 		consumed: walker.segmenter.FirstIndex() - 1,
 		failed:   -1,
 	}
-	p.cond = sync.NewCond(&p.mu)
 	return p
 }
 
@@ -108,7 +108,7 @@ func (p *prefetcher) take(ctx context.Context, segment int) (FileReader, error) 
 		go p.run(ctx, segment+1)
 	}
 	seg := p.segments[segment]
-	p.cond.Broadcast()
+	p.notify()
 	p.mu.Unlock()
 
 	if seg == nil {
@@ -135,7 +135,7 @@ func (p *prefetcher) release(segment int) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.releaseLocked(segment)
-	p.cond.Broadcast()
+	p.notify()
 }
 
 func (p *prefetcher) releaseLocked(segment int) {
@@ -151,47 +151,57 @@ func (p *prefetcher) run(ctx context.Context, from int) {
 	defer func() {
 		p.mu.Lock()
 		p.done = true
-		p.cond.Broadcast()
 		p.mu.Unlock()
 	}()
-
-	stop := context.AfterFunc(ctx, func() {
-		p.mu.Lock()
-		p.cond.Broadcast()
-		p.mu.Unlock()
-	})
-	defer stop()
 
 	last := p.walker.segmenter.LastIndex()
 	next := from
 
-	// Picking the segment and reserving it happen under one hold of the lock, so the
-	// walker cannot ask for that segment in between and end up opening it itself
-	// while the download is launched anyway.
-	p.mu.Lock()
-	defer p.mu.Unlock()
 	for {
-		for !p.launchableLocked(&next, last) {
-			if ctx.Err() != nil {
+		// Checking, picking the segment and reserving it happen under one hold of
+		// the lock, so the walker cannot ask for that segment in between and end up
+		// opening it itself while the download is launched anyway.
+		p.mu.Lock()
+		launchable := p.launchableLocked(&next, last)
+		finished := launchable && (p.disabled || next > last)
+		if launchable && !finished {
+			segment := next
+			rng := p.walker.segmenter.Range(segment)
+			if rng == nil {
+				p.mu.Unlock()
 				return
 			}
-			p.cond.Wait()
+			seg, limit := p.reserveLocked(segment)
+			next++
+			p.mu.Unlock()
+			go func() {
+				data, err := p.download(ctx, rng, limit)
+				p.complete(segment, seg, data, err)
+			}()
+			continue
 		}
-		if p.disabled || next > last {
+		p.mu.Unlock()
+		if finished {
 			return
 		}
-		segment := next
-		rng := p.walker.segmenter.Range(segment)
-		if rng == nil {
-			return
-		}
-		seg, limit := p.reserveLocked(segment)
-		next++
 
-		go func() {
-			data, err := p.download(ctx, rng, limit)
-			p.complete(segment, seg, data, err)
-		}()
+		select {
+		case <-p.wake:
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// notify wakes the launcher so it re-reads the state. Every change to what
+// launchableLocked looks at calls it, with the lock held. The channel holds one
+// pending wake-up and further ones are dropped, which is enough: a change can only
+// land once the launcher has released the lock, its token then makes the next
+// wait return at once, and the launcher reads all of the state on every pass.
+func (p *prefetcher) notify() {
+	select {
+	case p.wake <- struct{}{}:
+	default:
 	}
 }
 
@@ -285,7 +295,7 @@ func (p *prefetcher) complete(segment int, seg *prefetchedSegment, data []byte, 
 		}
 	}
 	close(seg.ready)
-	p.cond.Broadcast()
+	p.notify()
 }
 
 // download reads the whole segment, decompressed, into memory. It fails with

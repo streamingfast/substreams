@@ -39,6 +39,8 @@ type SessionWorkerPool struct {
 	borrowedWorkers      map[string]Worker
 	borrowedWorkersMutex sync.Mutex
 
+	launchQueue *LaunchQueue
+
 	rampingUp         *atomic.Bool
 	rampupWorkerGiven *atomic.Bool
 }
@@ -68,6 +70,7 @@ func NewSessionWorkerPool(
 		sessionKey:           sessionKey,
 		maxWorkersPerSession: maxWorkers,
 		borrowedWorkers:      make(map[string]Worker),
+		launchQueue:          NewLaunchQueue(maxWorkers),
 		rampingUp:            &atomic.Bool{},
 		rampupWorkerGiven:    &atomic.Bool{},
 	}
@@ -125,7 +128,7 @@ func (p *SessionWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 		return nil, fmt.Errorf("failed to get worker: %w", err)
 	}
 
-	worker := NewRemoteWorker(p.clientFactory, workerKey, p.logger)
+	worker := NewRemoteWorker(p.clientFactory, workerKey, p.logger, p.launchQueue)
 
 	p.borrowedWorkersMutex.Lock()
 	p.borrowedWorkers[workerKey] = worker

@@ -61,6 +61,13 @@ var StoreMmapOperationsTotal *dmetrics.CounterVec
 var Tier1ActiveRequestsHardLimit *dmetrics.Gauge
 var Tier2MaxConcurrentRequests *dmetrics.Gauge
 
+// CPU signals of the tier1 container's own cgroup, sampled by the request evictor
+var Tier1CPUQuotaCores *dmetrics.Gauge
+var Tier1CPUUsageRatio *dmetrics.Gauge
+var Tier1CPUOverloaded *dmetrics.Gauge
+var Tier1EffectiveActiveRequests *dmetrics.Gauge
+var Tier1EvictedRequestsCounter *dmetrics.CounterVec
+
 func DeclareTier1Metrics(zlog *zap.Logger) {
 	AppReadinessTier1 = MetricSet.NewAppReadiness("substreams_tier1")
 	Tier1RequestsCounter = MetricSet.NewCounter("substreams_counter", "Total Substreams requests count on tier1")
@@ -80,6 +87,19 @@ func DeclareTier1Metrics(zlog *zap.Logger) {
 	Tier1WorkerRejectedOverloadedCounter = MetricSet.NewCounter("substreams_tier1_worker_rejected_overloaded_counter", "Counter for number of times a worker rejected a request because it was overloaded (included in RetryCounter)")
 	Tier1OutputHeadBlockRelativeTime = MetricSet.NewHeadBlockRelativeTime("substreams_output")
 	Tier1ActiveRequestsHardLimit = MetricSet.NewGauge("substreams_tier1_active_requests_hard_limit", "Hard limit of concurrent active requests on tier1 (0 means unlimited)")
+
+	Tier1CPUQuotaCores = MetricSet.NewGauge("substreams_tier1_cpu_quota_cores", "CPU quota of the tier1 container's cgroup in cores (0 means no limit)")
+	Tier1CPUUsageRatio = MetricSet.NewGauge("substreams_tier1_cpu_usage_ratio", "CPU used by the tier1 container as a fraction of its cgroup quota, over the last evictor evaluation interval")
+	Tier1CPUOverloaded = MetricSet.NewGauge("substreams_tier1_cpu_overloaded", "1 while the tier1 pod considers itself CPU-overloaded (unready, may evict requests), 0 otherwise")
+	Tier1EffectiveActiveRequests = MetricSet.NewGauge(
+		"substreams_tier1_effective_active_requests",
+		"Active requests on tier1 adjusted for what they cost: the higher of substreams_active_requests and the number of requests the CPU budget is being spent at. Meant as the horizontal autoscaler input, since it stays at capacity while the pod is evicting instead of dropping with the requests it cancelled",
+	)
+	Tier1EvictedRequestsCounter = MetricSet.NewCounterVec(
+		"substreams_tier1_evicted_requests_counter",
+		[]string{"class", "action"},
+		"Requests the CPU evictor selected, by class (dev, prod-catchup, prod-live) and action (cancelled, or observed in observe mode)",
+	)
 
 	StoreBackendType = MetricSet.NewGaugeVec(
 		"substreams_store_backend_type",

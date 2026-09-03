@@ -178,9 +178,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			if current < first {
 				current = first // cover for execoutwalker initialisation
 			}
-			// if we have 10 maxParallelJobs, we don't schedule jobs more than 15 segments ahead of the execout walker (1.5x)
+			// if we have 10 maxParallelJobs, we don't schedule jobs more than 20 segments ahead of the execout walker (2x)
 			// This way, a client reading blocks very slowly will not cause the parallel processing of millions of blocks
-			notAboveSegment = current + int(reqctx.Details(s.ctx).MaxParallelJobs)*3/2
+			notAboveSegment = current + int(reqctx.Details(s.ctx).MaxParallelJobs)*2
 		}
 
 		workUnit, workRange, skippedAboveSegment := s.Stages.NextJob(notAboveSegment)

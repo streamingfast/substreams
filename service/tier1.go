@@ -110,7 +110,10 @@ type Tier1Service struct {
 
 	// You can call this function to switch the parent app to be ready or not ready influencing the health check,
 	// it's provided by [app.Tier1App] and tied to the health check endpoint.
-	appSetIsReadyState  func(isReady bool)
+	appSetIsReadyState func(isReady bool)
+	// readinessLock serializes the readiness reads and writes of refreshReadiness,
+	// which the request path and the CPU evictor both drive.
+	readinessLock       sync.Mutex
 	getRecentFinalBlock func() (uint64, error)
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
@@ -123,7 +126,9 @@ type Tier1Service struct {
 	storeResolver            dregistry.Resolver
 	sessionPool              dsession.SessionPool
 	activeRequestsManager    *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
+	evictor                  *active_requests.Evictor               // nil unless CPU eviction is enabled and cgroup CPU signals are readable
 	execOutMessageBufferSize int
+	execOutPrefetch          execout.PrefetchConfig
 
 	// liveBackFillerFinalBlockDelay overrides the default 120-block delay the
 	// live backfiller waits past a segment end before concluding merged blocks
@@ -195,6 +200,7 @@ func NewTier1(
 	enforceCompression bool,
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
+	evictorConfig active_requests.EvictorConfig,
 	sharedCacheSize uint64,
 	outputBufferSize uint64,
 	sessionPool dsession.SessionPool,
@@ -271,6 +277,28 @@ func NewTier1(
 	s.OnTerminating(func(_ error) {
 		s.activeRequestsWG.Wait()
 	})
+
+	if evictorConfig.Mode != active_requests.EvictionOff {
+		if evictorConfig.NominalCapacity == 0 {
+			evictorConfig.NominalCapacity = float64(activeRequestsSoftLimit)
+		}
+		if reader, err := active_requests.NewCPUReader(evictorConfig.QuotaCoresOverride); err != nil {
+			logger.Warn("CPU eviction disabled: cannot read cgroup CPU signals", zap.Error(err))
+		} else if reader.QuotaCores() == 0 {
+			logger.Warn("CPU eviction disabled: no CPU quota set on the cgroup, set QuotaCoresOverride to pick the budget yourself")
+		} else {
+			if limit := reader.CgroupQuotaCores(); limit > 0 && reader.QuotaCores() > limit {
+				logger.Warn("CPU quota override is above the cgroup limit: the kernel throttles the pod before the evictor fires",
+					zap.Float64("quota_cores", reader.QuotaCores()),
+					zap.Float64("cgroup_limit_cores", limit),
+				)
+			}
+			evictor := active_requests.NewEvictor(evictorConfig, s.activeRequestsManager, reader, logger)
+			evictor.OnEvaluate(s.refreshReadiness)
+			s.evictor = evictor
+			go evictor.Run(s.Terminating())
+		}
+	}
 
 	metrics.Tier1ActiveRequestsHardLimit.SetFloat64(float64(activeRequestsHardLimit))
 
@@ -540,10 +568,7 @@ func (s *Tier1Service) BlocksAny(
 	metrics.Tier1ActiveRequests.Inc()
 	defer func() {
 		metrics.Tier1ActiveRequests.Dec()
-
-		if status := s.getOverloadedStatus(); status.canAcceptUpcomingRequests() {
-			s.appSetIsReadyState(true)
-		}
+		s.refreshReadiness()
 	}()
 
 	// On app shutdown, we cancel the running '.blocks()' command,
@@ -609,6 +634,10 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 	}
 	return nil
 }
+
+// cacheMarkerWriteTimeout bounds the detached package and last_used writes so they
+// can never outlive a request by more than this.
+const cacheMarkerWriteTimeout = 30 * time.Second
 
 // lastUsedFilename names the usage marker written in every module's cache folder:
 // `last_used` for unauthenticated requests, `last_used_<plan>` (lowercase) otherwise.
@@ -772,13 +801,20 @@ func (s *Tier1Service) blocks(
 		cacheStore = cloned
 	}
 
-	if err := s.writePackage(ctx, request, execGraph, cacheStore); err != nil {
-		logger.Warn("cannot write package", zap.Error(err))
-	}
-
-	if err := s.writeLastUsed(ctx, execGraph, cacheStore); err != nil {
-		logger.Warn("cannot write 'last_used' file", zap.Error(err))
-	}
+	// Both writes are best effort and nothing in this request reads them back, so
+	// they run detached from the request: neither its start nor its exit waits for
+	// them, and a client that disconnects early still leaves its usage marker
+	// behind. The timeout is the only bound on how long they may run.
+	go func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cacheMarkerWriteTimeout)
+		defer cancel()
+		if err := s.writePackage(ctx, request, execGraph, cacheStore); err != nil {
+			logger.Warn("cannot write package", zap.Error(err))
+		}
+		if err := s.writeLastUsed(ctx, execGraph, cacheStore); err != nil {
+			logger.Warn("cannot write 'last_used' file", zap.Error(err))
+		}
+	}()
 
 	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), segmentSize, chainFirstStreamableBlock, logger)
 	if err != nil {
@@ -815,6 +851,7 @@ func (s *Tier1Service) blocks(
 	if s.getHeadBlock != nil {
 		opts = append(opts, pipeline.WithHeadBlockGetter(s.getHeadBlock))
 	}
+	opts = append(opts, pipeline.WithExecOutPrefetch(s.execOutPrefetch))
 
 	ctx, resolvedEndpoints, err := s.resolveFoundationalStores(ctx, execGraph, reqStats)
 	if err != nil {
@@ -931,6 +968,8 @@ func (s *Tier1Service) blocks(
 			0, // not used on tier1
 			0,
 			0,
+			requestDetails.ProductionMode,
+			reqStats,
 		)
 		defer func() {
 			s.activeRequestsManager.Remove(activeReqHandler)
@@ -1444,20 +1483,27 @@ type overloadingStatus struct {
 	activeRequestCount int
 	softLimit          int
 	hardLimit          int
+	// cpuOverloaded is set while the CPU evictor considers the pod overloaded,
+	// independently of the request-count limits
+	cpuOverloaded bool
 }
 
 // softLimitWouldBeReached returns true if the soft limit would be reached if one more request was added.
 func (s *overloadingStatus) softLimitWouldBeReached() bool {
-	return s.softLimit > 0 && s.activeRequestCount+1 >= s.softLimit
+	return s.cpuOverloaded || (s.softLimit > 0 && s.activeRequestCount+1 >= s.softLimit)
 }
 
 // hardLimitReached returns true if the hard limit is actually reached from the active request count.
 func (s *overloadingStatus) hardLimitReached() bool {
-	return s.hardLimit > 0 && s.activeRequestCount >= s.hardLimit
+	return s.cpuOverloaded || (s.hardLimit > 0 && s.activeRequestCount >= s.hardLimit)
 }
 
 // canAcceptUpcomingRequests returns true if the service can accept upcoming new requests.
 func (s *overloadingStatus) canAcceptUpcomingRequests() bool {
+	if s.cpuOverloaded {
+		return false
+	}
+
 	if s.softLimit <= 0 && s.hardLimit <= 0 {
 		return true
 	}
@@ -1474,18 +1520,28 @@ func (s *overloadingStatus) canAcceptUpcomingRequests() bool {
 }
 
 func (s *Tier1Service) getOverloadedStatus() (status overloadingStatus) {
-	// Never overloaded if both soft & hard limit are 0, -1 or anything less
+	status.cpuOverloaded = s.evictor != nil && s.evictor.IsOverloaded()
+
+	// request-count limits only apply when either soft or hard limit is > 0
 	if s.activeRequestsSoftLimit <= 0 && s.activeRequestsHardLimit <= 0 {
-		return
+		return status
 	}
 
-	activeRequestCount := s.getActiveRequestCount()
+	status.activeRequestCount = s.getActiveRequestCount()
+	status.softLimit = s.activeRequestsSoftLimit
+	status.hardLimit = s.activeRequestsHardLimit
+	return status
+}
 
-	return overloadingStatus{
-		activeRequestCount: activeRequestCount,
-		softLimit:          s.activeRequestsSoftLimit,
-		hardLimit:          s.activeRequestsHardLimit,
-	}
+// refreshReadiness re-derives the readiness flag from the current overload
+// status. The lock covers the read and the write together, so two callers
+// evaluating at once cannot apply their answers out of order and leave the flag
+// disagreeing with the status.
+func (s *Tier1Service) refreshReadiness() {
+	s.readinessLock.Lock()
+	defer s.readinessLock.Unlock()
+	status := s.getOverloadedStatus()
+	s.appSetIsReadyState(status.canAcceptUpcomingRequests())
 }
 
 func (s *Tier1Service) listActiveRecords() string {

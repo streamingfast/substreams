@@ -30,12 +30,95 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-- A tier2 that refuses a job because it is at its concurrent-request limit (`ResourceExhausted: service currently
-  overloaded`) is now retried after 300ms +/- 100ms instead of on the growing 1s-to-5s backoff shared with real
-  failures. The retry dials again and can land on a different instance, so waiting seconds on a busy fleet only
-  slowed the search down. Tunable with `SUBSTREAMS_WORKER_OVERLOADED_RETRY_DELAY` and
-  `SUBSTREAMS_WORKER_OVERLOADED_RETRY_JITTER`. A refused connection or an `Unavailable: no healthy upstream` from
-  the load balancer means no instance is reachable at all, so those keep the growing backoff.
+- `substreams-tier1` scheduling no longer slows down as a large backprocessing range progresses. Picking the next
+  tier2 job walked every segment between the squasher and the job frontier on every call, re-checking
+  dependencies that could not have changed, so a run over N segments cost O(N²) in scheduling. The scheduler now
+  keeps, per stage, the lowest segment that may still be pending and the highest segment completed so far, and
+  only looks at the handful of segments those point at. On a 3-stage graph with 4 workers and a squasher three
+  times slower than the jobs, scheduling 8000 segments went from 1.18 s to 2.7 ms, and now grows linearly with
+  the range. Job order is unchanged.
+
+- `substreams-tier1` now downloads the next cached execution output files while it streams the current one to a
+  production-mode client. Before, each 1000-block segment was opened, decompressed and sent before the next one
+  was even requested from the object store, so every segment paid a full store round trip on the critical path.
+  Prefetching is bounded per request by `Tier1Config.ExecOutPrefetch`: at most `Depth` segments ahead (default
+  and hard cap 4) holding at most `BudgetBytes` of decompressed data (default 64 MiB). No size is ever asked of
+  the store: the decompressed size of the last downloaded segment is the estimate for the next ones, and as many
+  download at once as estimate-sized files fit in the budget, each allowed to read an even share of it, so
+  in-flight reads never add up to more than the budget. A file bigger than its share is left to the walker and
+  the estimate is raised, so a chain going from quiet to busy shrinks the concurrency instead of overshooting.
+  A file bigger than the whole budget turns prefetching off for the rest of the request. Missing files are left
+  to the walker's existing retry loop, and the prefetcher stops looking ahead until the walker reaches them.
+  Setting either bound to zero turns prefetching off.
+
+- `substreams-tier1` now sends each batch of cached execution output on a separate goroutine, so decoding the next
+  batch overlaps with compressing and writing the current one. Before, the walker built a batch, sent it, and only
+  then started decoding the next, so the client-facing write sat on the critical path of every batch. At most one
+  batch is being built while one is sent, and a segment is only reported done once every batch is out, so message
+  order is unchanged.
+
+- `substreams-tier1` no longer copies each cached execution output payload once more while decoding it: the item
+  now aliases the buffer it was read into instead of copying out of it.
+
+- `substreams-tier1` now writes the `substreams.spkg` and `last_used` cache markers in the background instead of
+  before the pipeline starts, so those object store round trips no longer delay the first block sent. They run
+  detached from the request on their own context with a 30 second timeout: the request neither starts nor exits
+  waiting for them, and a client that disconnects early still leaves its usage marker behind.
+
+- `substreams-tier1` can now evict requests when its CPU is saturated. When its own cgroup reports CPU usage above
+  90% of quota for 15 seconds, the pod advertises itself unready to the load balancer, refuses new requests, waits
+  for the balancer to drain, then cancels enough of the heaviest requests with `Unavailable` to bring usage back
+  under 75% of quota, so their clients reconnect to a less busy pod. Order: dev-mode requests first, then production
+  requests on live blocks, then production requests still catching up from files. 
+  Off by default; enable and tune it through the tier1 app's `CPUEviction` config 
+  modes: `observe` (log only), `dev-only`, `full`
+  Needs cgroup v2 CPU accounting. A pod whose cgroup carries no CPU limit (`cpu.max` reads `max`) has no quota to
+  measure usage against and leaves the evictor off; set `CPUEviction.QuotaCoresOverride` to name the budget yourself.
+  New metrics: `substreams_tier1_cpu_*` gauges and `substreams_tier1_evicted_requests_counter`.
+
+- New `substreams_tier1_effective_active_requests` gauge, meant to replace `substreams_active_requests` as the
+  horizontal autoscaler input on tier1: the higher of the plain active-request count and the number of requests the
+  CPU budget is being spent at (`nominal_capacity * cpu_usage_ratio / cpu_eviction_target_ratio`). A pod full of
+  expensive requests, or one holding its CPU down by eviction, reports itself at capacity, so the autoscaler will
+  add more pods. `CPUEviction.NominalCapacity` should be set to the autoscaler's per-pod request target; it defaults
+  to the active-requests soft limit.
+
+- Trimmed tier2's per-segment logging: a large backfill fans out into tens of thousands of `ProcessRange` calls,
+  and each one was logging ~10 `Info` lines with no steady-state diagnostic value, which could spike a pod's log
+  volume by an order of magnitude. Removed the duplicate auth-info log in the tier2 response handler (already
+  logged once per segment on the incoming request), and demoted the store-size and exec-output-file-open logs to
+  `Debug`. Also suppressed the benign `http2: server: error reading preface ...: connection reset by peer` error
+  logged whenever a client drops a connection mid-handshake against the plaintext/h2c tier2 port, mirroring the
+  existing TLS-handshake suppressions. The bigger source of the same spike was `dmetering`'s per-request event
+  emitter, opened and torn down on every `ProcessRange` call; its 4 shutdown-lifecycle logs are now `Debug` too
+  (bumped to `github.com/streamingfast/dmetering@v0.0.0-20260901152443-1ff4cd0d617d`).
+
+- Jobs of a tier1 request now reach the tier2 fleet in the order the client will read their output, instead of
+  racing each other for whatever instance has room. A job asks a per-request launch queue for its turn before every
+  request it sends to a tier2, first attempt and retries alike, and leaves the queue the moment a tier2 takes it. The
+  queue holds the jobs waiting to get in, ordered by lowest segment first and, within a segment, by highest stage.
+  Only the first 20% of that queue may dial at all, at least two jobs and at most 15; the ones behind them send
+  nothing until a job ahead gets in and moves the window up. So with 10 workers and every job turned away, the two
+  lowest segments redial every 100ms while the other eight stay silent, and a job the scheduler creates late for a
+  low segment goes to the front of the queue and dials right away. A job with nothing queued ahead of it dials
+  immediately, so a fleet with room is paced no differently than before. Without this, the segment the client reads
+  first was no more likely to land than one it would only read minutes later, and a whole request could idle behind
+  a single unlucky low segment.
+
+- A tier2 job that fails is no longer retried on a growing 1s-to-5s backoff of its own. Every reason to dial again
+  now goes through the same queue, so retries keep the request's reading order: a job that could not get in at all
+  (`ResourceExhausted: service currently overloaded`, a refused connection, `Unavailable: no healthy upstream`)
+  waits 100ms, and a job that got in and then failed waits 5 seconds once — if a tier2 then turns it away for
+  capacity, it is back on the 100ms delay with its failure already counted. The counters that end a hopeless request
+  are unchanged: five failures, or two execution timeouts, and neither is charged for a job that never got in.
+  Tunable with `SUBSTREAMS_WORKER_LAUNCH_WINDOW_PERCENT` (default 20), `SUBSTREAMS_WORKER_LAUNCH_WINDOW_MAX`
+  (default 15), `SUBSTREAMS_WORKER_OVERLOADED_RETRY_DELAY` (default 100ms, was 300ms),
+  `SUBSTREAMS_WORKER_FAILED_RETRY_DELAY` (default 5s) and
+  `SUBSTREAMS_WORKER_OVERLOADED_RETRY_JITTER` (default 100ms, added to a wait so jobs turned away at the same instant
+  do not redial in lockstep).
+
+- Jobs are now scheduled up to twice the request's worker count ahead of the blocks the client is reading, instead of
+  1.5 times, so a client that reads slowly still keeps the workers busy.
 
 - Store snapshots (fullKV files) can now be pruned to save disk space: tier1 no longer assumes that a fullKV at block
   `x` implies that every earlier fullKV still exists. At request start it walks backwards from the first segment
@@ -57,6 +140,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   progress cadence for the whole request instead of using the ramp above; the 500ms minimum is unchanged.
 
 - `substreams-tier1` now names the usage marker it writes in every module cache folder after the request's plan tier: `last_used_<plan>` (lowercase, e.g. `last_used_pro`), still plain `last_used` when unauthenticated. `firecore tools substreams purge` reads the plan back from that name to apply a retention per plan.
+
+### Dependencies
+
+- `google.golang.org/grpc` is at v1.83.1, which clears GHSA-vp52-pcj8-j9qc, reported as HIGH: a peer could exhaust
+  server heap by fragmenting HTTP/2 DATA frames.
 
 ### Tests
 

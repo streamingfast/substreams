@@ -78,8 +78,10 @@ func ReadNextItem(reader io.Reader) (item *pb.Item, err error) {
 		return nil, fmt.Errorf("failed to read item data: %w", err)
 	}
 
+	// itemData is a fresh allocation nothing else reads, so the item aliases it
+	// instead of copying the payload out.
 	item = &pb.Item{}
-	if err := item.UnmarshalVT(itemData); err != nil {
+	if err := item.UnmarshalVTUnsafe(itemData); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal item: %w", err)
 	}
 

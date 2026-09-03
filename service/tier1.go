@@ -295,6 +295,7 @@ func NewTier1(
 			}
 			evictor := active_requests.NewEvictor(evictorConfig, s.activeRequestsManager, reader, logger)
 			evictor.OnEvaluate(s.refreshReadiness)
+			evictor.CountActiveRequestsWith(s.getActiveRequestCount)
 			s.evictor = evictor
 			go evictor.Run(s.Terminating())
 		}

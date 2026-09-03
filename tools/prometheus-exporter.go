@@ -244,9 +244,8 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Declared before the pollers start: a poller that fails on its very first attempt reports
-	// through these, and a nil one is both a data race and a nil dereference that takes the
-	// whole process down.
+	// Declared before the pollers start: a poller that fails on its very first attempt already
+	// reports through these, and they are read without synchronisation.
 	collectors := initHealthcheckMetrics(labelNames)
 
 	for endpoint := range endpointMap {

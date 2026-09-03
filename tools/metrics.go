@@ -103,11 +103,9 @@ func grpcCodeOf(err error) string {
 	return noGRPCCode
 }
 
-// streamFailure attributes an error returned by the Blocks call. `connect_failed` means the
-// dial itself failed, `connect_timeout` (set by the caller) means it was merely slow and the
-// backend was never reached at all. When the channel never
-// became ready, gRPC answers with the dial error it was holding, so the failure belongs to
-// the connection rather than to the endpoint's own answer.
+// streamFailure attributes an error returned by the Blocks call. A channel that never became
+// ready makes gRPC answer with the dial error it was holding, so the failure belongs to the
+// connection rather than to the endpoint's own answer, and `connect_failed` says so.
 func streamFailure(ctx context.Context, connectFailedFast bool, err error) (failureReason, error) {
 	err = withDeadlineCause(ctx, err)
 	if connectFailedFast {

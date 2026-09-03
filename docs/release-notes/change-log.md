@@ -105,9 +105,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `stream_error`, `stale_block`, `invalid_response` or `no_data` -- exposed on the new
   `substreams_healthcheck_failure_count{reason,grpc_code}` counter and included in the logs. An alert firing on
   `substreams_healthcheck_status` no longer requires guessing whether the endpoint was unreachable, unauthenticated,
-  overloaded or merely late. A dial that fails outright is reported as `connect_failed` within milliseconds, carrying
-  the dial error (`connection refused`, DNS failure); `connect_timeout` is reserved for a connection that is merely
-  slow to come up.
+  overloaded or merely late. A dial that fails outright is reported as `connect_failed`, carrying the dial
+  error where gRPC exposes it (`connection refused`); a hostname that does not resolve surfaces as the balancer's
+  own `no children to pick from`, since it replaces the resolver error. `connect_timeout` is reserved for a
+  connection that is merely slow to come up and never failed a dial.
 
 - Connection establishment gets its own budget, `--connect-timeout` (default 10s), separate from `--timeout`, which
   now covers the `Blocks` request alone. gRPC dials lazily, so DNS, TLS and load-balancer resolution used to be

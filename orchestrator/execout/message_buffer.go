@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/streamingfast/substreams/orchestrator/response"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv4 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4"
 	"go.uber.org/zap"
@@ -96,7 +95,7 @@ func (b *MessageBuffer) shouldFlushLocked() bool {
 // it — append, flush-check and flush all happen under a single lock, so the output
 // hot path takes the buffer mutex exactly once per block. It returns the time spent
 // flushing (0 if no flush happened).
-func (b *MessageBuffer) AppendAndFlushWhenNeeded(msg *pbsubstreamsrpcv2.BlockScopedData, dataSize int, streamSrv *response.Stream) (time.Duration, error) {
+func (b *MessageBuffer) AppendAndFlushWhenNeeded(msg *pbsubstreamsrpcv2.BlockScopedData, dataSize int, streamSrv dataStream) (time.Duration, error) {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
@@ -114,14 +113,14 @@ func (b *MessageBuffer) AppendAndFlushWhenNeeded(msg *pbsubstreamsrpcv2.BlockSco
 	return time.Since(start), nil
 }
 
-func (b *MessageBuffer) Flush(streamSrv *response.Stream) error {
+func (b *MessageBuffer) Flush(streamSrv dataStream) error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
 	return b.flushLocked(streamSrv)
 }
 
-func (b *MessageBuffer) flushLocked(streamSrv *response.Stream) error {
+func (b *MessageBuffer) flushLocked(streamSrv dataStream) error {
 	err := streamSrv.BlockScopedDatas(b.buf)
 	if err != nil {
 		return fmt.Errorf("flushing buffer: %w", err)

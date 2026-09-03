@@ -33,6 +33,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   existing retry loop, and the prefetcher stops looking ahead until the walker reaches them. Setting either bound
   to zero turns prefetching off.
 
+- `substreams-tier1` now sends each batch of cached execution output on a separate goroutine, so decoding the next
+  batch overlaps with compressing and writing the current one. Before, the walker built a batch, sent it, and only
+  then started decoding the next, so the client-facing write sat on the critical path of every batch. At most one
+  batch is being built while one is sent, and a segment is only reported done once every batch is out, so message
+  order is unchanged.
+
+- `substreams-tier1` no longer copies each cached execution output payload once more while decoding it: the item
+  now aliases the buffer it was read into instead of copying out of it.
+
 - `substreams-tier1` can now evict requests when its CPU is saturated. When its own cgroup reports CPU usage above
   90% of quota for 15 seconds, the pod advertises itself unready to the load balancer, refuses new requests, waits
   for the balancer to drain, then cancels enough of the heaviest requests with `Unavailable` to bring usage back

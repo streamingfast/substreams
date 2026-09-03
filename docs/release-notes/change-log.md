@@ -22,6 +22,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- `substreams-tier1` scheduling no longer slows down as a large backprocessing range progresses. Picking the next
+  tier2 job walked every segment between the squasher and the job frontier on every call, re-checking
+  dependencies that could not have changed, so a run over N segments cost O(N²) in scheduling. The scheduler now
+  keeps, per stage, the lowest segment that may still be pending and the highest segment completed so far, and
+  only looks at the handful of segments those point at. On a 3-stage graph with 4 workers and a squasher three
+  times slower than the jobs, scheduling 8000 segments went from 1.18 s to 2.7 ms, and now grows linearly with
+  the range. Job order is unchanged.
+
 - `substreams-tier1` now downloads the next cached execution output files while it streams the current one to a
   production-mode client. Before, each 1000-block segment was opened, decompressed and sent before the next one
   was even requested from the object store, so every segment paid a full store round trip on the critical path.

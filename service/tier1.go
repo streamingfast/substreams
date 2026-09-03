@@ -802,12 +802,10 @@ func (s *Tier1Service) blocks(
 	}
 
 	// Both writes are best effort and nothing in this request reads them back, so
-	// they run off the critical path and the request only waits for them on its
-	// way out. The context is detached from the request so a client that
-	// disconnects early still leaves its usage marker behind.
-	markersWritten := make(chan struct{})
+	// they run detached from the request: neither its start nor its exit waits for
+	// them, and a client that disconnects early still leaves its usage marker
+	// behind. The timeout is the only bound on how long they may run.
 	go func() {
-		defer close(markersWritten)
 		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cacheMarkerWriteTimeout)
 		defer cancel()
 		if err := s.writePackage(ctx, request, execGraph, cacheStore); err != nil {
@@ -817,7 +815,6 @@ func (s *Tier1Service) blocks(
 			logger.Warn("cannot write 'last_used' file", zap.Error(err))
 		}
 	}()
-	defer func() { <-markersWritten }()
 
 	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), segmentSize, chainFirstStreamableBlock, logger)
 	if err != nil {

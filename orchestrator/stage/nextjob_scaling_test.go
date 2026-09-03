@@ -109,6 +109,27 @@ func TestNextJob_FullRunCompletes(t *testing.T) {
 	scheduleRun(t, 300, 4, 3)
 }
 
+// An execout file found missing long after its segment was done sends the map unit
+// back to Pending. The cursors have all moved to the end of the range by then, and
+// the job must still come back out of NextJob.
+func TestNextJob_ReschedulesAMapSegmentWhoseFileWentMissing(t *testing.T) {
+	stages, _ := scheduleRun(t, 300, 4, 3)
+	_, r, _ := stages.NextJob(math.MaxInt)
+	require.Nil(t, r, "everything is done")
+
+	mapStage := len(stages.stages) - 1
+	require.True(t, stages.ReprocessMapSegment(150))
+
+	u, r, _ := stages.NextJob(math.MaxInt)
+	require.NotNil(t, r)
+	require.Equal(t, Unit{Segment: 150, Stage: mapStage}, u)
+
+	stages.MarkJobSuccess(u)
+	_, r, _ = stages.NextJob(math.MaxInt)
+	require.Nil(t, r)
+	require.True(t, stages.LastStageCompleted())
+}
+
 func BenchmarkNextJob_SlowSquasher(b *testing.B) {
 	for _, segments := range []int{1000, 2000, 4000, 8000} {
 		b.Run(itoa(segments), func(b *testing.B) {

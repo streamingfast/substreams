@@ -209,10 +209,8 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid --force-protocol-version %d: the prometheus exporter only speaks %s for now, leave the flag unset or pass 4", protocolVersionFlag, client.ProtocolVersionV4)
 	}
 
-	forceProtocolVersion, err := client.ParseProtocolVersion(protocolVersionFlag)
-	if err != nil {
-		return fmt.Errorf("invalid --force-protocol-version: %w", err)
-	}
+	// The check above leaves only 0 and 4, both of which parse.
+	forceProtocolVersion, _ := client.ParseProtocolVersion(protocolVersionFlag)
 
 	maxFreshness := sflags.MustGetDuration(cmd, "max-freshness")
 

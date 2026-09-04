@@ -151,6 +151,7 @@ type Pipeline struct {
 	checkPendingShutdown func() bool
 	outputBufferSize     int
 	supportBuffering     bool
+	execOutPrefetch      execout.PrefetchConfig
 }
 
 func New(
@@ -638,6 +639,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		noopMode,
 		p.outputBufferSize,
 		p.supportBuffering,
+		p.execOutPrefetch,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("building parallel processor: %w", err)

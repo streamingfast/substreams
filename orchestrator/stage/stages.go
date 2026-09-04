@@ -3,6 +3,7 @@ package stage
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -74,6 +75,15 @@ type Stages struct {
 	// longer re-walks the (ever-growing) prefix of finished segments on every
 	// call. See NextJob / segmentMayYieldJob.
 	nextJobCursor int
+
+	// pendingFrom[stage] is the lowest segment that may hold a Pending unit of that
+	// stage, and completedPrefix[stage] the highest segment up to which every unit
+	// of that stage is Completed or NoOp. Both only move forward, except through
+	// rewindNextJobCursor. NextJob visits only the segments they point at instead of
+	// walking every segment between the squasher and the job frontier. See
+	// candidateSegments.
+	pendingFrom     []int
+	completedPrefix []int
 }
 type stageStates []UnitState
 
@@ -151,6 +161,12 @@ func NewStages(
 
 	out.initSegmentsOffset(reqPlan)
 	out.nextJobCursor = out.globalSegmenter.FirstIndex()
+	out.pendingFrom = make([]int, len(out.stages))
+	out.completedPrefix = make([]int, len(out.stages))
+	for idx, stage := range out.stages {
+		out.pendingFrom[idx] = stage.segmenter.FirstIndex()
+		out.completedPrefix[idx] = stage.segmenter.FirstIndex() - 1
+	}
 
 	return out
 }
@@ -546,11 +562,12 @@ func (s *Stages) WaitAsyncWork() error {
 // segmentMayYieldJob reports whether NextJob could ever still return a job for
 // this segment. It is used to advance nextJobCursor over the finished prefix.
 //
-// A segment can no longer yield a job once every in-range stage's unit is in a
-// state that never transitions back to UnitPending:
-//   - Completed / NoOp are terminal for any stage;
-//   - PartialPresent is terminal only for map stages (maps are never squashed);
-//     a store partial can revert to Pending if a squash fails, so it still counts.
+// A segment can no longer yield a job once every in-range stage's unit has had its
+// job run: Completed, NoOp, PartialPresent or Merging. The last two are not
+// terminal for a store, a squash that finds no partial sends the unit back to
+// Pending, but every transition back to Pending goes through rewindNextJobCursor,
+// so the cursor is allowed past them. This keeps the cursor at the job frontier
+// rather than at the squasher, which can lag thousands of segments behind it.
 //
 // Out-of-range stages (segment before the stage's first index or after its last)
 // never schedule there, matching the skip/break in NextJob's main loop. Being
@@ -563,18 +580,89 @@ func (s *Stages) segmentMayYieldJob(segmentIdx int) bool {
 			continue
 		}
 		switch s.getState(Unit{Segment: segmentIdx, Stage: stageIdx}) {
-		case UnitCompleted, UnitNoOp:
-			// permanently done for this stage
-		case UnitPartialPresent:
-			if stage.kind != KindMap {
-				return true
-			}
+		case UnitCompleted, UnitNoOp, UnitPartialPresent, UnitMerging:
+			// the job ran; only rewindNextJobCursor can bring it back
 		default:
-			// Pending, Scheduled, Merging, Shadowed: may still (re)schedule
+			// Pending, Scheduled, Shadowed: may still (re)schedule
 			return true
 		}
 	}
 	return false
+}
+
+// rewindNextJobCursor brings the NextJob cursors back to u. Every transition that
+// puts a unit back to Pending must call it: NextJob only looks at what the cursors
+// point at, and they have moved past a segment whose jobs all ran.
+func (s *Stages) rewindNextJobCursor(u Unit) {
+	s.nextJobCursor = min(s.nextJobCursor, u.Segment)
+	s.pendingFrom[u.Stage] = min(s.pendingFrom[u.Stage], u.Segment)
+	s.completedPrefix[u.Stage] = min(s.completedPrefix[u.Stage], u.Segment-1)
+}
+
+// candidateSegments returns, in ascending order and starting at from, the only
+// segments at which NextJob can find a job:
+//
+//   - every segment of the shadow window, where NextJob also marks lower-stage
+//     units shadowed as it passes;
+//   - for each stage, its lowest Pending segment, when it lies within reach of the
+//     lower stages. A job of stage k at segment N loads the lower stages' stores as
+//     of N's start block, which exist only once every stage below k has completed
+//     N-1. Stages complete in segment order, so no unit of stage k above
+//     min(completedPrefix of the stages below)+1 can run yet, and no unit of stage
+//     k below its lowest Pending segment is Pending.
+//
+// Everything else is either done, in flight, or blocked on a lower stage, and
+// walking it would only re-check dependencies that cannot have changed.
+func (s *Stages) candidateSegments(from, lastSegment int) []int {
+	var out []int
+
+	if len(s.stages) >= 2 {
+		windowEnd := min(lastSegment, s.shadowableSegment+len(s.stages)-1)
+		for seg := from; seg <= windowEnd; seg++ {
+			out = append(out, seg)
+		}
+	}
+
+	reach := lastSegment
+	for idx, stage := range s.stages {
+		if idx > 0 {
+			reach = min(reach, s.advanceCompletedPrefix(idx-1, lastSegment)+1)
+		}
+		upTo := min(reach, stage.segmenter.LastIndex())
+		if pending := s.advancePendingFrom(idx, from, upTo); pending <= upTo {
+			out = append(out, pending)
+		}
+	}
+
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+// advancePendingFrom moves pendingFrom[stageIdx] up to the first Pending unit at or
+// above from, without looking past upTo, and returns it. The states it skips only
+// come back to Pending through rewindNextJobCursor.
+func (s *Stages) advancePendingFrom(stageIdx, from, upTo int) int {
+	p := max(s.pendingFrom[stageIdx], from)
+	for p <= upTo && s.getState(Unit{Segment: p, Stage: stageIdx}) != UnitPending {
+		p++
+	}
+	s.pendingFrom[stageIdx] = p
+	return p
+}
+
+// advanceCompletedPrefix moves completedPrefix[stageIdx] over every unit that is
+// Completed or NoOp and returns it.
+func (s *Stages) advanceCompletedPrefix(stageIdx, lastSegment int) int {
+	p := s.completedPrefix[stageIdx]
+	for p < lastSegment {
+		state := s.getState(Unit{Segment: p + 1, Stage: stageIdx})
+		if state != UnitCompleted && state != UnitNoOp {
+			break
+		}
+		p++
+	}
+	s.completedPrefix[stageIdx] = p
+	return p
 }
 
 // Returns the unit, its block range and a boolean indicating if we are backing off because of 'notAbove'
@@ -602,7 +690,7 @@ func (s *Stages) NextJob(notAboveSegment int) (Unit, *block.Range, bool) {
 		s.nextJobCursor++
 	}
 
-	for segmentIdx := s.nextJobCursor; segmentIdx <= lastSegment; segmentIdx++ {
+	for _, segmentIdx := range s.candidateSegments(s.nextJobCursor, lastSegment) {
 		someShadowed := s.markShadowedUnits(segmentIdx)
 		for stageIdx := lastStage; stageIdx >= 0; stageIdx-- {
 			stage := s.stages[stageIdx]

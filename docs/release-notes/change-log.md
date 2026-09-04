@@ -11,6 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### CLI
+
+- A manifest can now import `sf/substreams/sink/sql/schema/v1/schema.proto` without
+  vendoring a copy of it. The file is a system protobuf, but `protoparse` needs the
+  source on disk to honour its extensions, so an import previously failed with
+  `no such file`. It is now served from an embedded copy, the same way
+  `sf/substreams/options.proto` already was.
+
 ### Docs
 
 - Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can
@@ -21,6 +29,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   Sinks how-to under Hosted Services.
 
 ### Server
+
+- `substreams-tier1` scheduling no longer slows down as a large backprocessing range progresses. Picking the next
+  tier2 job walked every segment between the squasher and the job frontier on every call, re-checking
+  dependencies that could not have changed, so a run over N segments cost O(N²) in scheduling. The scheduler now
+  keeps, per stage, the lowest segment that may still be pending and the highest segment completed so far, and
+  only looks at the handful of segments those point at. On a 3-stage graph with 4 workers and a squasher three
+  times slower than the jobs, scheduling 8000 segments went from 1.18 s to 2.7 ms, and now grows linearly with
+  the range. Job order is unchanged.
+
+- `substreams-tier1` now downloads the next cached execution output files while it streams the current one to a
+  production-mode client. Before, each 1000-block segment was opened, decompressed and sent before the next one
+  was even requested from the object store, so every segment paid a full store round trip on the critical path.
+  Prefetching is bounded per request by `Tier1Config.ExecOutPrefetch`: at most `Depth` segments ahead (default
+  and hard cap 4) holding at most `BudgetBytes` of decompressed data (default 64 MiB). No size is ever asked of
+  the store: the decompressed size of the last downloaded segment is the estimate for the next ones, and as many
+  download at once as estimate-sized files fit in the budget, each allowed to read an even share of it, so
+  in-flight reads never add up to more than the budget. A file bigger than its share is left to the walker and
+  the estimate is raised, so a chain going from quiet to busy shrinks the concurrency instead of overshooting.
+  A file bigger than the whole budget turns prefetching off for the rest of the request. Missing files are left
+  to the walker's existing retry loop, and the prefetcher stops looking ahead until the walker reaches them.
+  Setting either bound to zero turns prefetching off.
+
+- `substreams-tier1` now sends each batch of cached execution output on a separate goroutine, so decoding the next
+  batch overlaps with compressing and writing the current one. Before, the walker built a batch, sent it, and only
+  then started decoding the next, so the client-facing write sat on the critical path of every batch. At most one
+  batch is being built while one is sent, and a segment is only reported done once every batch is out, so message
+  order is unchanged.
+
+- `substreams-tier1` no longer copies each cached execution output payload once more while decoding it: the item
+  now aliases the buffer it was read into instead of copying out of it.
+
+- `substreams-tier1` now writes the `substreams.spkg` and `last_used` cache markers in the background instead of
+  before the pipeline starts, so those object store round trips no longer delay the first block sent. They run
+  detached from the request on their own context with a 30 second timeout: the request neither starts nor exits
+  waiting for them, and a client that disconnects early still leaves its usage marker behind.
 
 - `substreams-tier1` can now evict requests when its CPU is saturated. When its own cgroup reports CPU usage above
   90% of quota for 15 seconds, the pod advertises itself unready to the load balancer, refuses new requests, waits
@@ -37,8 +80,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   horizontal autoscaler input on tier1: the higher of the plain active-request count and the number of requests the
   CPU budget is being spent at (`nominal_capacity * cpu_usage_ratio / cpu_eviction_target_ratio`). A pod full of
   expensive requests, or one holding its CPU down by eviction, reports itself at capacity, so the autoscaler will
-  add more pods. `CPUEviction.NominalCapacity` should be set to the autoscaler's per-pod request target; it defaults
-  to the active-requests soft limit.
+  add more pods. Its active-request count is the one admission uses, so it includes requests still setting up and
+  never reads below `substreams_active_requests`. `CPUEviction.NominalCapacity` should be set to the autoscaler's
+  per-pod request target; it defaults to the active-requests soft limit.
 
 - Trimmed tier2's per-segment logging: a large backfill fans out into tens of thousands of `ProcessRange` calls,
   and each one was logging ~10 `Info` lines with no steady-state diagnostic value, which could spike a pod's log
@@ -147,6 +191,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   server heap by fragmenting HTTP/2 DATA frames.
 
 ### Tests
+
+- The `tests_e2e/dummy` directory gains a `substreams.clickhouse.yaml` sibling manifest
+  packing `e2e_clickhouse`, whose `map_events_clickhouse` module emits
+  `test.clickhouse.Events`. That message carries the `(schema.table)` ClickHouse
+  annotations, so the package sinks with `substreams sink clickhouse` without further
+  setup. Kept out of `substreams.yaml` and given its own message so the annotations do
+  not change the module hashes of the existing e2e modules.
 
 - The `tests_e2e/dummy` package gains three modules for exercising Hosted Stores against a
   staging environment. `map_hosted_store_feed`, packed into `e2e-v0.3.0.spkg`, emits

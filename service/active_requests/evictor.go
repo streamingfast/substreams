@@ -145,8 +145,9 @@ type Evictor struct {
 	reader  *CPUReader
 	logger  *zap.Logger
 
-	overloaded atomic.Bool
-	onEvaluate func()
+	overloaded          atomic.Bool
+	onEvaluate          func()
+	countActiveRequests func() int
 
 	// zero time = condition not currently holding
 	overloadSince time.Time
@@ -193,6 +194,22 @@ func (ev *Evictor) OnEvaluate(fn func()) {
 	ev.onEvaluate = fn
 }
 
+// CountActiveRequestsWith overrides how the evictor counts the pod's active
+// requests when it publishes substreams_tier1_effective_active_requests. The
+// manager's map only holds requests that finished setting up, while admission
+// and substreams_active_requests count them from the moment they arrive, and
+// the autoscaler metric has to agree with those. Must be called before Run.
+func (ev *Evictor) CountActiveRequestsWith(fn func() int) {
+	ev.countActiveRequests = fn
+}
+
+func (ev *Evictor) activeRequests(inManager int) int {
+	if ev.countActiveRequests == nil {
+		return inManager
+	}
+	return ev.countActiveRequests()
+}
+
 func (ev *Evictor) notify() {
 	if ev.onEvaluate != nil {
 		ev.onEvaluate()
@@ -227,9 +244,9 @@ func (ev *Evictor) tick(now time.Time) {
 		ev.clearOverload()
 		return
 	}
-	candidates, totalActive := ev.sampleBurnRates(now)
+	candidates, inManager := ev.sampleBurnRates(now)
 	firing := ev.classify(signals, now)
-	ev.publishMetrics(signals, totalActive)
+	ev.publishMetrics(signals, ev.activeRequests(inManager))
 	ev.notify()
 
 	if !ev.overloaded.Load() {

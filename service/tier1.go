@@ -128,6 +128,7 @@ type Tier1Service struct {
 	activeRequestsManager    *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
 	evictor                  *active_requests.Evictor               // nil unless CPU eviction is enabled and cgroup CPU signals are readable
 	execOutMessageBufferSize int
+	execOutPrefetch          execout.PrefetchConfig
 
 	// liveBackFillerFinalBlockDelay overrides the default 120-block delay the
 	// live backfiller waits past a segment end before concluding merged blocks
@@ -294,6 +295,7 @@ func NewTier1(
 			}
 			evictor := active_requests.NewEvictor(evictorConfig, s.activeRequestsManager, reader, logger)
 			evictor.OnEvaluate(s.refreshReadiness)
+			evictor.CountActiveRequestsWith(s.getActiveRequestCount)
 			s.evictor = evictor
 			go evictor.Run(s.Terminating())
 		}
@@ -634,6 +636,10 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 	return nil
 }
 
+// cacheMarkerWriteTimeout bounds the detached package and last_used writes so they
+// can never outlive a request by more than this.
+const cacheMarkerWriteTimeout = 30 * time.Second
+
 // lastUsedFilename names the usage marker written in every module's cache folder:
 // `last_used` for unauthenticated requests, `last_used_<plan>` (lowercase) otherwise.
 // `firecore tools substreams purge` reads the plan back from that name to apply a
@@ -796,13 +802,20 @@ func (s *Tier1Service) blocks(
 		cacheStore = cloned
 	}
 
-	if err := s.writePackage(ctx, request, execGraph, cacheStore); err != nil {
-		logger.Warn("cannot write package", zap.Error(err))
-	}
-
-	if err := s.writeLastUsed(ctx, execGraph, cacheStore); err != nil {
-		logger.Warn("cannot write 'last_used' file", zap.Error(err))
-	}
+	// Both writes are best effort and nothing in this request reads them back, so
+	// they run detached from the request: neither its start nor its exit waits for
+	// them, and a client that disconnects early still leaves its usage marker
+	// behind. The timeout is the only bound on how long they may run.
+	go func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cacheMarkerWriteTimeout)
+		defer cancel()
+		if err := s.writePackage(ctx, request, execGraph, cacheStore); err != nil {
+			logger.Warn("cannot write package", zap.Error(err))
+		}
+		if err := s.writeLastUsed(ctx, execGraph, cacheStore); err != nil {
+			logger.Warn("cannot write 'last_used' file", zap.Error(err))
+		}
+	}()
 
 	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), segmentSize, chainFirstStreamableBlock, logger)
 	if err != nil {
@@ -839,6 +852,7 @@ func (s *Tier1Service) blocks(
 	if s.getHeadBlock != nil {
 		opts = append(opts, pipeline.WithHeadBlockGetter(s.getHeadBlock))
 	}
+	opts = append(opts, pipeline.WithExecOutPrefetch(s.execOutPrefetch))
 
 	ctx, resolvedEndpoints, err := s.resolveFoundationalStores(ctx, execGraph, reqStats)
 	if err != nil {

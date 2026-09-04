@@ -48,7 +48,9 @@ const ExitCodeDeliveryFailed = 75
 // DeliveryFailedError is returned from Sink.Run in OnFailureExit mode. The
 // pending block stays on disk for the next start.
 type DeliveryFailedError struct {
-	Delivery       *DeliveryError
+	Delivery *DeliveryError
+	// Kind is "block" for a block payload and "undo" for a reorg notification.
+	Kind           string
 	FirstAttemptAt time.Time
 }
 
@@ -63,6 +65,7 @@ func (e *DeliveryFailedError) Unwrap() error { return e.Delivery }
 func (e *DeliveryFailedError) TerminationMessage() []byte {
 	msg, _ := json.Marshal(map[string]any{
 		"reason":           "webhook_delivery_failed",
+		"kind":             e.Kind,
 		"url":              e.Delivery.URL,
 		"block":            e.Delivery.BlockNumber,
 		"status":           e.Delivery.StatusCode,
@@ -76,6 +79,8 @@ func (e *DeliveryFailedError) TerminationMessage() []byte {
 // Sink represents a webhook sink that sends substream data to HTTP endpoints
 type Sink struct {
 	webhookURL     string
+	undoURL        string
+	moduleName     string
 	stateFile      string
 	pendingFile    string
 	onFailure      OnFailure
@@ -90,6 +95,10 @@ type Sink struct {
 // SinkConfig holds configuration for the webhook sink
 type SinkConfig struct {
 	WebhookURL string
+	// UndoURL receives an UndoPayload for every undo signal the sink sees.
+	// Empty disables the notification; the cursor still moves back so the
+	// blocks that replace the undone ones are delivered as usual.
+	UndoURL string
 	// StateFile holds the cursor of the last delivered block. The pending
 	// block lives next to it in "<StateFile>.pending". Empty disables both.
 	StateFile    string
@@ -126,11 +135,13 @@ func NewSink(config SinkConfig) (*Sink, error) {
 
 	return &Sink{
 		webhookURL:     config.WebhookURL,
+		undoURL:        config.UndoURL,
+		moduleName:     sinker.OutputModuleName(),
 		stateFile:      config.StateFile,
 		pendingFile:    pendingFilePath(config.StateFile),
 		onFailure:      onFailure,
 		terminationLog: config.TerminationLogPath,
-		fingerprint:    configFingerprint(config.WebhookURL, config.ClientConfig),
+		fingerprint:    configFingerprint(config.WebhookURL, config.UndoURL, config.ClientConfig),
 		client:         NewClient(config.ClientConfig, config.Logger),
 		sinker:         sinker,
 		decoder:        decoder,
@@ -217,14 +228,19 @@ func (s *Sink) recoverPending(ctx context.Context, startCursor *sink.Cursor) (*s
 	return cursor, nil
 }
 
-// deliver POSTs the pending block and, on success, commits it: cursor written,
-// pending file removed, progress metric updated. The returned error is the
-// *DeliveryError from the client.
+// deliver POSTs the pending payload and, on success, commits it: cursor
+// written, pending file removed, progress metric updated. The returned error
+// is the *DeliveryError from the client.
 func (s *Sink) deliver(ctx context.Context, pending *pendingDelivery) error {
+	url := s.webhookURL
+	if pending.isUndo() {
+		url = s.undoURL
+	}
+
 	WebhookCallsCounter.Inc()
 	WebhookSizeBytes.AddInt(len(pending.Payload))
 
-	if err := s.client.Call(ctx, s.webhookURL, pending.Payload, pending.BlockNumber); err != nil {
+	if err := s.client.Call(ctx, url, pending.Payload, pending.BlockNumber); err != nil {
 		return err
 	}
 
@@ -253,7 +269,11 @@ func (s *Sink) deliveryFailed(pending *pendingDelivery, err error) error {
 	if !errors.As(err, &deliveryErr) {
 		deliveryErr = &DeliveryError{URL: s.webhookURL, BlockNumber: pending.BlockNumber, Attempts: 1, Err: err}
 	}
-	failed := &DeliveryFailedError{Delivery: deliveryErr, FirstAttemptAt: pending.FirstAttemptAt}
+	kind := pending.Kind
+	if kind == "" {
+		kind = pendingKindBlock
+	}
+	failed := &DeliveryFailedError{Delivery: deliveryErr, Kind: kind, FirstAttemptAt: pending.FirstAttemptAt}
 
 	if err := writeTerminationMessage(s.terminationLog, failed.TerminationMessage()); err != nil {
 		s.logger.Warn("failed to write termination message", zap.String("path", s.terminationLog), zap.Error(err))
@@ -296,6 +316,7 @@ func (s *Sink) handleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 	}
 
 	pending := &pendingDelivery{
+		Kind:           pendingKindBlock,
 		BlockNumber:    data.Clock.Number,
 		Payload:        wrappedOut,
 		FirstAttemptAt: time.Now(),
@@ -315,7 +336,7 @@ func (s *Sink) send(ctx context.Context, pending *pendingDelivery) error {
 		return fmt.Errorf("recording pending delivery for block %d: %w", pending.BlockNumber, err)
 	}
 
-	s.logger.Info("calling webhook", zap.Uint64("block", pending.BlockNumber))
+	s.logger.Info("calling webhook", zap.String("kind", pending.Kind), zap.Uint64("block", pending.BlockNumber))
 
 	err := s.deliver(ctx, pending)
 	if err == nil {
@@ -333,17 +354,39 @@ func (s *Sink) send(ctx context.Context, pending *pendingDelivery) error {
 	return nil
 }
 
-// handleBlockUndoSignal handles undo signals
+// handleBlockUndoSignal moves the cursor back to the last valid block and, when
+// an undo URL is configured, tells the receiver which blocks are gone.
 func (s *Sink) handleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *sink.Cursor) error {
-	// Save cursor to state file on undo
-	if s.stateFile != "" && cursor != nil {
-		if err := sink.WriteCursor(s.stateFile, cursor); err != nil {
-			s.logger.Warn("failed to save cursor to state file on undo",
-				zap.Error(err),
-				zap.String("file", s.stateFile))
+	if s.undoURL == "" {
+		if s.stateFile != "" && cursor != nil {
+			if err := sink.WriteCursor(s.stateFile, cursor); err != nil {
+				s.logger.Warn("failed to save cursor to state file on undo",
+					zap.Error(err),
+					zap.String("file", s.stateFile))
+			}
 		}
+		return nil
 	}
-	return nil
+
+	payload, err := NewUndoPayload(s.moduleName, undoSignal.LastValidBlock).ToJSON()
+	if err != nil {
+		return fmt.Errorf("failed to serialize undo payload: %w", err)
+	}
+
+	pending := &pendingDelivery{
+		Kind:           pendingKindUndo,
+		Payload:        payload,
+		FirstAttemptAt: time.Now(),
+		Fingerprint:    s.fingerprint,
+	}
+	if undoSignal.LastValidBlock != nil {
+		pending.BlockNumber = undoSignal.LastValidBlock.Number
+	}
+	if cursor != nil {
+		pending.Cursor = cursor.String()
+	}
+
+	return s.send(ctx, pending)
 }
 
 // PrintStats prints final statistics

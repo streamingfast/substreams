@@ -34,6 +34,7 @@ func init() {
 	sinkWebhookCmd.Flags().Duration("webhook-timeout", 30*time.Second, "Timeout for individual webhook calls")
 	sinkWebhookCmd.Flags().Duration("webhook-max-retry-interval", 30*time.Second, "Maximum interval between webhook retries (exponential backoff cap)")
 	sinkWebhookCmd.Flags().String("webhook-on-failure", string(webhook.OnFailureSkip), fmt.Sprintf("What to do once every retry for a block has failed: %q drops the block and continues, %q keeps the block on disk, writes the reason to the termination log and exits with status %d; the next start delivers that block before it connects to Substreams", webhook.OnFailureSkip, webhook.OnFailureExit, webhook.ExitCodeDeliveryFailed))
+	sinkWebhookCmd.Flags().String("webhook-undo-url", "", "URL that receives a POST for each chain reorganization, with body {\"lastValidBlock\": {\"number\": ..., \"id\": \"...\"}, \"manifest\": {\"moduleName\": \"...\"}}. Empty disables the notification; the blocks that replace the undone ones are still delivered to <url>")
 	sinkWebhookCmd.Flags().String("webhook-termination-log", "/dev/termination-log", "File that receives the reason for a delivery-failure exit, written only when the file already exists (Kubernetes creates it)")
 	sinkWebhookCmd.Flags().String("webhook-auth-header-name", webhook.DefaultAuthHeaderName, "Name of the header carrying the value read from --webhook-auth-header-value-envvar")
 	sinkWebhookCmd.Flags().String("webhook-auth-header-value-envvar", "WEBHOOK_AUTH_HEADER_VALUE", "Environment variable holding the auth header value sent on every call, for example 'Bearer <token>'. No header is sent when the variable is empty")
@@ -66,6 +67,13 @@ var sinkWebhookCmd = &cobra.Command{
 		start: the pending block is delivered first, and a Substreams stream is only opened once it went
 		through. The headers are recomputed from the current environment, so a rotated secret or a new URL
 		applies to the retry.
+
+		Reorganizations: with --final-blocks-only the sink only delivers blocks past finality and never sees
+		one. With --undo-buffer-size=N it holds the last N blocks back and absorbs any reorganization that fits
+		in them. Otherwise, or for a reorganization deeper than the buffer, the receiver has already been sent
+		blocks that are no longer on the chain: --webhook-undo-url receives a notification naming the last valid
+		block, then the replacement blocks arrive as regular calls. Undo notifications follow the same retry,
+		on-failure and pending-file rules as blocks.
 	`),
 	RunE: sinkWebhookE,
 	Args: cobra.RangeArgs(1, 3),
@@ -98,6 +106,7 @@ func sinkWebhookE(cmd *cobra.Command, args []string) error {
 
 	sinkConfig := webhook.SinkConfig{
 		WebhookURL:   webhookURL,
+		UndoURL:      sflags.MustGetString(cmd, "webhook-undo-url"),
 		StateFile:    sflags.MustGetString(cmd, "state-file"),
 		OnFailure:    onFailure,
 		SinkerConfig: sinkerConfig,

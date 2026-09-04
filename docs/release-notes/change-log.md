@@ -34,6 +34,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   has emitted nothing yet, which is what a restart from a cursor sitting on a fork produces. Before, the buffer
   swallowed it and the handler never rolled back blocks the previous run had emitted.
 
+- Add `--webhook-undo-url` to `substreams sink webhook`. When set, every undo signal is POSTed there as
+  `{"lastValidBlock": {"number", "id"}, "manifest": {"moduleName"}}` so the receiver can drop the blocks above
+  the last valid one before the replacements arrive. The notification carries the same auth header and
+  signature as blocks and follows the same retry, `--webhook-on-failure` and pending-file rules. Without it the
+  cursor still moves back and only the replacement blocks are delivered, as before. Pair with
+  `--undo-buffer-size` to hold back a few blocks and absorb shallow reorganizations without any notification.
+
 ### Docs
 
 - Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can

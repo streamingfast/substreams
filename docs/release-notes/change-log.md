@@ -11,6 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Sink
+
+- Add authentication to `substreams sink webhook` calls. The value of the environment variable named by
+  `--webhook-auth-header-value-envvar` is sent in the header named by `--webhook-auth-header-name`
+  (`Authorization` by default), and the secret named by `--webhook-signing-secret-envvar` signs every body
+  with HMAC-SHA256 in the `X-Substreams-Signature` header as `t=<unix seconds>,v1=<hex>` over `<t>.<body>`.
+  Receivers can verify with `webhook.VerifySignature`. Once every retry has failed, `Client.Call` returns a
+  `*webhook.DeliveryError` carrying the last HTTP status and the attempt count.
+
 ### Docs
 
 - Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can

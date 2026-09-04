@@ -18,6 +18,9 @@ import (
 // middle of a call leaves no file: the cursor was not advanced, so the stream
 // re-sends that block.
 type pendingDelivery struct {
+	// Kind is pendingKindBlock or pendingKindUndo and selects the URL the
+	// payload goes to. Empty reads as pendingKindBlock.
+	Kind        string `json:"kind,omitempty"`
 	Cursor      string `json:"cursor"`
 	BlockNumber uint64 `json:"block_number"`
 	// Payload holds the exact bytes that were attempted, so a retry is
@@ -32,6 +35,13 @@ type pendingDelivery struct {
 	Fingerprint string `json:"fingerprint"`
 }
 
+const (
+	pendingKindBlock = "block"
+	pendingKindUndo  = "undo"
+)
+
+func (p *pendingDelivery) isUndo() bool { return p.Kind == pendingKindUndo }
+
 // pendingFilePath derives the pending file from the state file. Both must
 // live on the same persistent volume, so one setting places the two.
 func pendingFilePath(stateFile string) string {
@@ -43,9 +53,9 @@ func pendingFilePath(stateFile string) string {
 
 // configFingerprint hashes what the delivery depends on. The secrets are
 // hashed rather than stored so the pending file never holds them.
-func configFingerprint(url string, cfg Config) string {
+func configFingerprint(url, undoURL string, cfg Config) string {
 	h := sha256.New()
-	for _, part := range []string{url, cfg.AuthHeaderName, cfg.AuthHeaderValue, cfg.SigningSecret} {
+	for _, part := range []string{url, undoURL, cfg.AuthHeaderName, cfg.AuthHeaderValue, cfg.SigningSecret} {
 		h.Write([]byte(part))
 		h.Write([]byte{0})
 	}

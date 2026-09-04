@@ -142,6 +142,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - `substreams-tier1` now names the usage marker it writes in every module cache folder after the request's plan tier: `last_used_<plan>` (lowercase, e.g. `last_used_pro`), still plain `last_used` when unauthenticated. `firecore tools substreams purge` reads the plan back from that name to apply a retention per plan.
 
+### Tools
+
+- `substreams tools prometheus-exporter` now says *why* an endpoint is down. Every failure is classified into a
+  `reason` -- `invalid_config`, `connect_failed`, `connect_timeout`, `invalid_request`, `request_timeout`,
+  `stream_error`, `stale_block`, `invalid_response` or `no_data` -- exposed on the new
+  `substreams_healthcheck_failure_count{reason,grpc_code}` counter and included in the logs. An alert firing on
+  `substreams_healthcheck_status` no longer requires guessing whether the endpoint was unreachable, unauthenticated,
+  overloaded or merely late. A dial that fails outright is reported as `connect_failed`, carrying the dial
+  error where gRPC exposes it (`connection refused`); a hostname that does not resolve surfaces as the balancer's
+  own `no children to pick from`, since it replaces the resolver error. `connect_timeout` is reserved for a
+  connection that is merely slow to come up and never failed a dial.
+
+- Connection establishment gets its own budget, `--connect-timeout` (default 10s), separate from `--timeout`, which
+  now covers the `Blocks` request alone. gRPC dials lazily, so DNS, TLS and load-balancer resolution used to be
+  charged to the request timeout and a slow connection was reported as an endpoint failure -- this is what produced
+  the `received context error while waiting for new LB policy update: context deadline exceeded` errors. The exporter
+  now waits for the channel to be `READY` before issuing the request, and reports the two phases separately as
+  `substreams_healthcheck_connect_duration_ms` and `substreams_healthcheck_stream_duration_ms`.
+  `substreams_healthcheck_duration_ms` keeps its previous meaning of the two combined.
+
+- Every failed poll is logged, not just the transition into `unavailable`. An endpoint that fails repeatedly, or one
+  that flaps between two Prometheus scrapes, previously produced a single line and then nothing. Failure logs carry
+  the reason, the gRPC code, both durations and the consecutive failure count; the recovery log carries how long the
+  endpoint was down and how many polls failed meanwhile. A block age crossing half of `--max-freshness` is reported
+  too, so an alert on `substreams_healthcheck_block_age_ms` is no longer silent. That one is edge-triggered and only
+  after three consecutive polls agree, so a chain whose block interval straddles the threshold stays quiet.
+
+- New `substreams_healthcheck_consecutive_failures` gauge, meant to be alerted on instead of
+  `substreams_healthcheck_status` when single-poll hiccups should be ignored.
+
+- `substreams_healthcheck_block_age_ms` is reset to `NaN` when a poll returns no block, instead of keeping the age of
+  the last block ever seen -- which silently under-reported staleness for as long as an endpoint stayed broken.
+
+- Fixed: endpoints configured with different sets of query-parameter labels (e.g. one with `?namespace=x&region=y`
+  and one with only `?namespace=z`) made the exporter panic on inconsistent label cardinality. Missing labels are now
+  filled with an empty value.
+
+- **Breaking** The exporter now speaks `sf.substreams.rpc.v4.Stream/Blocks` only. The v3-to-v2 fallback is gone --
+  it closed the connection and then kept reading from it, double-counting the failure -- and
+  `--force-protocol-version` accepts only `4` (or `0`), the flag being kept for the protocol versions to come. An
+  invalid value used to be parsed and then silently ignored, it is now rejected at startup, so an invocation passing
+  `--force-protocol-version 2` or `3` must drop the flag.
+
 ### Dependencies
 
 - `google.golang.org/grpc` is at v1.83.1, which clears GHSA-vp52-pcj8-j9qc, reported as HIGH: a peer could exhaust

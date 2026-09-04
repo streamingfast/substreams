@@ -20,6 +20,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   Receivers can verify with `webhook.VerifySignature`. Once every retry has failed, `Client.Call` returns a
   `*webhook.DeliveryError` carrying the last HTTP status and the attempt count.
 
+- Add `--webhook-on-failure=exit` to `substreams sink webhook`. Once every retry for a block has failed the
+  sink keeps that block in `<state-file>.pending`, writes a JSON reason (URL, block, status, attempts,
+  `first_attempt_at`) to `--webhook-termination-log` when that file exists, and exits with status 75. The next
+  start delivers the pending block before it opens a Substreams stream, so retrying against a dead endpoint costs
+  no egress. The default `skip` keeps the old behaviour of dropping the block. The pending file is written
+  before every attempt and removed after the cursor is saved, so a kill mid-delivery is recovered the same way;
+  a block whose cursor was already saved is discarded rather than sent twice, and a changed URL or secret
+  resets `first_attempt_at`. The sink now also exposes `substreams_sink_progress_block`, the last delivered
+  block.
+
 ### Docs
 
 - Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can

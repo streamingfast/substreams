@@ -30,42 +30,61 @@ type WebhookPayload struct {
 
 // NewWebhookPayload creates a new webhook payload with the desired format
 func NewWebhookPayload(moduleName string, clock *pbsubstreams.Clock, msgType string, data json.RawMessage) (*WebhookPayload, error) {
-	var timestampStr string
-	if clock != nil && clock.Timestamp != nil {
-		timestampStr = clock.Timestamp.AsTime().Format(time.RFC3339)
-	}
-
-	// Strip the "type.googleapis.com/" prefix from the type
-	cleanType := msgType
-	if strings.HasPrefix(msgType, "type.googleapis.com/") {
-		cleanType = strings.TrimPrefix(msgType, "type.googleapis.com/")
-	}
-
-	clockInfo := Clock{
-		Timestamp: timestampStr,
-		Number:    0,
-		ID:        "",
-	}
-
-	if clock != nil {
-		clockInfo.Number = clock.Number
-		clockInfo.ID = clock.Id
-	}
-
-	manifest := Manifest{
-		ModuleName: moduleName,
-		Type:       cleanType,
-	}
-
 	return &WebhookPayload{
-		Clock:    clockInfo,
-		Manifest: manifest,
+		Clock:    newClock(clock),
+		Manifest: newManifest(moduleName, msgType),
 		Data:     data,
 	}, nil
 }
 
 // ToJSON serializes the webhook payload to JSON bytes
 func (p *WebhookPayload) ToJSON() ([]byte, error) {
+	return json.Marshal(p)
+}
+
+func newClock(clock *pbsubstreams.Clock) Clock {
+	if clock == nil {
+		return Clock{}
+	}
+	var timestampStr string
+	if clock.Timestamp != nil {
+		timestampStr = clock.Timestamp.AsTime().Format(time.RFC3339)
+	}
+	return Clock{Timestamp: timestampStr, Number: clock.Number, ID: clock.Id}
+}
+
+func newManifest(moduleName string, msgType string) Manifest {
+	// Strip the "type.googleapis.com/" prefix from the type
+	return Manifest{ModuleName: moduleName, Type: strings.TrimPrefix(msgType, "type.googleapis.com/")}
+}
+
+// BlockEntry is one block inside a BatchPayload.
+type BlockEntry struct {
+	Clock Clock           `json:"clock"`
+	Data  json.RawMessage `json:"data"`
+}
+
+// BatchPayload is sent instead of WebhookPayload when batching is on. The
+// manifest is the same for every block so it is carried once; blocks are in
+// ascending order. Every call in batch mode uses this shape, a batch of one
+// included, so a receiver only ever parses one format.
+type BatchPayload struct {
+	Manifest Manifest     `json:"manifest"`
+	Blocks   []BlockEntry `json:"blocks"`
+}
+
+// NewBatchPayload creates an empty batch for the given module.
+func NewBatchPayload(moduleName string, msgType string) *BatchPayload {
+	return &BatchPayload{Manifest: newManifest(moduleName, msgType)}
+}
+
+// Append adds one block to the batch.
+func (p *BatchPayload) Append(clock *pbsubstreams.Clock, data json.RawMessage) {
+	p.Blocks = append(p.Blocks, BlockEntry{Clock: newClock(clock), Data: data})
+}
+
+// ToJSON serializes the batch payload to JSON bytes
+func (p *BatchPayload) ToJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 

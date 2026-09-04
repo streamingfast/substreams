@@ -40,6 +40,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   cursor still moves back and only the replacement blocks are delivered, as before. Pair with
   `--undo-buffer-size` to hold back a few blocks and absorb shallow reorganizations without any notification.
 
+- Add `--webhook-batch-max-blocks=N` to `substreams sink webhook`. Every call then carries up to N blocks in a
+  batch shape, `{"manifest": {...}, "blocks": [{"clock", "data"}, ...]}`, a batch of one included. A batch is sent
+  when it is full, when `--webhook-batch-max-wait` (1s) has passed and the next block arrives, when the chain is
+  live, before an undo notification, and when the stream ends. A failed batch is kept and resumed as one
+  payload. Switching batching on or off while the sink is stopped discards a pending payload of the other
+  shape; its blocks come back through the stream. Default is off, one block per call as before.
+
 ### Docs
 
 - Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can

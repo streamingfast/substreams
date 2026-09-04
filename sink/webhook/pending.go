@@ -20,7 +20,11 @@ import (
 type pendingDelivery struct {
 	// Kind is pendingKindBlock or pendingKindUndo and selects the URL the
 	// payload goes to. Empty reads as pendingKindBlock.
-	Kind        string `json:"kind,omitempty"`
+	Kind string `json:"kind,omitempty"`
+	// Batched marks a block payload in the BatchPayload shape. A pending
+	// payload whose shape does not match the mode the sink now runs in is
+	// discarded on start and its blocks come back through the stream.
+	Batched     bool   `json:"batched,omitempty"`
 	Cursor      string `json:"cursor"`
 	BlockNumber uint64 `json:"block_number"`
 	// Payload holds the exact bytes that were attempted, so a retry is

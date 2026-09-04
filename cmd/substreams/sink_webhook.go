@@ -34,6 +34,8 @@ func init() {
 	sinkWebhookCmd.Flags().Duration("webhook-timeout", 30*time.Second, "Timeout for individual webhook calls")
 	sinkWebhookCmd.Flags().Duration("webhook-max-retry-interval", 30*time.Second, "Maximum interval between webhook retries (exponential backoff cap)")
 	sinkWebhookCmd.Flags().String("webhook-on-failure", string(webhook.OnFailureSkip), fmt.Sprintf("What to do once every retry for a block has failed: %q drops the block and continues, %q keeps the block on disk, writes the reason to the termination log and exits with status %d; the next start delivers that block before it connects to Substreams", webhook.OnFailureSkip, webhook.OnFailureExit, webhook.ExitCodeDeliveryFailed))
+	sinkWebhookCmd.Flags().Int("webhook-batch-max-blocks", 0, "Send up to this many blocks per call, in the batch payload shape (see below). 0 sends one block per call in the single-block shape")
+	sinkWebhookCmd.Flags().Duration("webhook-batch-max-wait", time.Second, "Longest a batch waits for more blocks before it is sent, checked when the next block arrives. A batch is also sent when the chain is live, before an undo notification, and when the stream ends")
 	sinkWebhookCmd.Flags().String("webhook-undo-url", "", "URL that receives a POST for each chain reorganization, with body {\"lastValidBlock\": {\"number\": ..., \"id\": \"...\"}, \"manifest\": {\"moduleName\": \"...\"}}. Empty disables the notification; the blocks that replace the undone ones are still delivered to <url>")
 	sinkWebhookCmd.Flags().String("webhook-termination-log", "/dev/termination-log", "File that receives the reason for a delivery-failure exit, written only when the file already exists (Kubernetes creates it)")
 	sinkWebhookCmd.Flags().String("webhook-auth-header-name", webhook.DefaultAuthHeaderName, "Name of the header carrying the value read from --webhook-auth-header-value-envvar")
@@ -46,13 +48,21 @@ func init() {
 // sinkWebhookCmd represents the command to run substreams webhook sink
 var sinkWebhookCmd = &cobra.Command{
 	Use:   "webhook <url> [<manifest> [<module_name>]]",
-	Short: "Trigger a webhook call for each event from a substreams module",
+	Short: "POST the output of a substreams module to a webhook, one call per block or per batch of blocks",
 	Long: cli.Dedent(`
 		POST the output of a substreams module to <url>, one call per block, as JSON:
 
 		  {"clock": {"number": ..., "id": "...", "timestamp": "..."},
 		   "manifest": {"moduleName": "...", "type": "..."},
 		   "data": {...}}
+
+		With --webhook-batch-max-blocks=N every call carries up to N blocks, a batch of one included, as:
+
+		  {"manifest": {"moduleName": "...", "type": "..."},
+		   "blocks": [{"clock": {...}, "data": {...}}, ...]}
+
+		Blocks are in ascending order. Switching batching on or off while the sink is stopped discards a
+		pending payload of the other shape; its blocks come back through the stream in the new shape.
 
 		Calls carry the header named by --webhook-auth-header-name when the variable named by
 		--webhook-auth-header-value-envvar is set, and an ` + webhook.SignatureHeader + ` header when the
@@ -105,11 +115,13 @@ func sinkWebhookE(cmd *cobra.Command, args []string) error {
 	}
 
 	sinkConfig := webhook.SinkConfig{
-		WebhookURL:   webhookURL,
-		UndoURL:      sflags.MustGetString(cmd, "webhook-undo-url"),
-		StateFile:    sflags.MustGetString(cmd, "state-file"),
-		OnFailure:    onFailure,
-		SinkerConfig: sinkerConfig,
+		WebhookURL:     webhookURL,
+		UndoURL:        sflags.MustGetString(cmd, "webhook-undo-url"),
+		StateFile:      sflags.MustGetString(cmd, "state-file"),
+		OnFailure:      onFailure,
+		SinkerConfig:   sinkerConfig,
+		BatchMaxBlocks: sflags.MustGetInt(cmd, "webhook-batch-max-blocks"),
+		BatchMaxWait:   sflags.MustGetDuration(cmd, "webhook-batch-max-wait"),
 		ClientConfig: webhook.Config{
 			Timeout:         sflags.MustGetDuration(cmd, "webhook-timeout"),
 			MaxRetries:      sflags.MustGetInt(cmd, "webhook-max-retries"),

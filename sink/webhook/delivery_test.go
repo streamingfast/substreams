@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func opaqueCursor(num uint64) string {
@@ -356,6 +357,154 @@ func TestUndo_FailureFollowsOnFailurePolicy(t *testing.T) {
 	assert.Equal(t, opaqueCursor(10), got.String())
 	assert.Equal(t, int32(0), blocks.calls.Load())
 	assert.Equal(t, int32(3), undos.calls.Load())
+}
+
+func protoClock(num uint64) *pbsubstreams.Clock {
+	return &pbsubstreams.Clock{Number: num, Id: "id" + jsonNumber(num)}
+}
+
+func addBlock(t *testing.T, s *Sink, num uint64, live bool, now time.Time) {
+	t.Helper()
+	data := json.RawMessage(`{"n":` + jsonNumber(num) + `}`)
+	require.NoError(t, s.addToBatch(context.Background(), "map_events", "type.googleapis.com/sf.test.v1.Out", protoClock(num), data, sink.MustNewCursor(opaqueCursor(num)), live, now))
+}
+
+func TestBatch_FlushesWhenFull(t *testing.T) {
+	server, requests := captureServer(t, http.StatusOK)
+	s := newTestSink(t, server.URL, OnFailureExit)
+	s.batchMaxBlocks, s.batchMaxWait = 2, time.Minute
+
+	now := time.Now()
+	addBlock(t, s, 10, false, now)
+	assert.Empty(t, requests(), "one block below the max waits")
+	addBlock(t, s, 11, false, now)
+
+	got := requests()
+	require.Len(t, got, 1)
+	assert.JSONEq(t, `{"manifest":{"moduleName":"map_events","type":"sf.test.v1.Out"},"blocks":[{"clock":{"number":10,"id":"id10","timestamp":""},"data":{"n":10}},{"clock":{"number":11,"id":"id11","timestamp":""},"data":{"n":11}}]}`, string(got[0].body))
+	assert.Equal(t, opaqueCursor(11), readStateCursor(t, s), "cursor is the last block of the batch")
+	assert.Nil(t, s.batch)
+	assert.NoFileExists(t, s.pendingFile)
+}
+
+func TestBatch_FlushesWhenLiveOrWaited(t *testing.T) {
+	server, requests := captureServer(t, http.StatusOK)
+	s := newTestSink(t, server.URL, OnFailureExit)
+	s.batchMaxBlocks, s.batchMaxWait = 100, time.Second
+
+	now := time.Now()
+	addBlock(t, s, 10, true, now)
+	require.Len(t, requests(), 1, "a live block goes out on its own")
+
+	addBlock(t, s, 11, false, now)
+	addBlock(t, s, 12, false, now.Add(2*time.Second))
+	got := requests()
+	require.Len(t, got, 2, "waited past the max wait")
+	var batch BatchPayload
+	require.NoError(t, json.Unmarshal(got[1].body, &batch))
+	assert.Len(t, batch.Blocks, 2)
+}
+
+func TestBatch_SparseModuleFlushesOnEmptyBlock(t *testing.T) {
+	server, requests := captureServer(t, http.StatusOK)
+	s := newTestSink(t, server.URL, OnFailureExit)
+	s.batchMaxBlocks, s.batchMaxWait = 100, time.Second
+
+	addBlock(t, s, 10, false, time.Now().Add(-2*time.Second))
+	empty := &pbsubstreamsrpc.BlockScopedData{Clock: protoClock(11), Output: &pbsubstreamsrpc.MapModuleOutput{Name: "map_events", MapOutput: &anypb.Any{}}}
+	require.NoError(t, s.handleBlockScopedData(context.Background(), empty, nil, sink.MustNewCursor(opaqueCursor(11))))
+
+	require.Len(t, requests(), 1)
+	assert.Equal(t, opaqueCursor(10), readStateCursor(t, s), "an empty block does not join the batch")
+}
+
+func TestBatch_FlushedBeforeUndo(t *testing.T) {
+	var order []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		order = append(order, r.URL.Path+":"+string(body[:12]))
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	s := newTestSink(t, server.URL+"/blocks", OnFailureExit)
+	s.undoURL = server.URL + "/undo"
+	s.batchMaxBlocks, s.batchMaxWait = 100, time.Minute
+	addBlock(t, s, 10, false, time.Now())
+
+	undo := &pbsubstreamsrpc.BlockUndoSignal{LastValidBlock: &pbsubstreams.BlockRef{Number: 9, Id: "aa"}}
+	require.NoError(t, s.handleBlockUndoSignal(context.Background(), undo, sink.MustNewCursor(opaqueCursor(9))))
+
+	require.Equal(t, []string{`/blocks:{"manifest":`, `/undo:{"lastValidB`}, order)
+	assert.Equal(t, opaqueCursor(9), readStateCursor(t, s))
+}
+
+func TestBatch_FailureKeepsBatchPendingAndRecovers(t *testing.T) {
+	server := newTogglingServer(t, http.StatusServiceUnavailable)
+	s := newTestSink(t, server.URL, OnFailureExit)
+	s.batchMaxBlocks, s.batchMaxWait = 2, time.Minute
+
+	now := time.Now()
+	addBlock(t, s, 10, false, now)
+	err := s.addToBatch(context.Background(), "map_events", "t", protoClock(11), json.RawMessage(`{}`), sink.MustNewCursor(opaqueCursor(11)), false, now)
+	var failed *DeliveryFailedError
+	require.ErrorAs(t, err, &failed)
+	assert.Equal(t, uint64(11), failed.Delivery.BlockNumber)
+	assert.Nil(t, s.batch)
+
+	kept, err := readPending(s.pendingFile)
+	require.NoError(t, err)
+	assert.True(t, kept.Batched)
+
+	server.status.Store(http.StatusOK)
+	got, err := s.recoverPending(context.Background(), nil)
+	require.NoError(t, err)
+	assert.Equal(t, opaqueCursor(11), got.String())
+}
+
+func TestRecoverPending_DiscardsOtherBatchingMode(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		pendingBatched bool
+		maxBlocks      int
+	}{
+		{"batched pending, single mode", true, 0},
+		{"single pending, batched mode", false, 10},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := newTogglingServer(t, http.StatusOK)
+			s := newTestSink(t, server.URL, OnFailureExit)
+			s.batchMaxBlocks = tc.maxBlocks
+
+			p := newPending(10)
+			p.Batched = tc.pendingBatched
+			p.Fingerprint = s.fingerprint
+			require.NoError(t, writePending(s.pendingFile, p))
+
+			start := sink.MustNewCursor(opaqueCursor(9))
+			got, err := s.recoverPending(context.Background(), start)
+			require.NoError(t, err)
+			assert.Same(t, start, got, "stream resumes from the saved cursor")
+			assert.Equal(t, int32(0), server.calls.Load(), "nothing is sent in the old shape")
+			assert.NoFileExists(t, s.pendingFile)
+		})
+	}
+
+	t.Run("undo pending is kept in either mode", func(t *testing.T) {
+		server := newTogglingServer(t, http.StatusOK)
+		s := newTestSink(t, server.URL, OnFailureExit)
+		s.undoURL = server.URL
+		s.batchMaxBlocks = 10
+
+		p := newPending(10)
+		p.Kind = pendingKindUndo
+		p.Fingerprint = s.fingerprint
+		require.NoError(t, writePending(s.pendingFile, p))
+
+		_, err := s.recoverPending(context.Background(), nil)
+		require.NoError(t, err)
+		assert.Equal(t, int32(1), server.calls.Load())
+	})
 }
 
 func TestParseOnFailure(t *testing.T) {

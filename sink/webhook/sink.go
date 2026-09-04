@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 // OnFailure selects what the sink does once every attempt to deliver a block
@@ -86,10 +87,24 @@ type Sink struct {
 	onFailure      OnFailure
 	terminationLog string
 	fingerprint    string
+	batchMaxBlocks int
+	batchMaxWait   time.Duration
+	batch          *openBatch
 	client         *Client
 	sinker         *sink.Sinker
 	decoder        *protodecode.Decoder
 	logger         *zap.Logger
+}
+
+// openBatch is the batch being filled. It is flushed when it holds
+// batchMaxBlocks blocks, when batchMaxWait has passed since it was opened,
+// when a live block arrives, when an undo signal arrives, or when the stream
+// ends cleanly.
+type openBatch struct {
+	payload   *BatchPayload
+	cursor    string
+	lastBlock uint64
+	openedAt  time.Time
 }
 
 // SinkConfig holds configuration for the webhook sink
@@ -105,6 +120,13 @@ type SinkConfig struct {
 	OnFailure    OnFailure
 	SinkerConfig *sink.SinkerConfig
 	ClientConfig Config
+	// BatchMaxBlocks above zero switches every call to the BatchPayload shape
+	// and sends up to that many blocks per call. Zero sends one WebhookPayload
+	// per block.
+	BatchMaxBlocks int
+	// BatchMaxWait bounds how long a batch waits for more blocks. It is
+	// checked when the next block arrives. Defaults to one second.
+	BatchMaxWait time.Duration
 	// TerminationLogPath receives the reason for a delivery-failure exit. It
 	// is written only when the file already exists, which is the case under
 	// Kubernetes, so the default of /dev/termination-log is safe elsewhere.
@@ -133,7 +155,14 @@ func NewSink(config SinkConfig) (*Sink, error) {
 		onFailure = OnFailureSkip
 	}
 
+	batchMaxWait := config.BatchMaxWait
+	if batchMaxWait <= 0 {
+		batchMaxWait = time.Second
+	}
+
 	return &Sink{
+		batchMaxBlocks: max(config.BatchMaxBlocks, 0),
+		batchMaxWait:   batchMaxWait,
 		webhookURL:     config.WebhookURL,
 		undoURL:        config.UndoURL,
 		moduleName:     sinker.OutputModuleName(),
@@ -177,7 +206,16 @@ func (s *Sink) Run(ctx context.Context) error {
 	)
 
 	s.sinker.Run(ctx, startCursor, handlers)
-	return s.sinker.Err()
+	if err := s.sinker.Err(); err != nil {
+		return err
+	}
+
+	// A clean end, the stop block was reached. On a shutdown the batch is
+	// left alone: its cursor was not saved, so the stream re-sends it.
+	if s.batch != nil && ctx.Err() == nil {
+		return s.flushBatch(ctx)
+	}
+	return nil
 }
 
 // recoverPending delivers the pending block from a previous run and returns
@@ -189,6 +227,15 @@ func (s *Sink) recoverPending(ctx context.Context, startCursor *sink.Cursor) (*s
 	}
 	if pending == nil {
 		return startCursor, nil
+	}
+
+	if !pending.isUndo() && pending.Batched != s.batching() {
+		// The user switched batching on or off while the sink was down. The
+		// receiver expects the new shape, and the cursor was not advanced past
+		// these blocks, so the stream sends them again in that shape.
+		s.logger.Info("pending payload was written in the other batching mode, discarding it; the stream re-sends its blocks",
+			zap.Bool("pending_batched", pending.Batched), zap.Bool("batching", s.batching()), zap.Uint64("block", pending.BlockNumber))
+		return startCursor, removePending(s.pendingFile)
 	}
 
 	if pending.Fingerprint != s.fingerprint {
@@ -295,8 +342,20 @@ func writeTerminationMessage(path string, msg []byte) error {
 	return os.WriteFile(path, msg, 0o644)
 }
 
+func (s *Sink) batching() bool { return s.batchMaxBlocks > 0 }
+
 // handleBlockScopedData processes a block of data and sends it to the webhook
 func (s *Sink) handleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *sink.Cursor) error {
+	now := time.Now()
+
+	// Blocks with no output do not join a batch, but they do move the clock
+	// for one that is waiting: a sparse module must not hold a batch forever.
+	if s.batch != nil && now.Sub(s.batch.openedAt) >= s.batchMaxWait {
+		if err := s.flushBatch(ctx); err != nil {
+			return err
+		}
+	}
+
 	if data.Output.MapOutput.Value == nil {
 		return nil
 	}
@@ -304,7 +363,16 @@ func (s *Sink) handleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 	msgDesc := s.decoder.GetMessageDescriptor(data.Output.Name)
 	dataContent := s.decoder.DecodeDynamicMessage(msgDesc, data.Output.MapOutput)
 
-	payload, err := NewWebhookPayload(data.Output.Name, data.Clock, data.Output.MapOutput.TypeUrl, dataContent)
+	live := isLive != nil && *isLive
+	if s.batching() {
+		return s.addToBatch(ctx, data.Output.Name, data.Output.MapOutput.TypeUrl, data.Clock, dataContent, cursor, live, now)
+	}
+	return s.sendBlock(ctx, data.Output.Name, data.Output.MapOutput.TypeUrl, data.Clock, dataContent, cursor, now)
+}
+
+// sendBlock delivers one block as a WebhookPayload.
+func (s *Sink) sendBlock(ctx context.Context, moduleName, typeURL string, clock *pbsubstreams.Clock, dataContent json.RawMessage, cursor *sink.Cursor, now time.Time) error {
+	payload, err := NewWebhookPayload(moduleName, clock, typeURL, dataContent)
 	if err != nil {
 		return fmt.Errorf("failed to create webhook payload: %w", err)
 	}
@@ -316,15 +384,62 @@ func (s *Sink) handleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 
 	pending := &pendingDelivery{
 		Kind:           pendingKindBlock,
-		BlockNumber:    data.Clock.Number,
+		BlockNumber:    clock.Number,
 		Payload:        wrappedOut,
-		FirstAttemptAt: time.Now(),
+		FirstAttemptAt: now,
 		Fingerprint:    s.fingerprint,
 	}
 	if cursor != nil {
 		pending.Cursor = cursor.String()
 	}
 
+	return s.send(ctx, pending)
+}
+
+// addToBatch appends the block to the open batch and flushes it when it is
+// full, when it waited long enough, or when the chain is live and holding the
+// block back would only add latency.
+func (s *Sink) addToBatch(ctx context.Context, moduleName, typeURL string, clock *pbsubstreams.Clock, dataContent json.RawMessage, cursor *sink.Cursor, live bool, now time.Time) error {
+	if s.batch == nil {
+		s.batch = &openBatch{payload: NewBatchPayload(moduleName, typeURL), openedAt: now}
+	}
+	s.batch.payload.Append(clock, dataContent)
+	s.batch.lastBlock = clock.Number
+	if cursor != nil {
+		s.batch.cursor = cursor.String()
+	}
+
+	full := len(s.batch.payload.Blocks) >= s.batchMaxBlocks
+	waited := now.Sub(s.batch.openedAt) >= s.batchMaxWait
+	if full || waited || live {
+		return s.flushBatch(ctx)
+	}
+	return nil
+}
+
+// flushBatch delivers the open batch as one call and closes it. The batch
+// is closed even when delivery fails: in exit mode it is on disk, in skip mode
+// it is dropped.
+func (s *Sink) flushBatch(ctx context.Context) error {
+	batch := s.batch
+	s.batch = nil
+
+	wrappedOut, err := batch.payload.ToJSON()
+	if err != nil {
+		return fmt.Errorf("failed to serialize batch payload: %w", err)
+	}
+
+	pending := &pendingDelivery{
+		Kind:           pendingKindBlock,
+		Batched:        true,
+		Cursor:         batch.cursor,
+		BlockNumber:    batch.lastBlock,
+		Payload:        wrappedOut,
+		FirstAttemptAt: time.Now(),
+		Fingerprint:    s.fingerprint,
+	}
+
+	s.logger.Debug("flushing batch", zap.Int("blocks", len(batch.payload.Blocks)), zap.Uint64("last_block", batch.lastBlock))
 	return s.send(ctx, pending)
 }
 
@@ -348,6 +463,14 @@ func (s *Sink) send(ctx context.Context, pending *pendingDelivery) error {
 // handleBlockUndoSignal moves the cursor back to the last valid block and, when
 // an undo URL is configured, tells the receiver which blocks are gone.
 func (s *Sink) handleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *sink.Cursor) error {
+	// The receiver must see the blocks before it is told some of them are
+	// gone, so an open batch goes out first.
+	if s.batch != nil {
+		if err := s.flushBatch(ctx); err != nil {
+			return err
+		}
+	}
+
 	if s.undoURL == "" {
 		if s.stateFile != "" && cursor != nil {
 			if err := sink.WriteCursor(s.stateFile, cursor); err != nil {

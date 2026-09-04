@@ -1,6 +1,6 @@
 package pipeline
 
-import "sort"
+import "slices"
 
 type storeBoundary struct {
 	nextBoundary     uint64
@@ -64,9 +64,7 @@ func (r *storeBoundary) GetStoreFlushRanges(isSubRequest bool, reqStopBlockNum u
 	for v := range boundaries {
 		out = append(out, v)
 	}
-	sort.Slice(out, func(i, j int) bool {
-		return out[i] < out[j]
-	})
+	slices.Sort(out)
 	return out
 }
 

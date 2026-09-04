@@ -3,7 +3,6 @@ package output
 import (
 	"fmt"
 	"slices"
-	"sort"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -489,7 +488,7 @@ func (o *Output) orderMatchingBlocks(msg search.UpdateMatchingBlocks) []uint64 {
 		l[count] = k
 		count++
 	}
-	sort.Slice(l, func(i, j int) bool { return l[i] < l[j] })
+	slices.Sort(l)
 	return l
 }
 

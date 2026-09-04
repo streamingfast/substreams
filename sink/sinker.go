@@ -757,14 +757,20 @@ func (s *Sinker) doRequest(
 					return activeCursor, receivedDataMessage, fmt.Errorf("handle BlockUndoSignal: %w", err)
 				}
 			} else {
-				// In the case of dealing with an undo buffer, it's expected that a fork will never
-				// go beyond the first block in the buffer because if it does, `s.buffer.HandleBlockUndoSignal` here
-				// returns an error.
-				//
-				// This means ultimately that we expect to never call the downstream `BlockUndoSignalHandler` function.
-				err = s.buffer.HandleBlockUndoSignal(r.BlockUndoSignal)
+				// A fork within the buffer is handled by dropping buffered blocks and the
+				// downstream handler never hears about it. A fork below what this process
+				// emitted is an error. What is left is a fork below blocks a previous process
+				// emitted, typically a restart from a cursor that sits on a fork: the buffer
+				// cannot absorb that one, so the handler gets the signal as it would without
+				// a buffer.
+				absorbed, err := s.buffer.HandleBlockUndoSignal(r.BlockUndoSignal)
 				if err != nil {
 					return activeCursor, receivedDataMessage, fmt.Errorf("buffer undo block: %w", err)
+				}
+				if !absorbed {
+					if err := handler.HandleBlockUndoSignal(ctx, r.BlockUndoSignal, activeCursor); err != nil {
+						return activeCursor, receivedDataMessage, fmt.Errorf("handle BlockUndoSignal: %w", err)
+					}
 				}
 			}
 

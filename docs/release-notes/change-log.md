@@ -11,6 +11,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Sink
+
+- Add authentication to `substreams sink webhook` calls. The value of the environment variable named by
+  `--webhook-auth-header-value-envvar` is sent in the header named by `--webhook-auth-header-name`
+  (`Authorization` by default), and the secret named by `--webhook-signing-secret-envvar` signs every body
+  with HMAC-SHA256 in the `X-Substreams-Signature` header as `t=<unix seconds>,v1=<hex>` over `<t>.<body>`.
+  Receivers can verify with `webhook.VerifySignature`. Once every retry has failed, `Client.Call` returns a
+  `*webhook.DeliveryError` carrying the last HTTP status and the attempt count.
+
+- Add `--webhook-on-failure=exit` to `substreams sink webhook`. Once every retry for a block has failed the
+  sink keeps that block in `<state-file>.pending`, writes a JSON reason (URL, block, status, attempts,
+  `first_attempt_at`) to `--webhook-termination-log` when that file exists, and exits with status 75. The next
+  start delivers the pending block before it opens a Substreams stream, so retrying against a dead endpoint costs
+  no egress. The default `skip` keeps the old behaviour of dropping the block. The pending file is written
+  before every attempt and removed after the cursor is saved, so a kill mid-delivery is recovered the same way;
+  a block whose cursor was already saved is discarded rather than sent twice, and a changed URL or secret
+  resets `first_attempt_at`. The sink now also exposes `substreams_sink_progress_block`, the last delivered
+  block.
+
+- Sinks running with `--undo-buffer-size` now receive an undo signal that reaches below the buffer when the buffer
+  has emitted nothing yet, which is what a restart from a cursor sitting on a fork produces. Before, the buffer
+  swallowed it and the handler never rolled back blocks the previous run had emitted.
+
+- Add `--webhook-undo-url` to `substreams sink webhook`. When set, every undo signal is POSTed there as
+  `{"lastValidBlock": {"number", "id"}, "manifest": {"moduleName"}}` so the receiver can drop the blocks above
+  the last valid one before the replacements arrive. The notification carries the same auth header and
+  signature as blocks and follows the same retry, `--webhook-on-failure` and pending-file rules. Without it the
+  cursor still moves back and only the replacement blocks are delivered, as before. Pair with
+  `--undo-buffer-size` to hold back a few blocks and absorb shallow reorganizations without any notification.
+
 ### Docs
 
 - Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can

@@ -68,3 +68,36 @@ func NewWebhookPayload(moduleName string, clock *pbsubstreams.Clock, msgType str
 func (p *WebhookPayload) ToJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
+
+// BlockRef identifies a block in an undo payload.
+type BlockRef struct {
+	Number uint64 `json:"number"`
+	ID     string `json:"id"`
+}
+
+// UndoManifest names the module whose blocks are being undone.
+type UndoManifest struct {
+	ModuleName string `json:"moduleName"`
+}
+
+// UndoPayload is sent to the undo URL when the chain reorganizes. Every block
+// the receiver got with a number above LastValidBlock is no longer on the
+// chain; the blocks that replace them follow as regular payloads.
+type UndoPayload struct {
+	LastValidBlock BlockRef     `json:"lastValidBlock"`
+	Manifest       UndoManifest `json:"manifest"`
+}
+
+// NewUndoPayload creates the payload for an undo signal.
+func NewUndoPayload(moduleName string, lastValidBlock *pbsubstreams.BlockRef) *UndoPayload {
+	p := &UndoPayload{Manifest: UndoManifest{ModuleName: moduleName}}
+	if lastValidBlock != nil {
+		p.LastValidBlock = BlockRef{Number: lastValidBlock.Number, ID: lastValidBlock.Id}
+	}
+	return p
+}
+
+// ToJSON serializes the undo payload to JSON bytes
+func (p *UndoPayload) ToJSON() ([]byte, error) {
+	return json.Marshal(p)
+}

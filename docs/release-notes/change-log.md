@@ -30,6 +30,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   resets `first_attempt_at`. The sink now also exposes `substreams_sink_progress_block`, the last delivered
   block.
 
+- Sinks running with `--undo-buffer-size` now receive an undo signal that reaches below the buffer when the buffer
+  has emitted nothing yet, which is what a restart from a cursor sitting on a fork produces. Before, the buffer
+  swallowed it and the handler never rolled back blocks the previous run had emitted.
+
 ### Docs
 
 - Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can

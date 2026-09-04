@@ -17,6 +17,8 @@ import (
 func TestBlockBuffer(t *testing.T) {
 	type messageToResult map[*substreamsMessage]any
 	type finalBlocks []*pbsubstreamsrpc.BlockScopedData
+	// undoAbsorbed is the expected `absorbed` result of an undo signal
+	type undoAbsorbed bool
 
 	tests := []struct {
 		name     string
@@ -76,6 +78,56 @@ func TestBlockBuffer(t *testing.T) {
 				{msgBlockScopedData("1a", 0): nil},
 				{msgBlockScopedData("2a", 0): nil},
 				{msgBlockUndoSignal("1a"): nil},
+			},
+		},
+		{
+			name:     "undo_within_buffer_is_absorbed",
+			undoSize: 3,
+			messages: []messageToResult{
+				{msgBlockScopedData("1a", 0): nil},
+				{msgBlockScopedData("2a", 0): nil},
+				{msgBlockScopedData("3a", 0): nil},
+				{msgBlockUndoSignal("2a"): undoAbsorbed(true)},
+			},
+		},
+		{
+			name:     "undo_below_buffer_before_anything_emitted_is_not_absorbed",
+			undoSize: 3,
+			messages: []messageToResult{
+				{msgBlockScopedData("2a", 0): nil},
+				{msgBlockScopedData("3a", 0): nil},
+				{msgBlockUndoSignal("1a"): undoAbsorbed(false)},
+				{msgBlockScopedData("2b", 0): nil},
+			},
+		},
+		{
+			name:     "undo_on_empty_buffer_before_anything_emitted_is_not_absorbed",
+			undoSize: 3,
+			messages: []messageToResult{
+				{msgBlockUndoSignal("5a"): undoAbsorbed(false)},
+				{msgBlockScopedData("6b", 0): nil},
+			},
+		},
+		{
+			name:     "undo_below_buffer_after_emission_is_absorbed",
+			undoSize: 2,
+			messages: []messageToResult{
+				{msgBlockScopedData("1a", 0): nil},
+				{msgBlockScopedData("2a", 0): nil},
+				{msgBlockScopedData("3a", 0): blockScopedData("1a", 0)},
+				{msgBlockUndoSignal("1a"): undoAbsorbed(true)},
+				{msgBlockScopedData("2b", 0): nil},
+			},
+		},
+		{
+			name:     "undo_between_emitted_and_buffer_is_absorbed",
+			undoSize: 2,
+			messages: []messageToResult{
+				{msgBlockScopedData("1a", 0): nil},
+				{msgBlockScopedData("2a", 0): nil},
+				{msgBlockScopedData("3a", 0): blockScopedData("1a", 0)},
+				{msgBlockScopedData("5a", 0): blockScopedData("2a", 0)},
+				{msgBlockUndoSignal("4a"): undoAbsorbed(true)},
 			},
 		},
 		{
@@ -267,11 +319,15 @@ func TestBlockBuffer(t *testing.T) {
 			}
 
 			handleBlockUndoSignal := func(blockUndoSignal *pbsubstreamsrpc.BlockUndoSignal, expectedResult any) {
-				err := b.HandleBlockUndoSignal(blockUndoSignal)
+				absorbed, err := b.HandleBlockUndoSignal(blockUndoSignal)
 
 				switch v := expectedResult.(type) {
 				case error:
 					require.EqualError(t, err, v.Error())
+
+				case undoAbsorbed:
+					require.NoError(t, err)
+					require.Equal(t, bool(v), absorbed, "absorbed")
 
 				default:
 					if v == nil {

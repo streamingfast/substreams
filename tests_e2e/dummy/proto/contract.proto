@@ -2,11 +2,23 @@ syntax = "proto3";
 
 package test.output;
 
+import "sf/substreams/sink/sql/schema/v1/schema.proto";
+
 message Events {
   repeated Event event = 1;
 }
+// Annotated for the ClickHouse sink, which has no default ordering and refuses
+// to create a table without one. Postgres ignores these options.
 message Event {
-  string evt_tx_hash = 1;
+  option (schema.table) = {
+    name: "Event"
+    clickhouse_table_options: {
+      order_by_fields: [{name: "evt_tx_hash"}, {name: "evt_block_number"}]
+    }
+  };
+
+  // ClickHouse requires the primary key to be a prefix of the sorting key.
+  string evt_tx_hash = 1 [(schema.field) = { primary_key: true }];
   string evt_from = 2;
   string evt_to = 3;
   uint64 evt_block_number = 4;

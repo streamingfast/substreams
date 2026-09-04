@@ -11,6 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### CLI
+
+- A manifest can now import `sf/substreams/sink/sql/schema/v1/schema.proto` without
+  vendoring a copy of it. The file is a system protobuf, but `protoparse` needs the
+  source on disk to honour its extensions, so an import previously failed with
+  `no such file`. It is now served from an embedded copy, the same way
+  `sf/substreams/options.proto` already was.
+
 ### Docs
 
 - Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can
@@ -140,6 +148,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   server heap by fragmenting HTTP/2 DATA frames.
 
 ### Tests
+
+- The `tests_e2e/dummy` directory gains a `substreams.clickhouse.yaml` sibling manifest
+  packing `e2e_clickhouse`, whose `map_events_clickhouse` module emits
+  `test.clickhouse.Events`. That message carries the `(schema.table)` ClickHouse
+  annotations, so the package sinks with `substreams sink clickhouse` without further
+  setup. Kept out of `substreams.yaml` and given its own message so the annotations do
+  not change the module hashes of the existing e2e modules.
 
 - The `tests_e2e/dummy` package gains three modules for exercising Hosted Stores against a
   staging environment. `map_hosted_store_feed`, packed into `e2e-v0.3.0.spkg`, emits

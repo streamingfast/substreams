@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"time"
 
@@ -244,8 +245,7 @@ func (p *Pipeline) undoPartialStates() error {
 		return nil
 	}
 
-	for i := len(p.partialProcessingState.processedPartials) - 1; i >= 0; i-- {
-		clk := p.partialProcessingState.processedPartials[i]
+	for _, clk := range slices.Backward(p.partialProcessingState.processedPartials) {
 		if err := p.forkHandler.handleUndo(clk); err != nil {
 			return fmt.Errorf("reverting outputs: %w", err)
 		}

@@ -72,7 +72,11 @@ See walkthroughs provided below for different SQL services you can rely on, with
 Credentials are stored securely and used only to connect the sink process to your database. Use a dedicated database user with write access restricted to the target schema.
 {% endhint %}
 
-### 4. Execution
+### 4. GraphQL API
+
+Optionally select **Expose a GraphQL API over this database** to deploy a read-only [GraphQL layer](../sinks/hosted-sinks/graphql-layer.md) alongside the sink. You can also add or remove it later from the sink's **Edit** dialog.
+
+### 5. Execution
 
 | Field | Description |
 |---|---|
@@ -87,7 +91,7 @@ Credentials are stored securely and used only to connect the sink process to you
 | Filters | A filter expression passed to the Substreams execution. |
 | Parameters | Module parameters passed at execution time. |
 
-### 5. Deploy
+### 6. Deploy
 
 Click **Deploy sink**. The sink enters the `Deploying` state while the infrastructure provisions. Once pods are ready it transitions to `Deployed` and begins indexing.
 
@@ -105,3 +109,4 @@ Step-by-step guides for connecting a Hosted Sink to common managed database prov
 ## Next Steps
 
 - [Monitor and manage your sink](../sinks/hosted-sinks/manage-your-sink.md) — check status, view logs, edit config, stop, or delete.
+- [Serve your data over GraphQL](../sinks/hosted-sinks/graphql-layer.md) — add a read-only GraphQL API and console over the sink's database.

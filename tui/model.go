@@ -1,39 +1,50 @@
 package tui
 
 import (
+	"time"
+
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
 func newModel(ui *TUI) model {
-	return model{
-		StagesProgress: updatedRanges{},
-		ui:             ui,
-	}
+	m := model{ui: ui}
+	return m.withDefaults()
 }
 
 type model struct {
 	ui *TUI
 
-	StagesProgress updatedRanges
-	StagesModules  []string
-	SlowJobs       []string
-	SlowModules    []string
+	// now is injectable so that windowed rates, ETAs and job ages are deterministic in tests.
+	now func() time.Time
 
-	BarMode bool
-	BarSize uint64
+	Connected bool
+	TraceID   string
 
-	Updates           int
-	UpdatedSecond     int64
-	UpdatesPerSecond  int
-	UpdatesThisSecond int
+	// Width is 0 until the first tea.WindowSizeMsg is received.
+	Width int
 
-	Request                       *pbsubstreamsrpc.Request
-	BackprocessingCompleteAtBlock uint64
-	Connected                     bool
+	session   *pbsubstreamsrpc.SessionInit
+	sessionAt time.Time
+	progress  *pbsubstreamsrpc.ModulesProgress
+
+	globalRate  *rateWindow
+	moduleRates *moduleWindow
 
 	Failures    int
 	LastFailure *pbsubstreamsrpc.Error
-	Reason      string
+}
 
-	TraceID string
+// withDefaults fills in what the model cannot work without. Tests build a model as a bare
+// literal, so this cannot live in the constructor alone.
+func (m model) withDefaults() model {
+	if m.now == nil {
+		m.now = time.Now
+	}
+	if m.globalRate == nil {
+		m.globalRate = newRateWindow(rateWindowDuration)
+	}
+	if m.moduleRates == nil {
+		m.moduleRates = newModuleWindow(rateWindowDuration)
+	}
+	return m
 }

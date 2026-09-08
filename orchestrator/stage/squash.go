@@ -7,6 +7,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/dustin/go-humanize"
 	"github.com/hashicorp/go-multierror"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams/block"
@@ -69,7 +70,7 @@ func getPartialOrFullKV(ctx context.Context, modState *StoreModuleState, rng *bl
 	}()
 
 	go func() {
-		nextFull, err := modState.getStore(ctx, rng.ExclusiveEndBlock)
+		nextFull, err := modState.tryLoadFullKV(ctx, rng.ExclusiveEndBlock)
 		results <- Result{fullKVStore: nextFull, error: err}
 	}()
 
@@ -130,6 +131,9 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 	}
 
 	if newFullKV != nil {
+		if fullKV != nil {
+			fullKV.Close()
+		}
 		modState.cachedStore = newFullKV
 		modState.lastBlockInStore = rng.ExclusiveEndBlock
 		s.logger.Debug("squashing time metrics (skipped, loaded from full kv)", meter.logFields()...)
@@ -147,6 +151,12 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 
 	modState.lastBlockInStore = rng.ExclusiveEndBlock
 	meter.mergeEnd = time.Now()
+
+	s.logger.Info("merged partial into full store",
+		zap.String("store", modState.name),
+		zap.Uint64("up_to_block", rng.ExclusiveEndBlock),
+		zap.String("store_size", humanize.IBytes(fullKV.SizeBytes())),
+	)
 
 	s.logger.Info("deleting partial store", zap.Stringer("store", partialKV))
 

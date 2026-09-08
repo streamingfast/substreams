@@ -27,7 +27,7 @@ func TestFullKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 
 	kvs := &FullKV{
 		baseStore: &baseStore{
-			kv: map[string][]byte{},
+			kvImpl: newMemoryKVImpl(),
 
 			kvOps:      &pbssinternal.Operations{},
 			logger:     zap.NewNop(),
@@ -48,7 +48,7 @@ func TestFullKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 
 	kvl := &FullKV{
 		baseStore: &baseStore{
-			kv: map[string][]byte{},
+			kvImpl: newMemoryKVImpl(),
 
 			kvOps:      &pbssinternal.Operations{},
 			logger:     zap.NewNop(),
@@ -63,8 +63,41 @@ func TestFullKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 
 	err = kvl.Load(context.Background(), file)
 	require.NoError(t, err)
-	require.NotNilf(t, kvl.kv, "kvl.kv is nil")
+	require.NotNilf(t, kvl.kvImpl, "kvl.kvImpl is nil")
 }
+
+// TestFullKV_Load_CanceledContext_NotCorrupt ensures a load aborted by context
+// cancellation reports the cancellation, not ErrInvalidFullKVFile — otherwise
+// callers would delete a perfectly valid remote store file.
+func TestFullKV_Load_CanceledContext_NotCorrupt(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	store := dstore.NewMockStore(nil)
+	store.OpenObjectFunc = func(context.Context, string) (io.ReadCloser, error) {
+		cancel() // the stream is torn down mid-read
+		return io.NopCloser(&errReaderReadCloser{err: context.Canceled}), nil
+	}
+
+	kv := &FullKV{
+		baseStore: &baseStore{
+			kvImpl:     newMemoryKVImpl(),
+			kvOps:      &pbssinternal.Operations{},
+			logger:     zap.NewNop(),
+			marshaller: marshaller.Default(),
+			Config:     &Config{moduleInitialBlock: 0, objStore: store},
+		},
+	}
+
+	err := kv.Load(ctx, NewCompleteFileInfo("test", 0, 100))
+	require.Error(t, err)
+	require.ErrorIs(t, err, context.Canceled, "canceled load must surface cancellation")
+	require.NotErrorIs(t, err, ErrInvalidFullKVFile, "canceled load must not look like corruption")
+}
+
+type errReaderReadCloser struct{ err error }
+
+func (r *errReaderReadCloser) Read([]byte) (int, error) { return 0, r.err }
+func (r *errReaderReadCloser) Close() error             { return nil }
 
 func TestFullKV_QuickSave_QuickLoad_Empty(t *testing.T) {
 	var writtenBytes []byte
@@ -79,7 +112,7 @@ func TestFullKV_QuickSave_QuickLoad_Empty(t *testing.T) {
 	// Create store with empty KV map
 	kvs := &FullKV{
 		baseStore: &baseStore{
-			kv:         make(map[string][]byte),
+			kvImpl:     newMemoryKVImpl(),
 			kvOps:      &pbssinternal.Operations{},
 			logger:     zap.NewNop(),
 			marshaller: marshaller.Default(),
@@ -98,7 +131,7 @@ func TestFullKV_QuickSave_QuickLoad_Empty(t *testing.T) {
 	// Create new store to load into
 	kvl := &FullKV{
 		baseStore: &baseStore{
-			kv:         make(map[string][]byte),
+			kvImpl:     newMemoryKVImpl(),
 			kvOps:      &pbssinternal.Operations{},
 			logger:     zap.NewNop(),
 			marshaller: marshaller.Default(),
@@ -113,8 +146,8 @@ func TestFullKV_QuickSave_QuickLoad_Empty(t *testing.T) {
 	blockRef := bstream.NewBlockRef(blockHash, 123)
 	err = kvl.QuickLoad(context.Background(), blockRef)
 	require.NoError(t, err)
-	require.NotNil(t, kvl.kv, "kvl.kv should not be nil after QuickLoad")
-	require.Equal(t, 0, len(kvl.kv), "kvl.kv should be empty")
+	require.NotNil(t, kvl.kvImpl, "kvl.kvImpl should not be nil after QuickLoad")
+	require.Equal(t, 0, kvl.kvImpl.KeyCount(), "kvl.kvImpl should be empty")
 }
 
 func TestFullKV_QuickSave_QuickLoad_WithData(t *testing.T) {
@@ -136,7 +169,11 @@ func TestFullKV_QuickSave_QuickLoad_WithData(t *testing.T) {
 
 	kvs := &FullKV{
 		baseStore: &baseStore{
-			kv:             testData,
+			kvImpl: func() KVImpl {
+				impl := newMemoryKVImpl()
+				impl.Load(mapToIter(testData))
+				return impl
+			}(),
 			kvOps:          &pbssinternal.Operations{},
 			logger:         zap.NewNop(),
 			marshaller:     marshaller.Default(),
@@ -156,7 +193,7 @@ func TestFullKV_QuickSave_QuickLoad_WithData(t *testing.T) {
 	// Create new store to load into
 	kvl := &FullKV{
 		baseStore: &baseStore{
-			kv:         make(map[string][]byte),
+			kvImpl:     newMemoryKVImpl(),
 			kvOps:      &pbssinternal.Operations{},
 			logger:     zap.NewNop(),
 			marshaller: marshaller.Default(),
@@ -171,12 +208,14 @@ func TestFullKV_QuickSave_QuickLoad_WithData(t *testing.T) {
 	blockRef := bstream.NewBlockRef(blockHash, 456)
 	err = kvl.QuickLoad(context.Background(), blockRef)
 	require.NoError(t, err)
-	require.NotNil(t, kvl.kv, "kvl.kv should not be nil after QuickLoad")
-	require.Equal(t, len(testData), len(kvl.kv), "kvl.kv should have same number of entries")
+	require.NotNil(t, kvl.kvImpl, "kvl.kvImpl should not be nil after QuickLoad")
+	require.Equal(t, len(testData), kvl.kvImpl.KeyCount(), "kvl.kvImpl should have same number of entries")
 
 	// Verify all data was loaded correctly
 	for key, expectedValue := range testData {
-		actualValue, exists := kvl.kv[key]
+		snapshot, err := saveToMap(kvl.kvImpl.Save())
+		require.NoError(t, err)
+		actualValue, exists := snapshot[key]
 		require.True(t, exists, "key %s should exist", key)
 		require.Equal(t, expectedValue, actualValue, "value for key %s should match", key)
 	}
@@ -188,7 +227,7 @@ func TestFullKV_QuickSave_QuickLoad_WithData(t *testing.T) {
 func TestFullKV_QuickLoad_NoQuickSaveStore(t *testing.T) {
 	kvs := &FullKV{
 		baseStore: &baseStore{
-			kv:         make(map[string][]byte),
+			kvImpl:     newMemoryKVImpl(),
 			kvOps:      &pbssinternal.Operations{},
 			logger:     zap.NewNop(),
 			marshaller: marshaller.Default(),
@@ -208,7 +247,7 @@ func TestFullKV_QuickLoad_NoQuickSaveStore(t *testing.T) {
 func TestFullKV_QuickSave_NoQuickSaveStore(t *testing.T) {
 	kvs := &FullKV{
 		baseStore: &baseStore{
-			kv:         make(map[string][]byte),
+			kvImpl:     newMemoryKVImpl(),
 			kvOps:      &pbssinternal.Operations{},
 			logger:     zap.NewNop(),
 			marshaller: marshaller.Default(),
@@ -234,7 +273,7 @@ func TestFullKV_QuickLoad_FileNotFound(t *testing.T) {
 
 	kvs := &FullKV{
 		baseStore: &baseStore{
-			kv:         make(map[string][]byte),
+			kvImpl:     newMemoryKVImpl(),
 			kvOps:      &pbssinternal.Operations{},
 			logger:     zap.NewNop(),
 			marshaller: marshaller.Default(),
@@ -276,7 +315,11 @@ func TestFullKV_QuickSave_QuickLoad_LargeData(t *testing.T) {
 
 	kvs := &FullKV{
 		baseStore: &baseStore{
-			kv:             testData,
+			kvImpl: func() KVImpl {
+				impl := newMemoryKVImpl()
+				impl.Load(mapToIter(testData))
+				return impl
+			}(),
 			kvOps:          &pbssinternal.Operations{},
 			logger:         zap.NewNop(),
 			marshaller:     marshaller.Default(),
@@ -296,7 +339,7 @@ func TestFullKV_QuickSave_QuickLoad_LargeData(t *testing.T) {
 	// Create new store to load into
 	kvl := &FullKV{
 		baseStore: &baseStore{
-			kv:         make(map[string][]byte),
+			kvImpl:     newMemoryKVImpl(),
 			kvOps:      &pbssinternal.Operations{},
 			logger:     zap.NewNop(),
 			marshaller: marshaller.Default(),
@@ -311,14 +354,16 @@ func TestFullKV_QuickSave_QuickLoad_LargeData(t *testing.T) {
 	blockRef := bstream.NewBlockRef(blockHash, 1000)
 	err = kvl.QuickLoad(context.Background(), blockRef)
 	require.NoError(t, err)
-	require.NotNil(t, kvl.kv, "kvl.kv should not be nil after QuickLoad")
-	require.Equal(t, len(testData), len(kvl.kv), "kvl.kv should have same number of entries")
+	require.NotNil(t, kvl.kvImpl, "kvl.kvImpl should not be nil after QuickLoad")
+	require.Equal(t, len(testData), kvl.kvImpl.KeyCount(), "kvl.kvImpl should have same number of entries")
 
 	// Verify a few entries (not all for performance)
+	snapshot, err := saveToMap(kvl.kvImpl.Save())
+	require.NoError(t, err)
 	for i := 0; i < 10; i++ {
 		key := fmt.Sprintf("key_%d", i)
 		expectedValue := testData[key]
-		actualValue, exists := kvl.kv[key]
+		actualValue, exists := snapshot[key]
 		require.True(t, exists, "key %s should exist", key)
 		require.Equal(t, expectedValue, actualValue, "value for key %s should match", key)
 	}
@@ -352,7 +397,7 @@ func TestFullKV_QuickSave_QuickLoad_RoundTrip(t *testing.T) {
 
 	store := &FullKV{
 		baseStore: &baseStore{
-			kv:         make(map[string][]byte),
+			kvImpl:     newMemoryKVImpl(),
 			kvOps:      &pbssinternal.Operations{},
 			logger:     zap.NewNop(),
 			marshaller: marshaller.Default(),
@@ -367,10 +412,7 @@ func TestFullKV_QuickSave_QuickLoad_RoundTrip(t *testing.T) {
 		blockHash := fmt.Sprintf("block_hash_%d", i)
 
 		// Update store data
-		store.kv = make(map[string][]byte)
-		for k, v := range testData {
-			store.kv[k] = v
-		}
+		store.kvImpl.Load(mapToIter(testData))
 		store.totalSizeBytes = uint64(len(testData) * 10) // Approximate size
 
 		// Save
@@ -380,7 +422,7 @@ func TestFullKV_QuickSave_QuickLoad_RoundTrip(t *testing.T) {
 		// Load into new store
 		loadStore := &FullKV{
 			baseStore: &baseStore{
-				kv:         make(map[string][]byte),
+				kvImpl:     newMemoryKVImpl(),
 				kvOps:      &pbssinternal.Operations{},
 				logger:     zap.NewNop(),
 				marshaller: marshaller.Default(),
@@ -396,9 +438,11 @@ func TestFullKV_QuickSave_QuickLoad_RoundTrip(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify data matches
-		require.Equal(t, len(testData), len(loadStore.kv), "iteration %d: kv length should match", i)
+		require.Equal(t, len(testData), loadStore.kvImpl.KeyCount(), "iteration %d: kv length should match", i)
+		snapshot, err := saveToMap(loadStore.kvImpl.Save())
+		require.NoError(t, err)
 		for key, expectedValue := range testData {
-			actualValue, exists := loadStore.kv[key]
+			actualValue, exists := snapshot[key]
 			require.True(t, exists, "iteration %d: key %s should exist", i, key)
 			require.Equal(t, expectedValue, actualValue, "iteration %d: value for key %s should match", i, key)
 		}

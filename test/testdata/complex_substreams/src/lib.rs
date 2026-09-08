@@ -326,3 +326,36 @@ fn assert_set_sum_store_deltas_0(block: test::Block, set_sum_store: store::Delta
 
 
 
+
+/// Raw binding to the `context` host module. It lives here rather than coming from
+/// `substreams` because the crate does not expose it yet.
+mod context_intrinsics {
+    use prost::Message;
+
+    #[link(wasm_import_module = "context")]
+    extern "C" {
+        fn clock(output_ptr: *mut u8);
+    }
+
+    /// Reads the `{ptr, len}` pair the host writes at `output_ptr` and takes ownership of
+    /// the payload it points at, which the host allocated through our own `alloc`.
+    unsafe fn read_output(intrinsic: unsafe extern "C" fn(*mut u8)) -> Vec<u8> {
+        let mut output: [u32; 2] = [0, 0];
+        intrinsic(output.as_mut_ptr() as *mut u8);
+
+        let (ptr, len) = (output[0] as *mut u8, output[1] as usize);
+        Vec::from_raw_parts(ptr, len, len)
+    }
+
+    pub fn get_clock() -> crate::pb::sf::substreams::v1::Clock {
+        let data = unsafe { read_output(clock) };
+        crate::pb::sf::substreams::v1::Clock::decode(data.as_slice()).expect("clock is not a valid Clock message")
+    }
+}
+
+#[substreams::handlers::map]
+fn assert_context_intrinsics_0(clock: pb::sf::substreams::v1::Clock) -> Result<test::Boolean, Error> {
+    assert_eq!(context_intrinsics::get_clock(), clock);
+
+    Ok(test::Boolean { result: true })
+}

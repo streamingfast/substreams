@@ -16,9 +16,10 @@ import (
 )
 
 type StreamFactory struct {
-	mergedBlocksStore dstore.Store
-	forkedBlocksStore dstore.Store
-	hub               *hub.ForkableHub
+	mergedBlocksStore      dstore.Store
+	forkedBlocksStore      dstore.Store
+	hub                    *hub.ForkableHub
+	mergedBlocksBundleSize uint64 // 0 means bstream.DefaultMergedBlocksBundleSize
 }
 
 func (sf *StreamFactory) New(
@@ -37,6 +38,9 @@ func (sf *StreamFactory) New(
 		stream.WithStopBlock(stopBlockNum),
 		stream.WithCustomStepTypeFilter(bstream.StepsAll), // substreams always wants new, undo, new+irreversible, irreversible, stalled
 		stream.WithLogger(logger),
+	}
+	if sf.mergedBlocksBundleSize != 0 {
+		options = append(options, stream.WithMergedBlocksBundleSize(sf.mergedBlocksBundleSize))
 	}
 	if finalBlocksOnly {
 		options = append(options, stream.WithFinalBlocksOnly())
@@ -101,12 +105,30 @@ func (sf *StreamFactory) New(
 
 func (s *StreamFactory) GetRecentFinalBlock() (uint64, error) {
 	_, _, _, finalBlockNum, err := s.hub.HeadInfo()
-	if finalBlockNum > bstream.GetProtocolFirstStreamableBlock+200 {
-		finalBlockNum -= finalBlockNum % 100
-		finalBlockNum -= 100
-	}
+	return roundToBundleFinalBlock(finalBlockNum, s.bundleSize(), bstream.GetProtocolFirstStreamableBlock), err
+}
 
-	return finalBlockNum, err
+func (s *StreamFactory) bundleSize() uint64 {
+	if s.mergedBlocksBundleSize != 0 {
+		return s.mergedBlocksBundleSize
+	}
+	return bstream.DefaultMergedBlocksBundleSize
+}
+
+// roundToBundleFinalBlock rounds a final block down to the start of the previous
+// merged-blocks bundle, the most recent block that is guaranteed to be readable
+// from a fully-written merged-blocks file.
+func roundToBundleFinalBlock(finalBlockNum, bundleSize, firstStreamableBlock uint64) uint64 {
+	// Need at least one complete bundle above the chain start; below that no
+	// merged-blocks file exists yet, so there is nothing to snap to.
+	if finalBlockNum < firstStreamableBlock+bundleSize {
+		return finalBlockNum
+	}
+	rounded := finalBlockNum - finalBlockNum%bundleSize - bundleSize
+	if rounded < firstStreamableBlock {
+		return firstStreamableBlock
+	}
+	return rounded
 }
 
 func (s *StreamFactory) GetHeadBlock() (uint64, error) {

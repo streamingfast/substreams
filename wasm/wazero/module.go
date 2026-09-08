@@ -6,7 +6,9 @@ import (
 	"os"
 	"path"
 	"sync"
+	"time"
 
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/tetratelabs/wazero"
@@ -80,7 +82,11 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 	if err != nil {
 		return nil, err
 	}
-	hostModules = append(hostModules, envModule, stateModule, loggerModule)
+	contextModule, err := AddHostFunctions(ctx, runtime, "context", ContextFuncs)
+	if err != nil {
+		return nil, err
+	}
+	hostModules = append(hostModules, envModule, stateModule, loggerModule, contextModule)
 
 	// TODO: where to `Close()` the `runtime` here?
 	// One runtime per request?
@@ -269,14 +275,27 @@ func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry
 					data := readBytes(inst, ptr, length)
 					call := wasm.FromContext(ctx)
 
-					metricID := reqctx.WasmExtensionReqStats(ctx).RecordModuleWasmExternalCallBegin(call.ModuleName, fmt.Sprintf("%s:%s", namespace, importName))
+					extension := fmt.Sprintf("%s:%s", namespace, importName)
+					extStats := reqctx.WasmExtensionReqStats(ctx)
 
+					metricID := extStats.RecordModuleWasmExternalCallBegin(call.ModuleName, extension, call.Clock.GetNumber())
+
+					startTime := time.Now()
 					out, err := f(ctx, reqctx.Details(ctx).UniqueIDString(), call.Clock, data)
+					elapsed := time.Since(startTime)
+					// The call must be closed on every path, including errors, otherwise the in-process
+					// entry leaks and keeps inflating the reported external call duration forever.
+					extStats.RecordModuleWasmExternalCallEnd(call.ModuleName, extension, metricID, err)
+
+					outcome := metrics.WasmExtensionCallOutcomeSuccess
+					if err != nil {
+						outcome = metrics.WasmExtensionCallOutcomeError
+					}
+					metrics.RecordWasmExtensionCall(reqctx.Details(ctx).IsTier2Request, extension, outcome, elapsed)
+
 					if err != nil {
 						panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, importName, err))
 					}
-
-					reqctx.WasmExtensionReqStats(ctx).RecordModuleWasmExternalCallEnd(call.ModuleName, fmt.Sprintf("%s:%s", namespace, importName), metricID)
 
 					if ctx.Err() == context.Canceled {
 						// Sometimes long-running extensions will come back to a canceled context.

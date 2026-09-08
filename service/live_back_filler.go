@@ -84,7 +84,10 @@ func RequestBackProcessing(ctx context.Context, logger *zap.Logger, startBlock u
 		return nil
 	})
 
-	jobResult <- err
+	select {
+	case jobResult <- err:
+	case <-ctx.Done():
+	}
 }
 
 func requestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingRequest *pbssinternal.ProcessRangeRequest, clientFactory client.InternalClientFactory) error {
@@ -94,6 +97,11 @@ func requestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingR
 	if err != nil {
 		return fmt.Errorf("failed to create live cache grpc client: %w", err)
 	}
+	defer func() {
+		if err := closeFunc(); err != nil {
+			logger.Warn("closing client connection", zap.Error(err))
+		}
+	}()
 
 	if headers.IsSet() {
 		ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
@@ -103,6 +111,11 @@ func requestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingR
 	if err != nil {
 		return fmt.Errorf("getting stream: %w", err)
 	}
+	defer func() {
+		if err := stream.CloseSend(); err != nil {
+			logger.Warn("closing stream", zap.Error(err))
+		}
+	}()
 
 	for {
 		_, err = stream.Recv()
@@ -113,17 +126,6 @@ func requestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingR
 			return err
 		}
 	}
-
-	defer func() {
-		if err = stream.CloseSend(); err != nil {
-			logger.Warn("closing stream", zap.Error(err))
-		}
-		if err = closeFunc(); err != nil {
-			logger.Warn("closing stream", zap.Error(err))
-		}
-	}()
-
-	closeFunc()
 
 	return nil
 }
@@ -149,7 +151,7 @@ func (l *LiveBackFiller) Start(ctx context.Context) {
 	var jobFailed bool
 	var jobProcessing bool
 	var blockNumber uint64
-	jobResult := make(chan error)
+	jobResult := make(chan error, 1)
 	for {
 		select {
 		case <-ctx.Done():

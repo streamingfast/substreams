@@ -43,10 +43,21 @@ type Scheduler struct {
 	delayedScheduleNextJob bool
 	tracer                 ttrace.Tracer
 
+	// missingFileSegment / missingFileSince track how long the ExecOutWalker has
+	// been waiting for the current segment's output file. A file still missing
+	// after missingExecOutFileTimeout while its unit is marked done was deleted
+	// after being written; the job is re-run instead of waiting forever.
+	missingFileSegment int
+	missingFileSince   time.Time
+
 	// debugState mirrors SUBSTREAMS_DEBUG_SCHEDULER_STATE, read once here instead
 	// of calling os.Getenv (which takes a runtime lock) on every Update message.
 	debugState bool
 }
+
+// missingExecOutFileTimeout is how long the walker tolerates a missing output file
+// for a segment whose job already completed before re-running that job.
+const missingExecOutFileTimeout = 30 * time.Second
 
 func New(ctx context.Context, stream *response.Stream) *Scheduler {
 	logger := reqctx.Logger(ctx).Named("scheduler")
@@ -64,6 +75,10 @@ func New(ctx context.Context, stream *response.Stream) *Scheduler {
 
 func (s *Scheduler) Init() loop.Cmd {
 	var cmds []loop.Cmd
+
+	// Surfaced as the request's phase: until that segment lands, the blocks the client gets
+	// come from a worker rather than from the cache.
+	reqctx.ReqStats(s.ctx).RecordStreamingFirstSegment(s.StreamFirstTier2MapSegment)
 
 	if s.StreamFirstTier2MapSegment {
 		cmds = append(cmds, execout.CmdWaitFirstTier2MapSegmentStreamed(250*time.Millisecond))
@@ -121,6 +136,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		s.delayedScheduleNextJob = false
 		if msg.Streamed {
 			s.firstTier2MapSegmentStreamed = true
+			reqctx.ReqStats(s.ctx).RecordStreamingFirstSegment(false)
 		}
 
 		tryMerge := s.Stages.CmdTryMerge(msg.Unit.Stage)
@@ -162,12 +178,15 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			if current < first {
 				current = first // cover for execoutwalker initialisation
 			}
-			// if we have 10 maxParallelJobs, we don't schedule jobs more than 15 segments ahead of the execout walker (1.5x)
+			// if we have 10 maxParallelJobs, we don't schedule jobs more than 20 segments ahead of the execout walker (2x)
 			// This way, a client reading blocks very slowly will not cause the parallel processing of millions of blocks
-			notAboveSegment = current + int(reqctx.Details(s.ctx).MaxParallelJobs)*3/2
+			notAboveSegment = current + int(reqctx.Details(s.ctx).MaxParallelJobs)*2
 		}
 
 		workUnit, workRange, skippedAboveSegment := s.Stages.NextJob(notAboveSegment)
+		// Surfaced in the periodic request progress log: jobs held back here mean the
+		// consumer, not the processing, is setting the pace.
+		reqctx.ReqStats(s.ctx).RecordJobSchedulingBlocked(skippedAboveSegment)
 		if workRange == nil { // no job ready
 			if !skippedAboveSegment {
 				s.logger.Debug("no next job available and not skipped above segment, returning nil (potential deadlock point)",
@@ -196,6 +215,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			s.Stages.ReleaseJob(workUnit)
 			if errors.Is(err, work.ErrorResourceExhausted) {
 				s.logger.Debug("resource exhausted", zap.Error(err))
+				if stats := reqctx.ReqStatsOrNil(s.ctx); stats != nil {
+					stats.RecordWorkerPoolExhausted()
+				}
 				if s.delayedScheduleNextJob {
 					s.logger.Debug("skipping delayed schedule next job")
 					return nil
@@ -207,6 +229,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 				})
 			} else if errors.Is(err, work.ErrorResourceExhaustedRampUp) {
 				s.logger.Debug("resource exhausted ramp up", zap.Error(err))
+				if stats := reqctx.ReqStatsOrNil(s.ctx); stats != nil {
+					stats.RecordWorkerPoolRampUpDeferred()
+				}
 
 				if s.delayedScheduleNextJob {
 					s.logger.Debug("skipping ramp up delayed schedule next job")
@@ -269,6 +294,17 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			zap.Duration("next_wait", msg.NextWait),
 		)
 		s.ExecOutWalker.MarkNotWorking()
+		if current != s.missingFileSegment || s.missingFileSince.IsZero() {
+			s.missingFileSegment = current
+			s.missingFileSince = time.Now()
+		} else if time.Since(s.missingFileSince) > missingExecOutFileTimeout && s.Stages.ReprocessMapSegment(current) {
+			s.logger.Warn("execout file still missing for a completed segment, re-running its job",
+				zap.Int("segment", current),
+				zap.Duration("missing_for", time.Since(s.missingFileSince)),
+			)
+			s.missingFileSince = time.Now()
+			cmds = append(cmds, work.CmdScheduleNextJob("execout file missing"))
+		}
 		cmds = append(cmds, execout.CmdDownloadSegment(msg.NextWait))
 
 	case execout.MsgFileReadTransientError:

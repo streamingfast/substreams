@@ -57,6 +57,9 @@ type Store interface {
 
 type QuickLoad interface {
 	QuickLoad(ctx context.Context, atBlock bstream.BlockRef) error
+	QuickLoadOpen(ctx context.Context, atBlock bstream.BlockRef) error
+	QuickLoadFinish(ctx context.Context, atBlock bstream.BlockRef) error
+	QuickLoadClose()
 }
 
 type QuickSave interface {

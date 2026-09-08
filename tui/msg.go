@@ -2,7 +2,6 @@ package tui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
 type msg int
@@ -19,9 +18,6 @@ func (ui *TUI) Connecting() {
 }
 func (ui *TUI) Connected() {
 	ui.send(Connected)
-}
-func (ui *TUI) SetRequest(req *pbsubstreamsrpc.Request) {
-	ui.send(req)
 }
 func (ui *TUI) send(msg tea.Msg) {
 	if ui.prog != nil {

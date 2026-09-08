@@ -120,6 +120,29 @@ Note the `:` separator that signifies to use the imported namespace, as defined 
 
 The filename can be absolute or relative or a remote path prefixed by `http://` or `https://`. It can also be an IPFS reference.
 
+### Environment variables
+
+A handful of manifest fields support environment variable expansion using the `$VAR` or `${VAR}` syntax:
+
+- `imports` locations
+- `protobuf.importPaths`
+- the `foundational-store` module input
+
+This is convenient to author a manifest with a placeholder that is filled in later, for example a hosted-store deployment id:
+
+```yaml
+modules:
+  - name: my_module
+    inputs:
+      - foundational-store: $DEPLOYMENT_ID
+```
+
+Expansion happens when the manifest is packed or loaded. If a referenced variable is not set in the environment, the operation fails with an error rather than substituting an empty value.
+
+{% hint style="warning" %}
+**Caveat**: Environment variable expansion is a convenience that applies only while reading the manifest. The generated `.spkg` always embeds the resolved, hard-coded value — never the `$VAR` reference. Re-packaging in a different environment is what changes the resolved value.
+{% endhint %}
+
 ### `protobuf`
 
 The `protobuf` section points to the Google Protocol Buffer (protobuf) definitions used by the Rust modules in the Substreams module.

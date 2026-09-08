@@ -95,6 +95,7 @@ type ProcessRangeRequest struct {
 	EthCallFallbackToLatestDuration int64             `protobuf:"varint,19,opt,name=eth_call_fallback_to_latest_duration,json=ethCallFallbackToLatestDuration,proto3" json:"eth_call_fallback_to_latest_duration,omitempty"` // if non-zero, above this duration in nanoseconds, the eth_calls will use "latest" instead of block ref. It will also automatically retry 'block not found' with 'latest'. It has precedence over eth_call_fallback_to_number_duration.
 	EthCallFallbackToNumberDuration int64             `protobuf:"varint,20,opt,name=eth_call_fallback_to_number_duration,json=ethCallFallbackToNumberDuration,proto3" json:"eth_call_fallback_to_number_duration,omitempty"` // if non-zero, above this duration in nanoseconds, the eth_calls will use block number instead of block hash
 	StoreSizeLimit                  uint64            `protobuf:"varint,21,opt,name=store_size_limit,json=storeSizeLimit,proto3" json:"store_size_limit,omitempty"`                                                          // if non-zero, overrides the default store size limit (in bytes) for stores loaded during this request
+	MergedBlocksBundleSize          uint64            `protobuf:"varint,22,opt,name=merged_blocks_bundle_size,json=mergedBlocksBundleSize,proto3" json:"merged_blocks_bundle_size,omitempty"`                                // number of blocks per merged-blocks file in merged_blocks_store (0 means the default of 100)
 	unknownFields                   protoimpl.UnknownFields
 	sizeCache                       protoimpl.SizeCache
 }
@@ -259,6 +260,13 @@ func (x *ProcessRangeRequest) GetEthCallFallbackToNumberDuration() int64 {
 func (x *ProcessRangeRequest) GetStoreSizeLimit() uint64 {
 	if x != nil {
 		return x.StoreSizeLimit
+	}
+	return 0
+}
+
+func (x *ProcessRangeRequest) GetMergedBlocksBundleSize() uint64 {
+	if x != nil {
+		return x.MergedBlocksBundleSize
 	}
 	return 0
 }
@@ -607,12 +615,26 @@ func (x *ModuleStats) GetStoreSizeBytes() uint64 {
 }
 
 type ExternalCallMetric struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Count         uint64                 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
-	TimeMs        uint64                 `protobuf:"varint,3,opt,name=time_ms,json=timeMs,proto3" json:"time_ms,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// count is every call that was started, including those still waiting for an answer.
+	Count uint64 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	// time_ms includes the time already spent by calls that have not returned yet, so a call
+	// hung against an unreachable endpoint shows up as time spent rather than as nothing at all.
+	TimeMs uint64 `protobuf:"varint,3,opt,name=time_ms,json=timeMs,proto3" json:"time_ms,omitempty"`
+	// failed_count is how many of those calls came back with an error. A tier2 keeps retrying
+	// them internally, so without this tier1 only learns of a failing endpoint once the whole
+	// segment gives up, minutes later.
+	FailedCount uint64 `protobuf:"varint,4,opt,name=failed_count,json=failedCount,proto3" json:"failed_count,omitempty"`
+	// in_flight_count is how many calls are still waiting for an answer right now.
+	InFlightCount uint64 `protobuf:"varint,5,opt,name=in_flight_count,json=inFlightCount,proto3" json:"in_flight_count,omitempty"`
+	// oldest_in_flight_ms is how long the oldest of them has been waiting.
+	OldestInFlightMs uint64 `protobuf:"varint,6,opt,name=oldest_in_flight_ms,json=oldestInFlightMs,proto3" json:"oldest_in_flight_ms,omitempty"`
+	// oldest_in_flight_block is the block that call was made on, which is where processing is
+	// stuck for as long as it does not return.
+	OldestInFlightBlock uint64 `protobuf:"varint,7,opt,name=oldest_in_flight_block,json=oldestInFlightBlock,proto3" json:"oldest_in_flight_block,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *ExternalCallMetric) Reset() {
@@ -662,6 +684,34 @@ func (x *ExternalCallMetric) GetCount() uint64 {
 func (x *ExternalCallMetric) GetTimeMs() uint64 {
 	if x != nil {
 		return x.TimeMs
+	}
+	return 0
+}
+
+func (x *ExternalCallMetric) GetFailedCount() uint64 {
+	if x != nil {
+		return x.FailedCount
+	}
+	return 0
+}
+
+func (x *ExternalCallMetric) GetInFlightCount() uint64 {
+	if x != nil {
+		return x.InFlightCount
+	}
+	return 0
+}
+
+func (x *ExternalCallMetric) GetOldestInFlightMs() uint64 {
+	if x != nil {
+		return x.OldestInFlightMs
+	}
+	return 0
+}
+
+func (x *ExternalCallMetric) GetOldestInFlightBlock() uint64 {
+	if x != nil {
+		return x.OldestInFlightBlock
 	}
 	return 0
 }
@@ -845,7 +895,8 @@ var File_sf_substreams_intern_v2_service_proto protoreflect.FileDescriptor
 
 const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"\n" +
-	"%sf/substreams/intern/v2/service.proto\x12\x19sf.substreams.internal.v2\x1a\x19google/protobuf/any.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\"\xcc\t\n" +
+	"%sf/substreams/intern/v2/service.proto\x12\x19sf.substreams.internal.v2\x1a\x19google/protobuf/any.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\"\x87\n" +
+	"\n" +
 	"\x13ProcessRangeRequest\x12(\n" +
 	"\x0estop_block_num\x18\x02 \x01(\x04B\x02\x18\x01R\fstopBlockNum\x12#\n" +
 	"\routput_module\x18\x03 \x01(\tR\foutputModule\x123\n" +
@@ -868,7 +919,8 @@ const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"\x1cfoundational_store_endpoints\x18\x12 \x03(\v2N.sf.substreams.internal.v2.ProcessRangeRequest.FoundationalStoreEndpointsEntryR\x1afoundationalStoreEndpoints\x12M\n" +
 	"$eth_call_fallback_to_latest_duration\x18\x13 \x01(\x03R\x1fethCallFallbackToLatestDuration\x12M\n" +
 	"$eth_call_fallback_to_number_duration\x18\x14 \x01(\x03R\x1fethCallFallbackToNumberDuration\x12(\n" +
-	"\x10store_size_limit\x18\x15 \x01(\x04R\x0estoreSizeLimit\x1aG\n" +
+	"\x10store_size_limit\x18\x15 \x01(\x04R\x0estoreSizeLimit\x129\n" +
+	"\x19merged_blocks_bundle_size\x18\x16 \x01(\x04R\x16mergedBlocksBundleSize\x1aG\n" +
 	"\x19WasmExtensionConfigsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aM\n" +
@@ -900,11 +952,15 @@ const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"\x11store_write_count\x18\n" +
 	" \x01(\x04R\x0fstoreWriteCount\x128\n" +
 	"\x18store_deleteprefix_count\x18\v \x01(\x04R\x16storeDeleteprefixCount\x12(\n" +
-	"\x10store_size_bytes\x18\f \x01(\x04R\x0estoreSizeBytes\"W\n" +
+	"\x10store_size_bytes\x18\f \x01(\x04R\x0estoreSizeBytes\"\x86\x02\n" +
 	"\x12ExternalCallMetric\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05count\x18\x02 \x01(\x04R\x05count\x12\x17\n" +
-	"\atime_ms\x18\x03 \x01(\x04R\x06timeMs\"\xbc\x01\n" +
+	"\atime_ms\x18\x03 \x01(\x04R\x06timeMs\x12!\n" +
+	"\ffailed_count\x18\x04 \x01(\x04R\vfailedCount\x12&\n" +
+	"\x0fin_flight_count\x18\x05 \x01(\x04R\rinFlightCount\x12-\n" +
+	"\x13oldest_in_flight_ms\x18\x06 \x01(\x04R\x10oldestInFlightMs\x123\n" +
+	"\x16oldest_in_flight_block\x18\a \x01(\x04R\x13oldestInFlightBlock\"\xbc\x01\n" +
 	"\tCompleted\x12W\n" +
 	"\x14all_processed_ranges\x18\x01 \x03(\v2%.sf.substreams.internal.v2.BlockRangeR\x12allProcessedRanges\x12)\n" +
 	"\x10processed_blocks\x18\x03 \x01(\x04R\x0fprocessedBlocks\x12%\n" +

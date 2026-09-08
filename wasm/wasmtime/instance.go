@@ -3,9 +3,11 @@ package wasmtime
 import (
 	"context"
 	"fmt"
+	"time"
 
 	wasmtime "github.com/bytecodealliance/wasmtime-go/v41"
 
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/wasm"
 )
@@ -39,16 +41,30 @@ func (i *instance) Cleanup(_ context.Context) error {
 	return nil
 }
 
-func (i *instance) newExtensionFunction(ctx context.Context, namespace, name string, f wasm.WASMExtension) interface{} {
+func (i *instance) newExtensionFunction(ctx context.Context, namespace, name string, f wasm.WASMExtension) any {
 	return func(ptr, length, outputPtr int32) {
 		data := i.Heap.ReadBytes(ptr, length)
 
-		metricID := reqctx.WasmExtensionReqStats(ctx).RecordModuleWasmExternalCallBegin(i.CurrentCall.ModuleName, fmt.Sprintf("%s:%s", namespace, name))
+		extension := fmt.Sprintf("%s:%s", namespace, name)
+		extStats := reqctx.WasmExtensionReqStats(ctx)
+
+		metricID := extStats.RecordModuleWasmExternalCallBegin(i.CurrentCall.ModuleName, extension, i.CurrentCall.Clock.GetNumber())
+		startTime := time.Now()
 		out, err := f(ctx, reqctx.Details(ctx).UniqueIDString(), i.CurrentCall.Clock, data)
+		elapsed := time.Since(startTime)
+		// The call must be closed on every path, including errors, otherwise the in-process
+		// entry leaks and keeps inflating the reported external call duration forever.
+		extStats.RecordModuleWasmExternalCallEnd(i.CurrentCall.ModuleName, extension, metricID, err)
+
+		outcome := metrics.WasmExtensionCallOutcomeSuccess
+		if err != nil {
+			outcome = metrics.WasmExtensionCallOutcomeError
+		}
+		metrics.RecordWasmExtensionCall(reqctx.Details(ctx).IsTier2Request, extension, outcome, elapsed)
+
 		if err != nil {
 			panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, name, err))
 		}
-		reqctx.WasmExtensionReqStats(ctx).RecordModuleWasmExternalCallEnd(i.CurrentCall.ModuleName, fmt.Sprintf("%s:%s", namespace, name), metricID)
 
 		// It's unclear if WASMExtension implementor will correctly handle the context canceled case, as a safety
 		// measure, we check if the context was canceled without being handled correctly and stop here.
@@ -72,6 +88,10 @@ func (i *instance) newImports() error {
 	err = i.registerStateImports(linker)
 	if err != nil {
 		return fmt.Errorf("registering state imports: %w", err)
+	}
+	err = i.registerContextImports(linker)
+	if err != nil {
+		return fmt.Errorf("registering context imports: %w", err)
 	}
 
 	if err = linker.FuncWrap("env", "register_panic",
@@ -122,7 +142,7 @@ func (i *instance) registerLoggerImports(linker *wasmtime.Linker) error {
 }
 
 func (i *instance) registerStateImports(linker *wasmtime.Linker) error {
-	functions := map[string]interface{}{}
+	functions := map[string]any{}
 	functions["set"] = i.set
 	functions["set_if_not_exists"] = i.setIfNotExists
 	functions["append"] = i.append

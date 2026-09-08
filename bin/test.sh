@@ -18,10 +18,15 @@ main() {
   set -e
 
   go test ./... "$@"
-  # commented while they don't work on github for now
+
+  # tests_e2e is its own Go module, so `go test ./...` above never reaches it. It stays
+  # out of this script until it passes on Linux: the node writes root-owned files into
+  # the bind-mounted t.TempDir, which fails every container test's cleanup on a CI
+  # runner. See the fix/tests-e2e-on-linux branch.
+  #
   # pushd tests_e2e &> /dev/null
   # go test ./... "$@"
-  # popd
+  # popd &> /dev/null
 }
 
 usage_error() {

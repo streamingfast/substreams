@@ -400,7 +400,7 @@ func TestHandleStepPartial(t *testing.T) {
 				case bstream.StepPartial, bstream.StepNewPartial: // we always have partial blocks active here
 					err = pipe.handleStepPartial(ctx, clock, testCursor(blk.blk, blk.step), execOutput, blk.blk.PreviousRef(), blk.blk.PartialIndex, blk.blk.LastPartial)
 				case bstream.StepUndo, bstream.StepUndoPartial:
-					err = pipe.handleStepUndo(clock, testCursor(blk.blk, blk.step), blk.junction)
+					err = pipe.handleStepUndo(ctx, clock, testCursor(blk.blk, blk.step), blk.junction)
 				}
 				require.NoError(t, err)
 			}

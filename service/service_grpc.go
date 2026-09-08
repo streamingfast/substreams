@@ -48,6 +48,7 @@ func grpcServer(
 	pbsubstreamsrpc.RegisterStreamServer(server.ServiceRegistrar(), service)
 	pbsubstreamsrpcv3.RegisterStreamServer(server.ServiceRegistrar(), &v3Adapter{service})
 	pbsubstreamsrpcv4.RegisterStreamServer(server.ServiceRegistrar(), &v4Adapter{service})
+	pbsubstreamsrpcv4.RegisterEstimatorServer(server.ServiceRegistrar(), service)
 	if infoService != nil {
 		pbsubstreamsrpc.RegisterEndpointInfoServer(server.ServiceRegistrar(), infoService)
 	}
@@ -92,6 +93,17 @@ func (s *Tier1Service) BlocksV4(req *pbsubstreamsrpcv3.Request, srv pbsubstreams
 	header := metadataToHeader(ctx)
 	protocol := "/sf.substreams.rpc.v3.Stream/Blocks"
 	return s.BlocksAnyGrpc(ctx, v2req, header, protocol, req.Package, srv, true)
+}
+
+// Estimate implements the sf.substreams.rpc.v4.Estimator service over gRPC.
+func (s *Tier1Service) Estimate(req *pbsubstreamsrpcv4.EstimateRequest, srv grpc.ServerStreamingServer[pbsubstreamsrpcv4.EstimateResponse]) error {
+	ctx := srv.Context()
+	err := s.estimate(ctx, req, metadataToHeader(ctx), srv.Send)
+	if grpcErr := toGrpcTier1Error(ctx, err); grpcErr != nil {
+		s.logger.Debug("Estimate request completed with error", zap.Error(grpcErr))
+		return grpcErr
+	}
+	return nil
 }
 
 func (s *Tier1Service) BlocksAnyGrpc(

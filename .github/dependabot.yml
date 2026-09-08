@@ -16,3 +16,17 @@ updates:
     groups:
       all:
         patterns: ["*"]
+  # Test/bench fixture crates — suppress version and security update PRs.
+  - package-ecosystem: "cargo"
+    directories:
+      - "/sink/sql/db_proto/test/substreams/full-block"
+      - "/sink/sql/db_proto/test/substreams/order"
+      - "/tests_e2e/dummy"
+      - "/tests_e2e/partial_blocks_store"
+      - "/wasm/bench/substreams_wasm"
+      - "/wasm/bench/allocator_bench"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: "*"

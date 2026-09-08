@@ -10,6 +10,7 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/index"
+	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
 	ttrace "go.opentelemetry.io/otel/trace"
 )
@@ -163,6 +164,13 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 				return nil, fmt.Errorf("%w: block %d was reverted duing a reorg (UNDO) during an external call, please reconnect", ErrBlockUndo, clock.Number)
 			}
 			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w, %w", clock.Number, e.moduleName, err, ctxErr)
+		}
+		// A store backend failure (disk full, mmap grow/ENOMEM, I/O, closed db) is
+		// infrastructure, not a function of the module's input. It must NOT be
+		// wrapped as ErrWasmDeterministicExec, or callers would cache it as a
+		// deterministic error and serve it to every consumer instead of retrying.
+		if errors.Is(err, store.ErrStoreBackendFailure) {
+			return nil, fmt.Errorf("block %d: module %q: %w", clock.Number, e.moduleName, err)
 		}
 		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleName, wasm.ErrWasmDeterministicExec, err)
 	}

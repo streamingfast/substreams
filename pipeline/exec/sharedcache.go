@@ -163,7 +163,9 @@ func (s *SharedCache) Execute(
 		}
 
 		inst, err := wasmModule.ExecuteNewCall(ctx, call, nil, wasmArguments, argValues)
-		inst.Close(ctx)
+		if inst != nil {
+			inst.Close(ctx)
+		}
 		result.updateFromCall(call, err)
 		result.metricsGatherer.ApplyToStats(reqctx.ReqStats(originalContext))
 

@@ -1,0 +1,173 @@
+syntax = "proto3";
+import "google/protobuf/descriptor.proto";
+import "google/protobuf/timestamp.proto";
+
+import "sf/substreams/sink/sql/schema/v1/schema.proto";
+
+package test.relations;
+option go_package = "test/relations";
+
+
+message Output {
+  repeated Entity entities = 1;
+}
+
+
+message Entity {
+
+  oneof entity {
+    TypesTest types_test =1;
+
+    Customer customer = 10;
+    Order order = 11;
+    Item item = 12;
+  }
+}
+
+message TypesTest {
+  option (schema.table) = {
+    name: "types_tests"
+    clickhouse_table_options: {
+      order_by_fields: [{name: "id"}]
+    }
+  };
+
+
+  uint64 id =1 [(schema.field) = { primary_key: true }];
+  // Field for each protobuf native type
+  double double_field = 2;
+  float float_field = 3;
+  int32 int32_field = 4;
+  int64 int64_field = 5;
+  uint32 uint32_field = 6;
+  uint64 uint64_field = 7;
+  sint32 sint32_field = 8;
+  sint64 sint64_field = 9;
+  fixed32 fixed32_field = 10;
+  fixed64 fixed64_field = 11;
+  sfixed32 sfixed32_field = 12;
+  sfixed64 sfixed64_field = 13;
+  bool bool_field = 14;
+  string string_field = 15;
+  bytes bytes_field = 16;
+
+  optional string optional_string_set = 17;
+  optional string optional_string_not_set = 18;
+  optional int32 optional_int32_field_set = 19;
+  optional int32 optional_int32_field_not_set = 20;
+
+
+  google.protobuf.Timestamp timestamp_field = 30;
+
+  // Array fields for all supported proto types
+  repeated int32 repeated_int32_field = 50;
+  repeated int64 repeated_int64_field = 51;
+  repeated uint32 repeated_uint32_field = 52;
+  repeated uint64 repeated_uint64_field = 53;
+  repeated sint32 repeated_sint32_field = 54;
+  repeated sint64 repeated_sint64_field = 55;
+  repeated fixed32 repeated_fixed32_field = 56;
+  repeated fixed64 repeated_fixed64_field = 57;
+  repeated sfixed32 repeated_sfixed32_field = 58;
+  repeated sfixed64 repeated_sfixed64_field = 59;
+  repeated double repeated_double_field = 60;
+  repeated float repeated_float_field = 61;
+  repeated bool repeated_bool_field = 62;
+  repeated string repeated_string_field = 63;
+
+  string str_2_int128 = 100 [(schema.field) = { convertTo: { int128{} }}];
+  string str_2_uint128 = 101 [(schema.field) = { convertTo: { uint128 {} }}];
+
+  string str_2_int256 = 102 [(schema.field) = { convertTo: { int256{} }}];
+  string str_2_uint256 = 103 [(schema.field) = { convertTo: { uint256{}} }];
+
+  string str_2_decimal128 = 104 [(schema.field) = { convertTo: { decimal128{ scale: 4 }}}];
+  string str_2_decimal256 = 105 [(schema.field) = { convertTo: { decimal256{ scale: 4 }}}];
+
+  // Optional uint256 field to test empty string handling
+  optional string optional_str_2_uint256 = 106 [(schema.field) = { convertTo: { uint256{}} }];
+
+  NestedLevel1 level1 = 200 [(schema.field) = {inline: true}];
+  repeated NestedLevel1 list_of_level1 = 201 [(schema.field) = {inline: true}];
+
+}
+
+message Customer {
+  option (schema.table) = {
+    name: "customers"
+    clickhouse_table_options: {
+      order_by_fields: [{name: "customer_id"}]
+    }
+  };
+
+
+  string customer_id = 1 [(schema.field) = { primary_key: true }];
+  string name = 2;
+}
+
+message Order {
+  option (schema.table) = {
+    name: "orders"
+    clickhouse_table_options: {
+      order_by_fields: [{name: "order_id"}, {name: "customer_ref_id"}]
+      index_fields: [{
+        field_name: "order_id"
+        name: "order_id_idx"
+        type: bloom_filter
+        granularity: 4
+      }]
+    }
+  };
+
+
+  string order_id = 1 [(schema.field) = {  primary_key: true}];
+  string customer_ref_id = 2 [(schema.field) = { foreign_key: "customers on customer_id"}];
+  repeated OrderItem items = 3;
+  OrderExtension extension = 4;
+}
+
+message NestedLevel1 {
+  string name = 1;
+  string desc = 2;
+}
+
+message OrderExtension {
+  option (schema.table) = {
+    name: "order_extensions",
+    child_of: "orders on order_id"
+    clickhouse_table_options: {
+      order_by_fields: [{name: "order_id"}],
+      partition_fields: [{name: "_block_timestamp_", function: toYYYYDD}]
+    }
+  };
+  string description = 1;
+}
+
+message OrderItem {
+  option (schema.table) = {
+    name: "order_items",
+    child_of: "orders on order_id"
+    clickhouse_table_options: {
+      order_by_fields: [{name: "order_id"}, {name: "item_id"}]
+    }
+  };
+
+  // can also leverage orders._id using "order on order_id" if order do not have a external unique identifier
+  string item_id = 2 [(schema.field) = { foreign_key: "items on item_id"}];
+  int64 quantity = 11;
+}
+
+message Item {
+  option (schema.table) = {
+    name: "items"
+    clickhouse_table_options: {
+      order_by_fields: [{name: "item_id"}]
+    }
+  };
+
+
+  string item_id = 1 [(schema.field) = { unique: true }];
+
+  string name = 10;
+  double price = 11;
+}

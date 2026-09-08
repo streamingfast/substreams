@@ -3,6 +3,7 @@ package pipeline
 import (
 	"github.com/streamingfast/substreams"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	"github.com/streamingfast/substreams/storage/execout"
 )
 
 type Option func(p *Pipeline)
@@ -48,5 +49,13 @@ func WithHighestStage(stage uint32) Option {
 	return func(p *Pipeline) {
 		s := int(stage)
 		p.highestStage = &s
+	}
+}
+
+// WithExecOutPrefetch bounds how far ahead tier1 downloads cached execution
+// output files while streaming them to the client.
+func WithExecOutPrefetch(cfg execout.PrefetchConfig) Option {
+	return func(p *Pipeline) {
+		p.execOutPrefetch = cfg
 	}
 }

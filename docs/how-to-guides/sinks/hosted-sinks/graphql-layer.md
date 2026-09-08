@@ -4,7 +4,7 @@
 **Hosted Sinks is currently in beta.** The service is under active development and changes may occur. To stay up to date with the latest information, join our [Discord Server](https://discord.gg/jZwqxJAvRs) and follow the **#announcements** channel.
 {% endhint %}
 
-The **GraphQL layer** serves a read-only GraphQL API over the database your [Hosted Sink](./hosted-sinks.md) writes into. It is powered by [Hasura](https://hasura.io/) and lets you query your indexed data over HTTP, and browse it in a console, without standing up an API server of your own.
+The **GraphQL layer** serves a read-only GraphQL API over the database your [Hosted Sink](../../hosted-services/hosted-sinks.md) writes into. It is powered by [Hasura](https://hasura.io/) and lets you query your indexed data over HTTP, and browse it in a console, without standing up an API server of your own.
 
 The layer is a separate deployment that reads the same database as the sink. You can add it or remove it at any time without touching the pipeline: the sink keeps writing exactly as before. In the portal it appears alongside the sink it serves, labeled **GraphQL**.
 

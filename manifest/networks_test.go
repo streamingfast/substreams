@@ -5,6 +5,7 @@ import (
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMergeNetwork(t *testing.T) {
@@ -116,6 +117,26 @@ func TestMergeNetwork(t *testing.T) {
 		})
 	}
 
+}
+
+func TestApplyNetwork_rejectsInitialBlockForUnknownModule(t *testing.T) {
+	pkg := &pbsubstreams.Package{
+		Network: "mainnet",
+		Modules: &pbsubstreams.Modules{
+			Modules: []*pbsubstreams.Module{
+				{Name: "mod1"},
+			},
+		},
+		Networks: map[string]*pbsubstreams.NetworkParams{
+			"mainnet": {InitialBlocks: map[string]uint64{"mod11": 500}},
+		},
+	}
+
+	err := ApplyNetwork("mainnet", pkg)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `"mod11"`)
+	assert.Contains(t, err.Error(), `"mod1"`)
 }
 
 func TestMergeNetworks(t *testing.T) {

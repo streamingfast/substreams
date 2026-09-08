@@ -1,6 +1,6 @@
 # DSN Reference
 
-DSN stands for Data Source Name (or Database Source Name) and defines how to connect to your database. The `substreams-sink-sql` tool expects a URL input that specifies the driver, connection details, and options.
+DSN stands for Data Source Name (or Database Source Name) and defines how to connect to your database. The `substreams sink postgres` / `substreams sink clickhouse` commands expect a URL input (via the `--dsn` flag or the `SUBSTREAMS_SINK_DSN` environment variable) that specifies the driver, connection details, and options.
 
 ## General Format
 
@@ -81,8 +81,8 @@ clickhouse://myuser:mypassword@localhost:9000/mydatabase?compress=true&debug=tru
 |----------------|------|-------------|
 | **Unencrypted** | `9000` | Standard ClickHouse native protocol port |
 | **Encrypted (Cloud)** | `9440` | Native protocol SSL/TLS port for ClickHouse Cloud |
-| **HTTP** | `8123` | HTTP interface (not supported by substreams-sink-sql) |
-| **HTTPS** | `8443` | HTTPS interface (not supported by substreams-sink-sql) |
+| **HTTP** | `8123` | HTTP interface (not supported by the SQL sink) |
+| **HTTPS** | `8443` | HTTPS interface (not supported by the SQL sink) |
 
 ### Supported Options
 
@@ -112,7 +112,7 @@ export DB_USER="myuser"
 export DB_PASS="mypassword"
 export DSN="postgres://${DB_USER}:${DB_PASS}@localhost:5432/mydatabase"
 
-substreams-sink-sql from-proto $DSN ./substreams.yaml
+substreams sink postgres ./substreams.yaml --dsn $DSN
 ```
 
 ## Troubleshooting

@@ -27,7 +27,7 @@ func TestPartialKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 
 	kvs := &PartialKV{
 		baseStore: &baseStore{
-			kv: map[string][]byte{},
+			kvImpl: newMemoryKVImpl(),
 
 			logger:     zap.NewNop(),
 			marshaller: marshaller.Default(),
@@ -47,7 +47,7 @@ func TestPartialKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 
 	kvl := &PartialKV{
 		baseStore: &baseStore{
-			kv: map[string][]byte{},
+			kvImpl: newMemoryKVImpl(),
 
 			logger:     zap.NewNop(),
 			marshaller: marshaller.Default(),
@@ -61,7 +61,7 @@ func TestPartialKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 
 	err = kvl.Load(context.Background(), file)
 	require.NoError(t, err)
-	require.NotNilf(t, kvl.kv, "kvl.kv is nil")
+	require.NotNilf(t, kvl.kvImpl, "kvl.kvImpl is nil")
 }
 
 func TestBigIntConversion(t *testing.T) {

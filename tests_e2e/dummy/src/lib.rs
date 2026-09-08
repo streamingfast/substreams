@@ -9,8 +9,23 @@ use std::str::FromStr;
 use substreams::scalar::BigDecimal;
 #[allow(unused_imports)]
 use substreams::scalar::BigInt;
-use substreams::store::{StoreAdd, StoreAddBigInt, StoreGet, StoreGetBigInt, StoreNew};
+use substreams::store::{
+    FoundationalStore, StoreAdd, StoreAddBigInt, StoreGet, StoreGetBigInt, StoreNew,
+};
 use substreams::skip_empty_output;
+
+use prost::Message;
+use prost_types::Any;
+use substreams::pb::sf::substreams::foundational_store::model::v2::{
+    Entry, Key, ResponseCode, SinkEntries,
+};
+
+// Type URL the hosted store tags our values with. It has to match the "Type URL"
+// given when the store is created, and the one hosted-store.sh seeds with.
+const STORE_VALUE_TYPE_URL: &str = "type.googleapis.com/test.output.StoreValue";
+
+// Key rewritten on every block, so a consumer can tell a live store from a stalled one.
+const LATEST_KEY: &str = "latest";
 
 #[substreams::handlers::map]
 fn map_events(blk: acme::Block) -> Result<pbtest::Events, substreams::errors::Error> {
@@ -186,4 +201,116 @@ fn map_filtered(events: pbtest::Events) -> Result<pbtest::Events, substreams::er
 #[substreams::handlers::map]
 fn map_downstream(events: pbtest::Events) -> Result<pbtest::Events, substreams::errors::Error> {
     Ok(events)
+}
+
+// ---------------------------------------------------------------------------
+// Hosted Store modules
+//
+// map_hosted_store_feed populates a Substreams Feed Hosted Store; the two query
+// modules read one back. The query modules live in substreams.hosted-store.yaml
+// because their store identifier comes from the environment.
+// ---------------------------------------------------------------------------
+
+// Feeds a Substreams Feed Hosted Store. Two entries per block: `block:<height>`,
+// which is written once and never changes, and `latest`, overwritten every block.
+// if_not_exist stays false so `latest` can move.
+#[substreams::handlers::map]
+fn map_hosted_store_feed(blk: acme::Block) -> Result<SinkEntries, substreams::errors::Error> {
+    let header = blk.header.as_ref();
+    let value = pbtest::StoreValue {
+        block_number: header.map_or(0, |h| h.height),
+        block_hash: header.map_or(String::new(), |h| h.hash.clone()),
+        transaction_count: blk.transactions.len() as u64,
+    };
+
+    let any = Any {
+        type_url: STORE_VALUE_TYPE_URL.to_string(),
+        value: value.encode_to_vec(),
+    };
+
+    Ok(SinkEntries {
+        entries: vec![
+            entry(format!("block:{}", value.block_number), any.clone()),
+            entry(LATEST_KEY.to_string(), any),
+        ],
+        if_not_exist: false,
+    })
+}
+
+// Reads back what map_hosted_store_feed wrote, at the block being processed. Against
+// a store fed from the same chain, both keys report RESPONSE_CODE_FOUND on every block.
+#[substreams::handlers::map]
+fn map_query_substreams_feed_store(
+    blk: acme::Block,
+    store: FoundationalStore,
+) -> Result<pbtest::StoreQuery, substreams::errors::Error> {
+    let block_number = blk.header.as_ref().map_or(0, |h| h.height);
+
+    Ok(query(
+        block_number,
+        &store,
+        &[format!("block:{}", block_number), LATEST_KEY.to_string()],
+    ))
+}
+
+// Reads the two fixed keys hosted-store.sh seeds over gRPC. Nothing on-chain writes
+// them, so this is the module that proves the remote-feed path end to end: it hangs
+// until the store is marked ready, then reports FOUND for both keys.
+#[substreams::handlers::map]
+fn map_query_remote_feed_store(
+    blk: acme::Block,
+    store: FoundationalStore,
+) -> Result<pbtest::StoreQuery, substreams::errors::Error> {
+    let block_number = blk.header.as_ref().map_or(0, |h| h.height);
+
+    Ok(query(
+        block_number,
+        &store,
+        &["dummy-key-1".to_string(), "dummy-key-2".to_string()],
+    ))
+}
+
+fn entry(key: String, value: Any) -> Entry {
+    Entry {
+        key: Some(Key {
+            bytes: key.into_bytes(),
+        }),
+        value: Some(value),
+    }
+}
+
+// The store answers one QueriedEntry per requested key, in order, so results are
+// matched back to their key positionally.
+fn query(block_number: u64, store: &FoundationalStore, keys: &[String]) -> pbtest::StoreQuery {
+    let response = store.get(keys);
+
+    let entry = keys
+        .iter()
+        .enumerate()
+        .map(|(index, key)| {
+            let Some(queried) = response.entries.get(index) else {
+                return pbtest::StoreQueryEntry {
+                    key: key.clone(),
+                    code: "NO_ENTRY".to_string(),
+                    ..Default::default()
+                };
+            };
+
+            let any = queried.entry.as_ref().and_then(|e| e.value.as_ref());
+
+            pbtest::StoreQueryEntry {
+                key: key.clone(),
+                code: ResponseCode::try_from(queried.code)
+                    .map(|code| code.as_str_name().to_string())
+                    .unwrap_or_else(|_| format!("UNKNOWN({})", queried.code)),
+                type_url: any.map_or(String::new(), |a| a.type_url.clone()),
+                value: any.and_then(|a| pbtest::StoreValue::decode(a.value.as_slice()).ok()),
+            }
+        })
+        .collect();
+
+    pbtest::StoreQuery {
+        block_number,
+        entry,
+    }
 }

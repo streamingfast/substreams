@@ -23,6 +23,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 var ErrWasmDeterministicExec = errors.New("wasm execution failed deterministically")
@@ -159,11 +160,22 @@ func (c *Call) SetOutputStore(store store.Store) {
 }
 
 const maxLogByteCount = 512 * 1024            // 512 KiB
-const maxTotalLogsByteCount = 5 * 1024 * 1024 // 5 MiB
+const maxTotalLogsByteCount = 2 * 1024 * 1024 // 2 MiB
 var maxTotalLogsByteCountHumanized = humanize.IBytes(maxTotalLogsByteCount)
 
 func (c *Call) ReachedLogsMaxByteCount() bool {
-	return c.LogsByteCount >= maxLogByteCount
+	return c.LogsByteCount >= maxTotalLogsByteCount
+}
+
+// DoClock backs the `context::clock` intrinsic, returning the block clock encoded as a
+// `sf.substreams.v1.Clock` protobuf message.
+func (c *Call) DoClock() []byte {
+	out, err := proto.Marshal(c.Clock)
+	if err != nil {
+		c.PanicNonDeterministicError(fmt.Errorf("marshalling clock: %w", err))
+	}
+
+	return out
 }
 
 func (c *Call) DoSet(ord uint64, key string, value []byte) {

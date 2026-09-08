@@ -106,7 +106,9 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 		return moduleOutput, outputBytes, nil, false, skippableOutput, nil
 	}
 
-	uid := reqctx.ReqStats(ctx).RecordModuleWasmBlockBegin(modName)
+	stats := reqctx.ReqStats(ctx)
+	uid := stats.RecordModuleWasmBlockBegin(modName)
+	defer stats.RecordModuleWasmBlockEnd(modName, uid)
 
 	outputBytes, outputForFiles, moduleOutput, err := executor.run(ctx, execOutput, cachable)
 	switch {
@@ -126,8 +128,6 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	case err != nil:
 		return nil, nil, nil, false, skippableOutput, fmt.Errorf("execute: %w", err)
 	}
-
-	reqctx.ReqStats(ctx).RecordModuleWasmBlockEnd(modName, uid)
 
 	fillModuleOutputMetadata(executor, moduleOutput)
 

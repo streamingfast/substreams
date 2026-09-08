@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -87,6 +88,8 @@ func warnIncompletePackage(spkg *pbsubstreams.Package, config warningsConfig) (w
 	if spkg.Network == "" {
 		warnings = append(warnings, "Network (network) is not set")
 	}
+
+	warnings = append(warnings, manifest.NetworkNameWarnings(spkg)...)
 
 	if len(warnings) > 0 {
 		fmt.Println()

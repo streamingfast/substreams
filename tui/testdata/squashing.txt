@@ -1,0 +1,2 @@
+Backprocessing  █████████░░░░░░░░░░░  45%  0/10 jobs  (1M cached)
+  s0            ██████░░░░░░░░░░░░░░  30%  squashing 35 segments  ·  1,150,000 → 1,500,000

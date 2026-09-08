@@ -113,7 +113,7 @@ func BuildRequestDetailsFromSubrequest(ctx context.Context, request *pbssinterna
 	}
 
 	// note: we don't touch the maxParallelJobs here
-	_, req.MaxStageLayerParallelExecutor = reqctx.GetEffectiveHeaderValues(ctx, nil, 0, reqctx.DefaultMaxStageLayerParallelExecutorCount)
+	req.MaxStageLayerParallelExecutor = reqctx.GetEffectiveHeaderValues(ctx, nil, 0, reqctx.DefaultMaxStageLayerParallelExecutorCount).StageLayerExecutors
 
 	return req
 }
@@ -205,6 +205,7 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 	}
 
 	var undoSignal *pbsubstreamsrpc.BlockUndoSignal
+	requestBlockNum := cursor.Block.Num() // block the client was on, kept for reporting since 'cursor' may be replaced below
 
 	if cursor.Step == bstream.StepPartial && cursor.HeadBlock.Num() < cursor.Block.Num() {
 		// cursors with StepPartial hide the 'parent block' in the 'head block' field
@@ -231,6 +232,9 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 
 	if cursor.IsOnFinalBlock() {
 		nextBlock := cursor.Block.Num() + 1
+		if undoSignal != nil {
+			reportUndoSignal(ctx, "cursor_resolution", requestBlockNum, undoSignal.LastValidBlock.Number, req.StartCursor)
+		}
 		return nextBlock, cursor.ToOpaque(), undoSignal, nil
 	}
 
@@ -244,6 +248,13 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 
 	reorgJunctionBlock, head, err := resolveCursor(resolveCtx, cursor)
 	if err != nil {
+		if errors.Is(err, bstream.ErrCursorAboveHead) {
+			// Not a bad cursor: this instance has not reached that block yet, where the
+			// one that served the client had. An invalid argument would have the client
+			// discard a cursor it should keep, so this is retryable.
+			return 0, "", nil, connect.NewError(connect.CodeUnavailable, fmt.Errorf("cannot resolve StartCursor %q yet: %s", cursor, err.Error()))
+		}
+
 		return 0, "", nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("cannot resolve StartCursor %q: %s", cursor, err.Error()))
 	}
 	resolvedCursor := cursor
@@ -268,6 +279,10 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 		resolvedStartBlockNum = resolvedCursor.Block.Num() + 1
 	case resolvedCursor.Step.Matches(bstream.StepUndo):
 		resolvedStartBlockNum = resolvedCursor.Block.Num()
+	}
+
+	if undoSignal != nil {
+		reportUndoSignal(ctx, "cursor_resolution", requestBlockNum, undoSignal.LastValidBlock.Number, req.StartCursor)
 	}
 
 	return resolvedStartBlockNum, normalizedOpaqueCursor(*resolvedCursor), undoSignal, nil
@@ -298,13 +313,38 @@ func (j *junctionBlockGetter) ProcessBlock(block *pbbstream.Block, obj interface
 
 }
 
-func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStore dstore.Store) CursorResolver {
+func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStore dstore.Store, fileSourceOptions ...bstream.FileSourceOption) CursorResolver {
 	return func(ctx context.Context, cursor *bstream.Cursor) (reorgJunctionBlock, currentHead bstream.BlockRef, err error) {
 		jctBlkGetter := &junctionBlockGetter{}
 		var isFromFile bool
 		src := hub.SourceFromCursor(cursor, jctBlkGetter)
 		if src == nil { // block is out of reversible segment
-			src = bstream.NewFileSourceFromCursor(mergedBlocksStore, forkedBlocksStore, cursor, jctBlkGetter, zap.NewNop())
+			// ...unless it is not: the hub also declines a cursor whose block number it
+			// covers and whose ID it has never seen. Resolving that one from files means
+			// waiting for the merged bundle holding that block number to be written, which
+			// on a chain bundling 100 blocks leaves the stream silent for some twenty
+			// minutes — and the files cannot resolve it when it gets there either. Revert
+			// to the cursor's LIB right away instead, which is what the file source would
+			// have led to.
+			forkedBlocks := bstream.NewFileSourceFactory(mergedBlocksStore, forkedBlocksStore, zap.NewNop())
+			if err := bstream.CheckCursorResolvable(ctx, cursor, hub, forkedBlocks, reqctx.Logger(ctx)); err != nil {
+				// A cursor above the hub's head is the one case that is not the client's
+				// fault: this instance runs behind the one that served it, and the blocks
+				// it names do exist. Surfaced as-is so the request fails retryably rather
+				// than reverting a sink that is ahead of us.
+				if errors.Is(err, bstream.ErrCursorAboveHead) {
+					return nil, nil, err
+				}
+
+				headBlock := cursor.HeadBlock
+				if headNum, headID, _, _, err := hub.HeadInfo(); err == nil {
+					headBlock = bstream.NewBlockRef(headID, headNum)
+				}
+				reqctx.Logger(ctx).Warn("cursor cannot be resolved, reverting to its LIB", zap.Stringer("cursor", cursor), zap.Error(err))
+				return cursor.LIB, headBlock, nil
+			}
+
+			src = bstream.NewFileSourceFromCursor(mergedBlocksStore, forkedBlocksStore, cursor, jctBlkGetter, zap.NewNop(), fileSourceOptions...)
 			isFromFile = true
 		}
 
@@ -319,6 +359,13 @@ func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStor
 			src.Shutdown(ctx.Err())
 			return nil, nil, ctx.Err()
 		case <-src.Terminated():
+			// On cancellation, the shutdown goroutine above may terminate the
+			// source before this select observes ctx.Done(): in that case we
+			// must propagate the cancellation instead of falling through to
+			// the fallback below, which would emit an undo-to-LIB signal.
+			if ctx.Err() != nil {
+				return nil, nil, ctx.Err()
+			}
 		}
 
 		if !errors.Is(src.Err(), ErrDone) {

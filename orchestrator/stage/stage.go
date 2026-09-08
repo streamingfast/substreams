@@ -20,6 +20,11 @@ type Stage struct {
 
 	// allExecutedModules is all the store+mapper executed specifically for this stage
 	allExecutedModules []string
+	// executedStores and executedMappers split allExecutedModules by kind, for reporting.
+	// Index modules are grouped with the mappers, they behave the same from a progress
+	// standpoint.
+	executedStores  []string
+	executedMappers []string
 
 	SquashLock sync.Mutex
 
@@ -33,11 +38,13 @@ type Stage struct {
 	asyncWork *llerrgroup.Group
 }
 
-func NewStage(idx int, kind Kind, segmenter *block.Segmenter, moduleStates []*StoreModuleState, allExecutedModules []string) *Stage {
+func NewStage(idx int, kind Kind, segmenter *block.Segmenter, moduleStates []*StoreModuleState, allExecutedModules, executedStores, executedMappers []string) *Stage {
 	return &Stage{
 		idx:                idx,
 		kind:               kind,
 		allExecutedModules: allExecutedModules,
+		executedStores:     executedStores,
+		executedMappers:    executedMappers,
 		segmenter:          segmenter,
 		segmentCompleted:   segmenter.FirstIndex() - 1,
 		storeModuleStates:  moduleStates,

@@ -23,7 +23,9 @@ func createTestStoreConfig(name string, initialBlock uint64, mockStore dstore.St
 		"string",
 		mockStore,
 		nil, // quickSaveStore
-		0,   // storeSizeLimit: use global default
+		0,
+		"",
+		"",
 	)
 }
 
@@ -222,4 +224,46 @@ func TestConfigureLiveBackFillerFromQuickload_EdgeCases(t *testing.T) {
 		// currentSegment should remain at the lower value
 		assert.Equal(t, initialSegment, backFiller.CurrentSegment())
 	})
+}
+
+func TestWithStoresBackend_BothTiersAligned(t *testing.T) {
+	scratch := t.TempDir() // WithStoresScratchSpace sweeps this dir; keep it real + empty
+
+	t.Run("tier1", func(t *testing.T) {
+		s := &Tier1Service{}
+		WithStoresBackend("mmap")(s)
+		WithStoresScratchSpace(scratch)(s)
+
+		assert.Equal(t, "mmap", s.runtimeConfig.StoresBackend, "tier1 must read backend from WithStoresBackend")
+		assert.Equal(t, scratch, s.runtimeConfig.StoresScratchSpace, "tier1 must read scratch space from WithStoresScratchSpace")
+	})
+
+	t.Run("tier2", func(t *testing.T) {
+		s := &Tier2Service{}
+		WithStoresBackend("mmap")(s)
+		WithStoresScratchSpace(scratch)(s)
+
+		assert.Equal(t, "mmap", s.storesBackend, "tier2 must read backend from WithStoresBackend")
+		assert.Equal(t, scratch, s.storesScratchSpace, "tier2 must read scratch space from WithStoresScratchSpace")
+	})
+
+	// Both tiers must resolve the SAME backend string identically — the whole
+	// point of the alignment. A future divergence (e.g. one tier ignoring the
+	// option) should fail here.
+	t.Run("tiers agree", func(t *testing.T) {
+		for _, backend := range []string{"memory", "mmap"} {
+			t1 := &Tier1Service{}
+			t2 := &Tier2Service{}
+			WithStoresBackend(backend)(t1)
+			WithStoresBackend(backend)(t2)
+			assert.Equal(t, t1.runtimeConfig.StoresBackend, t2.storesBackend,
+				"tier1 and tier2 must resolve backend %q to the same value", backend)
+		}
+	})
+}
+
+func TestLastUsedFilename(t *testing.T) {
+	assert.Equal(t, "last_used", lastUsedFilename(""))
+	assert.Equal(t, "last_used_pro", lastUsedFilename("PRO"))
+	assert.Equal(t, "last_used_enterprise", lastUsedFilename("ENTERPRISE"))
 }

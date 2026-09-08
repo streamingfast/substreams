@@ -18,7 +18,7 @@ Delta updates solve both problems by expressing the update intent declaratively.
 Delta update operations require:
 
 - `substreams-sink-database-changes` Rust crate version **>= 4.0.0**
-- `substreams-sink-sql` version **>= 4.12.0**
+- The SQL sink included in the `substreams` CLI (equivalent to `substreams-sink-sql` **>= 4.12.0**)
 - PostgreSQL as the target database
 
 ## Supported Operations

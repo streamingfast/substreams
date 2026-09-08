@@ -50,6 +50,7 @@ func connectServer(
 	options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv2connect.StreamName))
 	options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv3connect.StreamName))
 	options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv4connect.StreamName))
+	options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv4connect.EstimatorName))
 
 	streamHandlerGetter := func(opts ...connect.HandlerOption) (string, http.Handler) {
 		var o []connect.HandlerOption
@@ -80,7 +81,16 @@ func connectServer(
 		return pbsubstreamsrpcv4connect.NewStreamHandler(handler, o...)
 	}
 
-	handlerGetters := []connectrpc.HandlerGetter{streamHandlerGetter, streamHandlerGetterV3, streamHandlerGetterV4}
+	estimatorHandlerGetter := func(opts ...connect.HandlerOption) (string, http.Handler) {
+		var o []connect.HandlerOption
+		for _, opt := range opts {
+			o = append(o, opt)
+		}
+		o = append(o, compress.WithAll(compress.LevelBalanced))
+		return pbsubstreamsrpcv4connect.NewEstimatorHandler(service, o...)
+	}
+
+	handlerGetters := []connectrpc.HandlerGetter{streamHandlerGetter, streamHandlerGetterV3, streamHandlerGetterV4, estimatorHandlerGetter}
 
 	if infoService != nil {
 		infoHandlerGetter := func(opts ...connect.HandlerOption) (string, http.Handler) {
@@ -185,6 +195,20 @@ func (s *ConnectService) BlocksV4(
 	}
 
 	return s.inner.BlocksAnyConnect(ctx, v2req, req.Header(), pbsubstreamsrpcv3connect.StreamBlocksProcedure, req.Msg.Package, &serverStreamWrapperV4{stream, ctx}, true)
+}
+
+// Estimate implements the sf.substreams.rpc.v4.Estimator service over connect.
+func (s *ConnectService) Estimate(
+	ctx context.Context,
+	req *connect.Request[pbsubstreamsrpcv4.EstimateRequest],
+	stream *connect.ServerStream[pbsubstreamsrpcv4.EstimateResponse],
+) error {
+	err := s.inner.estimate(ctx, req.Msg, req.Header(), stream.Send)
+	if connectError := toConnectError(ctx, err); connectError != nil {
+		s.inner.logger.Debug("Estimate request completed with error", zap.Error(connectError))
+		return connectError
+	}
+	return nil
 }
 
 type serverStreamWrapper struct {

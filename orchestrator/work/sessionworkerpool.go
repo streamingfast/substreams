@@ -39,6 +39,8 @@ type SessionWorkerPool struct {
 	borrowedWorkers      map[string]Worker
 	borrowedWorkersMutex sync.Mutex
 
+	launchQueue *LaunchQueue
+
 	rampingUp         *atomic.Bool
 	rampupWorkerGiven *atomic.Bool
 }
@@ -68,6 +70,7 @@ func NewSessionWorkerPool(
 		sessionKey:           sessionKey,
 		maxWorkersPerSession: maxWorkers,
 		borrowedWorkers:      make(map[string]Worker),
+		launchQueue:          NewLaunchQueue(maxWorkers),
 		rampingUp:            &atomic.Bool{},
 		rampupWorkerGiven:    &atomic.Bool{},
 	}
@@ -79,17 +82,21 @@ func NewSessionWorkerPool(
 	// Clean up workers on context cancellation
 	go func() {
 		<-ctx.Done()
-		wp.borrowedWorkersMutex.Lock()
-		defer wp.borrowedWorkersMutex.Unlock()
-
-		for key := range wp.borrowedWorkers {
-			logger.Debug("returning worker on context cancel", zap.String("worker_key", key))
-			wp.sessionPool.ReleaseWorker(key)
-			delete(wp.borrowedWorkers, key)
-		}
+		wp.ReleaseAll()
 	}()
 
 	return wp
+}
+
+func (p *SessionWorkerPool) ReleaseAll() {
+	p.borrowedWorkersMutex.Lock()
+	defer p.borrowedWorkersMutex.Unlock()
+
+	for key := range p.borrowedWorkers {
+		p.logger.Debug("returning worker", zap.String("worker_key", key))
+		p.sessionPool.ReleaseWorker(key)
+		delete(p.borrowedWorkers, key)
+	}
 }
 
 func (p *SessionWorkerPool) Borrow(ctx context.Context) (Worker, error) {
@@ -121,7 +128,7 @@ func (p *SessionWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 		return nil, fmt.Errorf("failed to get worker: %w", err)
 	}
 
-	worker := NewRemoteWorker(p.clientFactory, workerKey, p.logger)
+	worker := NewRemoteWorker(p.clientFactory, workerKey, p.logger, p.launchQueue)
 
 	p.borrowedWorkersMutex.Lock()
 	p.borrowedWorkers[workerKey] = worker

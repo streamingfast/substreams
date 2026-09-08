@@ -28,7 +28,7 @@ The modules within Solana Common exclude voting transactions, to benefit from a 
 
 ## Step 2: Visualize the Data
 
-1. Run `substreams auth` to create your [account](https://thegraph.market/) and generate an authentication token (JWT), then pass this token back as input.
+1. Run `substreams auth` to sign in at [The Graph Market](https://thegraph.market/), pick an API key in your browser, then load credentials with `. ./.substreams.env`.
 
 2. Run `substreams build` to compile the project.
 

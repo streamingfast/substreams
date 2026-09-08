@@ -26,12 +26,18 @@ import (
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
+	"github.com/streamingfast/substreams/service/active_requests"
+	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/wasm"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	"github.com/streamingfast/substreams/wasm/wazero"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
+
+// Unlinkable live blocks in a row that mean the hub is wedged for good. Resets on
+// any linkable block and only armed once ready; same value the relayer uses.
+const maxConsecutiveUnlinkableBlocks = 5
 
 type Tier1Modules struct {
 	// Required dependencies
@@ -51,11 +57,13 @@ type InfoServer interface {
 // returns config with default sane values
 func NewDefaultTier1Config() *Tier1Config {
 	return &Tier1Config{
-		SharedCacheSize:       15,
-		MaxSubrequests:        10,
-		StateBundleSize:       1000,
-		BlockExecutionTimeout: 1 * time.Minute,
-		OutputBufferSize:      100,
+		SharedCacheSize:        15,
+		MaxSubrequests:         10,
+		StateBundleSize:        1000,
+		MergedBlocksBundleSize: bstream.DefaultMergedBlocksBundleSize,
+		BlockExecutionTimeout:  1 * time.Minute,
+		OutputBufferSize:       100,
+		ExecOutPrefetch:        execout.PrefetchConfig{Depth: execout.MaxPrefetchDepth, BudgetBytes: 64 << 20},
 	}
 }
 
@@ -80,22 +88,40 @@ type Tier1Config struct {
 
 	TmpDir                  string
 	StateStoreURL           string
+	StoresScratchSpace      string
+	StoresBackend           string
 	QuickSaveStoreURL       string
 	StateStoreDefaultTag    string
 	BlockType               string
 	StateBundleSize         uint64
-	EnforceCompression      bool // refuse incoming requests that do not accept gzip compression (ConnectRPC or GRPC)
-	ActiveRequestsSoftLimit int  // maximum number of active requests a tier1 app can have with external clients before starting to advertise itself as unready in the health check
+	MergedBlocksBundleSize  uint64 // number of blocks per merged-blocks file in MergedBlocksStoreURL (0 means the default of 100)
+	EnforceCompression      bool   // refuse incoming requests that do not accept gzip compression (ConnectRPC or GRPC)
+	ActiveRequestsSoftLimit int    // maximum number of active requests a tier1 app can have with external clients before starting to advertise itself as unready in the health check
 
 	ActiveRequestsHardLimit int // maximum number of active requests a tier1 app can have with external clients, refuse with CodeUnavailable if reached
-	MaxSubrequests          uint64
-	SubrequestsEndpoint     string
-	SubrequestsInsecure     bool
-	SubrequestsPlaintext    bool
-	SubrequestsSecret       string
+
+	// CPUEviction configures the CPU-based request evictor; the zero value
+	// (mode off) disables it, unset tunables take their defaults.
+	CPUEviction active_requests.EvictorConfig
+
+	MaxSubrequests       uint64
+	SubrequestsEndpoint  string
+	SubrequestsInsecure  bool
+	SubrequestsPlaintext bool
+	SubrequestsSecret    string
 
 	SharedCacheSize  uint64
 	OutputBufferSize uint64 // Used to bundle execout messages within 'BlockScopedDatas' when using protocol V4
+
+	// ExecOutPrefetch bounds how far ahead a production-mode request downloads cached
+	// execution output files while streaming them: at most Depth segments (capped at
+	// execout.MaxPrefetchDepth), holding at most BudgetBytes of decompressed data per
+	// request. Zero disables prefetching.
+	ExecOutPrefetch execout.PrefetchConfig
+
+	// StoreSizeLimit, if non-zero, overrides the default store size limit (in bytes)
+	// used by tier2 stores. The value is forwarded to tier2 on each request.
+	StoreSizeLimit uint64
 
 	WASMExtensions wasm.WASMExtensioner
 	Tracing        bool
@@ -159,6 +185,17 @@ func (a *Tier1App) Run() error {
 		return fmt.Errorf("invalid app config: %w", err)
 	}
 
+	mergedBlocksBundleSize := a.config.MergedBlocksBundleSize
+	if mergedBlocksBundleSize == 0 {
+		mergedBlocksBundleSize = bstream.DefaultMergedBlocksBundleSize
+	}
+	if a.config.StateBundleSize%mergedBlocksBundleSize != 0 && mergedBlocksBundleSize%a.config.StateBundleSize != 0 {
+		a.logger.Warn("merged-blocks bundle size and state bundle size do not divide evenly, segment boundaries will not align with merged-blocks files",
+			zap.Uint64("merged_blocks_bundle_size", mergedBlocksBundleSize),
+			zap.Uint64("state_bundle_size", a.config.StateBundleSize),
+		)
+	}
+
 	mergedBlocksStore, err := dstore.NewDBinStore(a.config.MergedBlocksStoreURL)
 	if err != nil {
 		return fmt.Errorf("failed setting up block store from url %q: %w", a.config.MergedBlocksStoreURL, err)
@@ -211,7 +248,18 @@ func (a *Tier1App) Run() error {
 			)
 		})
 
-		forkableHub = hub.NewForkableHubWithOptions(liveSourceFactory, 200, oneBlocksStore, []hub.Option{hub.WithLogger(a.logger)})
+		// the hub must hold at least two merged-blocks files worth of final
+		// blocks so the joining source can hand off from a file boundary
+		keepFinalBlocks := int(max(200, 2*mergedBlocksBundleSize))
+		forkableHub = hub.NewForkableHubWithOptions(
+			liveSourceFactory,
+			keepFinalBlocks,
+			oneBlocksStore,
+			[]hub.Option{
+				hub.WithLogger(a.logger),
+				hub.WithMaxConsecutiveUnlinkableBlocks(maxConsecutiveUnlinkableBlocks),
+			},
+		)
 		forkableHub.OnTerminated(a.Shutdown)
 
 		go forkableHub.Run()
@@ -247,6 +295,19 @@ func (a *Tier1App) Run() error {
 		opts = append(opts, service.WithLiveBackFillerFinalBlockDelay(a.config.LiveBackFillerFinalBlockDelay))
 	}
 
+	// Scratch space and store backend are passed as options (same as tier2) so
+	// both tiers are wired identically.
+	if a.config.StoresScratchSpace != "" {
+		opts = append(opts, service.WithStoresScratchSpace(a.config.StoresScratchSpace))
+	}
+	if a.config.StoresBackend != "" {
+		opts = append(opts, service.WithStoresBackend(a.config.StoresBackend))
+	}
+	if a.config.StoreSizeLimit != 0 {
+		opts = append(opts, service.WithStoreSizeLimit(a.config.StoreSizeLimit))
+	}
+	opts = append(opts, service.WithExecOutPrefetch(a.config.ExecOutPrefetch))
+
 	if a.config.TmpDir != "" {
 		wazero.SetTempDir(a.config.TmpDir)
 	}
@@ -265,12 +326,13 @@ func (a *Tier1App) Run() error {
 		MeteringConfig:             a.config.MeteringConfig,
 		FirstStreamableBlock:       bstream.GetProtocolFirstStreamableBlock,
 		MergedBlockStoreURL:        a.config.MergedBlocksStoreURL,
+		MergedBlocksBundleSize:     mergedBlocksBundleSize,
 		StateStoreURL:              a.config.StateStoreURL,
 		StateBundleSize:            a.config.StateBundleSize,
 		StateStoreDefaultTag:       a.config.StateStoreDefaultTag,
 		WASMModules:                wasmModules,
 		FoundationalStoreEndpoints: foundationalStoreEndpoints,
-		HostedStoreRegistryAddress: a.config.HostedStoreRegistryAddress,
+		StoreSizeLimit:             a.config.StoreSizeLimit,
 	}
 
 	tier1Service, err := service.NewTier1(
@@ -291,6 +353,7 @@ func (a *Tier1App) Run() error {
 		a.config.EnforceCompression,
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
+		a.config.CPUEviction.WithDefaults(),
 		a.config.SharedCacheSize,
 		a.config.OutputBufferSize,
 		a.modules.SessionPool,

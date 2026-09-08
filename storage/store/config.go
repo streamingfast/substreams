@@ -29,6 +29,9 @@ type Config struct {
 	appendLimit    uint64
 	totalSizeLimit uint64
 	itemSizeLimit  uint64
+
+	scratchSpace string // local directory for ephemeral store files
+	backend      string // "memory" (default) or "mmap"; empty falls back to SUBSTREAMS_STORE_BACKEND (also memory-default)
 }
 
 var DefaultStoreSizeLimit uint64 = 1_073_741_824 // 1GiB
@@ -41,6 +44,8 @@ func NewConfig(
 	store dstore.Store,
 	quickSaveStore dstore.Store,
 	storeSizeLimit uint64,
+	scratchSpace string,
+	backend string,
 ) (*Config, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
@@ -74,15 +79,72 @@ func NewConfig(
 			}
 			return DefaultStoreSizeLimit
 		}(),
-		itemSizeLimit: 10_485_760, // 10MiB
+		itemSizeLimit: 10_485_760, // 10MiB,
+		scratchSpace:  scratchSpace,
+		backend:       backend,
 	}, nil
 }
 
 func (c *Config) newBaseStore(logger *zap.Logger) *baseStore {
+	switch c.backend {
+	case "memory":
+		return c.newBaseStoreWithBackend(logger, &MemoryBackendConfig{})
+	case "mmap":
+		return c.newBaseStoreWithBackend(logger, c.mmapBackendConfig())
+	default:
+		// fall back to env var when backend is unset, but preserve scratchSpace
+		t := getKVImplTypeFromEnv()
+		if t == KVImplTypeMemory {
+			return c.newBaseStoreWithBackend(logger, &MemoryBackendConfig{})
+		}
+		return c.newBaseStoreWithBackend(logger, c.mmapBackendConfig())
+	}
+}
+
+// mmapBackendConfig builds the mmap backend options for this store, pre-sizing
+// the bbolt mmap from the store's own size ceiling so the file can grow to its
+// full extent without a single remap stall.
+func (c *Config) mmapBackendConfig() *MmapBackendConfig {
+	return &MmapBackendConfig{
+		ScratchSpace:    c.scratchSpace,
+		InitialMmapSize: mmapInitialSizeForLimit(c.totalSizeLimit),
+	}
+}
+
+// mmapInitialSizeForLimit turns a store's uncompressed data-size limit into an
+// mmap reservation. It reserves ~1.5x the limit to absorb bbolt's B+tree page
+// overhead so a store never remaps as it approaches its cap, clamped to a
+// [floor, cap] range: the floor keeps tiny stores from remapping during load,
+// the cap keeps a pathologically large limit from reserving absurd address
+// space (a late remap in that rare case is acceptable). The reservation is
+// virtual only — unused pages never become resident.
+func mmapInitialSizeForLimit(totalSizeLimit uint64) int {
+	const floor = defaultInitialMmapSize
+	const maxReservation = 8 << 30 // 8 GiB
+
+	want := totalSizeLimit + totalSizeLimit/2 // ~1.5x
+	if want < floor {
+		want = floor
+	}
+	if want > maxReservation {
+		want = maxReservation
+	}
+	return int(want)
+}
+
+func (c *Config) newBaseStoreWithBackend(logger *zap.Logger, backend KVImplBackendConfig) *baseStore {
+	kvImplCfg := DefaultKVImplConfig(c.name, c.moduleHash, backend)
+
+	kvImpl, err := kvImplCfg.NewKVImpl(logger)
+	if err != nil {
+		logger.Warn("failed to create KV impl, falling back to in-memory", zap.Error(err))
+		kvImpl = newMemoryKVImplWithStoreName(c.name)
+	}
+
 	return &baseStore{
 		Config:                  c,
 		kvOps:                   &pbssinternal.Operations{},
-		kv:                      make(map[string][]byte),
+		kvImpl:                  kvImpl,
 		logger:                  logger.Named("store").With(zap.String("store_name", c.name), zap.String("module_hash", c.moduleHash)),
 		marshaller:              marshaller.Default(),
 		recentlyDeletedPrefixes: make(DeletedPrefixes),
@@ -110,7 +172,7 @@ func (c *Config) ModuleInitialBlock() uint64 {
 }
 
 func (c *Config) NewFullKV(logger *zap.Logger) *FullKV {
-	return &FullKV{c.newBaseStore(logger), "N/A"}
+	return &FullKV{baseStore: c.newBaseStore(logger), loadedFrom: "N/A"}
 }
 
 func (c *Config) ExistsFullKV(ctx context.Context, upTo uint64) (bool, error) {
@@ -125,7 +187,7 @@ func (c *Config) ExistsPartialKV(ctx context.Context, from, to uint64) (bool, er
 
 func (c *Config) NewPartialKV(initialBlock uint64, logger *zap.Logger) *PartialKV {
 	return &PartialKV{
-		baseStore:    c.newBaseStore(logger),
+		baseStore:    c.newBaseStoreWithBackend(logger, &MemoryBackendConfig{}),
 		initialBlock: initialBlock,
 		seen:         make(map[string]bool),
 	}

@@ -10,7 +10,22 @@ This document lists all environment variables used by the Substreams project, or
 **Development environment indicator**
 - **Purpose**: Indicates if running in local development mode
 - **Usage**: Set to "true" to use localhost URLs instead of production URLs
-- **Default**: `false` (uses production URLs: https://thegraph.market/auth/substreams-devenv)
+- **Default**: `false` (device login talks to `https://admin.streamingfast.io`; `--paste` uses `https://thegraph.market`)
+- **Local values**: device login talks to `http://localhost:9000`; `--paste` uses `http://localhost:3000`. JWT issue uses `http://localhost:8080` (see `SUBSTREAMS_AUTH_ISSUE_URL`); if that issuer is unavailable the API key is stored instead of failing.
+- **Location**: `cmd/substreams/auth.go`
+
+#### `SUBSTREAMS_PORTAL_API`
+**Portal API base URL override**
+- **Purpose**: Override the Portal API used by `substreams auth` browser login
+- **Usage**: Full base URL, e.g. `http://localhost:9000`
+- **Default**: `https://admin.streamingfast.io` (or `http://localhost:9000` when `LOCAL_DEVELOPMENT=true`)
+- **Location**: `cmd/substreams/auth.go`
+
+#### `SUBSTREAMS_AUTH_ISSUE_URL`
+**JWT issue base URL override**
+- **Purpose**: Override the `/v1/auth/issue` host used to exchange a `server_` API key for a JWT
+- **Usage**: Full base URL, e.g. `http://localhost:8080`
+- **Default**: `https://auth.thegraph.market` (or `http://localhost:8080` when `LOCAL_DEVELOPMENT=true`)
 - **Location**: `cmd/substreams/auth.go`
 
 ### `substreams registry` Commands
@@ -46,13 +61,6 @@ This document lists all environment variables used by the Substreams project, or
 ## Server Engine Variables
 
 ### Performance tuning
-
-#### `SUBSTREAMS_STORE_SIZE_LIMIT`
-**Store size limit**
-- **Purpose**: Set maximum size limit for Substreams stores in bytes
-- **Usage**: Set as unsigned integer (bytes) to limit store memory usage
-- **Default**: 1073741824 (1GiB)
-- **Location**: `service/utils.go`
 
 #### SUBSTREAMS_LOG_TOTAL_STORE_SIZE
 **Log total store size**
@@ -117,6 +125,20 @@ This document lists all environment variables used by the Substreams project, or
 - **Location**: `wasm/registry.go`
 
 ### Debugging and Logging
+
+#### `SUBSTREAMS_PROGRESS_LOG_FIRST_DELAY`
+**Delay before the first request progress log**
+- **Purpose**: Override how long tier1 waits before emitting the first `substreams request progress` log of a request
+- **Usage**: Set to any Go duration (ex: `30s`, `2m`). Must be greater than 0; an invalid or non-positive value panics at startup
+- **Default**: `1m`
+- **Location**: `metrics/progress_log.go`
+
+#### `SUBSTREAMS_PROGRESS_LOG_INTERVAL`
+**Interval between request progress logs**
+- **Purpose**: Override the interval between subsequent `substreams request progress` logs, after the first one. This only changes how often the line is printed: the `_5m` values on it always cover a fixed trailing 5 minutes
+- **Usage**: Set to any Go duration (ex: `1m`, `10m`). Must be greater than 0; an invalid or non-positive value panics at startup
+- **Default**: `5m`
+- **Location**: `metrics/progress_log.go`
 
 #### `SUBSTREAMS_PRINT_STACK`
 **Debug stack traces**

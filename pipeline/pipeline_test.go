@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -189,7 +190,7 @@ func testConfigMap(t *testing.T, configs []testStoreConfig) store2.ConfigMap {
 	objStore := dstore.NewMockStore(nil)
 
 	for _, conf := range configs {
-		newStore, err := store2.NewConfig(conf.name, conf.initBlock, conf.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", objStore, nil, 0)
+		newStore, err := store2.NewConfig(conf.name, conf.initBlock, conf.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", objStore, nil, 0, "", "")
 		require.NoError(t, err)
 		confMap[newStore.Name()] = newStore
 
@@ -266,4 +267,31 @@ func (cr *testCursorResolver) resolveCursor(_ context.Context, cursor *bstream.C
 		return cursor.Block, cursor.HeadBlock, nil
 	}
 	return resp.lastValid, resp.currentHead, resp.err
+}
+
+// TestEmitLinearSessionInitCarriesSegmentBlockCount pins the segment width onto the session
+// message. It is the only place a client can learn it: Stage.squash_wait_segment_count counts
+// segments, and the running-jobs list it could otherwise be derived from is empty exactly
+// while tier1 squashes, which is when that count matters.
+func TestEmitLinearSessionInitCarriesSegmentBlockCount(t *testing.T) {
+	var got *pbsubstreamsrpc.SessionInit
+	pipe := &Pipeline{
+		stateBundleSize: 1_000,
+		respFunc: func(resp substreams.ResponseFromAnyTier) error {
+			if session, ok := resp.(*pbsubstreamsrpc.Response).GetMessage().(*pbsubstreamsrpc.Response_Session); ok {
+				got = session.Session
+			}
+			return nil
+		},
+	}
+
+	ctx := reqctx.WithRequest(context.Background(), &reqctx.RequestDetails{
+		ResolvedStartBlockNum: 10_000,
+		LinearHandoffBlockNum: 10_000,
+		StopBlockNum:          20_000,
+	})
+
+	require.NoError(t, pipe.emitLinearSessionInit(ctx))
+	require.NotNil(t, got)
+	assert.Equal(t, uint64(1_000), got.GetSegmentBlockCount())
 }

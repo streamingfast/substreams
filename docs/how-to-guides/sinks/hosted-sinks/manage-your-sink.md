@@ -74,6 +74,10 @@ Update the Substreams package source (URL or Substreams.dev ID) and the executio
 
 Update the database connection details (host, port, credentials, SSL mode). Useful when your database credentials rotate or you migrate to a new host.
 
+### GraphQL tab
+
+Add or remove the read-only [GraphQL layer](./graphql-layer.md) that serves the sink's database. Adding it requires the database password again, since stored credentials are never handed back out. Removing it stops the API and its console; the sink and database are untouched.
+
 ## Stopping and Starting a Sink
 
 Click **Stop** to scale the deployment to zero replicas. The sink process halts and no data is written to your database, but the deployment config is preserved.
@@ -90,4 +94,4 @@ Resetting is irreversible. All previously indexed data in the target schema will
 
 ## Deleting a Sink
 
-Click **Delete** in the toolbar and confirm. The deployment and all associated pods are permanently removed. Your database and its data are not affected — only the hosted sink process is deleted.
+Click **Delete** in the toolbar and confirm. The deployment and all associated pods are permanently removed. If the sink has a [GraphQL layer](./graphql-layer.md), it is removed first. Your database and its data are not affected — only the hosted sink process is deleted.

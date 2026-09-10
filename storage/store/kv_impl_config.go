@@ -58,7 +58,7 @@ func (cfg *KVImplConfig) NewKVImpl(logger *zap.Logger) (KVImpl, error) {
 		if mmapCfg == nil {
 			mmapCfg = &MmapBackendConfig{}
 		}
-		logger.Info("using mmap KV store",
+		logger.Debug("using mmap KV store",
 			zap.String("scratch_space", mmapCfg.ScratchSpace),
 			zap.String("store_name", cfg.StoreName))
 		impl, err := newMmapKVImplWithConfig(cfg.StoreName, cfg.ModuleHash, mmapCfg)
@@ -71,7 +71,7 @@ func (cfg *KVImplConfig) NewKVImpl(logger *zap.Logger) (KVImpl, error) {
 		}
 		return impl, nil
 	default: // KVImplTypeMemory, mmap is opt-in, memory is the default
-		logger.Info("using in-memory KV store")
+		logger.Debug("using in-memory KV store")
 		return newMemoryKVImplWithStoreName(cfg.StoreName), nil
 	}
 }

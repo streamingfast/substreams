@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/pipeline/exec"
 )
@@ -136,4 +137,78 @@ func TestSquashRun(t *testing.T) {
 		assert.ErrorIs(t, err, boom)
 		assert.Equal(t, run[:1], merged)
 	})
+}
+
+func TestCloseWaitsForSquashRun(t *testing.T) {
+	s := newMergeTestStages(t)
+
+	squashing := make(chan struct{})
+	release := make(chan struct{})
+	squashDone := make(chan loop.Msg, 1)
+	go func() {
+		squashDone <- s.guardSquash(func() loop.Msg {
+			close(squashing)
+			<-release
+			return MsgMergeFinished{}
+		})
+	}()
+	<-squashing
+
+	closeDone := make(chan struct{})
+	go func() {
+		s.Close()
+		close(closeDone)
+	}()
+
+	select {
+	case <-closeDone:
+		t.Fatal("Close returned while a squash run was in flight")
+	case <-time.After(50 * time.Millisecond):
+	}
+	assert.Error(t, s.ctx.Err(), "Close cancels the stages context before waiting")
+
+	close(release)
+	assert.IsType(t, MsgMergeFinished{}, <-squashDone)
+	select {
+	case <-closeDone:
+	case <-time.After(time.Second):
+		t.Fatal("Close did not return once the squash run finished")
+	}
+}
+
+func TestSquashSkippedAfterClose(t *testing.T) {
+	s := newMergeTestStages(t)
+	s.Close()
+
+	ran := false
+	msg := s.guardSquash(func() loop.Msg {
+		ran = true
+		return MsgMergeFinished{}
+	})
+
+	assert.False(t, ran)
+	assert.IsType(t, MsgMergeFailed{}, msg)
+}
+
+func TestSquashRunStopsOnceContextCancelled(t *testing.T) {
+	s := newMergeTestStages(t)
+	for seg := 1; seg <= 3; seg++ {
+		s.forceTransition(seg, 0, UnitPartialPresent)
+	}
+	s.MarkSegmentMerging(unit(1, 0))
+	run := s.claimMergeRun(s.stages[0], unit(1, 0), 10)
+
+	var squashed []Unit
+	merged, _, err := squashRun(run, time.Hour, func(u Unit) error {
+		if err := s.ctx.Err(); err != nil {
+			return err
+		}
+		squashed = append(squashed, u)
+		s.cancel()
+		return nil
+	})
+
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Equal(t, run[:1], squashed, "the unit in progress finishes, the next one is not started")
+	assert.Equal(t, run[:1], merged)
 }

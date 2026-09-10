@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -38,7 +39,14 @@ import (
 
 type Stages struct {
 	ctx    context.Context
+	cancel context.CancelFunc
 	logger *zap.Logger
+
+	// A squash run holds squashMu shared for its whole duration and Close takes it
+	// exclusively, so a store is never closed under a merge or a save. closed tells a
+	// run that gets the lock after Close to do nothing.
+	squashMu sync.RWMutex
+	closed   bool
 
 	globalSegmenter   *block.Segmenter // This segmenter covers both the stores and the mapper
 	storeSegmenter    *block.Segmenter // This segmenter covers only jobs needed to build up stores according to the RequestPlan.
@@ -96,9 +104,11 @@ func NewStages(
 ) (out *Stages) {
 
 	logger := reqctx.Logger(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 	out = &Stages{
 		ctx:                 ctx,
-		logger:              reqctx.Logger(ctx),
+		cancel:              cancel,
+		logger:              logger,
 		globalSegmenter:     reqPlan.BackprocessSegmenter(),
 		outputModuleIsIndex: execGraph.OutputModule().GetKindBlockIndex() != nil,
 		execoutConfigs:      execoutConfigs,
@@ -171,7 +181,15 @@ func NewStages(
 	return out
 }
 
+// Close releases the cached stores. It first cancels the stages context, so the
+// in-flight squash run stops at its next unit, then waits for that run to finish:
+// closing a store under a merge would panic, and under a save would write an empty
+// full store to storage.
 func (s *Stages) Close() {
+	s.cancel()
+	s.squashMu.Lock()
+	defer s.squashMu.Unlock()
+	s.closed = true
 	for _, stage := range s.stages {
 		for _, modState := range stage.storeModuleStates {
 			modState.Close()
@@ -477,14 +495,31 @@ func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 	run := s.claimMergeRun(stage, mergeUnit, maxSquashRunSegments)
 
 	return func() loop.Msg {
-		merged, unmerged, err := squashRun(run, squashRunTimeBudget, func(u Unit) error {
-			return s.multiSquash(stage, u)
+		return s.guardSquash(func() loop.Msg {
+			merged, unmerged, err := squashRun(run, squashRunTimeBudget, func(u Unit) error {
+				if err := s.ctx.Err(); err != nil {
+					return err
+				}
+				return s.multiSquash(stage, u)
+			})
+			if err != nil {
+				return MsgMergeFailed{Unit: run[len(merged)], Error: err}
+			}
+			return MsgMergeFinished{Stage: stageIdx, Merged: merged, Unmerged: unmerged}
 		})
-		if err != nil {
-			return MsgMergeFailed{Unit: run[len(merged)], Error: err}
-		}
-		return MsgMergeFinished{Stage: stageIdx, Merged: merged, Unmerged: unmerged}
 	}
+}
+
+// guardSquash runs squash while holding squashMu shared, which keeps Close from
+// releasing the stores underneath it. Once Close has run, the stores are gone and
+// the scheduler loop that would receive the message is too, so squash is skipped.
+func (s *Stages) guardSquash(squash func() loop.Msg) loop.Msg {
+	s.squashMu.RLock()
+	defer s.squashMu.RUnlock()
+	if s.closed {
+		return MsgMergeFailed{Error: context.Canceled}
+	}
+	return squash()
 }
 
 func (s *Stages) MergeCompleted(mergeUnit Unit) {

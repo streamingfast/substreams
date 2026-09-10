@@ -43,6 +43,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   3 to 5 s, so squashing was capped at about 15 segments per minute even when a merge took 0.3 s, and it fell
   tens of thousands of segments behind the tier2 jobs.
 
+- `substreams-tier1` no longer releases the squasher's cached stores while a squash is still running. When the
+  scheduler stopped early (a tier2 job failed, or the pod was shutting down), the stores were closed under the
+  in-flight merge, which could panic the process or write an empty full store to storage. Closing now cancels
+  the squash, which stops at its next segment, and waits for it to finish.
+
 - `substreams-tier1` scheduling no longer slows down as a large backprocessing range progresses. Picking the next
   tier2 job walked every segment between the squasher and the job frontier on every call, re-checking
   dependencies that could not have changed, so a run over N segments cost O(N²) in scheduling. The scheduler now

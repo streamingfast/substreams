@@ -50,6 +50,47 @@ func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
 	return stage.syncWork.Wait() // ensure we don't merge the same fullKV multiple times concurrently before it is completely written
 }
 
+// A squash run covers at most maxSquashRunSegments segments and stops taking new ones
+// once squashRunTimeBudget is spent, so that a long run still reports progress regularly.
+const (
+	maxSquashRunSegments = 1000
+	squashRunTimeBudget  = 30 * time.Second
+)
+
+// claimMergeRun marks as Merging the units that directly follow first on its stage and
+// already have their partial, up to limit units in total, and returns them all, first
+// included. first must already be Merging. The whole run is squashed by a single
+// command: squashed one command at a time, each segment would wait for its own round
+// trip through the scheduler loop, which is busy with job scheduling.
+func (s *Stages) claimMergeRun(stage *Stage, first Unit, limit int) []Unit {
+	run := []Unit{first}
+	for len(run) < limit {
+		next := Unit{Stage: first.Stage, Segment: run[len(run)-1].Segment + 1}
+		if next.Segment > stage.segmenter.LastIndex() || s.getState(next) != UnitPartialPresent {
+			break
+		}
+		s.transition(next, UnitMerging, UnitPartialPresent)
+		run = append(run, next)
+	}
+	return run
+}
+
+// squashRun squashes the units of run in order. It always squashes the first one, then
+// stops once budget is spent and returns the units it did not get to as unmerged. On
+// error, merged holds the units squashed before the failing one.
+func squashRun(run []Unit, budget time.Duration, squash func(Unit) error) (merged, unmerged []Unit, err error) {
+	start := time.Now()
+	for i, u := range run {
+		if i > 0 && time.Since(start) >= budget {
+			return run[:i], run[i:], nil
+		}
+		if err := squash(u); err != nil {
+			return run[:i], nil, err
+		}
+	}
+	return run, nil, nil
+}
+
 type Result struct {
 	partialKVStore *store.PartialKV
 	partialFile    *store.FileInfo

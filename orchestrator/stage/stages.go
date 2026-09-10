@@ -474,18 +474,35 @@ func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 	}
 
 	s.MarkSegmentMerging(mergeUnit)
+	run := s.claimMergeRun(stage, mergeUnit, maxSquashRunSegments)
 
 	return func() loop.Msg {
-		if err := s.multiSquash(stage, mergeUnit); err != nil {
-			return MsgMergeFailed{Unit: mergeUnit, Error: err}
+		merged, unmerged, err := squashRun(run, squashRunTimeBudget, func(u Unit) error {
+			return s.multiSquash(stage, u)
+		})
+		if err != nil {
+			return MsgMergeFailed{Unit: run[len(merged)], Error: err}
 		}
-		return MsgMergeFinished{Unit: mergeUnit}
+		return MsgMergeFinished{Stage: stageIdx, Merged: merged, Unmerged: unmerged}
 	}
 }
 
 func (s *Stages) MergeCompleted(mergeUnit Unit) {
 	s.markSegmentCompleted(mergeUnit)
 	s.MoveSegmentCompletedForward(mergeUnit.Stage)
+}
+
+// MergeRunCompleted records the outcome of a squash run on a stage: the merged units are
+// complete, and the unmerged ones go back to having only their partial, for the next run
+// to pick up.
+func (s *Stages) MergeRunCompleted(stageIdx int, merged, unmerged []Unit) {
+	for _, u := range merged {
+		s.markSegmentCompleted(u)
+	}
+	for _, u := range unmerged {
+		s.transition(u, UnitPartialPresent, UnitMerging)
+	}
+	s.MoveSegmentCompletedForward(stageIdx)
 }
 
 func (s *Stages) MoveSegmentCompletedForward(stageIdx int) {

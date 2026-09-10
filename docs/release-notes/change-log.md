@@ -43,6 +43,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   3 to 5 s, so squashing was capped at about 15 segments per minute even when a merge took 0.3 s, and it fell
   tens of thousands of segments behind the tier2 jobs.
 
+- `substreams-tier1` squash runs now copy the previous full store over segments whose partials are all empty,
+  instead of merging and saving each of them: an empty partial leaves the store unchanged. A run lists the sizes
+  of its partials in one go, reads the first decompressed byte of the small ones only, so a large partial is
+  never downloaded, then copies the last written full store to every consecutive empty segment, 32 at a time,
+  server-side on object stores that support it. On a store most segments never touch, a run of 1000 segments
+  goes from about 190 s to a few seconds. A module's first segment and segments shorter than the store interval
+  still go through the regular squash.
+
 - `substreams-tier1` no longer releases the squasher's cached stores while a squash is still running. When the
   scheduler stopped early (a tier2 job failed, or the pod was shutting down), the stores were closed under the
   in-flight merge, which could panic the process or write an empty full store to storage. Closing now cancels

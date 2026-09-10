@@ -101,13 +101,19 @@ func TestMergeRunCompleted(t *testing.T) {
 	assert.Equal(t, unit(2, 0), s.stages[0].nextUnit(), "the next run starts at the first unmerged unit")
 }
 
+// oneUnitSteps makes each unit of run a step of its own, the way planSquashSteps does
+// when no partial is empty.
+func oneUnitSteps(run []Unit) [][]Unit {
+	return planSquashSteps(run, nil)
+}
+
 func TestSquashRun(t *testing.T) {
 	run := []Unit{unit(1, 0), unit(2, 0), unit(3, 0)}
 
 	t.Run("squashes every unit in order", func(t *testing.T) {
 		var squashed []Unit
-		merged, unmerged, err := squashRun(run, time.Hour, func(u Unit) error {
-			squashed = append(squashed, u)
+		merged, unmerged, err := squashRun(oneUnitSteps(run), time.Hour, func(step []Unit) error {
+			squashed = append(squashed, step...)
 			return nil
 		})
 
@@ -118,7 +124,7 @@ func TestSquashRun(t *testing.T) {
 	})
 
 	t.Run("squashes the first unit even with no budget left", func(t *testing.T) {
-		merged, unmerged, err := squashRun(run, 0, func(Unit) error { return nil })
+		merged, unmerged, err := squashRun(oneUnitSteps(run), 0, func([]Unit) error { return nil })
 
 		require.NoError(t, err)
 		assert.Equal(t, run[:1], merged)
@@ -127,8 +133,8 @@ func TestSquashRun(t *testing.T) {
 
 	t.Run("stops at the first error", func(t *testing.T) {
 		boom := errors.New("boom")
-		merged, _, err := squashRun(run, time.Hour, func(u Unit) error {
-			if u == unit(2, 0) {
+		merged, _, err := squashRun(oneUnitSteps(run), time.Hour, func(step []Unit) error {
+			if step[0] == unit(2, 0) {
 				return boom
 			}
 			return nil
@@ -137,6 +143,38 @@ func TestSquashRun(t *testing.T) {
 		assert.ErrorIs(t, err, boom)
 		assert.Equal(t, run[:1], merged)
 	})
+
+	t.Run("budget is only checked between steps", func(t *testing.T) {
+		steps := [][]Unit{{unit(1, 0), unit(2, 0)}, {unit(3, 0)}}
+		merged, unmerged, err := squashRun(steps, 0, func([]Unit) error { return nil })
+
+		require.NoError(t, err)
+		assert.Equal(t, run[:2], merged, "a step is never split")
+		assert.Equal(t, run[2:], unmerged)
+	})
+}
+
+func TestPlanSquashSteps(t *testing.T) {
+	run := []Unit{unit(1, 0), unit(2, 0), unit(3, 0), unit(4, 0), unit(5, 0), unit(6, 0)}
+
+	tests := []struct {
+		name  string
+		empty map[int]bool
+		want  [][]Unit
+	}{
+		{"no empty unit", nil, [][]Unit{{unit(1, 0)}, {unit(2, 0)}, {unit(3, 0)}, {unit(4, 0)}, {unit(5, 0)}, {unit(6, 0)}}},
+		{"all empty", map[int]bool{1: true, 2: true, 3: true, 4: true, 5: true, 6: true}, [][]Unit{run}},
+		{
+			"empty units grouped, others alone",
+			map[int]bool{1: true, 2: true, 4: true, 6: true},
+			[][]Unit{{unit(1, 0), unit(2, 0)}, {unit(3, 0)}, {unit(4, 0)}, {unit(5, 0)}, {unit(6, 0)}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, planSquashSteps(run, tt.empty))
+		})
+	}
 }
 
 func TestCloseWaitsForSquashRun(t *testing.T) {
@@ -199,11 +237,11 @@ func TestSquashRunStopsOnceContextCancelled(t *testing.T) {
 	run := s.claimMergeRun(s.stages[0], unit(1, 0), 10)
 
 	var squashed []Unit
-	merged, _, err := squashRun(run, time.Hour, func(u Unit) error {
+	merged, _, err := squashRun(oneUnitSteps(run), time.Hour, func(step []Unit) error {
 		if err := s.ctx.Err(); err != nil {
 			return err
 		}
-		squashed = append(squashed, u)
+		squashed = append(squashed, step...)
 		s.cancel()
 		return nil
 	})

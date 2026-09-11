@@ -1,7 +1,8 @@
 package service
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 
 	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -29,7 +30,9 @@ func sortClocksDistributor(clockDistributor map[uint64]*pbsubstreams.Clock) (sor
 		sortedClockDistributor = append(sortedClockDistributor, clock)
 	}
 
-	sort.Slice(sortedClockDistributor, func(i, j int) bool { return sortedClockDistributor[i].Number < sortedClockDistributor[j].Number })
+	slices.SortFunc(sortedClockDistributor, func(a, b *pbsubstreams.Clock) int {
+		return cmp.Compare(a.Number, b.Number)
+	})
 	return
 }
 

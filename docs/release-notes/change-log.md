@@ -34,6 +34,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- `substreams-tier1` now asks the relayer for every block from its own LIB when it connects
+  or reconnects, instead of the last 2 blocks. A gap left by a disconnect is filled from the
+  relayer's memory, and only the part older than what the relayer holds is read from the
+  one-block store. On fast chains a tier1 that fell a few seconds behind used to fill the
+  whole gap from the one-block store, long enough for the relayer to drop it again.
 - Fix partial-blocks (flashblocks) streams on a tier1 that is shutting down. The stream now
   ends with `Unavailable` like a full-block stream does, so the client reconnects elsewhere.
   It used to stay open but silent, then sent an undo signal at each block boundary naming a

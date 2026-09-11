@@ -653,6 +653,8 @@ github.com/stoewer/go-strcase v1.3.1 h1:iS0MdW+kVTxgMoE1LAZyMiYJFKlOzLooE4Mxjirt
 github.com/stoewer/go-strcase v1.3.1/go.mod h1:fAH5hQ5pehh+j3nZfvwdk2RgEgQjAoM8wodgtPmh1xo=
 github.com/streamingfast/bstream v0.0.2-0.20260817182204-a513e03b7ada h1:EzBAxetlI+6kEKKgZ7D75j0QlwIUP/2vI2KsQiDrkB8=
 github.com/streamingfast/bstream v0.0.2-0.20260817182204-a513e03b7ada/go.mod h1:Asuul2Rnxln0Vk6eY869AZ2UybIQcB7eYOQAIhfQHzE=
+github.com/streamingfast/bstream v0.0.2-0.20260910212213-07a378ae0f74 h1:0Dy392LW8ed46HJDbXjc+J8WI57w3MWGloaKlxzXYGg=
+github.com/streamingfast/bstream v0.0.2-0.20260910212213-07a378ae0f74/go.mod h1:Asuul2Rnxln0Vk6eY869AZ2UybIQcB7eYOQAIhfQHzE=
 github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b h1:ztYeX3/5rg2tV2EU7edcrcHzMz6wUbdJB+LqCrP5W8s=
 github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b/go.mod h1:o9R/tjNON01X2mgWL5qirl2MV6xQ4EZI5D504ST3K/M=
 github.com/streamingfast/dauth v0.0.0-20260304175046-02898e30442d h1:NYrpGcWWLNpIYbHwvNo/W8E+oXhsrn/0kUwun0Rwx8w=

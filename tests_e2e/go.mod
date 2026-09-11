@@ -3,7 +3,7 @@ module github.com/streamingfast/substreams/tests_e2e
 go 1.26.0
 
 require (
-	github.com/streamingfast/bstream v0.0.2-0.20260817182204-a513e03b7ada
+	github.com/streamingfast/bstream v0.0.2-0.20260910212213-07a378ae0f74
 	github.com/streamingfast/dmetering v0.0.0-20260901152443-1ff4cd0d617d
 	github.com/streamingfast/dregistry v0.0.0-20260818204944-2fed3956d4e1
 	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
@@ -134,12 +134,12 @@ require (
 	github.com/minio/minlz v1.0.1 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
-	github.com/moby/go-archive v0.2.0 // indirect
+	github.com/moby/go-archive v0.3.0 // indirect
 	github.com/moby/moby/api v1.55.0 // indirect
 	github.com/moby/moby/client v0.5.1 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/sys/sequential v0.7.0 // indirect
-	github.com/moby/sys/user v0.4.0 // indirect
+	github.com/moby/sys/user v0.4.1 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/moby/term v0.5.2 // indirect
 	github.com/mostynb/go-grpc-compression v1.2.3 // indirect
@@ -185,7 +185,7 @@ require (
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7 // indirect
 	github.com/streamingfast/dgrpc v0.0.0-20260801042045-4c4ac6a8e41a // indirect
 	github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62 // indirect
-	github.com/streamingfast/dstore v0.2.4-0.20260709193311-122163592902 // indirect
+	github.com/streamingfast/dstore v0.2.4-0.20260825160629-56e87480522c // indirect
 	github.com/streamingfast/dummy-blockchain v1.7.7 // indirect
 	github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a // indirect
 	github.com/streamingfast/firehose-networks v0.2.3 // indirect

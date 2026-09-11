@@ -34,6 +34,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Fix partial-blocks (flashblocks) streams on a tier1 that is shutting down. The stream now
+  ends with `Unavailable` like a full-block stream does, so the client reconnects elsewhere.
+  It used to stay open but silent, then sent an undo signal at each block boundary naming a
+  block the client had never received.
+- Never send an undo signal for partial-block state whose outputs were never sent.
+
 - `substreams-tier1` scheduling no longer slows down as a large backprocessing range progresses. Picking the next
   tier2 job walked every segment between the squasher and the job frontier on every call, re-checking
   dependencies that could not have changed, so a run over N segments cost O(N²) in scheduling. The scheduler now

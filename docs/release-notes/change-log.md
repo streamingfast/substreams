@@ -49,7 +49,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   never downloaded, then copies the last written full store to every consecutive empty segment, 32 at a time,
   server-side on object stores that support it. On a store most segments never touch, a run of 1000 segments
   goes from about 190 s to a few seconds. A module's first segment and segments shorter than the store interval
-  still go through the regular squash.
+  still go through the regular squash, and so do the segments of a copy that fails.
 
 - `substreams-tier1` no longer releases the squasher's cached stores while a squash is still running. When the
   scheduler stopped early (a tier2 job failed, or the pod was shutting down), the stores were closed under the

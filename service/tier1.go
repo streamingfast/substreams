@@ -49,6 +49,7 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/active_requests"
 	"github.com/streamingfast/substreams/service/config"
+	"github.com/streamingfast/substreams/squash"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
@@ -129,6 +130,8 @@ type Tier1Service struct {
 	// live backfiller waits past a segment end before concluding merged blocks
 	// are safely written. 0 means use the default.
 	liveBackFillerFinalBlockDelay uint64
+
+	squasher squash.Client
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -337,6 +340,10 @@ func NewTier1(
 
 	for _, opt := range opts {
 		opt(s)
+	}
+
+	if s.squasher != nil {
+		logger.Info("remote squasher configured")
 	}
 
 	return s, nil
@@ -814,6 +821,15 @@ func (s *Tier1Service) blocks(
 
 	if s.getHeadBlock != nil {
 		opts = append(opts, pipeline.WithHeadBlockGetter(s.getHeadBlock))
+	}
+
+	if s.squasher != nil {
+		ctx = reqctx.WithRemoteSquasher(ctx, &reqctx.RemoteSquasher{
+			Client:         s.squasher,
+			StateStoreURL:  s.tier2RequestParameters.StateStoreURL,
+			CacheTag:       cacheTag,
+			StoreSizeLimit: s.runtimeConfig.StoreSizeLimit,
+		})
 	}
 
 	ctx, resolvedEndpoints, err := s.resolveFoundationalStores(ctx, execGraph, reqStats)

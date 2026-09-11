@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/streamingfast/substreams/squash"
 	"github.com/streamingfast/substreams/wasm"
 )
 
@@ -131,6 +132,14 @@ func WithStoreSizeLimit(limit uint64) Option {
 	return func(a anyTierService) {
 		if s, ok := a.(*Tier1Service); ok {
 			s.runtimeConfig.StoreSizeLimit = limit
+		}
+	}
+}
+
+func WithSquasher(c squash.Client) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.squasher = c
 		}
 	}
 }

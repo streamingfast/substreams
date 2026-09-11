@@ -22,6 +22,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Tier1 store merging is selected with a plugin DSN, like auth. Empty or `local://`
+  keeps today's in-process squasher. `grpc://` is registered by the squasher project.
+  When a remote is set, each squash run is one RPC per store module covering every
+  claimed segment, so empty-partial copies and merges happen on the squasher and
+  tier1 does not read store files. If that remote is unreachable, the run is
+  squashed locally after retries fail; a live remote that returns an application
+  error still fails the request.
+
+- `substreams-tier1` now squashes store partials in runs. When a segment is ready to be merged, every
+  following segment whose partial is already there is merged by the same command, up to 1000 segments or 30 s
+  of work, instead of one segment per command. Each command waits for a round trip through the scheduler loop,
+  which also borrows a worker for every job it schedules. On a busy backprocessing request that round trip took
+  3 to 5 s, so squashing was capped at about 15 segments per minute even when a merge took 0.3 s, and it fell
+  tens of thousands of segments behind the tier2 jobs.
+
+- `substreams-tier1` squash runs now copy the previous full store over segments whose partials are all empty,
+  instead of merging and saving each of them: an empty partial leaves the store unchanged. A run lists the sizes
+  of its partials in one go, reads the first decompressed byte of the small ones only, so a large partial is
+  never downloaded, then copies the last written full store to every consecutive empty segment, 32 at a time,
+  server-side on object stores that support it. On a store most segments never touch, a run of 1000 segments
+  goes from about 190 s to a few seconds. A module's first segment and segments shorter than the store interval
+  still go through the regular squash, and so do the segments of a copy that fails.
+
+- `substreams-tier1` no longer releases the squasher's cached stores while a squash is still running. When the
+  scheduler stopped early (a tier2 job failed, or the pod was shutting down), the stores were closed under the
+  in-flight merge, which could panic the process or write an empty full store to storage. Closing now cancels
+  the squash, which stops at its next segment, and waits for it to finish.
+
 - Progress messages are sent far less often. The cadence now widens with the age of the request — every second for
   the first minute, every 10 seconds up to 5 minutes, every 30 seconds up to 10 minutes, then every minute — and it
   applies to the linear phase too, which previously sent one every 200ms. Progress messages count as egress like any

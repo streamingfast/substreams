@@ -26,6 +26,7 @@ import (
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
+	"github.com/streamingfast/substreams/squash"
 	"github.com/streamingfast/substreams/wasm"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	"github.com/streamingfast/substreams/wasm/wazero"
@@ -101,6 +102,11 @@ type Tier1Config struct {
 	SubrequestsInsecure     bool
 	SubrequestsPlaintext    bool
 	SubrequestsSecret       string
+
+	// SquasherPlugin is a DSN selecting the store-merge implementation, the
+	// same shape as --common-auth-plugin. Empty or local:// keeps today's
+	// in-process squasher. grpc:// is registered by the squasher project.
+	SquasherPlugin string
 
 	SharedCacheSize  uint64
 	OutputBufferSize uint64 // Used to bundle execout messages within 'BlockScopedDatas' when using protocol V4
@@ -291,6 +297,13 @@ func (a *Tier1App) Run() error {
 	}
 	if a.config.StoreSizeLimit != 0 {
 		opts = append(opts, service.WithStoreSizeLimit(a.config.StoreSizeLimit))
+	}
+	squasher, err := squash.New(a.config.SquasherPlugin, a.logger)
+	if err != nil {
+		return fmt.Errorf("unable to initialize squasher plugin: %w", err)
+	}
+	if squasher != nil {
+		opts = append(opts, service.WithSquasher(squasher))
 	}
 
 	if a.config.TmpDir != "" {

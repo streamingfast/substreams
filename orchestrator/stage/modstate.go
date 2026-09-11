@@ -22,6 +22,9 @@ type StoreModuleState struct {
 
 	cachedStore      *store.FullKV
 	lastBlockInStore uint64
+	// snapshotEnd is the end block of the last full store this module saved to or loaded
+	// from storage. When it equals lastBlockInStore, that file holds cachedStore's content.
+	snapshotEnd uint64
 }
 
 func NewModuleState(logger *zap.Logger, name string, segmenter *block.Segmenter, storeConfig *store.Config) *StoreModuleState {
@@ -88,6 +91,9 @@ func (s *StoreModuleState) getStore(ctx context.Context, exclusiveEndBlock uint6
 	}
 	s.cachedStore = loadStore
 	s.lastBlockInStore = exclusiveEndBlock
+	if moduleInitBlock < exclusiveEndBlock {
+		s.snapshotEnd = exclusiveEndBlock
+	}
 	return loadStore, nil
 }
 

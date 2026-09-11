@@ -3,9 +3,11 @@ package stage
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/dustin/go-humanize"
 	"github.com/hashicorp/go-multierror"
@@ -48,6 +50,261 @@ func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
 	}
 
 	return stage.syncWork.Wait() // ensure we don't merge the same fullKV multiple times concurrently before it is completely written
+}
+
+// A squash run covers at most maxSquashRunSegments segments and stops taking new ones
+// once squashRunTimeBudget is spent, so that a long run still reports progress regularly.
+const (
+	maxSquashRunSegments = 1000
+	squashRunTimeBudget  = 30 * time.Second
+
+	// snapshotCopyConcurrency bounds the full store copies in flight for one store module.
+	snapshotCopyConcurrency = 32
+)
+
+// copyOverEmptyPartials enables copying the previous full store over segments whose
+// partials are all empty, instead of merging and saving them one at a time. Tests turn it
+// off to compare both paths.
+var copyOverEmptyPartials = true
+
+// claimMergeRun marks as Merging the units that directly follow first on its stage and
+// already have their partial, up to limit units in total, and returns them all, first
+// included. first must already be Merging. The whole run is squashed by a single
+// command: squashed one command at a time, each segment would wait for its own round
+// trip through the scheduler loop, which is busy with job scheduling.
+func (s *Stages) claimMergeRun(stage *Stage, first Unit, limit int) []Unit {
+	run := []Unit{first}
+	for len(run) < limit {
+		next := Unit{Stage: first.Stage, Segment: run[len(run)-1].Segment + 1}
+		if next.Segment > stage.segmenter.LastIndex() || s.getState(next) != UnitPartialPresent {
+			break
+		}
+		s.transition(next, UnitMerging, UnitPartialPresent)
+		run = append(run, next)
+	}
+	return run
+}
+
+// squashRun squashes steps, consecutive groups of units, in order. It always squashes the
+// first step, then stops once budget is spent and returns the units of the steps it did
+// not get to as unmerged. On error, merged holds the units of the steps squashed before
+// the failing one.
+func squashRun(steps [][]Unit, budget time.Duration, squash func(step []Unit) error) (merged, unmerged []Unit, err error) {
+	start := time.Now()
+	for i, step := range steps {
+		if i > 0 && time.Since(start) >= budget {
+			return merged, slices.Concat(steps[i:]...), nil
+		}
+		if err := squash(step); err != nil {
+			return merged, nil, err
+		}
+		merged = append(merged, step...)
+	}
+	return merged, nil, nil
+}
+
+// planSquashSteps splits run into the steps squashRun goes through: each sequence of
+// consecutive empty units is one step, and every other unit is a step of its own.
+func planSquashSteps(run []Unit, empty map[int]bool) [][]Unit {
+	var steps [][]Unit
+	for i := 0; i < len(run); {
+		j := i + 1
+		if empty[run[i].Segment] {
+			for j < len(run) && empty[run[j].Segment] {
+				j++
+			}
+		}
+		steps = append(steps, run[i:j])
+		i = j
+	}
+	return steps
+}
+
+// findEmptyUnits returns the segments of run on which the partial of every store module
+// of stage that already started is empty. A module's first segment is never reported:
+// there is no earlier full store to copy. Any failure only means fewer segments are
+// reported, since the regular squash handles every unit.
+func (s *Stages) findEmptyUnits(stage *Stage, run []Unit) map[int]bool {
+	if !copyOverEmptyPartials || len(run) < 2 {
+		return nil
+	}
+
+	emptyFiles := make([]map[string]bool, len(stage.storeModuleStates))
+	for i, modState := range stage.storeModuleStates {
+		if modState.storeConfig == nil {
+			return nil
+		}
+		var files []*store.FileInfo
+		for _, u := range run {
+			if u.Segment <= modState.segmenter.FirstIndex() {
+				continue
+			}
+			if rng := modState.segmenter.Range(u.Segment); rng != nil {
+				files = append(files, store.NewPartialFileInfo(modState.name, rng.StartBlock, rng.ExclusiveEndBlock))
+			}
+		}
+		empties, err := modState.storeConfig.EmptyPartialKVs(s.ctx, files)
+		if err != nil {
+			s.logger.Warn("cannot tell which partials are empty, squashing them all", zap.String("store", modState.name), zap.Error(err))
+			return nil
+		}
+		emptyFiles[i] = empties
+	}
+
+	out := make(map[int]bool)
+	for _, u := range run {
+		empty := true
+		for i, modState := range stage.storeModuleStates {
+			if u.Segment < modState.segmenter.FirstIndex() {
+				continue // not started yet: nothing to squash for it
+			}
+			rng := modState.segmenter.Range(u.Segment)
+			if u.Segment == modState.segmenter.FirstIndex() || rng == nil ||
+				!emptyFiles[i][store.NewPartialFileInfo(modState.name, rng.StartBlock, rng.ExclusiveEndBlock).Filename] {
+				empty = false
+				break
+			}
+		}
+		if empty {
+			out[u.Segment] = true
+		}
+	}
+	return out
+}
+
+// squashEmptyUnits squashes consecutive units whose partials are all empty. Such a unit
+// leaves every store unchanged, so each of its full stores is a copy of the previous one.
+// Copying needs that previous full store both in memory and in storage: until it is, units
+// go through the regular squash one at a time. If a copy fails, the units go through the
+// regular squash too, which rewrites any full store already copied with the same content.
+func (s *Stages) squashEmptyUnits(stage *Stage, units []Unit) error {
+	for len(units) > 0 {
+		if canCopySnapshots(stage, units[0]) {
+			err := s.copySnapshots(stage, units)
+			if err == nil {
+				return nil
+			}
+			if ctxErr := s.ctx.Err(); ctxErr != nil {
+				return ctxErr
+			}
+			s.logger.Warn("copying full stores over empty partials failed, squashing them one at a time", zap.Error(err))
+			for _, u := range units {
+				if err := s.multiSquash(stage, u); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+		if err := s.multiSquash(stage, units[0]); err != nil {
+			return err
+		}
+		units = units[1:]
+		if err := s.ctx.Err(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// canCopySnapshots reports whether every started store module of stage holds, in memory
+// and in storage, the full store as of the start of u.
+func canCopySnapshots(stage *Stage, u Unit) bool {
+	for _, modState := range stage.storeModuleStates {
+		if u.Segment < modState.segmenter.FirstIndex() {
+			continue
+		}
+		rng := modState.segmenter.Range(u.Segment)
+		if rng == nil ||
+			modState.cachedStore == nil ||
+			modState.storeConfig.ModuleInitialBlock() >= rng.StartBlock ||
+			modState.lastBlockInStore != rng.StartBlock ||
+			modState.snapshotEnd != rng.StartBlock {
+			return false
+		}
+	}
+	return true
+}
+
+// copySnapshots squashes units, consecutive units whose partials are all empty, by
+// copying each started module's current full store to every one of them. The modules only
+// move forward once every copy succeeded, so a failure leaves them as they were.
+func (s *Stages) copySnapshots(stage *Stage, units []Unit) error {
+	var modStates []*StoreModuleState
+	for _, modState := range stage.storeModuleStates {
+		// A module not started at units[0] does not start within units either: its first
+		// segment is never empty, so it never is part of the copied units.
+		if units[0].Segment >= modState.segmenter.FirstIndex() {
+			modStates = append(modStates, modState)
+		}
+	}
+
+	lastCopied := make([]uint64, len(modStates))
+	var eg errgroup.Group
+	for i, modState := range modStates {
+		eg.Go(func() error {
+			end, err := s.copyModuleSnapshots(modState, units)
+			if err != nil {
+				return fmt.Errorf("squash stage %d module %q: %w", stage.idx, modState.name, err)
+			}
+			lastCopied[i] = end
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+
+	for i, modState := range modStates {
+		modState.lastBlockInStore = modState.segmenter.Range(units[len(units)-1].Segment).ExclusiveEndBlock
+		modState.snapshotEnd = lastCopied[i]
+
+		// Like the regular squash, only delete the partials that a full store now covers.
+		partials := make([]*store.FileInfo, 0, len(units))
+		for _, u := range units {
+			if !modState.segmenter.EndsOnInterval(u.Segment) {
+				continue
+			}
+			rng := modState.segmenter.Range(u.Segment)
+			partials = append(partials, store.NewPartialFileInfo(modState.name, rng.StartBlock, rng.ExclusiveEndBlock))
+		}
+		go modState.storeConfig.DeletePartialKVs(context.Background(), partials)
+	}
+	return nil
+}
+
+// copyModuleSnapshots copies modState's current full store to each of units that ends on
+// the store interval, and returns the end block of the last full store written.
+func (s *Stages) copyModuleSnapshots(modState *StoreModuleState, units []Unit) (uint64, error) {
+	start := time.Now()
+	from := modState.snapshotEnd
+
+	eg, ctx := errgroup.WithContext(s.ctx)
+	eg.SetLimit(snapshotCopyConcurrency)
+	copies := 0
+	lastCopied := from
+	for _, u := range units {
+		if !modState.segmenter.EndsOnInterval(u.Segment) {
+			continue // the regular squash does not save these either
+		}
+		to := modState.segmenter.Range(u.Segment).ExclusiveEndBlock
+		copies++
+		lastCopied = max(lastCopied, to)
+		eg.Go(func() error {
+			return modState.storeConfig.CopyFullKV(ctx, from, to)
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return 0, fmt.Errorf("copying full store at block %d: %w", from, err)
+	}
+
+	s.logger.Info("copied full store over empty partials",
+		zap.String("store", modState.name),
+		zap.Uint64("from_block", from),
+		zap.Uint64("up_to_block", lastCopied),
+		zap.Int("copies", copies),
+		zap.Duration("duration", time.Since(start)),
+	)
+	return lastCopied, nil
 }
 
 type Result struct {
@@ -136,6 +393,7 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 		}
 		modState.cachedStore = newFullKV
 		modState.lastBlockInStore = rng.ExclusiveEndBlock
+		modState.snapshotEnd = rng.ExclusiveEndBlock
 		s.logger.Debug("squashing time metrics (skipped, loaded from full kv)", meter.logFields()...)
 		return nil
 	}
@@ -180,6 +438,7 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 		if err != nil {
 			return fmt.Errorf("flushing full store: %w", err)
 		}
+		modState.snapshotEnd = rng.ExclusiveEndBlock
 	}
 
 	s.logger.Info("squashing time metrics", meter.logFields()...)

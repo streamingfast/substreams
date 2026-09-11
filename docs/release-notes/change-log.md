@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+- Fixed: `substreams registry login` failed with `no such file or directory` when `~/.config/substreams`
+  did not exist yet. The directory is now created before the token is written, and the token file is
+  written with mode `0600` instead of `0644` (an existing file is tightened on re-login).
+
 - A manifest can now import `sf/substreams/sink/sql/schema/v1/schema.proto` without
   vendoring a copy of it. The file is a system protobuf, but `protoparse` needs the
   source on disk to honour its extensions, so an import previously failed with

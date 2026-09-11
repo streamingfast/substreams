@@ -34,6 +34,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Per-store lines are now logged at `Debug` instead of `Info`: `using mmap KV store`,
+  `using in-memory KV store`, `flushing store at boundary`, `merged partial into full store`,
+  `deleting partial store`. They fired for every store opened by tier1 and tier2 and for
+  every squash. `squashing time metrics` stays at `Info` as the squash progress signal.
 - Fix partial-blocks (flashblocks) streams on a tier1 that is shutting down. The stream now
   ends with `Unavailable` like a full-block stream does, so the client reconnects elsewhere.
   It used to stay open but silent, then sent an undo signal at each block boundary naming a

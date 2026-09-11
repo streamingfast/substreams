@@ -1,13 +1,14 @@
 package tools
 
 import (
+	"cmp"
 	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
-	"sort"
+	"slices"
 	"sync"
 	"time"
 
@@ -181,8 +182,8 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 	for i, module := range sortedModules {
 		sortedModulesIndex[module.Name] = i
 	}
-	sort.Slice(stats, func(i, j int) bool {
-		return sortedModulesIndex[stats[i].Name] > sortedModulesIndex[stats[j].Name]
+	slices.SortFunc(stats, func(a, b *StoreStats) int {
+		return cmp.Compare(sortedModulesIndex[b.Name], sortedModulesIndex[a.Name])
 	})
 
 	data, err := json.MarshalIndent(stats, "", "  ")
@@ -272,8 +273,8 @@ func getStore(ctx context.Context, conf *store.Config, below uint64) (store.Stor
 	}
 
 	start = time.Now()
-	sort.Slice(kvFiles, func(i, j int) bool { //reverse sort
-		return kvFiles[i].Range.ExclusiveEndBlock >= kvFiles[j].Range.ExclusiveEndBlock
+	slices.SortFunc(kvFiles, func(a, b *store.FileInfo) int { // reverse sort
+		return cmp.Compare(b.Range.ExclusiveEndBlock, a.Range.ExclusiveEndBlock)
 	})
 	zlog.Debug("sorting snapshot files", zap.Duration("duration", time.Since(start)))
 

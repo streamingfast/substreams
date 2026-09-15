@@ -11,6 +11,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### CLI
+
+- Fixed: `substreams registry login` failed with `no such file or directory` when `~/.config/substreams`
+  did not exist yet. The directory is now created before the token is written, and the token file is
+  written with mode `0600` instead of `0644` (an existing file is tightened on re-login).
+
+- A manifest can now import `sf/substreams/sink/sql/schema/v1/schema.proto` without
+  vendoring a copy of it. The file is a system protobuf, but `protoparse` needs the
+  source on disk to honour its extensions, so an import previously failed with
+  `no such file`. It is now served from an embedded copy, the same way
+  `sf/substreams/options.proto` already was.
+
 ### Docs
 
 - Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can
@@ -21,6 +33,128 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   Sinks how-to under Hosted Services.
 
 ### Server
+
+- `substreams-tier1` now asks the relayer for every block from its own LIB when it connects
+  or reconnects, instead of the last 2 blocks. A gap left by a disconnect is filled from the
+  relayer's memory, and only the part older than what the relayer holds is read from the
+  one-block store. On fast chains a tier1 that fell a few seconds behind used to fill the
+  whole gap from the one-block store, long enough for the relayer to drop it again.
+- Fix partial-blocks (flashblocks) streams on a tier1 that is shutting down. The stream now
+  ends with `Unavailable` like a full-block stream does, so the client reconnects elsewhere.
+  It used to stay open but silent, then sent an undo signal at each block boundary naming a
+  block the client had never received.
+- Never send an undo signal for partial-block state whose outputs were never sent.
+
+- `substreams-tier1` now squashes store partials in runs. When a segment is ready to be merged, every
+  following segment whose partial is already there is merged by the same command, up to 1000 segments or 30 s
+  of work, instead of one segment per command. Each command waits for a round trip through the scheduler loop,
+  which also borrows a worker for every job it schedules. On a busy backprocessing request that round trip took
+  3 to 5 s, so squashing was capped at about 15 segments per minute even when a merge took 0.3 s, and it fell
+  tens of thousands of segments behind the tier2 jobs.
+
+- `substreams-tier1` squash runs now copy the previous full store over segments whose partials are all empty,
+  instead of merging and saving each of them: an empty partial leaves the store unchanged. A run lists the sizes
+  of its partials in one go, reads the first decompressed byte of the small ones only, so a large partial is
+  never downloaded, then copies the last written full store to every consecutive empty segment, 32 at a time,
+  server-side on object stores that support it. On a store most segments never touch, a run of 1000 segments
+  goes from about 190 s to a few seconds. A module's first segment and segments shorter than the store interval
+  still go through the regular squash, and so do the segments of a copy that fails.
+
+- `substreams-tier1` no longer releases the squasher's cached stores while a squash is still running. When the
+  scheduler stopped early (a tier2 job failed, or the pod was shutting down), the stores were closed under the
+  in-flight merge, which could panic the process or write an empty full store to storage. Closing now cancels
+  the squash, which stops at its next segment, and waits for it to finish.
+
+- `substreams-tier1` scheduling no longer slows down as a large backprocessing range progresses. Picking the next
+  tier2 job walked every segment between the squasher and the job frontier on every call, re-checking
+  dependencies that could not have changed, so a run over N segments cost O(N²) in scheduling. The scheduler now
+  keeps, per stage, the lowest segment that may still be pending and the highest segment completed so far, and
+  only looks at the handful of segments those point at. On a 3-stage graph with 4 workers and a squasher three
+  times slower than the jobs, scheduling 8000 segments went from 1.18 s to 2.7 ms, and now grows linearly with
+  the range. Job order is unchanged.
+
+- `substreams-tier1` now downloads the next cached execution output files while it streams the current one to a
+  production-mode client. Before, each 1000-block segment was opened, decompressed and sent before the next one
+  was even requested from the object store, so every segment paid a full store round trip on the critical path.
+  Prefetching is bounded per request by `Tier1Config.ExecOutPrefetch`: at most `Depth` segments ahead (default
+  and hard cap 4) holding at most `BudgetBytes` of decompressed data (default 64 MiB). No size is ever asked of
+  the store: the decompressed size of the last downloaded segment is the estimate for the next ones, and as many
+  download at once as estimate-sized files fit in the budget, each allowed to read an even share of it, so
+  in-flight reads never add up to more than the budget. A file bigger than its share is left to the walker and
+  the estimate is raised, so a chain going from quiet to busy shrinks the concurrency instead of overshooting.
+  A file bigger than the whole budget turns prefetching off for the rest of the request. Missing files are left
+  to the walker's existing retry loop, and the prefetcher stops looking ahead until the walker reaches them.
+  Setting either bound to zero turns prefetching off.
+
+- `substreams-tier1` now sends each batch of cached execution output on a separate goroutine, so decoding the next
+  batch overlaps with compressing and writing the current one. Before, the walker built a batch, sent it, and only
+  then started decoding the next, so the client-facing write sat on the critical path of every batch. At most one
+  batch is being built while one is sent, and a segment is only reported done once every batch is out, so message
+  order is unchanged.
+
+- `substreams-tier1` no longer copies each cached execution output payload once more while decoding it: the item
+  now aliases the buffer it was read into instead of copying out of it.
+
+- `substreams-tier1` now writes the `substreams.spkg` and `last_used` cache markers in the background instead of
+  before the pipeline starts, so those object store round trips no longer delay the first block sent. They run
+  detached from the request on their own context with a 30 second timeout: the request neither starts nor exits
+  waiting for them, and a client that disconnects early still leaves its usage marker behind.
+
+- `substreams-tier1` can now evict requests when its CPU is saturated. When its own cgroup reports CPU usage above
+  90% of quota for 15 seconds, the pod advertises itself unready to the load balancer, refuses new requests, waits
+  for the balancer to drain, then cancels enough of the heaviest requests with `Unavailable` to bring usage back
+  under 75% of quota, so their clients reconnect to a less busy pod. Order: dev-mode requests first, then production
+  requests on live blocks, then production requests still catching up from files. 
+  Off by default; enable and tune it through the tier1 app's `CPUEviction` config 
+  modes: `observe` (log only), `dev-only`, `full`
+  Needs cgroup v2 CPU accounting. A pod whose cgroup carries no CPU limit (`cpu.max` reads `max`) has no quota to
+  measure usage against and leaves the evictor off; set `CPUEviction.QuotaCoresOverride` to name the budget yourself.
+  New metrics: `substreams_tier1_cpu_*` gauges and `substreams_tier1_evicted_requests_counter`.
+
+- New `substreams_tier1_effective_active_requests` gauge, meant to replace `substreams_active_requests` as the
+  horizontal autoscaler input on tier1: the higher of the plain active-request count and the number of requests the
+  CPU budget is being spent at (`nominal_capacity * cpu_usage_ratio / cpu_eviction_target_ratio`). A pod full of
+  expensive requests, or one holding its CPU down by eviction, reports itself at capacity, so the autoscaler will
+  add more pods. Its active-request count is the one admission uses, so it includes requests still setting up and
+  never reads below `substreams_active_requests`. `CPUEviction.NominalCapacity` should be set to the autoscaler's
+  per-pod request target; it defaults to the active-requests soft limit.
+
+- Trimmed tier2's per-segment logging: a large backfill fans out into tens of thousands of `ProcessRange` calls,
+  and each one was logging ~10 `Info` lines with no steady-state diagnostic value, which could spike a pod's log
+  volume by an order of magnitude. Removed the duplicate auth-info log in the tier2 response handler (already
+  logged once per segment on the incoming request), and demoted the store-size and exec-output-file-open logs to
+  `Debug`. Also suppressed the benign `http2: server: error reading preface ...: connection reset by peer` error
+  logged whenever a client drops a connection mid-handshake against the plaintext/h2c tier2 port, mirroring the
+  existing TLS-handshake suppressions. The bigger source of the same spike was `dmetering`'s per-request event
+  emitter, opened and torn down on every `ProcessRange` call; its 4 shutdown-lifecycle logs are now `Debug` too
+  (bumped to `github.com/streamingfast/dmetering@v0.0.0-20260901152443-1ff4cd0d617d`).
+
+- Jobs of a tier1 request now reach the tier2 fleet in the order the client will read their output, instead of
+  racing each other for whatever instance has room. A job asks a per-request launch queue for its turn before every
+  request it sends to a tier2, first attempt and retries alike, and leaves the queue the moment a tier2 takes it. The
+  queue holds the jobs waiting to get in, ordered by lowest segment first and, within a segment, by highest stage.
+  Only the first 20% of that queue may dial at all, at least two jobs and at most 15; the ones behind them send
+  nothing until a job ahead gets in and moves the window up. So with 10 workers and every job turned away, the two
+  lowest segments redial every 100ms while the other eight stay silent, and a job the scheduler creates late for a
+  low segment goes to the front of the queue and dials right away. A job with nothing queued ahead of it dials
+  immediately, so a fleet with room is paced no differently than before. Without this, the segment the client reads
+  first was no more likely to land than one it would only read minutes later, and a whole request could idle behind
+  a single unlucky low segment.
+
+- A tier2 job that fails is no longer retried on a growing 1s-to-5s backoff of its own. Every reason to dial again
+  now goes through the same queue, so retries keep the request's reading order: a job that could not get in at all
+  (`ResourceExhausted: service currently overloaded`, a refused connection, `Unavailable: no healthy upstream`)
+  waits 100ms, and a job that got in and then failed waits 5 seconds once — if a tier2 then turns it away for
+  capacity, it is back on the 100ms delay with its failure already counted. The counters that end a hopeless request
+  are unchanged: five failures, or two execution timeouts, and neither is charged for a job that never got in.
+  Tunable with `SUBSTREAMS_WORKER_LAUNCH_WINDOW_PERCENT` (default 20), `SUBSTREAMS_WORKER_LAUNCH_WINDOW_MAX`
+  (default 15), `SUBSTREAMS_WORKER_OVERLOADED_RETRY_DELAY` (default 100ms, was 300ms),
+  `SUBSTREAMS_WORKER_FAILED_RETRY_DELAY` (default 5s) and
+  `SUBSTREAMS_WORKER_OVERLOADED_RETRY_JITTER` (default 100ms, added to a wait so jobs turned away at the same instant
+  do not redial in lockstep).
+
+- Jobs are now scheduled up to twice the request's worker count ahead of the blocks the client is reading, instead of
+  1.5 times, so a client that reads slowly still keeps the workers busy.
 
 - Store snapshots (fullKV files) can now be pruned to save disk space: tier1 no longer assumes that a fullKV at block
   `x` implies that every earlier fullKV still exists. At request start it walks backwards from the first segment
@@ -43,7 +177,62 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - `substreams-tier1` now names the usage marker it writes in every module cache folder after the request's plan tier: `last_used_<plan>` (lowercase, e.g. `last_used_pro`), still plain `last_used` when unauthenticated. `firecore tools substreams purge` reads the plan back from that name to apply a retention per plan.
 
+### Tools
+
+- `substreams tools prometheus-exporter` now says *why* an endpoint is down. Every failure is classified into a
+  `reason` -- `invalid_config`, `connect_failed`, `connect_timeout`, `invalid_request`, `request_timeout`,
+  `stream_error`, `stale_block`, `invalid_response` or `no_data` -- exposed on the new
+  `substreams_healthcheck_failure_count{reason,grpc_code}` counter and included in the logs. An alert firing on
+  `substreams_healthcheck_status` no longer requires guessing whether the endpoint was unreachable, unauthenticated,
+  overloaded or merely late. A dial that fails outright is reported as `connect_failed`, carrying the dial
+  error where gRPC exposes it (`connection refused`); a hostname that does not resolve surfaces as the balancer's
+  own `no children to pick from`, since it replaces the resolver error. `connect_timeout` is reserved for a
+  connection that is merely slow to come up and never failed a dial.
+
+- Connection establishment gets its own budget, `--connect-timeout` (default 10s), separate from `--timeout`, which
+  now covers the `Blocks` request alone. gRPC dials lazily, so DNS, TLS and load-balancer resolution used to be
+  charged to the request timeout and a slow connection was reported as an endpoint failure -- this is what produced
+  the `received context error while waiting for new LB policy update: context deadline exceeded` errors. The exporter
+  now waits for the channel to be `READY` before issuing the request, and reports the two phases separately as
+  `substreams_healthcheck_connect_duration_ms` and `substreams_healthcheck_stream_duration_ms`.
+  `substreams_healthcheck_duration_ms` keeps its previous meaning of the two combined.
+
+- Every failed poll is logged, not just the transition into `unavailable`. An endpoint that fails repeatedly, or one
+  that flaps between two Prometheus scrapes, previously produced a single line and then nothing. Failure logs carry
+  the reason, the gRPC code, both durations and the consecutive failure count; the recovery log carries how long the
+  endpoint was down and how many polls failed meanwhile. A block age crossing half of `--max-freshness` is reported
+  too, so an alert on `substreams_healthcheck_block_age_ms` is no longer silent. That one is edge-triggered and only
+  after three consecutive polls agree, so a chain whose block interval straddles the threshold stays quiet.
+
+- New `substreams_healthcheck_consecutive_failures` gauge, meant to be alerted on instead of
+  `substreams_healthcheck_status` when single-poll hiccups should be ignored.
+
+- `substreams_healthcheck_block_age_ms` is reset to `NaN` when a poll returns no block, instead of keeping the age of
+  the last block ever seen -- which silently under-reported staleness for as long as an endpoint stayed broken.
+
+- Fixed: endpoints configured with different sets of query-parameter labels (e.g. one with `?namespace=x&region=y`
+  and one with only `?namespace=z`) made the exporter panic on inconsistent label cardinality. Missing labels are now
+  filled with an empty value.
+
+- **Breaking** The exporter now speaks `sf.substreams.rpc.v4.Stream/Blocks` only. The v3-to-v2 fallback is gone --
+  it closed the connection and then kept reading from it, double-counting the failure -- and
+  `--force-protocol-version` accepts only `4` (or `0`), the flag being kept for the protocol versions to come. An
+  invalid value used to be parsed and then silently ignored, it is now rejected at startup, so an invocation passing
+  `--force-protocol-version 2` or `3` must drop the flag.
+
+### Dependencies
+
+- `google.golang.org/grpc` is at v1.83.1, which clears GHSA-vp52-pcj8-j9qc, reported as HIGH: a peer could exhaust
+  server heap by fragmenting HTTP/2 DATA frames.
+
 ### Tests
+
+- The `tests_e2e/dummy` directory gains a `substreams.clickhouse.yaml` sibling manifest
+  packing `e2e_clickhouse`, whose `map_events_clickhouse` module emits
+  `test.clickhouse.Events`. That message carries the `(schema.table)` ClickHouse
+  annotations, so the package sinks with `substreams sink clickhouse` without further
+  setup. Kept out of `substreams.yaml` and given its own message so the annotations do
+  not change the module hashes of the existing e2e modules.
 
 - The `tests_e2e/dummy` package gains three modules for exercising Hosted Stores against a
   staging environment. `map_hosted_store_feed`, packed into `e2e-v0.3.0.spkg`, emits

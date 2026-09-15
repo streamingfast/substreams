@@ -1,7 +1,7 @@
 specVersion: v0.1.0
 package:
   name: e2e
-  version: v0.3.0
+  version: v0.4.0
 
 protobuf:
   descriptorSets:
@@ -16,7 +16,11 @@ protobuf:
   importPaths:
     - ./proto
   excludePaths:
-    - sf/substreams
+    # Narrower than "sf/substreams": the sink/sql schema stays, since
+    # contract.proto imports it for the ClickHouse annotations.
+    - sf/substreams/rpc
+    - sf/substreams/v1
+    - sf/substreams/index
     - sf/firehose
     - google
 

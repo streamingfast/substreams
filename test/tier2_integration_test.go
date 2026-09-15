@@ -568,6 +568,9 @@ func TestTier2Call(t *testing.T) {
 }
 
 func assertFilesWithEmpty(t *testing.T, tempDir string, expectPartialSpkg bool, expectNonEmpty bool, wantedFiles []string, expectedEmptyFiles []string) {
+	if expectPartialSpkg {
+		waitForPartialSpkg(t, tempDir)
+	}
 	producedFiles, emptyFiles := listFiles(t, tempDir)
 
 	if !expectNonEmpty {

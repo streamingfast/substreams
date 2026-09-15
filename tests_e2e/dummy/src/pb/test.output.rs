@@ -6,9 +6,12 @@ pub struct Events {
     #[prost(message, repeated, tag="1")]
     pub event: ::prost::alloc::vec::Vec<Event>,
 }
+/// Annotated for the ClickHouse sink, which has no default ordering and refuses
+/// to create a table without one. Postgres ignores these options.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Event {
+    /// ClickHouse requires the primary key to be a prefix of the sorting key.
     #[prost(string, tag="1")]
     pub evt_tx_hash: ::prost::alloc::string::String,
     #[prost(string, tag="2")]

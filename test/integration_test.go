@@ -647,7 +647,25 @@ func listFiles(t *testing.T, tempDir string) (storedFiles []string, emptyFiles [
 	return
 }
 
+// waitForPartialSpkg waits for the package marker, which tier1 writes detached from
+// the request and may still be writing when the request has returned.
+func waitForPartialSpkg(t *testing.T, tempDir string) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		produced, _ := listFiles(t, tempDir)
+		for _, f := range produced {
+			if strings.HasSuffix(f, "substreams.partial.spkg.zst") {
+				return true
+			}
+		}
+		return false
+	}, 5*time.Second, 10*time.Millisecond, "substreams.partial.spkg should be produced")
+}
+
 func assertFiles(t *testing.T, tempDir string, expectPartialSpkg bool, expectNonEmpty bool, wantedFiles ...string) {
+	if expectPartialSpkg {
+		waitForPartialSpkg(t, tempDir)
+	}
 	producedFiles, emptyFiles := listFiles(t, tempDir)
 
 	if !expectNonEmpty {

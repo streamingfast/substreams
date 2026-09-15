@@ -39,6 +39,7 @@ func BuildParallelProcessor(
 	noopMode bool,
 	outputBufferSize int,
 	supportBuffering bool,
+	execOutPrefetch execout.PrefetchConfig,
 ) (*ParallelProcessor, error) {
 
 	// FIXME: Are all the progress messages properly sent? When we skip some stores and mark them complete,
@@ -66,6 +67,9 @@ func BuildParallelProcessor(
 			initialBlock := execGraph.ModulesInitBlocks()[requestedModule.Name]
 			if execOutSegmenter := reqPlan.ReadOutSegmenter(initialBlock, sched.StreamFirstTier2MapSegment); execOutSegmenter != nil {
 				walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)
+				if !noopMode { // noop mode reads one item per file, prefetching whole files would be wasted
+					walker.WithPrefetch(execOutPrefetch)
+				}
 
 				sched.ExecOutWalker = orchestratorExecout.NewWalker(
 					ctx,

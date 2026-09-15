@@ -26,6 +26,8 @@ import (
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
+	"github.com/streamingfast/substreams/service/active_requests"
+	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/wasm"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	"github.com/streamingfast/substreams/wasm/wazero"
@@ -36,6 +38,20 @@ import (
 // Unlinkable live blocks in a row that mean the hub is wedged for good. Resets on
 // any linkable block and only armed once ready; same value the relayer uses.
 const maxConsecutiveUnlinkableBlocks = 5
+
+// burstFromLIB is the burst the hub's live source asks the relayer for: every block from
+// the hub's LIB onward, forks included, so the gap left by a disconnect is filled from the
+// relayer's memory instead of from the one-block store. When the LIB is older than what
+// the relayer holds, the relayer starts at its lowest block and the hub fills the rest from
+// the one-block store. A hub without a head yet asks for the last 2 blocks.
+func burstFromLIB(h *hub.ForkableHub) int64 {
+	_, _, _, libNum, err := h.HeadInfo()
+	// a burst of -1 means "from the relayer's LIB", -N (N > 1) means "from block N"
+	if err != nil || libNum < 2 {
+		return 2
+	}
+	return -int64(libNum)
+}
 
 type Tier1Modules struct {
 	// Required dependencies
@@ -61,6 +77,7 @@ func NewDefaultTier1Config() *Tier1Config {
 		MergedBlocksBundleSize: bstream.DefaultMergedBlocksBundleSize,
 		BlockExecutionTimeout:  1 * time.Minute,
 		OutputBufferSize:       100,
+		ExecOutPrefetch:        execout.PrefetchConfig{Depth: execout.MaxPrefetchDepth, BudgetBytes: 64 << 20},
 	}
 }
 
@@ -96,14 +113,25 @@ type Tier1Config struct {
 	ActiveRequestsSoftLimit int    // maximum number of active requests a tier1 app can have with external clients before starting to advertise itself as unready in the health check
 
 	ActiveRequestsHardLimit int // maximum number of active requests a tier1 app can have with external clients, refuse with CodeUnavailable if reached
-	MaxSubrequests          uint64
-	SubrequestsEndpoint     string
-	SubrequestsInsecure     bool
-	SubrequestsPlaintext    bool
-	SubrequestsSecret       string
+
+	// CPUEviction configures the CPU-based request evictor; the zero value
+	// (mode off) disables it, unset tunables take their defaults.
+	CPUEviction active_requests.EvictorConfig
+
+	MaxSubrequests       uint64
+	SubrequestsEndpoint  string
+	SubrequestsInsecure  bool
+	SubrequestsPlaintext bool
+	SubrequestsSecret    string
 
 	SharedCacheSize  uint64
 	OutputBufferSize uint64 // Used to bundle execout messages within 'BlockScopedDatas' when using protocol V4
+
+	// ExecOutPrefetch bounds how far ahead a production-mode request downloads cached
+	// execution output files while streaming them: at most Depth segments (capped at
+	// execout.MaxPrefetchDepth), holding at most BudgetBytes of decompressed data per
+	// request. Zero disables prefetching.
+	ExecOutPrefetch execout.PrefetchConfig
 
 	// StoreSizeLimit, if non-zero, overrides the default store size limit (in bytes)
 	// used by tier2 stores. The value is forwarded to tier2 on each request.
@@ -231,6 +259,7 @@ func (a *Tier1App) Run() error {
 				}),
 				blockstream.WithRequester("substreams-tier1"),
 				blockstream.WithPartialBlocks(),
+				blockstream.WithBurstFunc(func() int64 { return burstFromLIB(forkableHub) }),
 			)
 		})
 
@@ -292,6 +321,7 @@ func (a *Tier1App) Run() error {
 	if a.config.StoreSizeLimit != 0 {
 		opts = append(opts, service.WithStoreSizeLimit(a.config.StoreSizeLimit))
 	}
+	opts = append(opts, service.WithExecOutPrefetch(a.config.ExecOutPrefetch))
 
 	if a.config.TmpDir != "" {
 		wazero.SetTempDir(a.config.TmpDir)
@@ -338,6 +368,7 @@ func (a *Tier1App) Run() error {
 		a.config.EnforceCompression,
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
+		a.config.CPUEviction.WithDefaults(),
 		a.config.SharedCacheSize,
 		a.config.OutputBufferSize,
 		a.modules.SessionPool,

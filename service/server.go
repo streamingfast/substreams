@@ -157,6 +157,7 @@ func ListenTier2(
 			regexp.MustCompile(`TLS handshake error.*EOF`),
 			regexp.MustCompile(`TLS handshake error.*connection reset by peer`),
 			regexp.MustCompile(`TLS handshake error.*first record does not look like a TLS handshake`),
+			regexp.MustCompile(`http2: server: error reading preface.*connection reset by peer`),
 		),
 	}
 	if enforceCompression {

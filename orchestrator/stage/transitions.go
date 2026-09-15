@@ -112,6 +112,7 @@ func (s *Stages) MarkSegmentPending(u Unit) {
 	s.transition(u, UnitPending,
 		UnitMerging, // Squasher didn't find the partials, so asking for the job to re-run
 	)
+	s.rewindNextJobCursor(u)
 }
 
 // ReprocessMapSegment sends a map-stage unit back to Pending so its job runs again,
@@ -129,11 +130,7 @@ func (s *Stages) ReprocessMapSegment(segmentIdx int) bool {
 		return false
 	}
 	s.setState(u, UnitPending)
-	// NextJob only scans from nextJobCursor; the cursor had moved past this segment
-	// when the unit was done.
-	if segmentIdx < s.nextJobCursor {
-		s.nextJobCursor = segmentIdx
-	}
+	s.rewindNextJobCursor(u)
 	return true
 }
 
@@ -163,6 +160,7 @@ func (s *Stages) ReleaseJob(u Unit) {
 	s.transition(u, UnitPending,
 		UnitScheduled,
 	)
+	s.rewindNextJobCursor(u)
 }
 
 func (s *Stages) markSegmentScheduled(u Unit) {

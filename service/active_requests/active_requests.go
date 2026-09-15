@@ -83,6 +83,16 @@ func NewActiveRequestsHandler(manager *ActiveRequestsManager) *ActiveRequestsHan
 	}
 }
 
+// ComputeStats gives the manager read access to a request's execution stats,
+// implemented by *metrics.Stats.
+type ComputeStats interface {
+	// LocalWasmComputeDuration is the cumulative wall time spent executing wasm
+	// locally, excluding waits on external calls; wasm does not otherwise block,
+	// so it approximates CPU time.
+	LocalWasmComputeDuration() time.Duration
+	CurrentBlock() uint64
+}
+
 type activeRequestRecord struct {
 	StartTime              time.Time
 	cancelFunc             context.CancelCauseFunc
@@ -92,6 +102,19 @@ type activeRequestRecord struct {
 	SegmentSize            uint64
 	Stage                  uint32
 	FullKVStoreMemoryBytes uint64
+
+	// ProductionMode and Live classify the request for CPU eviction: dev-mode
+	// requests are evicted before production ones, and production requests still
+	// catching up before those streaming live blocks. Live is only ever flipped
+	// from false to true, under the manager's lock.
+	ProductionMode bool
+	Live           bool
+	// BurnCores is the CPU consumed by this request's wasm execution over the
+	// last evictor evaluation interval, in cores; refreshed under the manager's
+	// lock by the evictor.
+	BurnCores float64
+
+	stats ComputeStats
 }
 
 var ErrInstanceOutOfMemory = errors.New("instance out of memory")
@@ -101,6 +124,16 @@ func (arh *ActiveRequestsHandler) totalLoadedSize() (totalSize uint64) {
 		totalSize += req.FullKVStoreMemoryBytes
 	}
 	return totalSize
+}
+
+// SetLive marks the request as having reached live blocks (fed by the hub
+// instead of files). Idempotent; a request never goes back to non-live.
+func (arh *ActiveRequestsHandler) SetLive() {
+	arh.manager.Lock()
+	defer arh.manager.Unlock()
+	if req := arh.manager.reqs[arh.uniqueID]; req != nil {
+		req.Live = true
+	}
 }
 
 func (arh *ActiveRequestsHandler) AdjustFullKVSize(size uint64) {
@@ -171,7 +204,7 @@ func (arh *ActiveRequestsHandler) AllocateFullKVSizeOrForceCancelRequest(size ui
 	}
 }
 
-func (arr *ActiveRequestsManager) Add(cancel context.CancelCauseFunc, traceID string, outputModuleHash string, segmentNumber, segmentSize uint64, stage uint32) *ActiveRequestsHandler {
+func (arr *ActiveRequestsManager) Add(cancel context.CancelCauseFunc, traceID string, outputModuleHash string, segmentNumber, segmentSize uint64, stage uint32, productionMode bool, stats ComputeStats) *ActiveRequestsHandler {
 	uniqueID := reqID(traceID, segmentNumber, segmentSize, stage)
 	arr.Lock()
 	arr.reqs[uniqueID] = &activeRequestRecord{
@@ -183,6 +216,8 @@ func (arr *ActiveRequestsManager) Add(cancel context.CancelCauseFunc, traceID st
 		SegmentSize:            segmentSize,
 		Stage:                  stage,
 		FullKVStoreMemoryBytes: 0,
+		ProductionMode:         productionMode,
+		stats:                  stats,
 	}
 	arr.Unlock()
 

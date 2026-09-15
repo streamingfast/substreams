@@ -63,6 +63,7 @@
 * [Hosted Services](how-to-guides/hosted-services/hosted-services.md)
   * [Hosted Sinks](how-to-guides/hosted-services/hosted-sinks.md)
     * [Managing Your Sink](how-to-guides/sinks/hosted-sinks/manage-your-sink.md)
+    * [GraphQL Layer](how-to-guides/sinks/hosted-sinks/graphql-layer.md)
     * [Supabase](how-to-guides/sinks/hosted-sinks/supabase.md)
     * [Neon](how-to-guides/sinks/hosted-sinks/neon.md)
     * [ClickHouse Cloud](how-to-guides/sinks/hosted-sinks/clickhouse-cloud.md)

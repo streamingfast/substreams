@@ -1,13 +1,14 @@
 package execout
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"iter"
 	"path"
-	"sort"
+	"slices"
 	"strconv"
 
 	"github.com/streamingfast/dstore"
@@ -277,8 +278,8 @@ func rewriteAsOrdered(ctx context.Context, r io.ReadCloser, readBytes []byte, st
 	}
 	items := o.Items
 
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].BlockNum < items[j].BlockNum
+	slices.SortFunc(items, func(a, b *pboutput.Item) int {
+		return cmp.Compare(a.BlockNum, b.BlockNum)
 	})
 
 	store.SetOverwrite(true)

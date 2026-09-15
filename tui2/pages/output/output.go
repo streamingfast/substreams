@@ -305,8 +305,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			o.statusBar.SetBytesRepresentation(o.bytesRepresentation)
 			o.setOutputViewContent(true)
 		case "N":
-			for i := len(o.searchMatchingOutputViewOffsets) - 1; i >= 0; i-- {
-				pos := o.searchMatchingOutputViewOffsets[i]
+			for _, pos := range slices.Backward(o.searchMatchingOutputViewOffsets) {
 				if pos < o.outputView.YOffset {
 					o.outputView.YOffset = pos
 					break
@@ -554,8 +553,7 @@ func (o *Output) jumpToPreviousMatchingBlock() tea.Cmd {
 	activeBlock := o.active.BlockNum
 	blocks := o.searchBlockNumsWithMatches
 	return func() tea.Msg {
-		for i := len(blocks) - 1; i >= 0; i-- {
-			block := blocks[i]
+		for _, block := range slices.Backward(blocks) {
 			if block < activeBlock {
 				return blockselect.BlockChangedMsg(block)
 			}

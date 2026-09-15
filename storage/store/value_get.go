@@ -3,6 +3,7 @@ package store
 import (
 	"bytes"
 	"fmt"
+	"slices"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -63,8 +64,7 @@ func (b *baseStore) HasFirst(key string) bool {
 }
 
 func (b *baseStore) getLast(key string) ([]byte, bool) {
-	for i := len(b.deltas) - 1; i >= 0; i-- {
-		delta := b.deltas[i]
+	for _, delta := range slices.Backward(b.deltas) {
 		if delta.Key != key {
 			continue
 		}
@@ -96,8 +96,7 @@ func (b *baseStore) GetLast(key string) ([]byte, bool) {
 }
 
 func (b *baseStore) HasLast(key string) bool {
-	for i := len(b.deltas) - 1; i >= 0; i-- {
-		delta := b.deltas[i]
+	for _, delta := range slices.Backward(b.deltas) {
 		if delta.Key != key {
 			continue
 		}
@@ -119,8 +118,7 @@ func (b *baseStore) HasLast(key string) bool {
 func (b *baseStore) getAt(ord uint64, key string) (out []byte, found bool) {
 	out, found = b.getLast(key)
 
-	for i := len(b.deltas) - 1; i >= 0; i-- {
-		delta := b.deltas[i]
+	for _, delta := range slices.Backward(b.deltas) {
 		if delta.Ordinal <= ord {
 			break
 		}
@@ -161,8 +159,7 @@ func (b *baseStore) GetAt(ord uint64, key string) (out []byte, found bool) {
 func (b *baseStore) HasAt(ord uint64, key string) bool {
 	_, found := b.GetFirst(key)
 
-	for i := len(b.deltas) - 1; i >= 0; i-- {
-		delta := b.deltas[i]
+	for _, delta := range slices.Backward(b.deltas) {
 		if delta.Ordinal <= ord {
 			break
 		}

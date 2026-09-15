@@ -28,21 +28,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can
   hard-delete a batch of keys over gRPC. Missing keys are ignored; later reads return
   `NOT_FOUND`, not a tombstone.
+  
 - Add a Hosted Services how-to that describes Hosted Sinks and Hosted Stores, with
   separate Remote Feed and Substreams Feed hosted-store guides. Move the Hosted
   Sinks how-to under Hosted Services.
 
 ### Server
 
+- Per-store lines are now logged at `Debug` instead of `Info`: `using mmap KV store`,
+  `using in-memory KV store`, `flushing store at boundary`, `merged partial into full store`,
+  `deleting partial store`. They fired for every store opened by tier1 and tier2 and for
+  every squash. `squashing time metrics` stays at `Info` as the squash progress signal.
+  
 - `substreams-tier1` now asks the relayer for every block from its own LIB when it connects
   or reconnects, instead of the last 2 blocks. A gap left by a disconnect is filled from the
   relayer's memory, and only the part older than what the relayer holds is read from the
   one-block store. On fast chains a tier1 that fell a few seconds behind used to fill the
   whole gap from the one-block store, long enough for the relayer to drop it again.
+  
 - Fix partial-blocks (flashblocks) streams on a tier1 that is shutting down. The stream now
   ends with `Unavailable` like a full-block stream does, so the client reconnects elsewhere.
   It used to stay open but silent, then sent an undo signal at each block boundary naming a
   block the client had never received.
+  
 - Never send an undo signal for partial-block state whose outputs were never sent.
 
 - `substreams-tier1` now squashes store partials in runs. When a segment is ready to be merged, every

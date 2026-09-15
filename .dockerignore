@@ -1,6 +1,5 @@
 .git
 target
 **/target
-dist
+dit
 rust
-

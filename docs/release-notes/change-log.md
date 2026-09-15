@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+- Fixed: `substreams registry login` failed with `no such file or directory` when `~/.config/substreams`
+  did not exist yet. The directory is now created before the token is written, and the token file is
+  written with mode `0600` instead of `0644` (an existing file is tightened on re-login).
+
 - A manifest can now import `sf/substreams/sink/sql/schema/v1/schema.proto` without
   vendoring a copy of it. The file is a system protobuf, but `protoparse` needs the
   source on disk to honour its extensions, so an import previously failed with
@@ -24,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can
   hard-delete a batch of keys over gRPC. Missing keys are ignored; later reads return
   `NOT_FOUND`, not a tombstone.
+  
 - Add a Hosted Services how-to that describes Hosted Sinks and Hosted Stores, with
   separate Remote Feed and Substreams Feed hosted-store guides. Move the Hosted
   Sinks how-to under Hosted Services.
@@ -34,11 +39,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `using in-memory KV store`, `flushing store at boundary`, `merged partial into full store`,
   `deleting partial store`. They fired for every store opened by tier1 and tier2 and for
   every squash. `squashing time metrics` stays at `Info` as the squash progress signal.
+  
+- `substreams-tier1` now asks the relayer for every block from its own LIB when it connects
+  or reconnects, instead of the last 2 blocks. A gap left by a disconnect is filled from the
+  relayer's memory, and only the part older than what the relayer holds is read from the
+  one-block store. On fast chains a tier1 that fell a few seconds behind used to fill the
+  whole gap from the one-block store, long enough for the relayer to drop it again.
+  
 - Fix partial-blocks (flashblocks) streams on a tier1 that is shutting down. The stream now
   ends with `Unavailable` like a full-block stream does, so the client reconnects elsewhere.
   It used to stay open but silent, then sent an undo signal at each block boundary naming a
   block the client had never received.
+  
 - Never send an undo signal for partial-block state whose outputs were never sent.
+
+- `substreams-tier1` now squashes store partials in runs. When a segment is ready to be merged, every
+  following segment whose partial is already there is merged by the same command, up to 1000 segments or 30 s
+  of work, instead of one segment per command. Each command waits for a round trip through the scheduler loop,
+  which also borrows a worker for every job it schedules. On a busy backprocessing request that round trip took
+  3 to 5 s, so squashing was capped at about 15 segments per minute even when a merge took 0.3 s, and it fell
+  tens of thousands of segments behind the tier2 jobs.
+
+- `substreams-tier1` squash runs now copy the previous full store over segments whose partials are all empty,
+  instead of merging and saving each of them: an empty partial leaves the store unchanged. A run lists the sizes
+  of its partials in one go, reads the first decompressed byte of the small ones only, so a large partial is
+  never downloaded, then copies the last written full store to every consecutive empty segment, 32 at a time,
+  server-side on object stores that support it. On a store most segments never touch, a run of 1000 segments
+  goes from about 190 s to a few seconds. A module's first segment and segments shorter than the store interval
+  still go through the regular squash, and so do the segments of a copy that fails.
+
+- `substreams-tier1` no longer releases the squasher's cached stores while a squash is still running. When the
+  scheduler stopped early (a tier2 job failed, or the pod was shutting down), the stores were closed under the
+  in-flight merge, which could panic the process or write an empty full store to storage. Closing now cancels
+  the squash, which stops at its next segment, and waits for it to finish.
 
 - `substreams-tier1` scheduling no longer slows down as a large backprocessing range progresses. Picking the next
   tier2 job walked every segment between the squasher and the job frontier on every call, re-checking

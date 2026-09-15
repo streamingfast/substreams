@@ -98,7 +98,7 @@ func DeclareTier1Metrics(zlog *zap.Logger) {
 	Tier1EvictedRequestsCounter = MetricSet.NewCounterVec(
 		"substreams_tier1_evicted_requests_counter",
 		[]string{"class", "action"},
-		"Requests the CPU evictor selected, by class (dev, prod-catchup, prod-live) and action (cancelled, or observed in observe mode)",
+		"Requests the CPU evictor selected, by class (dev, prod-cached, prod-catchup, prod-live) and action (cancelled, or observed in observe mode)",
 	)
 
 	StoreBackendType = MetricSet.NewGaugeVec(

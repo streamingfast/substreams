@@ -70,6 +70,13 @@ func (p *Pipeline) ProcessFromExecOutput(
 func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err error) {
 	ctx := p.ctx
 
+	if !p.processingBlocksSet {
+		p.processingBlocksSet = true
+		if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
+			reqHandler.SetProcessingBlocks()
+		}
+	}
+
 	metrics.BlockBeginProcess.Inc()
 	defer metrics.BlockEndProcess.Inc()
 

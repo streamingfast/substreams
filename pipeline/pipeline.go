@@ -145,6 +145,7 @@ type Pipeline struct {
 	sentBlocks            uint64
 	quickSaved            bool
 	sessionInitSent       bool // ensures a single Response_Session per request; see sendSession
+	processingBlocksSet   bool // ensures the active request is marked as processing blocks only once
 
 	blockStepMap         map[bstream.StepType]uint64
 	workerPoolFactory    work.WorkerPoolFactory

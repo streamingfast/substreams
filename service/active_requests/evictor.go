@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -43,7 +44,12 @@ type EvictorConfig struct {
 	DrainDelay     time.Duration // delay between going unready and the first cancellation, covering the LB routing lag
 
 	MinAge       time.Duration // requests younger than this are never cancelled
-	MinBurnCores float64       // requests consuming less CPU than this are never cancelled (cutting them would not help)
+	MinBurnCores float64       // requests consuming less CPU than this are never cancelled (cutting them would not help); does not apply to prod-cached
+
+	// Order lists the request classes eviction may cancel, least important
+	// first. A class left out is never cancelled. Empty means
+	// DefaultEvictionOrder. The dev-only mode still restricts it to dev.
+	Order []EvictionClass
 
 	// QuotaCoresOverride is the CPU budget, in cores, to measure usage against
 	// instead of the cgroup's cpu.max. Set it on a pod whose cgroup accounts CPU
@@ -90,6 +96,9 @@ func (c EvictorConfig) WithDefaults() EvictorConfig {
 	setDuration(&c.DrainDelay, def.DrainDelay)
 	setDuration(&c.MinAge, def.MinAge)
 	setFloat(&c.MinBurnCores, def.MinBurnCores)
+	if len(c.Order) == 0 {
+		c.Order = def.Order
+	}
 	return c
 }
 
@@ -106,32 +115,72 @@ func DefaultEvictorConfig() EvictorConfig {
 		DrainDelay:       8 * time.Second,
 		MinAge:           90 * time.Second,
 		MinBurnCores:     0.05,
+		Order:            DefaultEvictionOrder(),
 	}
 }
 
-type evictClass int
+type EvictionClass string
 
-// Eviction order. A dev-mode request is a developer iterating and is always
-// cut first. Between the two production classes, a live request burning a lot
-// of CPU keeps burning it for as long as it stays connected, while a catching
-// up request is spending CPU on work it will finish and then stop needing;
-// cutting the catchup one throws away progress that has to be redone.
 const (
-	classDev         evictClass = iota // dev-mode requests, cancelled first
-	classProdLive                      // production-mode requests streaming live blocks
-	classProdCatchup                   // production-mode requests still catching up from files, cancelled last
+	// ClassDev is a dev-mode request, whatever it is doing.
+	ClassDev EvictionClass = "dev"
+	// ClassProdCached is a production-mode request that has not started
+	// processing blocks on this pod: it only streams outputs already cached by
+	// tier2 and runs no wasm here, so its CPU does not show in its burn rate.
+	ClassProdCached EvictionClass = "prod-cached"
+	// ClassProdCatchup is a production-mode request processing blocks on this
+	// pod that has not reached live blocks.
+	ClassProdCatchup EvictionClass = "prod-catchup"
+	// ClassProdLive is a production-mode request that has received live blocks.
+	ClassProdLive EvictionClass = "prod-live"
 )
 
-func (c evictClass) String() string {
-	switch c {
-	case classDev:
-		return "dev"
-	case classProdLive:
-		return "prod-live"
-	case classProdCatchup:
-		return "prod-catchup"
+// DefaultEvictionOrder cuts a dev-mode request first, since it is a developer
+// iterating. Between the production classes, a live request burning a lot of
+// CPU keeps burning it for as long as it stays connected, while a catching up
+// request is spending CPU on work it will finish and then stop needing; cutting
+// the catchup one throws away progress that has to be redone. prod-cached is
+// left out, so such requests are never cancelled.
+func DefaultEvictionOrder() []EvictionClass {
+	return []EvictionClass{ClassDev, ClassProdLive, ClassProdCatchup}
+}
+
+// ParseEvictionOrder parses a comma-separated list of classes, least important
+// first, e.g. "dev,prod-cached,prod-catchup". An empty string returns nil,
+// which WithDefaults turns into DefaultEvictionOrder.
+func ParseEvictionOrder(s string) ([]EvictionClass, error) {
+	if strings.TrimSpace(s) == "" {
+		return nil, nil
 	}
-	return "unknown"
+	var out []EvictionClass
+	seen := make(map[EvictionClass]bool)
+	for _, part := range strings.Split(s, ",") {
+		class := EvictionClass(strings.TrimSpace(part))
+		switch class {
+		case ClassDev, ClassProdCached, ClassProdCatchup, ClassProdLive:
+		default:
+			return nil, fmt.Errorf("invalid eviction class %q (accepted: dev, prod-cached, prod-catchup, prod-live)", part)
+		}
+		if seen[class] {
+			return nil, fmt.Errorf("eviction class %q listed twice", class)
+		}
+		seen[class] = true
+		out = append(out, class)
+	}
+	return out, nil
+}
+
+func requestClass(req *activeRequestRecord) EvictionClass {
+	switch {
+	case !req.ProductionMode:
+		return ClassDev
+	case req.Live:
+		return ClassProdLive
+	case req.ProcessingBlocks:
+		return ClassProdCatchup
+	default:
+		return ClassProdCached
+	}
 }
 
 // Evictor detects CPU overload of the tier1 pod from its cgroup and cancels
@@ -263,21 +312,16 @@ func (ev *Evictor) tick(now time.Time) {
 		return
 	}
 
+	order := ev.cfg.Order
 	if ev.cfg.Mode == EvictionDevOnly {
-		onlyDev := candidates[:0]
-		for _, c := range candidates {
-			if c.class == classDev {
-				onlyDev = append(onlyDev, c)
-			}
-		}
-		candidates = onlyDev
+		order = []EvictionClass{ClassDev}
 	}
 
 	usedCores := signals.UsageRatio * signals.QuotaCores
 	targetCores := ev.cfg.TargetRatio * signals.QuotaCores
 	excessCores := usedCores - targetCores
 
-	victims := selectVictims(candidates, excessCores)
+	victims := selectVictims(candidates, excessCores, order)
 	if len(victims) == 0 {
 		return
 	}
@@ -285,7 +329,7 @@ func (ev *Evictor) tick(now time.Time) {
 	for _, v := range victims {
 		fields := []zap.Field{
 			zap.String("trace_id", v.traceID),
-			zap.String("class", v.class.String()),
+			zap.String("class", string(v.class)),
 			zap.Float64("burn_cores", v.burnCores),
 			zap.Duration("age", now.Sub(v.startTime)),
 			zap.Uint64("current_block", v.currentBlock),
@@ -361,7 +405,7 @@ func holdSince(since time.Time, condition bool, now time.Time) time.Time {
 type evictCandidate struct {
 	uniqueID     string
 	traceID      string
-	class        evictClass
+	class        EvictionClass
 	burnCores    float64
 	startTime    time.Time
 	currentBlock uint64
@@ -369,9 +413,10 @@ type evictCandidate struct {
 }
 
 // sampleBurnRates computes each request's CPU burn rate (in cores) since the
-// previous tick and returns the eviction candidates: old enough, burning
-// enough to be worth cancelling. It also refreshes BurnCores on the records
-// for the debug API listing.
+// previous tick and returns the eviction candidates: old enough, and burning
+// enough to be worth cancelling unless they are prod-cached, whose CPU the burn
+// rate does not see. It also refreshes BurnCores on the records for the debug
+// API listing.
 func (ev *Evictor) sampleBurnRates(now time.Time) (candidates []evictCandidate, totalActive int) {
 	ev.manager.Lock()
 	defer ev.manager.Unlock()
@@ -396,15 +441,12 @@ func (ev *Evictor) sampleBurnRates(now time.Time) (candidates []evictCandidate, 
 		}
 		req.BurnCores = burn
 
-		if !sampled || now.Sub(req.StartTime) < ev.cfg.MinAge || burn < ev.cfg.MinBurnCores {
+		if now.Sub(req.StartTime) < ev.cfg.MinAge {
 			continue
 		}
-		class := classDev
-		if req.ProductionMode {
-			class = classProdCatchup
-			if req.Live {
-				class = classProdLive
-			}
+		class := requestClass(req)
+		if class != ClassProdCached && (!sampled || burn < ev.cfg.MinBurnCores) {
+			continue
 		}
 		candidates = append(candidates, evictCandidate{
 			uniqueID:     uniqueID,
@@ -424,23 +466,40 @@ func (ev *Evictor) sampleBurnRates(now time.Time) (candidates []evictCandidate, 
 	return candidates, totalActive
 }
 
-// selectVictims picks which candidates to cancel: least important class first,
-// highest burn first within a class, cutting until the cancelled burn covers
-// excessCores.
-func selectVictims(candidates []evictCandidate, excessCores float64) []evictCandidate {
-	sorted := make([]evictCandidate, len(candidates))
-	copy(sorted, candidates)
-	sort.Slice(sorted, func(i, j int) bool {
-		if sorted[i].class != sorted[j].class {
-			return sorted[i].class < sorted[j].class
+// selectVictims picks which candidates to cancel: classes in the given order,
+// least important first, skipping classes not listed; highest burn first
+// within a class, oldest first on a tie. It cuts until the cancelled burn
+// covers excessCores. A prod-cached request's cost is unknown, so cutting stops
+// right after one: the next round measures what it freed.
+func selectVictims(candidates []evictCandidate, excessCores float64, order []EvictionClass) []evictCandidate {
+	rank := make(map[EvictionClass]int, len(order))
+	for i, class := range order {
+		rank[class] = i
+	}
+
+	var sorted []evictCandidate
+	for _, c := range candidates {
+		if _, ok := rank[c.class]; ok {
+			sorted = append(sorted, c)
 		}
-		return sorted[i].burnCores > sorted[j].burnCores
+	}
+	sort.SliceStable(sorted, func(i, j int) bool {
+		if sorted[i].class != sorted[j].class {
+			return rank[sorted[i].class] < rank[sorted[j].class]
+		}
+		if sorted[i].burnCores != sorted[j].burnCores {
+			return sorted[i].burnCores > sorted[j].burnCores
+		}
+		return sorted[i].startTime.Before(sorted[j].startTime)
 	})
 
 	var out []evictCandidate
 	var evictedCores float64
 	for _, c := range sorted {
 		out = append(out, c)
+		if c.class == ClassProdCached {
+			break
+		}
 		evictedCores += c.burnCores
 		if evictedCores >= excessCores {
 			break
@@ -477,9 +536,9 @@ func (ev *Evictor) publishMetrics(signals CPUSignals, activeRequests int) {
 	}
 }
 
-func recordEviction(class evictClass, action string) {
+func recordEviction(class EvictionClass, action string) {
 	if metrics.Tier1EvictedRequestsCounter == nil {
 		return
 	}
-	metrics.Tier1EvictedRequestsCounter.Inc(class.String(), action)
+	metrics.Tier1EvictedRequestsCounter.Inc(string(class), action)
 }

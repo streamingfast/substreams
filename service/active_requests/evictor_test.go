@@ -13,19 +13,19 @@ import (
 
 func TestSelectVictims_ClassThenBurnOrder(t *testing.T) {
 	candidates := []evictCandidate{
-		{traceID: "prod-live-big", class: classProdLive, burnCores: 3.0},
-		{traceID: "dev-small", class: classDev, burnCores: 0.2},
-		{traceID: "dev-big", class: classDev, burnCores: 1.5},
-		{traceID: "catchup", class: classProdCatchup, burnCores: 2.0},
+		{traceID: "prod-live-big", class: ClassProdLive, burnCores: 3.0},
+		{traceID: "dev-small", class: ClassDev, burnCores: 0.2},
+		{traceID: "dev-big", class: ClassDev, burnCores: 1.5},
+		{traceID: "catchup", class: ClassProdCatchup, burnCores: 2.0},
 	}
 
 	// a small excess is covered by the least important class, even against a bigger burner
-	victims := selectVictims(candidates, 1.0)
+	victims := selectVictims(candidates, 1.0, DefaultEvictionOrder())
 	require.Len(t, victims, 1)
 	assert.Equal(t, "dev-big", victims[0].traceID)
 
 	// cutting continues in class order until the evicted burn covers the excess
-	victims = selectVictims(candidates, 3.0)
+	victims = selectVictims(candidates, 3.0, DefaultEvictionOrder())
 	require.Len(t, victims, 3)
 	assert.Equal(t, "dev-big", victims[0].traceID)
 	assert.Equal(t, "dev-small", victims[1].traceID)
@@ -34,21 +34,104 @@ func TestSelectVictims_ClassThenBurnOrder(t *testing.T) {
 
 func TestSelectVictims_CutsLiveBeforeCatchup(t *testing.T) {
 	candidates := []evictCandidate{
-		{traceID: "catchup-1", class: classProdCatchup, burnCores: 2.0},
-		{traceID: "catchup-2", class: classProdCatchup, burnCores: 1.8},
-		{traceID: "live-1", class: classProdLive, burnCores: 1.5},
+		{traceID: "catchup-1", class: ClassProdCatchup, burnCores: 2.0},
+		{traceID: "catchup-2", class: ClassProdCatchup, burnCores: 1.8},
+		{traceID: "live-1", class: ClassProdLive, burnCores: 1.5},
 	}
 
 	// an excess nothing can cover takes every candidate, live before catchup
-	victims := selectVictims(candidates, 100)
+	victims := selectVictims(candidates, 100, DefaultEvictionOrder())
 	require.Len(t, victims, 3)
 	assert.Equal(t, "live-1", victims[0].traceID)
 	assert.Equal(t, "catchup-1", victims[1].traceID)
 	assert.Equal(t, "catchup-2", victims[2].traceID)
 
 	// cutting stops as soon as the evicted burn covers the excess
-	victims = selectVictims(candidates, 3.0)
+	victims = selectVictims(candidates, 3.0, DefaultEvictionOrder())
 	require.Len(t, victims, 2)
+}
+
+func TestSelectVictims_CustomOrderSkipsUnlistedClasses(t *testing.T) {
+	t0 := time.Now()
+	candidates := []evictCandidate{
+		{traceID: "live", class: ClassProdLive, burnCores: 3.0},
+		{traceID: "catchup", class: ClassProdCatchup, burnCores: 2.0},
+		{traceID: "dev", class: ClassDev, burnCores: 0.5},
+		{traceID: "cached-young", class: ClassProdCached, startTime: t0},
+		{traceID: "cached-old", class: ClassProdCached, startTime: t0.Add(-time.Hour)},
+	}
+	order := []EvictionClass{ClassDev, ClassProdCached, ClassProdCatchup}
+
+	// a prod-cached request's cost is unknown: cutting stops right after the first one, oldest first
+	victims := selectVictims(candidates, 100, order)
+	require.Len(t, victims, 2)
+	assert.Equal(t, "dev", victims[0].traceID)
+	assert.Equal(t, "cached-old", victims[1].traceID)
+
+	// without prod-cached candidates, cutting goes on to catchup and never reaches live
+	victims = selectVictims(candidates[:3], 100, order)
+	require.Len(t, victims, 2)
+	assert.Equal(t, "dev", victims[0].traceID)
+	assert.Equal(t, "catchup", victims[1].traceID)
+}
+
+func TestParseEvictionOrder(t *testing.T) {
+	order, err := ParseEvictionOrder("dev, prod-cached,prod-catchup")
+	require.NoError(t, err)
+	assert.Equal(t, []EvictionClass{ClassDev, ClassProdCached, ClassProdCatchup}, order)
+
+	order, err = ParseEvictionOrder("")
+	require.NoError(t, err)
+	assert.Nil(t, order)
+
+	_, err = ParseEvictionOrder("dev,prod")
+	assert.ErrorContains(t, err, `invalid eviction class "prod"`)
+
+	_, err = ParseEvictionOrder("dev,dev")
+	assert.ErrorContains(t, err, "listed twice")
+}
+
+type fakeComputeStats struct{ compute time.Duration }
+
+func (f *fakeComputeStats) LocalWasmComputeDuration() time.Duration { return f.compute }
+func (f *fakeComputeStats) CurrentBlock() uint64                    { return 0 }
+
+func TestSampleBurnRates_Classes(t *testing.T) {
+	cfg := DefaultEvictorConfig()
+	manager := NewActiveRequestsManager(zap.NewNop())
+	ev := NewEvictor(cfg, manager, nil, zap.NewNop())
+	noop := func(error) {}
+
+	manager.Add(noop, "cached", "", 0, 0, 0, true, &fakeComputeStats{})
+	catchupStats := &fakeComputeStats{}
+	catchup := manager.Add(noop, "catchup", "", 0, 0, 0, true, catchupStats)
+	catchup.SetProcessingBlocks()
+	liveStats := &fakeComputeStats{}
+	live := manager.Add(noop, "live", "", 0, 0, 0, true, liveStats)
+	live.SetProcessingBlocks()
+	live.SetLive()
+	manager.Add(noop, "dev-idle", "", 0, 0, 0, false, &fakeComputeStats{})
+	for _, req := range manager.reqs {
+		req.StartTime = time.Now().Add(-time.Hour)
+	}
+
+	t0 := time.Now()
+	ev.sampleBurnRates(t0)
+	catchupStats.compute = 5 * time.Second
+	liveStats.compute = 5 * time.Second
+	candidates, total := ev.sampleBurnRates(t0.Add(5 * time.Second))
+	assert.Equal(t, 4, total)
+
+	classes := make(map[string]EvictionClass)
+	for _, c := range candidates {
+		classes[c.traceID] = c.class
+	}
+	// prod-cached burns no wasm but stays a candidate; an idle dev request does not
+	assert.Equal(t, map[string]EvictionClass{
+		"cached":  ClassProdCached,
+		"catchup": ClassProdCatchup,
+		"live":    ClassProdLive,
+	}, classes)
 }
 
 func newTestEvictor(cfg EvictorConfig) *Evictor {

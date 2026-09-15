@@ -136,13 +136,11 @@ const (
 )
 
 // DefaultEvictionOrder cuts a dev-mode request first, since it is a developer
-// iterating. Between the production classes, a live request burning a lot of
-// CPU keeps burning it for as long as it stays connected, while a catching up
-// request is spending CPU on work it will finish and then stop needing; cutting
-// the catchup one throws away progress that has to be redone. prod-cached is
-// left out, so such requests are never cancelled.
+// iterating, then a request only streaming cached outputs, which can resume
+// from its cursor elsewhere, then one catching up. prod-live is left out: live
+// requests are the streams eviction exists to protect.
 func DefaultEvictionOrder() []EvictionClass {
-	return []EvictionClass{ClassDev, ClassProdLive, ClassProdCatchup}
+	return []EvictionClass{ClassDev, ClassProdCached, ClassProdCatchup}
 }
 
 // ParseEvictionOrder parses a comma-separated list of classes, least important

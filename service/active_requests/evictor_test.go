@@ -13,10 +13,10 @@ import (
 
 func TestSelectVictims_ClassThenBurnOrder(t *testing.T) {
 	candidates := []evictCandidate{
-		{traceID: "prod-live-big", class: ClassProdLive, burnCores: 3.0},
+		{traceID: "catchup-big", class: ClassProdCatchup, burnCores: 3.0},
 		{traceID: "dev-small", class: ClassDev, burnCores: 0.2},
 		{traceID: "dev-big", class: ClassDev, burnCores: 1.5},
-		{traceID: "catchup", class: ClassProdCatchup, burnCores: 2.0},
+		{traceID: "catchup-small", class: ClassProdCatchup, burnCores: 2.0},
 	}
 
 	// a small excess is covered by the least important class, even against a bigger burner
@@ -29,29 +29,28 @@ func TestSelectVictims_ClassThenBurnOrder(t *testing.T) {
 	require.Len(t, victims, 3)
 	assert.Equal(t, "dev-big", victims[0].traceID)
 	assert.Equal(t, "dev-small", victims[1].traceID)
-	assert.Equal(t, "prod-live-big", victims[2].traceID)
+	assert.Equal(t, "catchup-big", victims[2].traceID)
 }
 
-func TestSelectVictims_CutsLiveBeforeCatchup(t *testing.T) {
+func TestSelectVictims_DefaultOrderNeverCutsLive(t *testing.T) {
 	candidates := []evictCandidate{
 		{traceID: "catchup-1", class: ClassProdCatchup, burnCores: 2.0},
 		{traceID: "catchup-2", class: ClassProdCatchup, burnCores: 1.8},
 		{traceID: "live-1", class: ClassProdLive, burnCores: 1.5},
 	}
 
-	// an excess nothing can cover takes every candidate, live before catchup
+	// an excess nothing can cover takes every candidate except live ones
 	victims := selectVictims(candidates, 100, DefaultEvictionOrder())
-	require.Len(t, victims, 3)
-	assert.Equal(t, "live-1", victims[0].traceID)
-	assert.Equal(t, "catchup-1", victims[1].traceID)
-	assert.Equal(t, "catchup-2", victims[2].traceID)
+	require.Len(t, victims, 2)
+	assert.Equal(t, "catchup-1", victims[0].traceID)
+	assert.Equal(t, "catchup-2", victims[1].traceID)
 
 	// cutting stops as soon as the evicted burn covers the excess
-	victims = selectVictims(candidates, 3.0, DefaultEvictionOrder())
-	require.Len(t, victims, 2)
+	victims = selectVictims(candidates, 1.0, DefaultEvictionOrder())
+	require.Len(t, victims, 1)
 }
 
-func TestSelectVictims_CustomOrderSkipsUnlistedClasses(t *testing.T) {
+func TestSelectVictims_CachedStopsTheRound(t *testing.T) {
 	t0 := time.Now()
 	candidates := []evictCandidate{
 		{traceID: "live", class: ClassProdLive, burnCores: 3.0},
@@ -60,7 +59,7 @@ func TestSelectVictims_CustomOrderSkipsUnlistedClasses(t *testing.T) {
 		{traceID: "cached-young", class: ClassProdCached, startTime: t0},
 		{traceID: "cached-old", class: ClassProdCached, startTime: t0.Add(-time.Hour)},
 	}
-	order := []EvictionClass{ClassDev, ClassProdCached, ClassProdCatchup}
+	order := DefaultEvictionOrder()
 
 	// a prod-cached request's cost is unknown: cutting stops right after the first one, oldest first
 	victims := selectVictims(candidates, 100, order)
@@ -72,6 +71,20 @@ func TestSelectVictims_CustomOrderSkipsUnlistedClasses(t *testing.T) {
 	victims = selectVictims(candidates[:3], 100, order)
 	require.Len(t, victims, 2)
 	assert.Equal(t, "dev", victims[0].traceID)
+	assert.Equal(t, "catchup", victims[1].traceID)
+}
+
+func TestSelectVictims_CustomOrder(t *testing.T) {
+	candidates := []evictCandidate{
+		{traceID: "catchup", class: ClassProdCatchup, burnCores: 2.0},
+		{traceID: "live", class: ClassProdLive, burnCores: 1.5},
+		{traceID: "dev", class: ClassDev, burnCores: 0.5},
+	}
+
+	// dev is not listed, so it is never cut; live goes before catchup as listed
+	victims := selectVictims(candidates, 100, []EvictionClass{ClassProdLive, ClassProdCatchup})
+	require.Len(t, victims, 2)
+	assert.Equal(t, "live", victims[0].traceID)
 	assert.Equal(t, "catchup", victims[1].traceID)
 }
 

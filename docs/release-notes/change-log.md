@@ -38,6 +38,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Production-mode requests are disconnected with the same `Unavailable` "endpoint is shutting down, please reconnect" error as a tier1 restart when back-processing finishes more than
+  2 segments behind the last final block (rounded down to a segment). Clients reconnecting from their
+  cursor then back-process the gap in parallel instead of processing it linearly on tier1. Set
+  `SUBSTREAMS_MAX_LINEAR_HANDOFF_LAG_SEGMENTS` to change the number of segments.
+
 - CPU eviction: new `CPUEviction.Order` config (parse it with `active_requests.ParseEvictionOrder`, e.g.
   `dev,prod-cached,prod-catchup`) lists the request classes eviction may cancel, least important first. A
   class left out is never cancelled. The default is `dev,prod-cached,prod-catchup`: live production requests

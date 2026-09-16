@@ -35,6 +35,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- CPU eviction: new `CPUEviction.Order` config (parse it with `active_requests.ParseEvictionOrder`, e.g.
+  `dev,prod-cached,prod-catchup`) lists the request classes eviction may cancel, least important first. A
+  class left out is never cancelled. The default is `dev,prod-cached,prod-catchup`: live production requests
+  are no longer cancelled unless `prod-live` is added to the order.
+  A new `prod-cached` class covers production requests that only stream outputs cached by tier2 and have
+  not processed a block on tier1. They run no wasm there, so `MinBurnCores` does not apply to them, and
+  since their CPU cost is unknown, a round of eviction stops right after cancelling one of them.
+
 - Per-store lines are now logged at `Debug` instead of `Info`: `using mmap KV store`,
   `using in-memory KV store`, `flushing store at boundary`, `merged partial into full store`,
   `deleting partial store`. They fired for every store opened by tier1 and tier2 and for

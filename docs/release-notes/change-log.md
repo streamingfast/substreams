@@ -22,8 +22,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- The `grpc://` / `grpcs://` squasher plugin now lives in this module at
+  `github.com/streamingfast/substreams/squash/grpc`. Firehose-core and chain
+  binaries can import that package and call `Register()` instead of depending
+  on the private `github.com/streamingfast/substreams-squasher` module.
+
 - Tier1 store merging is selected with a plugin DSN, like auth. Empty or `local://`
-  keeps today's in-process squasher. `grpc://` is registered by the squasher project.
+  keeps today's in-process squasher. `grpc://` / `grpcs://` are registered by
+  `github.com/streamingfast/substreams/squash/grpc`.
   When a remote is set, each squash run is one RPC per store module covering every
   claimed segment, so empty-partial copies and merges happen on the squasher and
   tier1 does not read store files. If that remote is unreachable, the run is

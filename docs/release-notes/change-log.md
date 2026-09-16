@@ -21,6 +21,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Docs
 
+- Add a Solana how-to on versioned transactions (v0 and v1): what the new `version`,
+  `versioned`, and `transaction_config` fields are, and when a Substreams package
+  needs to rebuild against `substreams-solana` v0.15.1+ to read them.
 - Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can
   hard-delete a batch of keys over gRPC. Missing keys are ignored; later reads return
   `NOT_FOUND`, not a tombstone.

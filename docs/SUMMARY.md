@@ -50,6 +50,7 @@
     * Local Development
       * [Anchor](how-to-guides/develop-your-own-substreams/solana/local-development/anchor.md)
     * [From Yellowstone to Substreams](how-to-guides/develop-your-own-substreams/solana/migrate-from-yellowstone.md)
+    * [Versioned Transactions (v0 and v1)](how-to-guides/develop-your-own-substreams/solana/versioned-transactions.md)
   * [on Cosmos](how-to-guides/develop-your-own-substreams/cosmos)
     * [Injective](how-to-guides/develop-your-own-substreams/cosmos/injective)
       * [Simple Substreams Example](how-to-guides/develop-your-own-substreams/cosmos/injective/block-stats.md)

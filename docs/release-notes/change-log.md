@@ -382,7 +382,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Dependencies
 
 - Bumped notably `github.com/ClickHouse/clickhouse-go/v2` to v2.48.0, `github.com/AfterShip/clickhouse-sql-parser` to
-  v0.5.5, `google.golang.org/grpc` to v1.83.0 and the OpenTelemetry SDK to v1.45.0.
+  v0.5.5, `google.golang.org/grpc` to v1.83.2 and the OpenTelemetry SDK to v1.45.0.
+
+- `google.golang.org/grpc` is at v1.83.2, which clears CVE-2026-84304 and CVE-2026-84445, and
+  `golang.org/x/crypto` is at v0.56.0, which clears CVE-2026-78662 and CVE-2026-56855, all reported as HIGH against the
+  published `ghcr.io/streamingfast/substreams` image.
 
 - `golang.org/x/mod` is at v0.40.0, which clears CVE-2026-56864 and CVE-2026-56865, both reported as HIGH against the
   published `ghcr.io/streamingfast/substreams` image.

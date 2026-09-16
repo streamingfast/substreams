@@ -39,6 +39,20 @@ import (
 // any linkable block and only armed once ready; same value the relayer uses.
 const maxConsecutiveUnlinkableBlocks = 5
 
+// burstFromLIB is the burst the hub's live source asks the relayer for: every block from
+// the hub's LIB onward, forks included, so the gap left by a disconnect is filled from the
+// relayer's memory instead of from the one-block store. When the LIB is older than what
+// the relayer holds, the relayer starts at its lowest block and the hub fills the rest from
+// the one-block store. A hub without a head yet asks for the last 2 blocks.
+func burstFromLIB(h *hub.ForkableHub) int64 {
+	_, _, _, libNum, err := h.HeadInfo()
+	// a burst of -1 means "from the relayer's LIB", -N (N > 1) means "from block N"
+	if err != nil || libNum < 2 {
+		return 2
+	}
+	return -int64(libNum)
+}
+
 type Tier1Modules struct {
 	// Required dependencies
 	Authenticator         dauth.Authenticator
@@ -245,6 +259,7 @@ func (a *Tier1App) Run() error {
 				}),
 				blockstream.WithRequester("substreams-tier1"),
 				blockstream.WithPartialBlocks(),
+				blockstream.WithBurstFunc(func() int64 { return burstFromLIB(forkableHub) }),
 			)
 		})
 

@@ -70,6 +70,13 @@ func (p *Pipeline) ProcessFromExecOutput(
 func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err error) {
 	ctx := p.ctx
 
+	if !p.processingBlocksSet {
+		p.processingBlocksSet = true
+		if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
+			reqHandler.SetProcessingBlocks()
+		}
+	}
+
 	metrics.BlockBeginProcess.Inc()
 	defer metrics.BlockEndProcess.Inc()
 
@@ -344,6 +351,13 @@ func (p *Pipeline) handleStepUndoPartial(ctx context.Context, cursor *bstream.Cu
 		return nil
 	}
 
+	if len(p.partialProcessingState.processedPartials) == 0 {
+		// no output was sent for this block: the client has nothing to undo, and an undo
+		// signal here would name a block it never received
+		p.partialProcessingState = nil
+		return nil
+	}
+
 	clock := &pbsubstreams.Clock{
 		Id:     p.partialProcessingState.lastBlockID,
 		Number: p.partialProcessingState.num,
@@ -376,6 +390,16 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 }
 
 func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, parentBlock bstream.BlockRef, idx int32, isLast bool) (err error) {
+	if p.isTier1 && p.checkPendingShutdown() {
+		// same as handleStepNew: end the stream so the client reconnects elsewhere. Going silent
+		// instead would leave the stream open, sending nothing but an undo signal at every block
+		// boundary until the process exits.
+		if err := p.quickSaveStores(ctx, "shutting down"); err != nil {
+			return err
+		}
+		return ErrShuttingDown
+	}
+
 	if p.lastProcessedBlockRef != nil && clock.Number <= p.lastProcessedBlockRef.Num() {
 		// this can happen if we got the full block and used it as the 'last partial block'
 		return nil
@@ -435,9 +459,6 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 
 	reqDetails := reqctx.Details(ctx)
 	if isBlockOverStopBlock(clock.Number, reqDetails.StopBlockNum) {
-		return nil
-	}
-	if p.isTier1 && p.checkPendingShutdown() {
 		return nil
 	}
 	if p.pendingUndoMessage != nil && p.gate.shouldSendOutputs() {

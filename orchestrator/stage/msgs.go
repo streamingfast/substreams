@@ -14,10 +14,15 @@ func CmdAllStoresCompleted() loop.Cmd {
 	}
 }
 
+// MsgMergeFinished reports a squash run on one stage: the Merged units were squashed into
+// the full stores, in order, and the Unmerged ones were claimed by the run but left for
+// the next one.
 type MsgMergeFinished struct {
 	loop.IsMsg
-	Unit
-} // A single partial store was successfully merged into the full store.
+	Stage    int
+	Merged   []Unit
+	Unmerged []Unit
+}
 
 type MsgMergeFailed struct {
 	loop.IsMsg

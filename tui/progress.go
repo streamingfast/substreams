@@ -1,8 +1,9 @@
 package tui
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -260,7 +261,9 @@ func computeModuleRows(progress *pbsubstreamsrpc.ModulesProgress, recent *module
 		rows = append(rows, row)
 	}
 
-	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Cost() > rows[j].Cost() })
+	slices.SortStableFunc(rows, func(a, b moduleRow) int {
+		return cmp.Compare(b.Cost(), a.Cost())
+	})
 	if len(rows) > maxModuleRows {
 		rows = rows[:maxModuleRows]
 	}

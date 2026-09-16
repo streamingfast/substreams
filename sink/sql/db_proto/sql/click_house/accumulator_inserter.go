@@ -1,9 +1,10 @@
 package clickhouse
 
 import (
+	"cmp"
 	"database/sql"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -573,8 +574,8 @@ func (i *AccumulatorInserter) flush(database *Database) error {
 		accumulators = append(accumulators, *acc)
 	}
 
-	sort.Slice(accumulators, func(i, j int) bool {
-		return accumulators[i].ordinal < accumulators[j].ordinal
+	slices.SortFunc(accumulators, func(a, b accumulator) int {
+		return cmp.Compare(a.ordinal, b.ordinal)
 	})
 
 	client, err := database.client()

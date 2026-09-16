@@ -676,3 +676,77 @@ func testCursor(blk *pbbstream.Block, step bstream.StepType) *bstream.Cursor {
 		LIB:       bstream.NewBlockRef("lib-"+blockID, lib),
 	}
 }
+
+// A partial-blocks stream on a tier1 that is shutting down must end with ErrShuttingDown, like a
+// full-block stream does, so the client reconnects elsewhere. Staying open but silent leaves the
+// pipeline holding partial state it never sent, and it would then send an undo signal at every
+// block boundary naming blocks the client never received.
+func TestHandleStepPartial_ShuttingDown(t *testing.T) {
+	ctx := setupTestContext(t, "test_module", 200)
+	ctx = reqctx.WithPartialBlocks(ctx, true)
+
+	var responses []*pbsubstreamsrpc.Response
+	blockType := "sf.acme.type.v1.Block"
+	pipe := setupTestPipeline(t, [][]exec.ModuleExecutor{{exec.NewTestingExecutor("outmod", blockType)}})
+	pipe.execGraph = newTestModuleGraph(t, "outmod", blockType)
+	pipe.respFunc = func(resp substreams.ResponseFromAnyTier) error {
+		rpcResp := resp.(*pbsubstreamsrpc.Response)
+		if rpcResp.GetBlockScopedData() != nil || rpcResp.GetBlockUndoSignal() != nil {
+			responses = append(responses, rpcResp)
+		}
+		return nil
+	}
+	pipe.ctx = ctx
+	pipe.gate = newGate(ctx)
+	pipe.gate.passed = true
+	pipe.blockType = blockType
+	pipe.stateBundleSize = 100
+	pipe.isTier1 = true
+	shuttingDown := false
+	pipe.checkPendingShutdown = func() bool { return shuttingDown }
+
+	process := func(b blockWithStep) error {
+		require.NoError(t, fillTestAcmeBlock(b.blk, b.txs))
+		clock := BlockToClock(b.blk)
+		execOutput := NewExecOutputTesting(t, b.blk, clock, blockType)
+		if b.step == bstream.StepNew {
+			return pipe.handleStepNew(ctx, clock, testCursor(b.blk, b.step), execOutput, false)
+		}
+		return pipe.handleStepPartial(ctx, clock, testCursor(b.blk, b.step), execOutput, b.blk.PreviousRef(), b.blk.PartialIndex, b.blk.LastPartial)
+	}
+
+	require.NoError(t, process(withStepNew(testBlock(3, "3a"))))
+	require.NoError(t, process(withTxs(withStepNew(testPartialBlock(4, "4x", 1, false)), "t1")))
+	require.Len(t, responses, 2)
+
+	shuttingDown = true
+	err := process(withTxs(withStepNew(testPartialBlock(4, "4y", 2, false)), "t1", "t2"))
+	require.ErrorIs(t, err, ErrShuttingDown)
+
+	// the last partial and the next block are refused the same way, and nothing else is sent
+	require.ErrorIs(t, process(withTxs(withStepNew(testPartialBlock(4, "4a", 3, true)), "t1", "t2", "t3")), ErrShuttingDown)
+	require.ErrorIs(t, process(withTxs(withStepNew(testPartialBlock(5, "5x", 1, false)), "u1")), ErrShuttingDown)
+	require.Len(t, responses, 2, "no data or undo signal may be sent once shutting down")
+}
+
+// An undo of partial state for which nothing was ever sent must not produce an undo signal:
+// it would name a block the client never received as 'last valid'.
+func TestHandleStepUndoPartial_NothingSent(t *testing.T) {
+	ctx := setupTestContext(t, "test_module", 200)
+	ctx = reqctx.WithPartialBlocks(ctx, true)
+
+	var responses []*pbsubstreamsrpc.Response
+	pipe := setupTestPipeline(t, nil)
+	pipe.respFunc = func(resp substreams.ResponseFromAnyTier) error {
+		responses = append(responses, resp.(*pbsubstreamsrpc.Response))
+		return nil
+	}
+	pipe.ctx = ctx
+	pipe.gate = newGate(ctx)
+	pipe.gate.passed = true
+
+	pipe.partialProcessingState = newPartialProcessingState(5, "5x", 1, bstream.NewBlockRef("4a", 4))
+	require.NoError(t, pipe.handleStepUndoPartial(ctx, testCursor(testPartialBlock(5, "5x", 1, false), bstream.StepPartial)))
+	require.Nil(t, pipe.partialProcessingState)
+	require.Empty(t, responses)
+}

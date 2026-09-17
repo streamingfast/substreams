@@ -22,13 +22,13 @@ func TestLinearHandoffLagTarget(t *testing.T) {
 		expectTarget   uint64
 		expectTooFar   bool
 	}{
-		{"final block did not move", 1000, 0, 1050, 2, 1000, false},
-		{"exactly max lag", 1000, 0, 1250, 2, 1200, false},
-		{"one segment over max lag", 1000, 0, 1300, 2, 1300, true},
-		{"stop block caps the target", 1000, 1150, 5000, 2, 1200, false},
-		{"stop block above lag", 1000, 1301, 5000, 2, 1400, true},
-		{"final block below handoff", 1000, 0, 900, 2, 900, false},
-		{"zero max lag", 1000, 0, 1100, 0, 1100, true},
+		{name: "final block did not move", linearHandoff: 1000, lastFinalBlock: 1050, maxLagSegments: 2, expectTarget: 1000},
+		{name: "exactly max lag", linearHandoff: 1000, lastFinalBlock: 1250, maxLagSegments: 2, expectTarget: 1200},
+		{name: "one segment over max lag", linearHandoff: 1000, lastFinalBlock: 1300, maxLagSegments: 2, expectTarget: 1300, expectTooFar: true},
+		{name: "stop block caps the target", linearHandoff: 1000, stopBlock: 1150, lastFinalBlock: 5000, maxLagSegments: 2, expectTarget: 1200},
+		{name: "stop block above lag", linearHandoff: 1000, stopBlock: 1301, lastFinalBlock: 5000, maxLagSegments: 2, expectTarget: 1400, expectTooFar: true},
+		{name: "final block below handoff", linearHandoff: 1000, lastFinalBlock: 900, maxLagSegments: 2, expectTarget: 900},
+		{name: "zero max lag", linearHandoff: 1000, lastFinalBlock: 1100, expectTarget: 1100, expectTooFar: true},
 	}
 
 	for _, tt := range tests {

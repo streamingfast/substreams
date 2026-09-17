@@ -1,4 +1,4 @@
-package service
+package pipeline
 
 import (
 	"fmt"
@@ -8,10 +8,11 @@ import (
 
 const defaultMaxLinearHandoffLagSegments = 2
 
-// maxLinearHandoffLagSegments is how many segments the linear handoff block may trail the
-// last final block (rounded down to a segment) once backprocessing completes. Past that, the
-// client is disconnected so that its reconnection back-processes the gap in parallel.
-var maxLinearHandoffLagSegments = parseMaxLinearHandoffLagSegments(os.Getenv("SUBSTREAMS_MAX_LINEAR_HANDOFF_LAG_SEGMENTS"))
+// MaxLinearHandoffLagSegments is how many segments a production request may trail the last
+// final block (rounded down to a segment), either when backprocessing completes or while
+// streaming final blocks. Past that, the client is disconnected so that its reconnection
+// back-processes the gap in parallel.
+var MaxLinearHandoffLagSegments = parseMaxLinearHandoffLagSegments(os.Getenv("SUBSTREAMS_MAX_LINEAR_HANDOFF_LAG_SEGMENTS"))
 
 func parseMaxLinearHandoffLagSegments(value string) uint64 {
 	if value == "" {
@@ -24,9 +25,9 @@ func parseMaxLinearHandoffLagSegments(value string) uint64 {
 	return v
 }
 
-// linearHandoffLagTarget returns the block the linear handoff would be set to if the request
+// LinearHandoffLagTarget returns the block the linear handoff would be set to if the request
 // was planned now, and whether the given handoff trails it by more than maxLagSegments.
-func linearHandoffLagTarget(linearHandoff, stopBlock, lastFinalBlock, segmentSize, maxLagSegments uint64) (target uint64, tooFarBehind bool) {
+func LinearHandoffLagTarget(linearHandoff, stopBlock, lastFinalBlock, segmentSize, maxLagSegments uint64) (target uint64, tooFarBehind bool) {
 	target = lastFinalBlock - (lastFinalBlock % segmentSize)
 	if stopBlock != 0 {
 		stopBoundary := stopBlock

@@ -38,8 +38,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-- Production-mode requests are disconnected with the same `Unavailable` "endpoint is shutting down, please reconnect" error as a tier1 restart when back-processing finishes more than
-  2 segments behind the last final block (rounded down to a segment). Clients reconnecting from their
+- Production-mode requests are disconnected with the same `Unavailable` "endpoint is shutting down, please reconnect" error as a tier1 restart when they are more than
+  2 segments behind the last final block (rounded down to a segment), either when back-processing finishes or, checked
+  at every segment boundary, while streaming final blocks. Clients reconnecting from their
   cursor then back-process the gap in parallel instead of processing it linearly on tier1. Set
   `SUBSTREAMS_MAX_LINEAR_HANDOFF_LAG_SEGMENTS` to change the number of segments.
 

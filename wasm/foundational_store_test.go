@@ -91,6 +91,31 @@ func assertFatalNonDeterministic(t *testing.T, recovered error) {
 	assert.False(t, errors.Is(recovered, ErrFoundationalStoreCanceled), "must not be the upstream-cancel error, got: %v", recovered)
 }
 
+func TestFoundationalStore_IndexRoutesToMatchingClient(t *testing.T) {
+	firstClient := &fakeStoreClient{steps: []step{{resp: &pbservice.GetResponse{BlockReached: true}}}}
+	secondEntries := &pbmodel.QueriedEntries{}
+	secondClient := &fakeStoreClient{steps: []step{{resp: &pbservice.GetResponse{
+		BlockReached: true,
+		Entries:      secondEntries,
+	}}}}
+	call := NewCall(
+		context.Background(),
+		&pbsubstreams.Clock{Number: 100},
+		"test_module",
+		"entrypoint",
+		nil,
+		nil,
+		false,
+		[]pbservice.StoreClient{firstClient, secondClient},
+	)
+
+	actual := call.DoFoundationalStoreGet(1, &pbmodel.Keys{})
+
+	require.Same(t, secondEntries, actual)
+	require.Equal(t, 0, firstClient.calls)
+	require.Equal(t, 1, secondClient.calls)
+}
+
 func TestFoundationalStore_FatalErrorsBubbleUp(t *testing.T) {
 	// auth failures and org id mismatches must fail fast instead of retrying
 	// until the global deadline.

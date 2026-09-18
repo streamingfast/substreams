@@ -912,13 +912,19 @@ func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock
 	return nil
 }
 
-func getFoundationalStores(inputs []wasm.Argument) []pbservice.StoreClient {
+func getFoundationalStores(inputs []wasm.Argument) ([]pbservice.StoreClient, error) {
+	var clients []pbservice.StoreClient
 	for _, arg := range inputs {
 		if fStore, ok := arg.(*wasm.FoundationalStoreInput); ok {
-			return fStore.Clients
+			// One foundational-store argument becomes one guest index. Flattening an inner
+			// slice would shift every later argument, so only singleton slices are valid.
+			if len(fStore.Clients) != 1 {
+				return nil, fmt.Errorf("foundational store input %q has %d clients, expected exactly 1", fStore.Name(), len(fStore.Clients))
+			}
+			clients = append(clients, fStore.Clients[0])
 		}
 	}
-	return nil
+	return clients, nil
 }
 
 // BuildModuleExecutors builds the ModuleExecutors, and the loadedModules.
@@ -1002,7 +1008,10 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 				key := moduleKey{binaryIndex: module.BinaryIndex, binaryType: code.Type}
 				mod := loadedModules[key]
 
-				foundationalStores := getFoundationalStores(inputs)
+				foundationalStores, err := getFoundationalStores(inputs)
+				if err != nil {
+					return fmt.Errorf("module %q: get foundational stores: %w", module.Name, err)
+				}
 				switch kind := module.Kind.(type) {
 				case *pbsubstreams.Module_KindMap_:
 					p.ModuleBlockIndexes[module.Name] = moduleBlockIndex

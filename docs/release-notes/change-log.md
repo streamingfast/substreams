@@ -38,6 +38,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Modules can now consume multiple foundational-store inputs. Each input keeps its manifest argument
+  order when the server assigns guest store indices.
+
 - CPU eviction: new `CPUEviction.Order` config (parse it with `active_requests.ParseEvictionOrder`, e.g.
   `dev,prod-cached,prod-catchup`) lists the request classes eviction may cancel, least important first. A
   class left out is never cancelled. The default is `dev,prod-cached,prod-catchup`: live production requests

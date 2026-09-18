@@ -18,6 +18,7 @@ import (
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/metrics"
+	pbservice "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
@@ -29,6 +30,94 @@ import (
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	_ "github.com/streamingfast/substreams/wasm/wazero"
 )
+
+func TestGetFoundationalStores(t *testing.T) {
+	clientA := pbservice.NewStoreClient(nil)
+	clientB := pbservice.NewStoreClient(nil)
+	clientC := pbservice.NewStoreClient(nil)
+	clientD := pbservice.NewStoreClient(nil)
+
+	tests := []struct {
+		name     string
+		inputs   []wasm.Argument
+		expected []pbservice.StoreClient
+	}{
+		{
+			name: "zero store inputs",
+			inputs: []wasm.Argument{
+				wasm.NewParamsInput("params"),
+			},
+		},
+		{
+			name: "one store input",
+			inputs: []wasm.Argument{
+				wasm.NewFoundationalStoreInput("store-a", []pbservice.StoreClient{clientA}),
+			},
+			expected: []pbservice.StoreClient{clientA},
+		},
+		{
+			name: "two store inputs",
+			inputs: []wasm.Argument{
+				wasm.NewFoundationalStoreInput("store-a", []pbservice.StoreClient{clientA}),
+				wasm.NewFoundationalStoreInput("store-b", []pbservice.StoreClient{clientB}),
+			},
+			expected: []pbservice.StoreClient{clientA, clientB},
+		},
+		{
+			name: "multiple store inputs preserve declaration order",
+			inputs: []wasm.Argument{
+				wasm.NewSourceInput("sf.test.Block", 0),
+				wasm.NewFoundationalStoreInput("store-a", []pbservice.StoreClient{clientA}),
+				wasm.NewParamsInput("params"),
+				wasm.NewFoundationalStoreInput("store-b", []pbservice.StoreClient{clientB}),
+				wasm.NewFoundationalStoreInput("store-c", []pbservice.StoreClient{clientC}),
+				wasm.NewFoundationalStoreInput("store-d", []pbservice.StoreClient{clientD}),
+			},
+			expected: []pbservice.StoreClient{clientA, clientB, clientC, clientD},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual, err := getFoundationalStores(test.inputs)
+			require.NoError(t, err)
+			require.Len(t, actual, len(test.expected))
+			for i := range test.expected {
+				require.Same(t, test.expected[i], actual[i])
+			}
+		})
+	}
+
+	t.Run("rejects zero clients for one store input", func(t *testing.T) {
+		actual, err := getFoundationalStores([]wasm.Argument{
+			wasm.NewFoundationalStoreInput("store-a", nil),
+		})
+
+		require.EqualError(t, err, `foundational store input "store-a" has 0 clients, expected exactly 1`)
+		require.Nil(t, actual)
+	})
+
+	t.Run("rejects multiple clients for one store input", func(t *testing.T) {
+		actual, err := getFoundationalStores([]wasm.Argument{
+			wasm.NewFoundationalStoreInput("store-a", []pbservice.StoreClient{clientA, clientB}),
+			wasm.NewFoundationalStoreInput("store-b", []pbservice.StoreClient{clientC}),
+		})
+
+		require.EqualError(t, err, `foundational store input "store-a" has 2 clients, expected exactly 1`)
+		require.Nil(t, actual)
+	})
+
+	t.Run("rejects a non-first input with multiple clients", func(t *testing.T) {
+		actual, err := getFoundationalStores([]wasm.Argument{
+			wasm.NewFoundationalStoreInput("store-a", []pbservice.StoreClient{clientA}),
+			wasm.NewParamsInput("params"),
+			wasm.NewFoundationalStoreInput("store-b", []pbservice.StoreClient{clientB, clientC}),
+		})
+
+		require.EqualError(t, err, `foundational store input "store-b" has 2 clients, expected exactly 1`)
+		require.Nil(t, actual)
+	})
+}
 
 func TestPipeline_runExecutor(t *testing.T) {
 	tests := []struct {

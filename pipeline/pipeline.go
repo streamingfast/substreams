@@ -125,6 +125,9 @@ type Pipeline struct {
 	getHeadBlockNum func() (uint64, error)
 	highestStage    *int
 
+	getRecentFinalBlock func() (uint64, error)
+	lastLagCheckSegment uint64
+
 	forkHandler     *ForkHandler
 	insideReorgUpTo bstream.BlockRef
 

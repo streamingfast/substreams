@@ -386,7 +386,39 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 		return fmt.Errorf("exec output cache: handle final: %w", err)
 	}
 	p.forkHandler.removeReversibleOutput(clock.Id)
-	return nil
+	return p.checkFinalBlockLag(clock.Number)
+}
+
+// checkFinalBlockLag runs once per segment. Block numbers can be skipped, so the boundary is
+// detected by a change of segment rather than by a block number divisible by the segment size.
+func (p *Pipeline) checkFinalBlockLag(blockNum uint64) error {
+	if p.getRecentFinalBlock == nil {
+		return nil
+	}
+	segment := blockNum / p.stateBundleSize
+	if segment <= p.lastLagCheckSegment {
+		return nil
+	}
+	p.lastLagCheckSegment = segment
+
+	logger := reqctx.Logger(p.ctx)
+	lastFinalBlock, err := p.getRecentFinalBlock()
+	if err != nil {
+		logger.Warn("cannot get last final block to check final block lag", zap.Error(err))
+		return nil
+	}
+
+	target, tooFarBehind := LinearHandoffLagTarget(segment*p.stateBundleSize, reqctx.Details(p.ctx).StopBlockNum, lastFinalBlock, p.stateBundleSize, MaxLinearHandoffLagSegments)
+	if !tooFarBehind {
+		return nil
+	}
+	logger.Info("final block is too far behind the last final block, disconnecting client so it back-processes the gap on reconnection",
+		zap.Uint64("final_block", blockNum),
+		zap.Uint64("new_handoff_block", target),
+		zap.Uint64("last_final_block", lastFinalBlock),
+		zap.Uint64("max_lag_segments", MaxLinearHandoffLagSegments),
+	)
+	return ErrShuttingDown
 }
 
 func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, parentBlock bstream.BlockRef, idx int32, isLast bool) (err error) {

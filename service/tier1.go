@@ -853,6 +853,9 @@ func (s *Tier1Service) blocks(
 		opts = append(opts, pipeline.WithHeadBlockGetter(s.getHeadBlock))
 	}
 	opts = append(opts, pipeline.WithExecOutPrefetch(s.execOutPrefetch))
+	if requestDetails.ProductionMode && s.getRecentFinalBlock != nil {
+		opts = append(opts, pipeline.WithFinalBlockLagCheck(s.getRecentFinalBlock, requestDetails.LinearHandoffBlockNum))
+	}
 
 	ctx, resolvedEndpoints, err := s.resolveFoundationalStores(ctx, execGraph, reqStats)
 	if err != nil {
@@ -1025,6 +1028,20 @@ func (s *Tier1Service) blocks(
 	}
 	if reqPlan.LinearPipeline == nil {
 		return pipe.OnStreamTerminated(ctx, io.EOF)
+	}
+
+	if requestDetails.ProductionMode && !loadedFromQuicksave && reqPlan.RequiresParallelProcessing() {
+		if lastFinalBlock, err := s.getRecentFinalBlock(); err != nil {
+			logger.Warn("cannot get last final block to check linear handoff lag", zap.Error(err))
+		} else if target, tooFarBehind := pipeline.LinearHandoffLagTarget(requestDetails.LinearHandoffBlockNum, request.StopBlockNum, lastFinalBlock, segmentSize, pipeline.MaxLinearHandoffLagSegments); tooFarBehind {
+			logger.Info("linear handoff block is too far behind the last final block, disconnecting client so it back-processes the gap on reconnection",
+				zap.Uint64("handoff_block", requestDetails.LinearHandoffBlockNum),
+				zap.Uint64("new_handoff_block", target),
+				zap.Uint64("last_final_block", lastFinalBlock),
+				zap.Uint64("max_lag_segments", pipeline.MaxLinearHandoffLagSegments),
+			)
+			return pipe.OnStreamTerminated(ctx, connect.NewError(connect.CodeUnavailable, errShuttingDown))
+		}
 	}
 
 	var streamErr error

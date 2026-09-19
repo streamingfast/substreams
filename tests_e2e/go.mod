@@ -3,7 +3,7 @@ module github.com/streamingfast/substreams/tests_e2e
 go 1.26.0
 
 require (
-	github.com/streamingfast/bstream v0.0.2-0.20260817182204-a513e03b7ada
+	github.com/streamingfast/bstream v0.0.2-0.20260910212213-07a378ae0f74
 	github.com/streamingfast/dmetering v0.0.0-20260901152443-1ff4cd0d617d
 	github.com/streamingfast/dregistry v0.0.0-20260818204944-2fed3956d4e1
 	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
@@ -115,7 +115,7 @@ require (
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -185,7 +185,7 @@ require (
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7 // indirect
 	github.com/streamingfast/dgrpc v0.0.0-20260801042045-4c4ac6a8e41a // indirect
 	github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62 // indirect
-	github.com/streamingfast/dstore v0.2.4-0.20260709193311-122163592902 // indirect
+	github.com/streamingfast/dstore v0.2.4-0.20260825160629-56e87480522c // indirect
 	github.com/streamingfast/dummy-blockchain v1.7.7 // indirect
 	github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a // indirect
 	github.com/streamingfast/firehose-networks v0.2.3 // indirect
@@ -208,15 +208,15 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.70.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0 // indirect
 	go.opentelemetry.io/otel v1.45.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.45.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.45.0 // indirect
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.41.0 // indirect
 	go.opentelemetry.io/otel/exporters/zipkin v1.41.0 // indirect
 	go.opentelemetry.io/otel/metric v1.45.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.45.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.45.0 // indirect
 	go.opentelemetry.io/otel/trace v1.45.0 // indirect
-	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
+	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
@@ -231,7 +231,7 @@ require (
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/api v0.274.0 // indirect
 	google.golang.org/genproto v0.0.0-20260319201613-d00831a3d3e7 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260803160001-6ac0973c030d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260803160001-6ac0973c030d // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

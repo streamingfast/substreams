@@ -106,9 +106,12 @@ func (b *ParallelProcessor) Run(ctx context.Context, checkPendingShutdown func()
 	defer b.scheduler.Stages.Close()
 
 	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
 		for {
 			select {
-			case <-time.Tick(time.Second):
+			case <-ticker.C:
 				if checkPendingShutdown() {
 					b.scheduler.Send(work.MsgPendingShutdown{})
 					return

@@ -125,6 +125,9 @@ type Pipeline struct {
 	getHeadBlockNum func() (uint64, error)
 	highestStage    *int
 
+	getRecentFinalBlock func() (uint64, error)
+	lastLagCheckSegment uint64
+
 	forkHandler     *ForkHandler
 	insideReorgUpTo bstream.BlockRef
 
@@ -145,12 +148,14 @@ type Pipeline struct {
 	sentBlocks            uint64
 	quickSaved            bool
 	sessionInitSent       bool // ensures a single Response_Session per request; see sendSession
+	processingBlocksSet   bool // ensures the active request is marked as processing blocks only once
 
 	blockStepMap         map[bstream.StepType]uint64
 	workerPoolFactory    work.WorkerPoolFactory
 	checkPendingShutdown func() bool
 	outputBufferSize     int
 	supportBuffering     bool
+	execOutPrefetch      execout.PrefetchConfig
 }
 
 func New(
@@ -543,7 +548,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 		return nil, err
 	}
 
-	logger.Info("about to load stores", zap.String("approx_store_size", humanize.IBytes(neededSize)))
+	logger.Debug("about to load stores", zap.String("approx_store_size", humanize.IBytes(neededSize)))
 
 	if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
 		reqHandler.AllocateFullKVSizeOrForceCancelRequest(neededSize)
@@ -596,7 +601,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 	}
 
 	if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
-		logger.Info("adjusting to stores size", zap.String("approx_store_size", humanize.IBytes(actualRequestStoresSize)))
+		logger.Debug("adjusting to stores size", zap.String("approx_store_size", humanize.IBytes(actualRequestStoresSize)))
 		reqHandler.AdjustFullKVSize(actualRequestStoresSize)
 	}
 
@@ -638,6 +643,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		noopMode,
 		p.outputBufferSize,
 		p.supportBuffering,
+		p.execOutPrefetch,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("building parallel processor: %w", err)

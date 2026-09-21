@@ -1,8 +1,11 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -97,4 +100,94 @@ func TestGetExecutionPlan_CancelledContextNoMapRace(t *testing.T) {
 	// Give the cleanup goroutine time to run its iteration before the test
 	// ends, so the race detector observes both sides.
 	time.Sleep(100 * time.Millisecond)
+}
+
+// TestGetExecutionPlan_StoreOutputMissingWithFullKV checks that a store whose fullKV
+// exists at the segment end but whose exec output file is gone is re-executed only to
+// replay its per-block state for the modules above it: its snapshot is never rewritten.
+func TestGetExecutionPlan_StoreOutputMissingWithFullKV(t *testing.T) {
+	logger := zap.NewNop()
+
+	modules := []*pbsubstreams.Module{
+		{
+			Name: "store_a",
+			Kind: &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{
+				UpdatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
+				ValueType:    "string",
+			}},
+			Inputs: []*pbsubstreams.Module_Input{
+				{Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "test.Block"}}},
+			},
+		},
+		{
+			Name: "map_a",
+			Kind: &pbsubstreams.Module_KindMap_{},
+			Inputs: []*pbsubstreams.Module_Input{
+				{Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "test.Block"}}},
+				{Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{
+					ModuleName: "store_a",
+					Mode:       pbsubstreams.Module_Input_Store_GET,
+				}}},
+			},
+		},
+	}
+
+	execGraph, err := exec.NewOutputModuleGraph("map_a", true, &pbsubstreams.Modules{
+		Modules: modules,
+		Binaries: []*pbsubstreams.Binary{
+			{Type: "test", Content: []byte("some-fake-binary-data")},
+		},
+	}, 0)
+	require.NoError(t, err)
+
+	const stage = uint32(1)
+	const startBlock = uint64(100)
+	const stopBlock = uint64(200)
+	storeHash := execGraph.ModuleHashes()["store_a"]
+
+	setup := func(t *testing.T, files ...string) *ExecutionPlan {
+		baseStore := dstore.NewMockStore(nil)
+		for _, file := range files {
+			baseStore.SetFile(file, []byte{})
+		}
+		// The mock returns io.EOF for a missing file; sub-stores inherit this func with
+		// the sub-folder stripped from `name`, hence the suffix match.
+		baseStore.OpenObjectFunc = func(_ context.Context, name string) (io.ReadCloser, error) {
+			for path, content := range baseStore.Files {
+				if strings.HasSuffix(path, name) {
+					return io.NopCloser(bytes.NewReader(content)), nil
+				}
+			}
+			return nil, dstore.ErrNotFound
+		}
+		execoutConfigs, err := execout.NewConfigs(baseStore, execGraph.UsedModulesUpToStage(int(stage)), execGraph.ModuleHashes(), stopBlock-startBlock, 0, logger)
+		require.NoError(t, err)
+		storeConfigs, err := store.NewConfigMap(baseStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), 0, 0, t.TempDir(), "memory")
+		require.NoError(t, err)
+		indexConfigs, err := index.NewConfigs(baseStore, execGraph.UsedIndexesModulesUpToStage(int(stage)), execGraph.ModuleHashes(), 0, logger)
+		require.NoError(t, err)
+
+		plan, err := GetExecutionPlan(context.Background(), logger, execGraph, stage, startBlock, stopBlock, "map_a", execoutConfigs, indexConfigs, storeConfigs)
+		require.NoError(t, err)
+		require.NotNil(t, plan)
+		return plan
+	}
+
+	fullKV := fmt.Sprintf("%s/states/%010d-%010d.kv", storeHash, stopBlock, 0)
+	output := fmt.Sprintf("%s/outputs/%010d-%010d.output", storeHash, startBlock, stopBlock)
+
+	t.Run("output missing", func(t *testing.T) {
+		plan := setup(t, fullKV)
+		require.Contains(t, plan.RequiredModules, "store_a", "the store replays through wasm when its ops file is gone")
+		require.NotContains(t, plan.StoresToWrite, "store_a", "an existing fullKV is never rebuilt")
+		require.Contains(t, plan.ExecoutWriters, "store_a")
+		require.False(t, plan.Skippable)
+	})
+
+	t.Run("output present", func(t *testing.T) {
+		plan := setup(t, fullKV, output)
+		require.NotContains(t, plan.RequiredModules, "store_a")
+		require.NotContains(t, plan.StoresToWrite, "store_a")
+		require.Contains(t, plan.ExistingExecOuts, "store_a")
+	})
 }

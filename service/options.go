@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/substreams/squash"
+	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/wasm"
 )
 
@@ -162,6 +163,17 @@ func WithLiveBackFillerFinalBlockDelay(delay uint64) Option {
 	return func(a anyTierService) {
 		if s, ok := a.(*Tier1Service); ok {
 			s.liveBackFillerFinalBlockDelay = delay
+		}
+	}
+}
+
+// WithExecOutPrefetch bounds how far ahead a production-mode request downloads
+// cached execution output files while streaming them to the client. A zero
+// depth or budget turns prefetching off.
+func WithExecOutPrefetch(cfg execout.PrefetchConfig) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.execOutPrefetch = cfg
 		}
 	}
 }

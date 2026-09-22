@@ -334,14 +334,17 @@ func (a *Tier1App) Run() error {
 		opts = append(opts, service.WithStoreSizeLimit(a.config.StoreSizeLimit))
 	}
 	opts = append(opts, service.WithExecOutPrefetch(a.config.ExecOutPrefetch))
-	squasher, err := squash.New(a.config.SquasherPlugin, a.logger)
-	if err != nil {
-		return fmt.Errorf("unable to initialize squasher plugin: %w", err)
+	if a.config.SquasherPlugin != "" {
+		squasher, err := squash.New(a.config.SquasherPlugin, a.logger)
+		if err != nil {
+			return fmt.Errorf("unable to initialize squasher plugin: %w", err)
+		}
+		// local:// is registered and returns nil, which keeps in-process squashing.
+		if squasher != nil {
+			opts = append(opts, service.WithSquasher(squasher))
+			opts = append(opts, service.WithRemoteSquashQuietPeriod(a.config.RemoteSquashQuietPeriod))
+		}
 	}
-	if squasher != nil {
-		opts = append(opts, service.WithSquasher(squasher))
-	}
-	opts = append(opts, service.WithRemoteSquashQuietPeriod(a.config.RemoteSquashQuietPeriod))
 
 	if a.config.TmpDir != "" {
 		wazero.SetTempDir(a.config.TmpDir)

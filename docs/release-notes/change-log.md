@@ -267,8 +267,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Dependencies
 
-- `google.golang.org/grpc` is at v1.83.1, which clears GHSA-vp52-pcj8-j9qc, reported as HIGH: a peer could exhaust
-  server heap by fragmenting HTTP/2 DATA frames.
+- `google.golang.org/grpc` is at `v1.85.0-dev.0.20260825072537-93e31b48545e`. That clears
+  GHSA-vp52-pcj8-j9qc and CVE-2026-84445 (an xDS server panics on a request with neither
+  `:authority` nor `Host`). v1.84.0 is still inside the range Docker Scout reports, which
+  failed the image build.
 
 ### Tests
 

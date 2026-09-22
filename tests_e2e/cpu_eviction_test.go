@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"syscall"
 	"testing"
@@ -18,7 +19,6 @@ import (
 	"github.com/streamingfast/substreams/service/active_requests"
 	"github.com/streamingfast/substreams/tools/devenv"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -28,7 +28,17 @@ import (
 // concurrent dev-mode requests burn about 7.5 cores against it, so the evictor
 // sees a genuine overload built from real wasm execution — over the threshold
 // by enough to fire, but not so far that the batch has to take every request.
+// Machines with fewer cores get a quota scaled down by evictionQuotaCoreRatio,
+// see evictionQuota.
 const evictionQuotaCores = 6.0
+
+// evictionQuotaCoreRatio keeps the quota under what the machine can actually
+// burn: a 4-core CI runner can never reach 90% of a 6-core quota.
+const evictionQuotaCoreRatio = 0.7
+
+func evictionQuota() float64 {
+	return min(evictionQuotaCores, evictionQuotaCoreRatio*float64(runtime.NumCPU()))
+}
 
 // fakeCgroup writes cpu.max once and then rewrites cpu.stat from the process's
 // own CPU time, so the evictor's cgroup reader sees this test's real CPU use
@@ -154,10 +164,10 @@ func TestCPUEviction_OverloadedPodShedsRequests(t *testing.T) {
 
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 6000)
 	require.NoError(t, err)
+	defer devenv.TerminateDummyBlockchain(ctx, container)
 	waitMergerCaughtUp(t, ctx, tmpDir, 6000)
-	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 
-	t.Setenv("SUBSTREAMS_CGROUP_DIR", fakeCgroup(t, evictionQuotaCores))
+	t.Setenv("SUBSTREAMS_CGROUP_DIR", fakeCgroup(t, evictionQuota()))
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
 	app1, endpoint := startTier1WithRetry(t, ctx, devenv.Tier1Config{

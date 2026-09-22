@@ -11,9 +11,9 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
+	"github.com/streamingfast/substreams/tools/devenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
 	"go.uber.org/zap"
 )
 
@@ -36,7 +36,7 @@ func TestPartialBlocksSimple(t *testing.T) {
 	t.Logf("Starting container with image: %s and burst %d", image, burst)
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks", burst)
 	require.NoError(t, err)
-	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
+	defer devenv.TerminateDummyBlockchain(ctx, container)
 
 	// Log container details for debugging
 	if container != nil {
@@ -56,7 +56,7 @@ func TestPartialBlocksSimple(t *testing.T) {
 	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
 
 	defer func() {
-		container.Terminate(ctx, testcontainers.StopTimeout(0))
+		devenv.TerminateDummyBlockchain(ctx, container)
 		// ensure we close this well, for next tests
 		app.Shutdown(nil)
 		app2.Shutdown(nil)
@@ -190,7 +190,7 @@ func TestPartialBlocksWithStores(t *testing.T) {
 			t.Logf("Starting container with image: %s and burst %d", image, burst)
 			container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, "--with-flash-blocks --with-reorgs", burst, 330)
 			require.NoError(t, err)
-			defer container.Terminate(ctx, testcontainers.StopTimeout(0))
+			defer devenv.TerminateDummyBlockchain(ctx, container)
 
 			// Log container details for debugging
 			if container != nil {
@@ -211,7 +211,7 @@ func TestPartialBlocksWithStores(t *testing.T) {
 
 			defer func() {
 				fmt.Println("Terminating container...")
-				container.Terminate(ctx, testcontainers.StopTimeout(0))
+				devenv.TerminateDummyBlockchain(ctx, container)
 				// ensure we close this well, for next tests
 				app.Shutdown(nil)
 				app2.Shutdown(nil)
@@ -378,7 +378,7 @@ func TestPartialBlocksReorgs(t *testing.T) {
 			app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
 
 			defer func() {
-				container.Terminate(ctx, testcontainers.StopTimeout(0))
+				devenv.TerminateDummyBlockchain(ctx, container)
 				// ensure we close this well, for next tests
 				app.Shutdown(nil)
 				app2.Shutdown(nil)

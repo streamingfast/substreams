@@ -189,7 +189,7 @@ func TestCPUEviction_OverloadedPodShedsRequests(t *testing.T) {
 
 	require.True(t, app1.IsReady(ctx), "tier1 should start ready")
 
-	pkg, err := manifest.MustNewReader("./dummy/e2e-v0.3.0.spkg").Read()
+	pkg, err := manifest.MustNewReader("./dummy/e2e-v0.4.0.spkg").Read()
 	require.NoError(t, err)
 
 	// Dev mode runs every module of the chain on tier1 itself, so each request

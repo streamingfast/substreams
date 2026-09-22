@@ -29,6 +29,7 @@ func TestDummyBlockchainContainer(t *testing.T) {
 	// launch dummy blockchain container
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 	require.NoError(t, err)
+	waitMergerCaughtUp(t, ctx, tmpDir, 1000)
 	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 
 	zlog.Info("dummy blockchain container started", zap.String("tmp_dir", tmpDir))
@@ -227,6 +228,7 @@ func TestErrNoInputTypeUrlNotEmpty(t *testing.T) {
 
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 	require.NoError(t, err)
+	waitMergerCaughtUp(t, ctx, tmpDir, 1000)
 	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)

@@ -496,16 +496,7 @@ func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 
 	return func() loop.Msg {
 		return s.guardSquash(func() loop.Msg {
-			empty := s.findEmptyUnits(stage, run)
-			merged, unmerged, err := squashRun(planSquashSteps(run, empty), squashRunTimeBudget, func(step []Unit) error {
-				if err := s.ctx.Err(); err != nil {
-					return err
-				}
-				if empty[step[0].Segment] {
-					return s.squashEmptyUnits(stage, step)
-				}
-				return s.multiSquash(stage, step[0])
-			})
+			merged, unmerged, err := s.squashStage(stage, run)
 			if err != nil {
 				return MsgMergeFailed{Unit: run[len(merged)], Error: err}
 			}

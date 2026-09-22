@@ -107,15 +107,19 @@ func oneUnitSteps(run []Unit) [][]Unit {
 	return planSquashSteps(run, nil)
 }
 
+type stepSquashFunc func([]Unit) error
+
+func (f stepSquashFunc) squashStep(step []Unit) error { return f(step) }
+
 func TestSquashRun(t *testing.T) {
 	run := []Unit{unit(1, 0), unit(2, 0), unit(3, 0)}
 
 	t.Run("squashes every unit in order", func(t *testing.T) {
 		var squashed []Unit
-		merged, unmerged, err := squashRun(oneUnitSteps(run), time.Hour, func(step []Unit) error {
+		merged, unmerged, err := squashRun(oneUnitSteps(run), time.Hour, stepSquashFunc(func(step []Unit) error {
 			squashed = append(squashed, step...)
 			return nil
-		})
+		}))
 
 		require.NoError(t, err)
 		assert.Equal(t, run, squashed)
@@ -124,7 +128,7 @@ func TestSquashRun(t *testing.T) {
 	})
 
 	t.Run("squashes the first unit even with no budget left", func(t *testing.T) {
-		merged, unmerged, err := squashRun(oneUnitSteps(run), 0, func([]Unit) error { return nil })
+		merged, unmerged, err := squashRun(oneUnitSteps(run), 0, stepSquashFunc(func([]Unit) error { return nil }))
 
 		require.NoError(t, err)
 		assert.Equal(t, run[:1], merged)
@@ -133,12 +137,12 @@ func TestSquashRun(t *testing.T) {
 
 	t.Run("stops at the first error", func(t *testing.T) {
 		boom := errors.New("boom")
-		merged, _, err := squashRun(oneUnitSteps(run), time.Hour, func(step []Unit) error {
+		merged, _, err := squashRun(oneUnitSteps(run), time.Hour, stepSquashFunc(func(step []Unit) error {
 			if step[0] == unit(2, 0) {
 				return boom
 			}
 			return nil
-		})
+		}))
 
 		assert.ErrorIs(t, err, boom)
 		assert.Equal(t, run[:1], merged)
@@ -146,7 +150,7 @@ func TestSquashRun(t *testing.T) {
 
 	t.Run("budget is only checked between steps", func(t *testing.T) {
 		steps := [][]Unit{{unit(1, 0), unit(2, 0)}, {unit(3, 0)}}
-		merged, unmerged, err := squashRun(steps, 0, func([]Unit) error { return nil })
+		merged, unmerged, err := squashRun(steps, 0, stepSquashFunc(func([]Unit) error { return nil }))
 
 		require.NoError(t, err)
 		assert.Equal(t, run[:2], merged, "a step is never split")
@@ -237,14 +241,14 @@ func TestSquashRunStopsOnceContextCancelled(t *testing.T) {
 	run := s.claimMergeRun(s.stages[0], unit(1, 0), 10)
 
 	var squashed []Unit
-	merged, _, err := squashRun(oneUnitSteps(run), time.Hour, func(step []Unit) error {
+	merged, _, err := squashRun(oneUnitSteps(run), time.Hour, stepSquashFunc(func(step []Unit) error {
 		if err := s.ctx.Err(); err != nil {
 			return err
 		}
 		squashed = append(squashed, step...)
 		s.cancel()
 		return nil
-	})
+	}))
 
 	assert.ErrorIs(t, err, context.Canceled)
 	assert.Equal(t, run[:1], squashed, "the unit in progress finishes, the next one is not started")

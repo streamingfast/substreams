@@ -146,6 +146,12 @@ func TestPartialBlocksSimple(t *testing.T) {
 
 }
 
+// partialStoresBurst is the genesis burst of TestPartialBlocksWithStores. Its requests start 30
+// blocks past it, about 5s at 330 blocks a minute: blocks the chain produces before tier1 is up
+// and the request is live arrive as full blocks without partials, so a range starting right at
+// the burst gets fewer partials the slower the machine starts the stack.
+const partialStoresBurst = 300
+
 func TestPartialBlocksWithStores(t *testing.T) {
 	testCases := []struct {
 		name           string
@@ -157,16 +163,16 @@ func TestPartialBlocksWithStores(t *testing.T) {
 	}{
 		{
 			name:           "dev with stores",
-			startBlock:     300,
-			stopBlock:      330,
+			startBlock:     partialStoresBurst + 30,
+			stopBlock:      partialStoresBurst + 60,
 			productionMode: false,
 			spkgFile:       "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
 			outputModule:   "map_tx_counter_summary",
 		},
 		{
 			name:           "prod with stores",
-			startBlock:     300,
-			stopBlock:      330,
+			startBlock:     partialStoresBurst + 30,
+			stopBlock:      partialStoresBurst + 60,
 			productionMode: true,
 			spkgFile:       "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
 			outputModule:   "map_tx_counter_summary",
@@ -185,7 +191,7 @@ func TestPartialBlocksWithStores(t *testing.T) {
 
 			// launch dummy blockchain container with flash blocks enabled
 			image := latestDummyBlockchainImage
-			burst := int(tc.startBlock)
+			burst := partialStoresBurst
 
 			t.Logf("Starting container with image: %s and burst %d", image, burst)
 			container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, "--with-flash-blocks --with-reorgs", burst, 330)

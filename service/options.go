@@ -178,6 +178,17 @@ func WithLiveBackFillerFinalBlockDelay(delay uint64) Option {
 	}
 }
 
+// WithMaxRequestDuration gracefully ends a tier1 request once it has run for
+// the given duration, quick-saving its stores so the client resumes quickly
+// on reconnection. Zero disables the limit.
+func WithMaxRequestDuration(d time.Duration) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.maxRequestDuration = d
+		}
+	}
+}
+
 // WithExecOutPrefetch bounds how far ahead a production-mode request downloads
 // cached execution output files while streaming them to the client. A zero
 // depth or budget turns prefetching off.

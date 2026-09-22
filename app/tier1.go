@@ -156,6 +156,12 @@ type Tier1Config struct {
 	// live backfiller waits before concluding merged blocks are safely written.
 	// Leave at 0 to use the default.
 	LiveBackFillerFinalBlockDelay uint64
+
+	// MaxRequestDuration, if non-zero, gracefully ends requests that have run
+	// for that long (stores are quick-saved and the client is told to
+	// reconnect). Set it a bit under the stream duration limit of any load
+	// balancer in front of tier1.
+	MaxRequestDuration time.Duration
 }
 
 type Tier1App struct {
@@ -318,6 +324,9 @@ func (a *Tier1App) Run() error {
 		opts = append(opts, service.WithBlockExecutionTimeout(a.config.BlockExecutionTimeout))
 	}
 
+	if a.config.MaxRequestDuration != 0 {
+		opts = append(opts, service.WithMaxRequestDuration(a.config.MaxRequestDuration))
+	}
 	if a.config.LiveBackFillerFinalBlockDelay != 0 {
 		opts = append(opts, service.WithLiveBackFillerFinalBlockDelay(a.config.LiveBackFillerFinalBlockDelay))
 	}
@@ -489,6 +498,9 @@ func (a *Tier1App) setIsReady(ready bool) {
 func (config *Tier1Config) Validate() error {
 	if _, err := service.ResolveRemoteSquashQuietPeriod(config.RemoteSquashQuietPeriod); err != nil {
 		return err
+	}
+	if config.MaxRequestDuration < 0 {
+		return fmt.Errorf("max request duration must not be negative, got %s", config.MaxRequestDuration)
 	}
 	return nil
 }

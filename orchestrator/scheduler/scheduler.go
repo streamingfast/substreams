@@ -273,6 +273,10 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		)
 
 	case stage.MsgAllStoresCompleted:
+		// CmdTryMerge sends this after every job once all stores are done, handle it only once.
+		if s.storesSyncCompleted {
+			return nil
+		}
 		s.logger.Info("all stores completed, marking stores sync completed")
 		s.storesSyncCompleted = true
 		if !s.delayedScheduleNextJob {
@@ -436,7 +440,7 @@ func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
 			)
 		}
 
-		s.logger.Info("`waiting for output stream to complete, stores ready", fields...)
+		s.logger.Info("waiting for output stream to complete, stores ready", fields...)
 	}
 	if s.outputStreamCompleted && !s.storesSyncCompleted {
 		s.logger.Info("waiting for stores to complete, output stream completed")

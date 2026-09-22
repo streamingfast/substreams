@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.23.0
 
 ### CLI
 
@@ -72,6 +72,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `using in-memory KV store`, `flushing store at boundary`, `merged partial into full store`,
   `deleting partial store`. They fired for every store opened by tier1 and tier2 and for
   every squash. `squashing time metrics` stays at `Info` as the squash progress signal.
+
+- The tier1 block hub logs `processing block` at `Debug`, except for one line every 10 seconds
+  kept at `Info` to show progress; on flash-block chains it fired several times per block.
+  `linking live block using one blocks` moves up to `Info`, so a one-block store lookup after
+  an unlinkable live block shows in production logs.
   
 - Tier1 no longer logs `all stores completed, marking stores sync completed` and
   `waiting for output stream to complete, stores ready` after every tier2 job on requests without stores.

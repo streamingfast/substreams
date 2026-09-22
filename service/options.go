@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/substreams/squash"
+	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/wasm"
 )
 
@@ -144,6 +145,17 @@ func WithSquasher(c squash.Client) Option {
 	}
 }
 
+// WithRemoteSquashQuietPeriod sets how long tier1 squashes locally after the
+// remote squasher stops answering, before one run tries it again. Zero keeps
+// DefaultRemoteSquashQuietPeriod. A negative duration is rejected at startup.
+func WithRemoteSquashQuietPeriod(d time.Duration) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.remoteSquashQuietPeriod = d
+		}
+	}
+}
+
 func WithStoresBackend(backend string) Option {
 	return func(a anyTierService) {
 		switch s := a.(type) {
@@ -162,6 +174,17 @@ func WithLiveBackFillerFinalBlockDelay(delay uint64) Option {
 	return func(a anyTierService) {
 		if s, ok := a.(*Tier1Service); ok {
 			s.liveBackFillerFinalBlockDelay = delay
+		}
+	}
+}
+
+// WithExecOutPrefetch bounds how far ahead a production-mode request downloads
+// cached execution output files while streaming them to the client. A zero
+// depth or budget turns prefetching off.
+func WithExecOutPrefetch(cfg execout.PrefetchConfig) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.execOutPrefetch = cfg
 		}
 	}
 }

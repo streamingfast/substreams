@@ -12,6 +12,23 @@ func TestNew() *Graph {
 	}
 }
 
+// TestGraphMapper returns a graph of a single stage holding one mapper.
+func TestGraphMapper(initialBlock uint64) *Graph {
+	return &Graph{
+		lowestInitBlock: initialBlock,
+		stagedUsedModules: ExecutionStages{
+			{
+				{
+					&pbsubstreams.Module{
+						Kind:         &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
+						InitialBlock: initialBlock,
+					},
+				},
+			},
+		},
+	}
+}
+
 // TestGraphStores returns a graph of two stages: the stores, all in one layer, then an
 // output mapper starting at the lowest initial block of the stores.
 func TestGraphStores(stores ...*pbsubstreams.Module) *Graph {

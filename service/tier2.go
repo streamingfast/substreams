@@ -345,6 +345,8 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		request.SegmentNumber,
 		request.SegmentSize,
 		request.Stage,
+		true, // tier2 jobs only exist for production-mode work
+		reqStats,
 	)
 
 	defer func() {
@@ -752,14 +754,10 @@ func canSkipBlockSource(existingExecOuts map[string]execout.FileReader, required
 }
 
 func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbssinternal.Substreams_ProcessRangeServer) substreams.ResponseFunc {
-	var userID, apiKeyID, ip string
+	var userID, apiKeyID string
 	if auth := dauth.FromContext(ctx); auth != nil {
 		userID = auth.UserID()
 		apiKeyID = auth.APIKeyID()
-		ip = auth.RealIP()
-		logger.Info("auth information available in tier2 response handler", zap.String("user_id", userID), zap.String("key_id", apiKeyID), zap.String("ip_address", ip))
-	} else {
-		logger.Warn("no auth information available in tier2 response handler")
 	}
 
 	// Progress snapshots are emitted from a ticker goroutine while the block loop keeps
@@ -822,6 +820,12 @@ func toGRPCError(ctx context.Context, err error) error {
 	// already GRPC error
 	if grpcError := dgrpc.AsGRPCError(err); grpcError != nil {
 		return grpcError.Err()
+	}
+
+	// A snapshot pruned under a running request: retrying the job cannot help, the
+	// request has to be restarted so that tier1 picks a new resume point.
+	if errors.Is(err, store.ErrSnapshotMissing) {
+		return status.Error(codes.FailedPrecondition, err.Error()+"; restart the request")
 	}
 
 	// GRPC to connect error

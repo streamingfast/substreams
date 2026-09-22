@@ -10,12 +10,18 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 )
 
-type storeSnapshotsMap struct {
+type StoreSnapshotsMap struct {
 	sync.Mutex
 	Snapshots map[string]*storeSnapshots
 }
 
-func (s *storeSnapshotsMap) String() string {
+func NewStoreSnapshotsMap() *StoreSnapshotsMap {
+	return &StoreSnapshotsMap{
+		Snapshots: map[string]*storeSnapshots{},
+	}
+}
+
+func (s *StoreSnapshotsMap) String() string {
 	var out []string
 	for k, v := range s.Snapshots {
 		out = append(out, fmt.Sprintf("store=%s (%s)", k, v))
@@ -23,10 +29,31 @@ func (s *storeSnapshotsMap) String() string {
 	return strings.Join(out, ", ")
 }
 
-func FetchState(ctx context.Context, storeConfigMap store.ConfigMap, from, to uint64) (*storeSnapshotsMap, error) {
-	state := &storeSnapshotsMap{
-		Snapshots: map[string]*storeSnapshots{},
+// Summary reports the number of files seen per store, for logging.
+func (s *StoreSnapshotsMap) Summary() string {
+	var out []string
+	for k, v := range s.Snapshots {
+		out = append(out, fmt.Sprintf("%s: %d fullkv, %d partials", k, len(v.FullKVFiles), len(v.Partials)))
 	}
+	return strings.Join(out, "; ")
+}
+
+// Merge adds every file of `other` into `s`, keeping files sorted.
+func (s *StoreSnapshotsMap) Merge(other *StoreSnapshotsMap) {
+	for name, snapshots := range other.Snapshots {
+		existing := s.Snapshots[name]
+		if existing == nil {
+			s.Snapshots[name] = snapshots
+			continue
+		}
+		existing.FullKVFiles = append(existing.FullKVFiles, snapshots.FullKVFiles...)
+		existing.Partials = append(existing.Partials, snapshots.Partials...)
+		existing.Sort()
+	}
+}
+
+func FetchState(ctx context.Context, storeConfigMap store.ConfigMap, from, to uint64) (*StoreSnapshotsMap, error) {
+	state := NewStoreSnapshotsMap()
 
 	eg := llerrgroup.New(10)
 

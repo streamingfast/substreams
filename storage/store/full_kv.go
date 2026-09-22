@@ -161,6 +161,11 @@ func (s *FullKV) QuickSave(ctx context.Context, atBlockHash string) error {
 
 var ErrInvalidFullKVFile = errors.New("unmarshal store error") // this error will bubble up to the user
 
+// ErrSnapshotMissing is returned when a fullKV file that the request planned on does not
+// exist any more, typically pruned while the request was running. The request cannot
+// recover by retrying the job: its resume point must be computed again.
+var ErrSnapshotMissing = errors.New("does not exist")
+
 func (s *FullKV) Delete(ctx context.Context, file *FileInfo) error {
 	s.Store().DeleteObject(ctx, file.Filename)
 	return nil
@@ -172,6 +177,9 @@ func (s *FullKV) Load(ctx context.Context, file *FileInfo) error {
 
 	reader, err := loadStoreStream(ctx, s.objStore, file.Filename)
 	if err != nil {
+		if errors.Is(err, dstore.ErrNotFound) {
+			return fmt.Errorf("load store stream: snapshot %q %w (it may have been pruned): %v", file.Filename, ErrSnapshotMissing, err)
+		}
 		return fmt.Errorf("load store stream: %w", err)
 	}
 	defer reader.Close()

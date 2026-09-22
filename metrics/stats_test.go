@@ -240,3 +240,30 @@ func TestRecordEndSubrequest_NoStagesReported(t *testing.T) {
 	// an unknown job is ignored rather than dereferenced
 	require.NotPanics(t, func() { stats.RecordEndSubrequest(9999, JobComplete) })
 }
+
+func TestStats_LocalWasmComputeDuration(t *testing.T) {
+	stats := NewReqStats(&Config{}, nil, nil, zlogTest)
+
+	stats.moduleStats("mod_a").processingTime = 3 * time.Second
+	stats.moduleStats("mod_b").processingTime = 2 * time.Second
+	setExternalCallMetric(stats, "mod_a", "eth:call", 1, 500*time.Millisecond, 500*time.Millisecond)
+
+	assert.Equal(t, 4500*time.Millisecond, stats.LocalWasmComputeDuration())
+
+	// an execution still in progress counts, and its in-progress external call is deducted
+	stats.moduleStats("mod_b").inprocessSince[42] = time.Now().Add(-10 * time.Second)
+	stats.moduleStats("mod_b").inprocessCallMetrics[43] = inprocessCall{startTime: time.Now().Add(-4 * time.Second), extension: "eth:call"}
+
+	assert.InDelta(t, (10500 * time.Millisecond).Seconds(), stats.LocalWasmComputeDuration().Seconds(), 0.1)
+}
+
+func TestStats_CurrentBlock(t *testing.T) {
+	stats := NewReqStats(&Config{}, nil, nil, zlogTest)
+	assert.Zero(t, stats.CurrentBlock())
+
+	stats.lastSentBlockNum = 100
+	assert.Equal(t, uint64(100), stats.CurrentBlock())
+
+	stats.lastProcessedBlockNum = 250
+	assert.Equal(t, uint64(250), stats.CurrentBlock())
+}

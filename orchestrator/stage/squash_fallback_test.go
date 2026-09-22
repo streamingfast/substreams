@@ -3,7 +3,9 @@ package stage
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/abourget/llerrgroup"
 	"github.com/stretchr/testify/assert"
@@ -12,7 +14,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/metrics"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/squash"
 	"github.com/streamingfast/substreams/storage/store"
@@ -123,6 +128,141 @@ func TestSquashStageRemoteApplicationErrorDoesNotFallback(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "remote squash")
 	assert.Equal(t, 1, client.calls)
+}
+
+func TestRemoteFailureDoesNotPoisonLocalMergeGroup(t *testing.T) {
+	t.Parallel()
+
+	client := &stubSquashClient{err: status.Error(codes.Unavailable, "connection refused")}
+	stages, stage := remoteSquashFixture(client)
+
+	err := stages.remoteSquashRun(stage, []Unit{{Segment: 0}})
+	require.Error(t, err)
+	require.NoError(t, stage.syncWork.Wait())
+}
+
+func TestRemoteSquashDoesNotRetry(t *testing.T) {
+	t.Parallel()
+
+	client := &stubSquashClient{err: status.Error(codes.Unavailable, "connection refused")}
+	stages, stage := remoteSquashFixture(client)
+
+	err := stages.remoteSquash(stage.storeModuleStates[0], []squash.Range{{StartBlock: 0, ExclusiveEndBlock: 10}})
+	require.Error(t, err)
+	assert.Equal(t, 1, client.calls)
+}
+
+func TestSquashStageApplicationErrorDoesNotStickToLocal(t *testing.T) {
+	t.Parallel()
+
+	client := &stubSquashClient{err: status.Error(codes.InvalidArgument, "bad module")}
+	stages, stage := remoteSquashFixture(client)
+	remote := reqctx.GetRemoteSquasher(stages.ctx)
+	remote.Availability = reqctx.NewRemoteAvailability(time.Minute, time.Now)
+
+	_, _, err := stages.squashStage(stage, []Unit{{Segment: 0}})
+	require.Error(t, err)
+	assert.False(t, remote.PreferLocal())
+	assert.Equal(t, 1, client.calls)
+
+	_, _, err = stages.squashStage(stage, []Unit{{Segment: 0}})
+	require.Error(t, err)
+	assert.Equal(t, 2, client.calls)
+	assert.False(t, remote.PreferLocal())
+}
+
+func TestSquashStageUnreachableStaysLocalUntilRemoteAnswers(t *testing.T) {
+	t.Parallel()
+
+	client := &stubSquashClient{err: status.Error(codes.Unavailable, "connection refused")}
+	clock := &manualClock{at: time.Unix(1_000, 0)}
+	quiet := 30 * time.Second
+	stages, stage := remoteSquashFixture(client)
+	remote := reqctx.GetRemoteSquasher(stages.ctx)
+	remote.Availability = reqctx.NewRemoteAvailability(quiet, clock.Now)
+	prepareLocalFallback(t, stages, stage)
+
+	run := []Unit{{Segment: 0}}
+	_, _, err := stages.squashStage(stage, run)
+	require.Error(t, err)
+	assert.Equal(t, 1, client.calls)
+	assert.True(t, remote.PreferLocal())
+
+	_, _, err = stages.squashStage(stage, run)
+	require.Error(t, err)
+	assert.Equal(t, 1, client.calls, "later runs stay local while the remote is down")
+
+	clock.Advance(quiet)
+	client.err = nil
+	merged, unmerged, err := stages.squashStage(stage, run)
+	require.NoError(t, err)
+	assert.Equal(t, run, merged)
+	assert.Empty(t, unmerged)
+	assert.Equal(t, 2, client.calls)
+	assert.False(t, remote.PreferLocal())
+}
+
+func TestSquashStageCanceledProbeDoesNotFallBack(t *testing.T) {
+	t.Parallel()
+
+	client := &stubSquashClient{err: status.Error(codes.Unavailable, "connection refused")}
+	clock := &manualClock{at: time.Unix(1_000, 0)}
+	quiet := 30 * time.Second
+	gate := reqctx.NewRemoteAvailability(quiet, clock.Now)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx = reqctx.WithRemoteSquasher(ctx, &reqctx.RemoteSquasher{Client: client, Availability: gate})
+
+	stages, stage := remoteSquashFixture(client)
+	stages.ctx = ctx
+	gate.MarkDown()
+	clock.Advance(quiet)
+	cancel()
+
+	_, _, err := stages.squashStage(stage, []Unit{{Segment: 0}})
+	require.Error(t, err)
+	assert.Equal(t, 1, client.calls)
+	assert.True(t, gate.PreferLocal(), "a canceled probe keeps the quiet period and does not squash locally")
+}
+
+func prepareLocalFallback(t *testing.T, stages *Stages, stage *Stage) {
+	t.Helper()
+	obj, err := dstore.NewStore("memory://squash", "", "", false)
+	require.NoError(t, err)
+	cfg, err := store.NewConfig(
+		"mod",
+		0,
+		"hash",
+		pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
+		"string",
+		obj,
+		nil,
+		0,
+		t.TempDir(),
+		"memory",
+	)
+	require.NoError(t, err)
+	modState := stage.storeModuleStates[0]
+	modState.storeConfig = cfg
+	modState.logger = zap.NewNop()
+	stages.ctx = reqctx.WithReqStats(stages.ctx, metrics.NewReqStats(&metrics.Config{}, nil, nil, zap.NewNop()))
+}
+
+type manualClock struct {
+	mu sync.Mutex
+	at time.Time
+}
+
+func (c *manualClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.at
+}
+
+func (c *manualClock) Advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.at = c.at.Add(d)
 }
 
 func remoteSquashFixture(client squash.Client) (*Stages, *Stage) {

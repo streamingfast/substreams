@@ -90,17 +90,23 @@ func (s *Stages) claimMergeRun(stage *Stage, first Unit, limit int) []Unit {
 	return run
 }
 
+// stepSquasher squashes one step of a run: a single unit, or a consecutive
+// group of empty units.
+type stepSquasher interface {
+	squashStep(step []Unit) error
+}
+
 // squashRun squashes steps, consecutive groups of units, in order. It always squashes the
 // first step, then stops once budget is spent and returns the units of the steps it did
 // not get to as unmerged. On error, merged holds the units of the steps squashed before
 // the failing one.
-func squashRun(steps [][]Unit, budget time.Duration, squash func(step []Unit) error) (merged, unmerged []Unit, err error) {
+func squashRun(steps [][]Unit, budget time.Duration, squash stepSquasher) (merged, unmerged []Unit, err error) {
 	start := time.Now()
 	for i, step := range steps {
 		if i > 0 && time.Since(start) >= budget {
 			return merged, slices.Concat(steps[i:]...), nil
 		}
-		if err := squash(step); err != nil {
+		if err := squash.squashStep(step); err != nil {
 			return merged, nil, err
 		}
 		merged = append(merged, step...)
@@ -359,19 +365,36 @@ func getPartialOrFullKV(ctx context.Context, modState *StoreModuleState, rng *bl
 	return nil, nil, nil, fmt.Errorf("getting partial or full kv: %w", err)
 }
 
-// squashStage squashes run. A remote squasher, when configured, gets the whole run
-// per module in one RPC so it can keep the full store hot and copy over empty
-// partials; tier1 does not read store files. If that remote is unreachable, the run
-// is squashed locally instead.
+// squashStage squashes run. A remote squasher, when configured and not marked
+// down, gets the whole run per module in one RPC so it can keep the full store
+// hot and copy over empty partials; tier1 does not read store files. The RPC is
+// not retried here — the client owns transport retries, and the next squash run
+// is what tries the remote again. If this attempt is unreachable, the run is
+// squashed locally and later runs stay local until an attempt succeeds.
 func (s *Stages) squashStage(stage *Stage, run []Unit) (merged, unmerged []Unit, err error) {
-	if reqctx.GetRemoteSquasher(s.ctx) != nil {
+	remote := reqctx.GetRemoteSquasher(s.ctx)
+	if remote != nil && !remote.PreferLocal() {
 		err := s.remoteSquashRun(stage, run)
 		if err == nil {
+			if remote.MarkRemoteUp() {
+				s.logger.Info("remote squasher responding, resuming remote squash",
+					zap.Int("stage", stage.idx),
+				)
+			}
 			return run, nil, nil
 		}
-		if !shouldFallbackToLocal(s.ctx, err) {
+		// A canceled request says nothing about the remote: don't fall back and
+		// don't clear or extend the quiet period the probe just took.
+		if s.ctx.Err() != nil {
 			return nil, nil, err
 		}
+		if !shouldFallbackToLocal(s.ctx, err) {
+			// The remote answered. An application error still fails the run,
+			// but it is not a reason to stay on the local squasher.
+			remote.MarkRemoteUp()
+			return nil, nil, err
+		}
+		remote.MarkRemoteDown()
 		s.logger.Warn("remote squasher not responding, falling back to local squash",
 			zap.Int("stage", stage.idx),
 			zap.Int("units", len(run)),
@@ -383,24 +406,42 @@ func (s *Stages) squashStage(stage *Stage, run []Unit) (merged, unmerged []Unit,
 
 func (s *Stages) localSquashRun(stage *Stage, run []Unit) (merged, unmerged []Unit, err error) {
 	empty := s.findEmptyUnits(stage, run)
-	return squashRun(planSquashSteps(run, empty), squashRunTimeBudget, func(step []Unit) error {
-		if err := s.ctx.Err(); err != nil {
-			return err
-		}
-		if empty[step[0].Segment] {
-			return s.squashEmptyUnits(stage, step)
-		}
-		return s.multiSquash(stage, step[0])
+	return squashRun(planSquashSteps(run, empty), squashRunTimeBudget, localStepSquasher{
+		stages: s,
+		stage:  stage,
+		empty:  empty,
 	})
 }
 
+// localStepSquasher is the in-process stepSquasher. Empty steps are copied
+// forward; every other step is merged one unit at a time.
+type localStepSquasher struct {
+	stages *Stages
+	stage  *Stage
+	empty  map[int]bool
+}
+
+func (q localStepSquasher) squashStep(step []Unit) error {
+	if err := q.stages.ctx.Err(); err != nil {
+		return err
+	}
+	if q.empty[step[0].Segment] {
+		return q.stages.squashEmptyUnits(q.stage, step)
+	}
+	return q.stages.multiSquash(q.stage, step[0])
+}
+
 func (s *Stages) remoteSquashRun(stage *Stage, run []Unit) error {
+	// Not stage.syncWork: that group latches its first error, so a failed remote
+	// attempt would make the local fallback's Wait return the remote error even
+	// after the in-process squash succeeded.
+	var grp errgroup.Group
 	for _, modState := range stage.storeModuleStates {
 		ranges := rangesForModule(modState, run)
 		if len(ranges) == 0 {
 			continue
 		}
-		stage.syncWork.Go(func() error {
+		grp.Go(func() error {
 			if stats := reqctx.ReqStatsOrNil(s.ctx); stats != nil {
 				stats.RecordModuleMerging(modState.name)
 				defer stats.RecordModuleMergeComplete(modState.name)
@@ -411,7 +452,7 @@ func (s *Stages) remoteSquashRun(stage *Stage, run []Unit) error {
 			return nil
 		})
 	}
-	return stage.syncWork.Wait()
+	return grp.Wait()
 }
 
 func rangesForModule(modState *StoreModuleState, run []Unit) []squash.Range {
@@ -484,13 +525,13 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 	modState.lastBlockInStore = rng.ExclusiveEndBlock
 	meter.mergeEnd = time.Now()
 
-	s.logger.Info("merged partial into full store",
+	s.logger.Debug("merged partial into full store",
 		zap.String("store", modState.name),
 		zap.Uint64("up_to_block", rng.ExclusiveEndBlock),
 		zap.String("store_size", humanize.IBytes(fullKV.SizeBytes())),
 	)
 
-	s.logger.Info("deleting partial store", zap.Stringer("store", partialKV))
+	s.logger.Debug("deleting partial store", zap.Stringer("store", partialKV))
 
 	// Flush full store
 	if segmentEndsOnInterval {
@@ -557,21 +598,9 @@ func (s *Stages) remoteSquash(modState *StoreModuleState, ranges []squash.Range)
 		StoreSizeLimit:       remote.StoreSizeLimit,
 	}
 
-	var resp *squash.Result
-	err := derr.RetryContext(s.ctx, 5, func(ctx context.Context) error {
-		var callErr error
-		resp, callErr = remote.Client.Squash(ctx, req)
-		if callErr == nil {
-			return nil
-		}
-		if grpcErr := dgrpc.AsGRPCError(callErr); grpcErr != nil {
-			switch grpcErr.Code() {
-			case codes.InvalidArgument, codes.FailedPrecondition, codes.NotFound:
-				return derr.NewFatalError(callErr)
-			}
-		}
-		return callErr
-	})
+	// One attempt. Transport retries belong to the squasher client; once this
+	// returns unreachable, squashStage leaves the remote alone until a later run.
+	resp, err := remote.Client.Squash(s.ctx, req)
 	first, last := ranges[0].StartBlock, ranges[len(ranges)-1].ExclusiveEndBlock
 	if err != nil {
 		return fmt.Errorf("remote squash %s [%d-%d]: %w", modState.name, first, last, err)

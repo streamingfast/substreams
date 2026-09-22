@@ -3,6 +3,7 @@ package pipeline
 import (
 	"github.com/streamingfast/substreams"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	"github.com/streamingfast/substreams/storage/execout"
 )
 
 type Option func(p *Pipeline)
@@ -44,9 +45,27 @@ func WithHeadBlockGetter(getter func() (uint64, error)) Option {
 	}
 }
 
+// WithFinalBlockLagCheck disconnects the request with ErrShuttingDown when, at a segment
+// boundary, its final block trails the last final block of the chain by more than
+// MaxLinearHandoffLagSegments.
+func WithFinalBlockLagCheck(getRecentFinalBlock func() (uint64, error), linearHandoff uint64) Option {
+	return func(p *Pipeline) {
+		p.getRecentFinalBlock = getRecentFinalBlock
+		p.lastLagCheckSegment = linearHandoff / p.stateBundleSize
+	}
+}
+
 func WithHighestStage(stage uint32) Option {
 	return func(p *Pipeline) {
 		s := int(stage)
 		p.highestStage = &s
+	}
+}
+
+// WithExecOutPrefetch bounds how far ahead tier1 downloads cached execution
+// output files while streaming them to the client.
+func WithExecOutPrefetch(cfg execout.PrefetchConfig) Option {
+	return func(p *Pipeline) {
+		p.execOutPrefetch = cfg
 	}
 }

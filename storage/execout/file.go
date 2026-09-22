@@ -1,13 +1,14 @@
 package execout
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"iter"
 	"path"
-	"sort"
+	"slices"
 	"strconv"
 
 	"github.com/streamingfast/dstore"
@@ -89,7 +90,7 @@ func NewFileWriter(ctx context.Context, store dstore.Store, logger *zap.Logger, 
 	}
 
 	filename := fw.Filename()
-	fw.logger.Info("begin writing execution output file", zap.String("filename", filename))
+	fw.logger.Debug("begin writing execution output file", zap.String("filename", filename))
 	r, w := io.Pipe()
 	fw.writer = w
 	fw.writeError = make(chan error, 1)
@@ -277,8 +278,8 @@ func rewriteAsOrdered(ctx context.Context, r io.ReadCloser, readBytes []byte, st
 	}
 	items := o.Items
 
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].BlockNum < items[j].BlockNum
+	slices.SortFunc(items, func(a, b *pboutput.Item) int {
+		return cmp.Compare(a.BlockNum, b.BlockNum)
 	})
 
 	store.SetOverwrite(true)

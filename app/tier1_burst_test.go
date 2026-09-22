@@ -13,6 +13,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestRemoteSquashQuietPeriodConfig(t *testing.T) {
+	cfg := NewDefaultTier1Config()
+	assert.Equal(t, 5*time.Minute, cfg.RemoteSquashQuietPeriod)
+	require.NoError(t, cfg.Validate())
+
+	cfg.RemoteSquashQuietPeriod = 0
+	require.NoError(t, cfg.Validate())
+
+	cfg.RemoteSquashQuietPeriod = -time.Second
+	require.EqualError(t, cfg.Validate(), "remote squash quiet period must not be negative, got -1s")
+}
+
 func TestBurstFromLIB(t *testing.T) {
 	t.Run("hub without a head", func(t *testing.T) {
 		assert.Equal(t, int64(2), burstFromLIB(nil))

@@ -42,9 +42,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   keeps today's in-process squasher. `grpc://` is registered by the squasher project.
   When a remote is set, each squash run is one RPC per store module covering every
   claimed segment, so empty-partial copies and merges happen on the squasher and
-  tier1 does not read store files. If that remote is unreachable, the run is
-  squashed locally after retries fail; a live remote that returns an application
-  error still fails the request.
+  tier1 does not read store files. The call is a single attempt; transport retries
+  belong to the squasher client. If the remote is unreachable, the run is squashed
+  locally and later runs stay local until an attempt succeeds. That wait defaults
+  to 5 minutes (`Tier1Config.RemoteSquashQuietPeriod`); zero keeps the default. A
+  live remote that returns an application error still fails the request.
 
 - Production-mode requests are disconnected with the same `Unavailable` "endpoint is shutting down, please reconnect" error as a tier1 restart when they are more than
   2 segments behind the last final block (rounded down to a segment), either when back-processing finishes or, checked

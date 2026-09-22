@@ -145,6 +145,17 @@ func WithSquasher(c squash.Client) Option {
 	}
 }
 
+// WithRemoteSquashQuietPeriod sets how long tier1 squashes locally after the
+// remote squasher stops answering, before one run tries it again. Zero keeps
+// DefaultRemoteSquashQuietPeriod. A negative duration is rejected at startup.
+func WithRemoteSquashQuietPeriod(d time.Duration) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.remoteSquashQuietPeriod = d
+		}
+	}
+}
+
 func WithStoresBackend(backend string) Option {
 	return func(a anyTierService) {
 		switch s := a.(type) {

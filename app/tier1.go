@@ -72,13 +72,14 @@ type InfoServer interface {
 // returns config with default sane values
 func NewDefaultTier1Config() *Tier1Config {
 	return &Tier1Config{
-		SharedCacheSize:        15,
-		MaxSubrequests:         10,
-		StateBundleSize:        1000,
-		MergedBlocksBundleSize: bstream.DefaultMergedBlocksBundleSize,
-		BlockExecutionTimeout:  1 * time.Minute,
-		OutputBufferSize:       100,
-		ExecOutPrefetch:        execout.PrefetchConfig{Depth: execout.MaxPrefetchDepth, BudgetBytes: 64 << 20},
+		SharedCacheSize:         15,
+		MaxSubrequests:          10,
+		StateBundleSize:         1000,
+		MergedBlocksBundleSize:  bstream.DefaultMergedBlocksBundleSize,
+		BlockExecutionTimeout:   1 * time.Minute,
+		RemoteSquashQuietPeriod: service.DefaultRemoteSquashQuietPeriod,
+		OutputBufferSize:        100,
+		ExecOutPrefetch:         execout.PrefetchConfig{Depth: execout.MaxPrefetchDepth, BudgetBytes: 64 << 20},
 	}
 }
 
@@ -129,6 +130,11 @@ type Tier1Config struct {
 	// same shape as --common-auth-plugin. Empty or local:// keeps today's
 	// in-process squasher. grpc:// is registered by the squasher project.
 	SquasherPlugin string
+
+	// RemoteSquashQuietPeriod is how long tier1 squashes locally after the
+	// remote squasher stops answering, before one run tries it again. Zero
+	// keeps the default of 5 minutes. Negative is rejected.
+	RemoteSquashQuietPeriod time.Duration
 
 	SharedCacheSize  uint64
 	OutputBufferSize uint64 // Used to bundle execout messages within 'BlockScopedDatas' when using protocol V4
@@ -335,6 +341,7 @@ func (a *Tier1App) Run() error {
 	if squasher != nil {
 		opts = append(opts, service.WithSquasher(squasher))
 	}
+	opts = append(opts, service.WithRemoteSquashQuietPeriod(a.config.RemoteSquashQuietPeriod))
 
 	if a.config.TmpDir != "" {
 		wazero.SetTempDir(a.config.TmpDir)
@@ -477,6 +484,9 @@ func (a *Tier1App) setIsReady(ready bool) {
 // Validate inspects itself to determine if the current config is valid according to
 // substreams rules.
 func (config *Tier1Config) Validate() error {
+	if _, err := service.ResolveRemoteSquashQuietPeriod(config.RemoteSquashQuietPeriod); err != nil {
+		return err
+	}
 	return nil
 }
 

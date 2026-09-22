@@ -38,6 +38,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Added `MaxRequestDuration` to the tier1 config. When non-zero, a request that has run for that long
+  is ended the same way as on shutdown: its stores are quick-saved (when a quicksave store is set) and
+  the client gets an `Unavailable` error telling it to reconnect. Set it a bit under the stream
+  duration limit of the load balancer in front of tier1, so the request ends cleanly before the load
+  balancer cuts it.
+
 - The `grpc://` / `grpcs://` squasher plugin now lives in this module at
   `github.com/streamingfast/substreams/squash/grpc`. Firehose-core and chain
   binaries can import that package and call `Register()` instead of depending

@@ -70,6 +70,12 @@ func (p *Pipeline) ProcessFromExecOutput(
 func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err error) {
 	ctx := p.ctx
 
+	p.blockMu.Lock()
+	defer p.blockMu.Unlock()
+	if p.drained {
+		return ErrShuttingDown
+	}
+
 	if !p.processingBlocksSet {
 		p.processingBlocksSet = true
 		if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
@@ -555,6 +561,20 @@ func normalizeModuleOutput(in *pbsubstreamsrpc.MapModuleOutput, outputModule str
 		in.Name = outputModule
 	}
 	return in
+}
+
+// Drain waits for the block being processed (if any) to finish, quick-saves the stores
+// and makes every later ProcessBlock call return ErrShuttingDown. It lets the caller end
+// the stream on a timer without waiting for the next block, which can take a long time
+// on slow chains. The caller is expected to cancel the stream right after.
+func (p *Pipeline) Drain(reason string) error {
+	p.blockMu.Lock()
+	defer p.blockMu.Unlock()
+	if p.drained {
+		return nil
+	}
+	p.drained = true
+	return p.quickSaveStores(p.ctx, reason)
 }
 
 // quickSaveStores writes the current store state to the temporary quicksave store so a

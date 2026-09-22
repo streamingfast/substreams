@@ -153,6 +153,11 @@ type Tier1Service struct {
 	// are safely written. 0 means use the default.
 	liveBackFillerFinalBlockDelay uint64
 
+	// maxRequestDuration, if non-zero, is how long a request may run before
+	// it is gracefully ended the same way as on shutdown (stores quick-saved,
+	// client told to reconnect).
+	maxRequestDuration time.Duration
+
 	squasher squash.Client
 	// remoteSquashQuietPeriod is how long a down remote is left alone. Zero
 	// means DefaultRemoteSquashQuietPeriod; set by WithRemoteSquashQuietPeriod.
@@ -907,6 +912,11 @@ func (s *Tier1Service) blocks(
 		return err
 	}
 
+	var deadline time.Time
+	if s.maxRequestDuration != 0 {
+		deadline = time.Now().Add(s.maxRequestDuration)
+	}
+
 	pipe := pipeline.New(
 		ctx,
 		true,
@@ -921,9 +931,7 @@ func (s *Tier1Service) blocks(
 		s.runtimeConfig.WorkerPoolFactory,
 		respFunc,
 		s.blockExecutionTimeout,
-		func() bool {
-			return s.IsTerminating() // pipeline starts draining when the service is actually terminating, (after the global shutdown-signal-delay)
-		},
+		s.pendingShutdownCheck(deadline, logger),
 		resolvedEndpoints,
 		execOutMessageBufferSize,
 		supportBuffering,
@@ -1155,6 +1163,22 @@ func (s *Tier1Service) blocks(
 		return fmt.Errorf("error getting stream: %w", err)
 	}
 
+	if !deadline.IsZero() && cancelRunning != nil {
+		// The pipeline checks the deadline on every block, but on a slow chain the next
+		// block can be far away, so also end the stream as soon as the deadline passes.
+		go func() {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Until(deadline)):
+			}
+			if err := pipe.Drain("max request duration reached"); err != nil {
+				logger.Warn("draining pipeline on max request duration", zap.Error(err))
+			}
+			cancelRunning(errShuttingDown)
+		}()
+	}
+
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/pipeline/blocks_stream")
 	for {
 		streamErr = blockStream.Run(ctx)
@@ -1191,6 +1215,30 @@ func (s *Tier1Service) blocks(
 	span.EndWithErr(&streamErr)
 
 	return pipe.OnStreamTerminated(ctx, streamErr)
+}
+
+// pendingShutdownCheck returns the function the pipeline polls to know when to
+// drain: when the service is actually terminating (after the global
+// shutdown-signal-delay), or when the request deadline has passed. A zero
+// deadline means no limit.
+func (s *Tier1Service) pendingShutdownCheck(deadline time.Time, logger *zap.Logger) func() bool {
+	if deadline.IsZero() {
+		return s.IsTerminating
+	}
+
+	var logOnce sync.Once
+	return func() bool {
+		if s.IsTerminating() {
+			return true
+		}
+		if time.Now().Before(deadline) {
+			return false
+		}
+		logOnce.Do(func() {
+			logger.Info("request reached max request duration, ending it gracefully", zap.Duration("max_request_duration", s.maxRequestDuration))
+		})
+		return true
+	}
 }
 
 // configureLiveBackFillerFromQuickload will ensure that any used store

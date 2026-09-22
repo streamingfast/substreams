@@ -154,6 +154,7 @@ func TestCPUEviction_OverloadedPodShedsRequests(t *testing.T) {
 
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 6000)
 	require.NoError(t, err)
+	waitMergerCaughtUp(t, ctx, tmpDir, 6000)
 	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 
 	t.Setenv("SUBSTREAMS_CGROUP_DIR", fakeCgroup(t, evictionQuotaCores))

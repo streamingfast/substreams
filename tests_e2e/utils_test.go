@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dmetering/logger"
@@ -371,4 +372,13 @@ func findFreePort(t *testing.T) int {
 	require.NoError(t, err)
 
 	return port
+}
+
+// waitMergerCaughtUp waits until the merger has bundled the genesis burst. Tier1 started
+// before that cannot link live blocks and restarts, see devenv.WaitMergedBlocks. Tests that
+// need to start while the burst is still recent, like the partial blocks ones, skip it.
+func waitMergerCaughtUp(t *testing.T, ctx context.Context, tmpDir string, burst int) {
+	t.Helper()
+	err := devenv.WaitMergedBlocks(ctx, tmpDir, uint64(burst), time.Minute+time.Duration(burst/50)*time.Second)
+	require.NoError(t, err, "merger never caught up with the burst")
 }

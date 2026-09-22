@@ -32,6 +32,7 @@ func TestFoundationalStoreJSONResolution(t *testing.T) {
 
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 200)
 	require.NoError(t, err)
+	waitMergerCaughtUp(t, ctx, tmpDir, 200)
 	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 
 	configPath := filepath.Join(tmpDir, "foundational-stores.json")
@@ -60,6 +61,7 @@ func TestFoundationalStoreControlPlaneResolution(t *testing.T) {
 
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 200)
 	require.NoError(t, err)
+	waitMergerCaughtUp(t, ctx, tmpDir, 200)
 	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 
 	registryAddr := startFakeRegistry(t, map[string]*pbregistry.FoundationStoreEntry{
@@ -92,6 +94,7 @@ func TestFoundationalStoreControlPlaneUnreachable(t *testing.T) {
 
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 200)
 	require.NoError(t, err)
+	waitMergerCaughtUp(t, ctx, tmpDir, 200)
 	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)

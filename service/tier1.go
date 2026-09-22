@@ -49,6 +49,7 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/active_requests"
 	"github.com/streamingfast/substreams/service/config"
+	"github.com/streamingfast/substreams/squash"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
@@ -64,6 +65,23 @@ var errShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 var fallbackDuration time.Duration
 var useBlockNumberDuration time.Duration
 var deterministicErrorMaxAge = time.Hour
+
+// DefaultRemoteSquashQuietPeriod is how long tier1 squashes locally after the
+// remote squasher stops answering, before one run tries it again. A configured
+// quiet period of zero selects this.
+const DefaultRemoteSquashQuietPeriod = 5 * time.Minute
+
+// ResolveRemoteSquashQuietPeriod returns d, or DefaultRemoteSquashQuietPeriod
+// when d is zero. A negative duration is rejected.
+func ResolveRemoteSquashQuietPeriod(d time.Duration) (time.Duration, error) {
+	if d < 0 {
+		return 0, fmt.Errorf("remote squash quiet period must not be negative, got %s", d)
+	}
+	if d == 0 {
+		return DefaultRemoteSquashQuietPeriod, nil
+	}
+	return d, nil
+}
 
 func init() {
 	if v := os.Getenv(EnvDeterministicErrorMaxAge); v != "" {
@@ -134,6 +152,14 @@ type Tier1Service struct {
 	// live backfiller waits past a segment end before concluding merged blocks
 	// are safely written. 0 means use the default.
 	liveBackFillerFinalBlockDelay uint64
+
+	squasher squash.Client
+	// remoteSquashQuietPeriod is how long a down remote is left alone. Zero
+	// means DefaultRemoteSquashQuietPeriod; set by WithRemoteSquashQuietPeriod.
+	remoteSquashQuietPeriod time.Duration
+	// remoteSquashAvailability is shared by every request. Nil when no remote
+	// squasher is configured.
+	remoteSquashAvailability *reqctx.RemoteAvailability
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -366,6 +392,15 @@ func NewTier1(
 
 	for _, opt := range opts {
 		opt(s)
+	}
+
+	quiet, err := ResolveRemoteSquashQuietPeriod(s.remoteSquashQuietPeriod)
+	if err != nil {
+		return nil, err
+	}
+	if s.squasher != nil {
+		logger.Info("remote squasher configured", zap.Duration("quiet_period", quiet))
+		s.remoteSquashAvailability = reqctx.NewRemoteAvailability(quiet, nil)
 	}
 
 	return s, nil
@@ -855,6 +890,16 @@ func (s *Tier1Service) blocks(
 	opts = append(opts, pipeline.WithExecOutPrefetch(s.execOutPrefetch))
 	if requestDetails.ProductionMode && s.getRecentFinalBlock != nil {
 		opts = append(opts, pipeline.WithFinalBlockLagCheck(s.getRecentFinalBlock, requestDetails.LinearHandoffBlockNum))
+	}
+
+	if s.squasher != nil {
+		ctx = reqctx.WithRemoteSquasher(ctx, &reqctx.RemoteSquasher{
+			Client:         s.squasher,
+			StateStoreURL:  s.tier2RequestParameters.StateStoreURL,
+			CacheTag:       cacheTag,
+			StoreSizeLimit: s.runtimeConfig.StoreSizeLimit,
+			Availability:   s.remoteSquashAvailability,
+		})
 	}
 
 	ctx, resolvedEndpoints, err := s.resolveFoundationalStores(ctx, execGraph, reqStats)

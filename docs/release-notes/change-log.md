@@ -38,8 +38,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- The `grpc://` / `grpcs://` squasher plugin now lives in this module at
+  `github.com/streamingfast/substreams/squash/grpc`. Firehose-core and chain
+  binaries can import that package and call `Register()` instead of depending
+  on the private `github.com/streamingfast/substreams-squasher` module.
+
 - Tier1 store merging is selected with a plugin DSN, like auth. Empty or `local://`
-  keeps today's in-process squasher. `grpc://` is registered by the squasher project.
+  keeps today's in-process squasher. `grpc://` / `grpcs://` are registered by
+  `github.com/streamingfast/substreams/squash/grpc`.
   When a remote is set, each squash run is one RPC per store module covering every
   claimed segment, so empty-partial copies and merges happen on the squasher and
   tier1 does not read store files. The call is a single attempt; transport retries
@@ -261,8 +267,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Dependencies
 
-- `google.golang.org/grpc` is at v1.83.1, which clears GHSA-vp52-pcj8-j9qc, reported as HIGH: a peer could exhaust
-  server heap by fragmenting HTTP/2 DATA frames.
+- `google.golang.org/grpc` is at `v1.85.0-dev.0.20260825072537-93e31b48545e`. That clears
+  GHSA-vp52-pcj8-j9qc and CVE-2026-84445 (an xDS server panics on a request with neither
+  `:authority` nor `Host`). v1.84.0 is still inside the range Docker Scout reports, which
+  failed the image build.
 
 ### Tests
 
@@ -602,7 +610,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Dependencies
 
 - Bumped notably `github.com/ClickHouse/clickhouse-go/v2` to v2.48.0, `github.com/AfterShip/clickhouse-sql-parser` to
-  v0.5.5, `google.golang.org/grpc` to v1.83.0 and the OpenTelemetry SDK to v1.45.0.
+  v0.5.5, `google.golang.org/grpc` to v1.83.2 and the OpenTelemetry SDK to v1.45.0.
+
+- `google.golang.org/grpc` is at v1.83.2, which clears CVE-2026-84304 and CVE-2026-84445, and
+  `golang.org/x/crypto` is at v0.56.0, which clears CVE-2026-78662 and CVE-2026-56855, all reported as HIGH against the
+  published `ghcr.io/streamingfast/substreams` image.
 
 - `golang.org/x/mod` is at v0.40.0, which clears CVE-2026-56864 and CVE-2026-56865, both reported as HIGH against the
   published `ghcr.io/streamingfast/substreams` image.

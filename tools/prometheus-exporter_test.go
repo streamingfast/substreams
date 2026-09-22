@@ -42,14 +42,14 @@ func TestParseEndpoint(t *testing.T) {
 		},
 		{
 			name:     "another example with both",
-			endpoint: "arb-one.streamingfast.io:443@123?namespace=arb-one",
+			endpoint: "arb-one.example:443@123?namespace=arb-one",
 			want: struct {
 				host       string
 				startBlock *int
 				params     map[string]string
 				err        error
 			}{
-				host: "arb-one.streamingfast.io:443",
+				host: "arb-one.example:443",
 				params: map[string]string{
 					"namespace": "arb-one",
 				},

@@ -92,9 +92,7 @@ func (s *Scheduler) Init() loop.Cmd {
 
 	cmds = append(cmds, work.CmdScheduleNextJob("scheduler init"))
 
-	if s.Stages.AllStoresCompleted() {
-		cmds = append(cmds, func() loop.Msg { return stage.MsgAllStoresCompleted{} })
-	}
+	cmds = append(cmds, s.Stages.CmdAllStoresCompletedOnce())
 
 	cmds = append(cmds, s.Stages.CmdStartMerge())
 
@@ -273,10 +271,6 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		)
 
 	case stage.MsgAllStoresCompleted:
-		// CmdTryMerge sends this after every job once all stores are done, handle it only once.
-		if s.storesSyncCompleted {
-			return nil
-		}
 		s.logger.Info("all stores completed, marking stores sync completed")
 		s.storesSyncCompleted = true
 		if !s.delayedScheduleNextJob {

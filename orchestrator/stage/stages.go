@@ -78,6 +78,9 @@ type Stages struct {
 	allStoresDone   bool
 	allStoresCursor []int
 
+	// allStoresCompletedSent makes MsgAllStoresCompleted a one-time signal.
+	allStoresCompletedSent bool
+
 	// nextJobCursor is the lowest segment that may still yield a job. NextJob
 	// starts its scan here instead of at globalSegmenter.FirstIndex(), so it no
 	// longer re-walks the (ever-growing) prefix of finished segments on every
@@ -454,27 +457,29 @@ func (s *Stages) CmdStartMerge() loop.Cmd {
 	return loop.Batch(cmds...)
 }
 
+// CmdAllStoresCompletedOnce returns a command sending MsgAllStoresCompleted the first
+// time it is called with all stores completed, and nil otherwise.
+func (s *Stages) CmdAllStoresCompletedOnce() loop.Cmd {
+	if s.allStoresCompletedSent || !s.AllStoresCompleted() {
+		return nil
+	}
+	s.allStoresCompletedSent = true
+	return CmdAllStoresCompleted()
+}
+
 func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 	// TODO: this function needs to be broken into a message and a few
 	// functions, and be called directly within the Scheduler's Update()
 	// function, similar to the CmdDownloadCurrentSegment flow, and the
 	// NextJob thing.
 
-	if s.AllStoresCompleted() {
-		// FIXME: this CmdTryMerge function is called once for each stage,
-		// so we could receive multiple such calls, and thus
-		// issue multiple MsgAllStoresCompleted. But this signal
-		// should be unique, once and for all (it is an indicator that the
-		// full job of the Scheduler is done in a way).
-		// Here we risk putting out multiple messages of that kind,
-		// However, it's probably all right, because it produces a QuitMsg
-		// and duplicates of that might just be piled and not read.
-		return CmdAllStoresCompleted()
-	}
-
 	stage := s.stages[stageIdx]
 	if stage.kind != KindStore {
 		return nil
+	}
+
+	if s.AllStoresCompleted() {
+		return s.CmdAllStoresCompletedOnce()
 	}
 
 	mergeUnit := stage.nextUnit()

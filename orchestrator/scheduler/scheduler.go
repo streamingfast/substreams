@@ -92,9 +92,7 @@ func (s *Scheduler) Init() loop.Cmd {
 
 	cmds = append(cmds, work.CmdScheduleNextJob("scheduler init"))
 
-	if s.Stages.AllStoresCompleted() {
-		cmds = append(cmds, func() loop.Msg { return stage.MsgAllStoresCompleted{} })
-	}
+	cmds = append(cmds, s.Stages.CmdAllStoresCompletedOnce())
 
 	cmds = append(cmds, s.Stages.CmdStartMerge())
 
@@ -436,7 +434,7 @@ func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
 			)
 		}
 
-		s.logger.Info("`waiting for output stream to complete, stores ready", fields...)
+		s.logger.Info("waiting for output stream to complete, stores ready", fields...)
 	}
 	if s.outputStreamCompleted && !s.storesSyncCompleted {
 		s.logger.Info("waiting for stores to complete, output stream completed")

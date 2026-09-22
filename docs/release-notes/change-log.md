@@ -67,6 +67,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `deleting partial store`. They fired for every store opened by tier1 and tier2 and for
   every squash. `squashing time metrics` stays at `Info` as the squash progress signal.
   
+- Tier1 no longer logs `all stores completed, marking stores sync completed` and
+  `waiting for output stream to complete, stores ready` after every tier2 job on requests without stores.
+  It also no longer schedules an extra job lookup each time.
+
 - `substreams-tier1` now asks the relayer for every block from its own LIB when it connects
   or reconnects, instead of the last 2 blocks. A gap left by a disconnect is filled from the
   relayer's memory, and only the part older than what the relayer holds is read from the

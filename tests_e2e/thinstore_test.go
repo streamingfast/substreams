@@ -57,7 +57,6 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tools/devenv"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
 )
 
 const (
@@ -118,7 +117,7 @@ func startThinstoreStack(t *testing.T, blocks uint64) *thinstoreStack {
 		StartupTimeout: 10 * time.Minute,
 	})
 	require.NoError(t, err)
-	t.Cleanup(func() { container.Terminate(ctx, testcontainers.StopTimeout(0)) })
+	t.Cleanup(func() { devenv.TerminateDummyBlockchain(ctx, container) })
 
 	// Wait for the merger to have written every bundle of the baseline range before tier1
 	// starts: its block hub bootstraps from the merged blocks, and joining the live stream

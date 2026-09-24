@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -81,6 +82,33 @@ func TestClient_Call_CustomAuthHeaderName(t *testing.T) {
 	require.Len(t, got, 1)
 	assert.Equal(t, "k123", got[0].header.Get("X-Api-Key"))
 	assert.Empty(t, got[0].header.Get("Authorization"))
+}
+
+func TestClient_Call_DoesNotFollowRedirects(t *testing.T) {
+	target, targetRequests := captureServer(t, http.StatusOK)
+	var redirects atomic.Int32
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		redirects.Add(1)
+		http.Redirect(w, r, target.URL, http.StatusTemporaryRedirect)
+	}))
+	t.Cleanup(origin.Close)
+
+	client := NewClient(Config{
+		Timeout:         time.Second,
+		MaxRetries:      3,
+		MaxInterval:     time.Millisecond,
+		AuthHeaderName:  "X-Api-Key",
+		AuthHeaderValue: "k123",
+		SigningSecret:   "whsec_test",
+	}, zap.NewNop())
+
+	err := client.Call(context.Background(), origin.URL, []byte(`{}`), 1)
+
+	var deliveryErr *DeliveryError
+	require.ErrorAs(t, err, &deliveryErr)
+	assert.Equal(t, http.StatusTemporaryRedirect, deliveryErr.StatusCode)
+	assert.Equal(t, int32(1), redirects.Load(), "a redirect is not retried")
+	assert.Empty(t, targetRequests(), "the redirect target receives nothing")
 }
 
 func TestClient_Call_NoAuthByDefault(t *testing.T) {

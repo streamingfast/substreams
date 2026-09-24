@@ -447,36 +447,6 @@ func TestClient_Call_HTTPSEndpoint(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestClient_Call_RedirectResponse(t *testing.T) {
-	redirectCount := 0
-	finalServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer finalServer.Close()
-
-	redirectServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		redirectCount++
-		if redirectCount <= 2 {
-			http.Redirect(w, r, finalServer.URL, http.StatusFound)
-		} else {
-			w.WriteHeader(http.StatusOK)
-		}
-	}))
-	defer redirectServer.Close()
-
-	config := Config{
-		Timeout:     30 * time.Second,
-		MaxRetries:  3,
-		MaxInterval: 30 * time.Second,
-	}
-	client := NewClient(config, zap.NewNop())
-	payload := []byte(`{"test": "data"}`)
-
-	err := client.Call(context.Background(), redirectServer.URL, payload, 123)
-	assert.NoError(t, err)
-	assert.Greater(t, redirectCount, 0, "Expected at least one redirect")
-}
-
 func TestClient_Call_SlowServerWithTimeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)

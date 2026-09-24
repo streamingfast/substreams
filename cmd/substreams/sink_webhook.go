@@ -70,7 +70,8 @@ var sinkWebhookCmd = &cobra.Command{
 		"t=<unix seconds>,v1=<hex>" where <hex> is HMAC-SHA256 over "<t>.<body>" keyed with the secret.
 
 		Network errors and 5xx responses are retried with exponential backoff up to --webhook-max-retries.
-		A 4xx response is not retried. --webhook-on-failure decides what happens after the last retry.
+		A 4xx response is not retried, and neither is a 3xx: redirects are not followed, so the auth header
+		and the body never reach another host. --webhook-on-failure decides what happens after the last retry.
 
 		With --webhook-on-failure=exit the payload that could not be delivered is written to
 		'<state-file>.pending', and the next start delivers it before it opens a Substreams stream. The headers

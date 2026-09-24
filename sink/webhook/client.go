@@ -91,6 +91,11 @@ func NewClient(config Config, logger *zap.Logger) *Client {
 	return &Client{
 		httpClient: &http.Client{
 			Timeout: config.Timeout,
+			// A redirect would carry the auth header and the body to another
+			// host, so the 3xx response is returned as is.
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
 		},
 		maxRetries:      config.MaxRetries,
 		maxInterval:     config.MaxInterval,
@@ -186,6 +191,9 @@ func (c *Client) Call(ctx context.Context, url string, payload []byte, blockNumb
 
 		lastStatus = resp.StatusCode
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+				return backoff.Permanent(fmt.Errorf("webhook returned redirect status %d to %q for block %d, redirects are not followed", resp.StatusCode, resp.Header.Get("Location"), blockNumber))
+			}
 			// Client errors (4xx) are permanent - bad request, auth, etc.
 			if resp.StatusCode >= 400 && resp.StatusCode < 500 {
 				return backoff.Permanent(fmt.Errorf("webhook returned client error status %d for block %d", resp.StatusCode, blockNumber))

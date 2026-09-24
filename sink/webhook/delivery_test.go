@@ -3,6 +3,7 @@ package webhook
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -179,6 +180,40 @@ func TestSend_SkipModeDropsBlock(t *testing.T) {
 	assert.Empty(t, msg, "skip mode is not an exit, nothing to report")
 }
 
+func TestSend_ShutdownIsNotADeliveryFailure(t *testing.T) {
+	for _, onFailure := range []OnFailure{OnFailureExit, OnFailureSkip} {
+		t.Run(string(onFailure), func(t *testing.T) {
+			server := newTogglingServer(t, http.StatusServiceUnavailable)
+			s := newTestSink(t, server.URL, onFailure)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			err := s.send(ctx, newPending(10))
+
+			require.ErrorIs(t, err, context.Canceled)
+			var failed *DeliveryFailedError
+			assert.False(t, errors.As(err, &failed))
+			assert.NoFileExists(t, s.pendingFile)
+			msg, err := os.ReadFile(s.terminationLog)
+			require.NoError(t, err)
+			assert.Empty(t, msg)
+		})
+	}
+}
+
+func TestSend_CursorWriteFailureAfterDeliveryIsNotADeliveryFailure(t *testing.T) {
+	server := newTogglingServer(t, http.StatusOK)
+	s := newTestSink(t, server.URL, OnFailureExit)
+	s.stateFile = t.TempDir() // a directory, so writing the cursor fails
+
+	require.NoError(t, s.send(context.Background(), newPending(10)))
+	assert.Equal(t, int32(1), server.calls.Load())
+	assert.NoFileExists(t, s.pendingFile, "the receiver has the payload, it must not be kept for a re-send")
+	msg, err := os.ReadFile(s.terminationLog)
+	require.NoError(t, err)
+	assert.Empty(t, msg)
+}
+
 func TestTerminationMessage_OnlyWrittenWhenFileExists(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "absent")
 	require.NoError(t, writeTerminationMessage(path, []byte("x")))
@@ -241,6 +276,49 @@ func TestRecoverPending_SkipModeDropsAndContinues(t *testing.T) {
 	got, err := s.recoverPending(context.Background(), start)
 	require.NoError(t, err)
 	assert.Same(t, start, got)
+	assert.NoFileExists(t, s.pendingFile)
+}
+
+func TestRecoverPending_ShutdownKeepsPending(t *testing.T) {
+	for _, onFailure := range []OnFailure{OnFailureExit, OnFailureSkip} {
+		t.Run(string(onFailure), func(t *testing.T) {
+			server := newTogglingServer(t, http.StatusServiceUnavailable)
+			s := newTestSink(t, server.URL, onFailure)
+
+			p := newPending(10)
+			p.Fingerprint = s.fingerprint
+			require.NoError(t, writePending(s.pendingFile, p))
+
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			_, err := s.recoverPending(ctx, nil)
+
+			require.ErrorIs(t, err, context.Canceled)
+			var failed *DeliveryFailedError
+			assert.False(t, errors.As(err, &failed))
+			assert.FileExists(t, s.pendingFile)
+			msg, err := os.ReadFile(s.terminationLog)
+			require.NoError(t, err)
+			assert.Empty(t, msg)
+		})
+	}
+}
+
+func TestRecoverPending_UndoWithoutUndoURLIsDropped(t *testing.T) {
+	server := newTogglingServer(t, http.StatusOK)
+	s := newTestSink(t, server.URL, OnFailureExit)
+	require.NoError(t, sink.WriteCursor(s.stateFile, sink.MustNewCursor(opaqueCursor(12))))
+
+	p := newPending(10)
+	p.Kind = pendingKindUndo
+	p.Fingerprint = s.fingerprint
+	require.NoError(t, writePending(s.pendingFile, p))
+
+	got, err := s.recoverPending(context.Background(), sink.MustNewCursor(opaqueCursor(12)))
+	require.NoError(t, err)
+	assert.Equal(t, opaqueCursor(10), got.String(), "the cursor still moves back to the last valid block")
+	assert.Equal(t, opaqueCursor(10), readStateCursor(t, s))
+	assert.Equal(t, int32(0), server.calls.Load())
 	assert.NoFileExists(t, s.pendingFile)
 }
 

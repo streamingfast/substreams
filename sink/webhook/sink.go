@@ -192,6 +192,9 @@ func (s *Sink) Run(ctx context.Context) error {
 	}
 
 	if startCursor, err = s.recoverPending(ctx, startCursor); err != nil {
+		if ctx.Err() != nil {
+			return nil
+		}
 		return err
 	}
 
@@ -238,6 +241,14 @@ func (s *Sink) recoverPending(ctx context.Context, startCursor *sink.Cursor) (*s
 		return startCursor, removePending(s.pendingFile)
 	}
 
+	if pending.isUndo() && s.undoURL == "" {
+		// The undo URL was removed while the sink was down. Without it an undo
+		// only moves the cursor back, so do that and drop the notification.
+		s.logger.Warn("dropping pending reorg notification, no undo URL is configured", zap.Uint64("last_valid_block", pending.BlockNumber))
+		s.commit(pending)
+		return pendingCursor(pending)
+	}
+
 	if pending.Fingerprint != s.fingerprint {
 		// The user changed the URL or a secret since the failure began. What
 		// follows is a fresh outage, if it is one at all.
@@ -254,6 +265,10 @@ func (s *Sink) recoverPending(ctx context.Context, startCursor *sink.Cursor) (*s
 		zap.Time("first_attempt_at", pending.FirstAttemptAt))
 
 	if err := s.deliver(ctx, pending); err != nil {
+		if ctx.Err() != nil {
+			// A shutdown, not a failed delivery: the pending file stays as is.
+			return nil, ctx.Err()
+		}
 		if s.onFailure == OnFailureExit {
 			return nil, s.deliveryFailed(pending, err)
 		}
@@ -261,6 +276,10 @@ func (s *Sink) recoverPending(ctx context.Context, startCursor *sink.Cursor) (*s
 		return startCursor, removePending(s.pendingFile)
 	}
 
+	return pendingCursor(pending)
+}
+
+func pendingCursor(pending *pendingDelivery) (*sink.Cursor, error) {
 	cursor, err := sink.NewCursor(pending.Cursor)
 	if err != nil {
 		return nil, fmt.Errorf("invalid cursor in pending delivery: %w", err)
@@ -268,37 +287,45 @@ func (s *Sink) recoverPending(ctx context.Context, startCursor *sink.Cursor) (*s
 	return cursor, nil
 }
 
-// deliver POSTs the pending payload and, on success, commits it: cursor
-// written, pending file removed, progress metric updated. The returned error
-// is the *DeliveryError from the client.
-func (s *Sink) deliver(ctx context.Context, pending *pendingDelivery) error {
-	url := s.webhookURL
+func (s *Sink) urlFor(pending *pendingDelivery) string {
 	if pending.isUndo() {
-		url = s.undoURL
+		return s.undoURL
 	}
+	return s.webhookURL
+}
 
+// deliver POSTs the pending payload and, on success, commits it. The returned
+// error is always the client's delivery error.
+func (s *Sink) deliver(ctx context.Context, pending *pendingDelivery) error {
 	WebhookCallsCounter.Inc()
 	WebhookSizeBytes.AddInt(len(pending.Payload))
 
-	if err := s.client.Call(ctx, url, pending.Payload, pending.BlockNumber); err != nil {
+	if err := s.client.Call(ctx, s.urlFor(pending), pending.Payload, pending.BlockNumber); err != nil {
 		return err
 	}
 
+	s.commit(pending)
+	return nil
+}
+
+// commit records a delivered payload: cursor written, pending file removed,
+// progress metric updated. The receiver already has the payload, so a disk
+// error here is only logged and never goes through the on-failure policy; the
+// worst it causes is the payload being sent again after a restart.
+func (s *Sink) commit(pending *pendingDelivery) {
 	if s.stateFile != "" && pending.Cursor != "" {
 		cursor, err := sink.NewCursor(pending.Cursor)
 		if err != nil {
-			return fmt.Errorf("invalid cursor for block %d: %w", pending.BlockNumber, err)
-		}
-		if err := sink.WriteCursor(s.stateFile, cursor); err != nil {
-			return fmt.Errorf("saving cursor to state file %q: %w", s.stateFile, err)
+			s.logger.Warn("invalid cursor for delivered payload, state file not updated", zap.Uint64("block", pending.BlockNumber), zap.Error(err))
+		} else if err := sink.WriteCursor(s.stateFile, cursor); err != nil {
+			s.logger.Warn("failed to save cursor to state file", zap.String("file", s.stateFile), zap.Error(err))
 		}
 	}
 	if err := removePending(s.pendingFile); err != nil {
-		return fmt.Errorf("removing pending delivery: %w", err)
+		s.logger.Warn("failed to remove pending delivery", zap.String("file", s.pendingFile), zap.Error(err))
 	}
 
 	WebhookProgressBlock.SetUint64(pending.BlockNumber)
-	return nil
 }
 
 // deliveryFailed keeps the payload on disk for the next start and turns the
@@ -313,7 +340,7 @@ func (s *Sink) deliveryFailed(pending *pendingDelivery, err error) error {
 
 	var deliveryErr *DeliveryError
 	if !errors.As(err, &deliveryErr) {
-		deliveryErr = &DeliveryError{URL: s.webhookURL, BlockNumber: pending.BlockNumber, Attempts: 1, Err: err}
+		deliveryErr = &DeliveryError{URL: s.urlFor(pending), BlockNumber: pending.BlockNumber, Attempts: 1, Err: err}
 	}
 	kind := pending.Kind
 	if kind == "" {
@@ -450,6 +477,11 @@ func (s *Sink) send(ctx context.Context, pending *pendingDelivery) error {
 	err := s.deliver(ctx, pending)
 	if err == nil {
 		return nil
+	}
+	if ctx.Err() != nil {
+		// A shutdown, not a failed delivery. The cursor was not saved, so the
+		// stream re-sends this payload on the next start.
+		return ctx.Err()
 	}
 
 	if s.onFailure == OnFailureExit {

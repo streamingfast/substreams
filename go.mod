@@ -37,7 +37,7 @@ require (
 	github.com/abourget/llerrgroup v0.2.0
 	github.com/alecthomas/chroma v0.10.0
 	github.com/alecthomas/participle v0.7.1
-	github.com/bmatcuk/doublestar/v4 v4.10.0
+	github.com/bmatcuk/doublestar/v4 v4.10.2
 	github.com/bobg/go-generics/v2 v2.2.2
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/bytecodealliance/wasmtime-go/v41 v41.0.0

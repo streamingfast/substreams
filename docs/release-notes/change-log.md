@@ -35,6 +35,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `substreams sink webhook` no longer follows redirects. A 3xx response is a failed delivery and is not retried,
   so the auth header and the body never reach another host. Point `<url>` at the final address.
 
+- `substreams sink webhook` now reuses its connection between calls instead of opening a new one, with a new
+  TLS handshake, for every block. A failed call's error now includes the start of the receiver's response
+  body. Connecting to the receiver times out after 5s instead of 30s, and idle connections are closed after
+  30s so they are not reused after a load balancer has dropped them.
+
 - Add `--webhook-on-failure=exit` to `substreams sink webhook`. Once every retry for a block has failed the
   sink keeps that block in `<state-file>.pending`, writes a JSON reason (URL, block, status, attempts,
   `first_attempt_at`) to `--webhook-termination-log` when that file exists, and exits with status 75. The next

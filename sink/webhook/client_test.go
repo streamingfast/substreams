@@ -694,3 +694,37 @@ func TestClient_Call_ConfigValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestClient_Call_ReusesConnection(t *testing.T) {
+	var mu sync.Mutex
+	remoteAddrs := map[string]bool{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		remoteAddrs[r.RemoteAddr] = true
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"accepted"}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Timeout: time.Second}, zap.NewNop())
+	for i := uint64(0); i < 3; i++ {
+		require.NoError(t, client.Call(context.Background(), server.URL, []byte(`{}`), i))
+	}
+
+	assert.Len(t, remoteAddrs, 1, "every call goes over the same connection")
+}
+
+func TestClient_Call_ErrorIncludesResponseBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("missing field clock\n"))
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Timeout: time.Second}, zap.NewNop())
+	err := client.Call(context.Background(), server.URL, []byte(`{}`), 7)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `webhook returned client error status 400 for block 7: "missing field clock"`)
+}

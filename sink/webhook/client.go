@@ -8,6 +8,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -90,7 +92,8 @@ func NewClient(config Config, logger *zap.Logger) *Client {
 
 	return &Client{
 		httpClient: &http.Client{
-			Timeout: config.Timeout,
+			Timeout:   config.Timeout,
+			Transport: newTransport(),
 			// A redirect would carry the auth header and the body to another
 			// host, so the 3xx response is returned as is.
 			CheckRedirect: func(*http.Request, []*http.Request) error {
@@ -104,6 +107,38 @@ func NewClient(config Config, logger *zap.Logger) *Client {
 		signingSecret:   signingSecret,
 		logger:          logger,
 	}
+}
+
+// newTransport is http.DefaultTransport with shorter connect timeouts, so an
+// unreachable host fails an attempt quickly instead of using the whole call
+// timeout, and a shorter idle timeout, so a connection is dropped before the
+// load balancers usually in front of receivers (60s on AWS ALB) close it.
+func newTransport() *http.Transport {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext
+	transport.TLSHandshakeTimeout = 5 * time.Second
+	transport.IdleConnTimeout = 30 * time.Second
+	return transport
+}
+
+// maxResponseBodyRead bounds how much of a response body is read. A body read
+// to the end lets the connection be reused for the next call.
+const maxResponseBodyRead = 64 << 10
+
+// maxResponseBodyInError bounds how much of a failed response's body goes
+// into the error.
+const maxResponseBodyInError = 256
+
+// responseExcerpt formats the start of a response body for an error message.
+func responseExcerpt(body []byte) string {
+	text := strings.TrimSpace(string(body))
+	if text == "" {
+		return ""
+	}
+	if len(text) > maxResponseBodyInError {
+		text = text[:maxResponseBodyInError] + "..."
+	}
+	return fmt.Sprintf(": %q", text)
 }
 
 // Sign computes the SignatureHeader value for body at the given time. It
@@ -187,7 +222,8 @@ func (c *Client) Call(ctx context.Context, url string, payload []byte, blockNumb
 			// Network errors are typically transient and should be retried
 			return fmt.Errorf("webhook call failed for block %d: %w", blockNumber, err)
 		}
-		defer resp.Body.Close()
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodyRead))
+		resp.Body.Close()
 
 		lastStatus = resp.StatusCode
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -196,10 +232,10 @@ func (c *Client) Call(ctx context.Context, url string, payload []byte, blockNumb
 			}
 			// Client errors (4xx) are permanent - bad request, auth, etc.
 			if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-				return backoff.Permanent(fmt.Errorf("webhook returned client error status %d for block %d", resp.StatusCode, blockNumber))
+				return backoff.Permanent(fmt.Errorf("webhook returned client error status %d for block %d%s", resp.StatusCode, blockNumber, responseExcerpt(body)))
 			}
 			// Server errors (5xx) are transient and should be retried
-			return fmt.Errorf("webhook returned server error status %d for block %d", resp.StatusCode, blockNumber)
+			return fmt.Errorf("webhook returned server error status %d for block %d%s", resp.StatusCode, blockNumber, responseExcerpt(body))
 		}
 
 		return nil

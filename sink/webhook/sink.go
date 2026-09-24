@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/substreams/protodecode"
 	"github.com/streamingfast/substreams/sink"
@@ -24,7 +25,8 @@ type OnFailure string
 const (
 	// OnFailureSkip logs the failure, drops the block and moves on to the next
 	// one. The cursor is not advanced past the dropped block, so a later
-	// restart replays it.
+	// restart replays it. An undo notification is never dropped: it is
+	// retried until it goes through.
 	OnFailureSkip OnFailure = "skip"
 	// OnFailureExit keeps the block in the pending file, writes a termination
 	// message and stops the sink with ExitCodeDeliveryFailed. The next start
@@ -299,6 +301,12 @@ func (s *Sink) recoverPending(ctx context.Context, startCursor *sink.Cursor) (*s
 		if s.onFailure == OnFailureExit {
 			return nil, s.deliveryFailed(pending, err)
 		}
+		if pending.isUndo() {
+			if err := s.retryUndo(ctx, pending, err); err != nil {
+				return nil, err
+			}
+			return pendingCursor(pending)
+		}
 		s.logger.Warn("dropping pending block after failed delivery", zap.Uint64("block", pending.BlockNumber), zap.Error(err))
 		return startCursor, removePending(s.pendingFile)
 	}
@@ -515,9 +523,52 @@ func (s *Sink) send(ctx context.Context, pending *pendingDelivery) error {
 	if s.onFailure == OnFailureExit {
 		return s.deliveryFailed(pending, err)
 	}
+	if pending.isUndo() {
+		return s.retryUndo(ctx, pending, err)
+	}
 
 	s.logger.Warn("dropping block after failed delivery", zap.Uint64("block", pending.BlockNumber), zap.Error(err))
 	return nil
+}
+
+// retryUndo delivers an undo notification that already failed once, retrying
+// until it goes through or ctx is done. Dropping it would let the replacement
+// blocks reach a receiver that still holds the undone ones. No pending file
+// is written: the cursor still points at the undone blocks, so after a
+// restart the stream sends the same undo signal again.
+func (s *Sink) retryUndo(ctx context.Context, pending *pendingDelivery, err error) error {
+	b := backoff.NewExponentialBackOff()
+	b.MaxElapsedTime = 0
+	if s.client.maxInterval > 0 {
+		b.MaxInterval = s.client.maxInterval
+		if b.InitialInterval > b.MaxInterval {
+			b.InitialInterval = b.MaxInterval
+		}
+		b.Reset()
+	}
+
+	rounds := 1
+	for {
+		s.logger.Warn("undo notification not delivered, retrying until it goes through",
+			zap.Uint64("last_valid_block", pending.BlockNumber),
+			zap.Int("rounds", rounds),
+			zap.Duration("failing_for", time.Since(pending.FirstAttemptAt)),
+			zap.Error(err))
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(b.NextBackOff()):
+		}
+
+		rounds++
+		if err = s.deliver(ctx, pending); err == nil {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+	}
 }
 
 // handleBlockUndoSignal moves the cursor back to the last valid block and, when

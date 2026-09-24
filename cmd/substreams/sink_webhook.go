@@ -33,7 +33,7 @@ func init() {
 	sinkWebhookCmd.Flags().Int("webhook-max-retries", 3, "Maximum number of retries for webhook calls (0 disables retries, -1 for infinite retries)")
 	sinkWebhookCmd.Flags().Duration("webhook-timeout", 30*time.Second, "Timeout for individual webhook calls")
 	sinkWebhookCmd.Flags().Duration("webhook-max-retry-interval", 30*time.Second, "Maximum interval between webhook retries (exponential backoff cap)")
-	sinkWebhookCmd.Flags().String("webhook-on-failure", string(webhook.OnFailureSkip), fmt.Sprintf("What to do once every retry for a block has failed: %q drops the block and continues, %q keeps the block on disk, writes the reason to the termination log and exits with status %d; the next start delivers that block before it connects to Substreams", webhook.OnFailureSkip, webhook.OnFailureExit, webhook.ExitCodeDeliveryFailed))
+	sinkWebhookCmd.Flags().String("webhook-on-failure", string(webhook.OnFailureSkip), fmt.Sprintf("What to do once every retry for a block has failed: %q drops the block and continues (an undo notification is instead retried until it goes through), %q keeps the block on disk, writes the reason to the termination log and exits with status %d; the next start delivers that block before it connects to Substreams", webhook.OnFailureSkip, webhook.OnFailureExit, webhook.ExitCodeDeliveryFailed))
 	sinkWebhookCmd.Flags().Int("webhook-batch-max-blocks", 0, "Send up to this many blocks per call, in the batch payload shape (see below). 0 sends one block per call in the single-block shape")
 	sinkWebhookCmd.Flags().Duration("webhook-batch-max-wait", time.Second, "Longest a batch waits for more blocks before it is sent, checked when the next block arrives. A batch is also sent when the chain is live, before an undo notification, and when the stream ends")
 	sinkWebhookCmd.Flags().String("webhook-undo-url", "", "URL that receives a POST for each chain reorganization, with body {\"lastValidBlock\": {\"number\": ..., \"id\": \"...\"}, \"manifest\": {\"moduleName\": \"...\"}}. Empty disables the notification; the blocks that replace the undone ones are still delivered to <url>")
@@ -83,7 +83,8 @@ var sinkWebhookCmd = &cobra.Command{
 		in them. Otherwise, or for a reorganization deeper than the buffer, the receiver has already been sent
 		blocks that are no longer on the chain: --webhook-undo-url receives a notification naming the last valid
 		block, then the replacement blocks arrive as regular calls. Undo notifications follow the same retry,
-		on-failure and pending-file rules as blocks.
+		on-failure and pending-file rules as blocks, except that --webhook-on-failure=skip never drops one: it
+		is retried until it goes through, and no replacement block is sent before then.
 	`),
 	RunE: sinkWebhookE,
 	Args: cobra.RangeArgs(1, 3),

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -642,4 +643,81 @@ func TestParseOnFailure(t *testing.T) {
 	assert.Equal(t, OnFailureSkip, got)
 	_, err = ParseOnFailure("pause")
 	assert.Error(t, err)
+}
+
+// undoFailingServer answers /undo with 503 for the first failures calls and
+// 200 afterwards, answers every other path with 200, and records the path of
+// each call in order.
+func undoFailingServer(t *testing.T, failures int) (*httptest.Server, func() []string) {
+	t.Helper()
+	var mu sync.Mutex
+	var paths []string
+	undoCalls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		paths = append(paths, r.URL.Path)
+		if r.URL.Path == "/undo" {
+			undoCalls++
+			if failures < 0 || undoCalls <= failures {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+	return server, func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), paths...)
+	}
+}
+
+func TestUndo_SkipModeRetriesUntilDelivered(t *testing.T) {
+	server, paths := undoFailingServer(t, 3)
+	s := newTestSink(t, server.URL+"/blocks", OnFailureSkip)
+	s.undoURL = server.URL + "/undo"
+
+	undo := &pbsubstreamsrpc.BlockUndoSignal{LastValidBlock: &pbsubstreams.BlockRef{Number: 9, Id: "aa"}}
+	require.NoError(t, s.handleBlockUndoSignal(context.Background(), undo, sink.MustNewCursor(opaqueCursor(9))))
+	assert.Equal(t, opaqueCursor(9), readStateCursor(t, s))
+	assert.NoFileExists(t, s.pendingFile)
+
+	require.NoError(t, s.sendBlock(context.Background(), "map_events", "t", protoClock(10), json.RawMessage(`{}`), sink.MustNewCursor(opaqueCursor(10)), time.Now()))
+
+	assert.Equal(t, []string{"/undo", "/undo", "/undo", "/undo", "/blocks"}, paths(), "the replacement block goes out only after the undo notification")
+}
+
+func TestUndo_SkipModeRetryStopsOnShutdown(t *testing.T) {
+	server, _ := undoFailingServer(t, -1)
+	s := newTestSink(t, server.URL+"/blocks", OnFailureSkip)
+	s.undoURL = server.URL + "/undo"
+	require.NoError(t, sink.WriteCursor(s.stateFile, sink.MustNewCursor(opaqueCursor(12))))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	undo := &pbsubstreamsrpc.BlockUndoSignal{LastValidBlock: &pbsubstreams.BlockRef{Number: 9, Id: "aa"}}
+	err := s.handleBlockUndoSignal(ctx, undo, sink.MustNewCursor(opaqueCursor(9)))
+
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Equal(t, opaqueCursor(12), readStateCursor(t, s), "the cursor stays on the undone blocks so the stream sends the undo again")
+	assert.NoFileExists(t, s.pendingFile)
+}
+
+func TestRecoverPending_SkipModeRetriesUndoUntilDelivered(t *testing.T) {
+	server, paths := undoFailingServer(t, 3)
+	s := newTestSink(t, server.URL+"/blocks", OnFailureSkip)
+	s.undoURL = server.URL + "/undo"
+
+	p := newPending(9)
+	p.Kind = pendingKindUndo
+	p.Fingerprint = s.fingerprint
+	require.NoError(t, writePending(s.pendingFile, p))
+
+	got, err := s.recoverPending(context.Background(), sink.MustNewCursor(opaqueCursor(12)))
+	require.NoError(t, err)
+	assert.Equal(t, opaqueCursor(9), got.String())
+	assert.Equal(t, []string{"/undo", "/undo", "/undo", "/undo"}, paths())
+	assert.NoFileExists(t, s.pendingFile)
 }

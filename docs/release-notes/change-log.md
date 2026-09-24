@@ -48,9 +48,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Add `--webhook-undo-url` to `substreams sink webhook`. When set, every undo signal is POSTed there as
   `{"lastValidBlock": {"number", "id"}, "manifest": {"moduleName"}}` so the receiver can drop the blocks above
   the last valid one before the replacements arrive. The notification carries the same auth header and
-  signature as blocks and follows the same retry, `--webhook-on-failure` and pending-file rules. Without it the
-  cursor still moves back and only the replacement blocks are delivered, as before. Pair with
-  `--undo-buffer-size` to hold back a few blocks and absorb shallow reorganizations without any notification.
+  signature as blocks and follows the same retry, `--webhook-on-failure` and pending-file rules, except that
+  `--webhook-on-failure=skip` never drops one: it is retried until it goes through, and no replacement block is
+  sent before then. Without it the cursor still moves back and only the replacement blocks are delivered, as
+  before. Pair with `--undo-buffer-size` to hold back a few blocks and absorb shallow reorganizations without
+  any notification.
 
 - Add `--webhook-batch-max-blocks=N` to `substreams sink webhook`. Every call then carries up to N blocks in a
   batch shape, `{"manifest": {...}, "blocks": [{"clock", "data"}, ...]}`, a batch of one included. A batch is sent

@@ -101,10 +101,37 @@ type Sink struct {
 // when a live block arrives, when an undo signal arrives, or when the stream
 // ends cleanly.
 type openBatch struct {
-	payload   *BatchPayload
-	cursor    string
-	lastBlock uint64
-	openedAt  time.Time
+	payload *BatchPayload
+	// cursors holds the cursor of each entry in payload.Blocks, so an undo
+	// can cut the batch at any block.
+	cursors  []string
+	openedAt time.Time
+}
+
+func (b *openBatch) lastBlock() uint64 {
+	return b.payload.Blocks[len(b.payload.Blocks)-1].Clock.Number
+}
+
+// cursor is the cursor of the last block that came with one.
+func (b *openBatch) cursor() string {
+	for i := len(b.cursors) - 1; i >= 0; i-- {
+		if b.cursors[i] != "" {
+			return b.cursors[i]
+		}
+	}
+	return ""
+}
+
+// truncate drops the blocks above lastValid. It reports false when no block
+// is left.
+func (b *openBatch) truncate(lastValid uint64) bool {
+	n := len(b.payload.Blocks)
+	for n > 0 && b.payload.Blocks[n-1].Clock.Number > lastValid {
+		n--
+	}
+	b.payload.Blocks = b.payload.Blocks[:n]
+	b.cursors = b.cursors[:n]
+	return n > 0
 }
 
 // SinkConfig holds configuration for the webhook sink
@@ -431,10 +458,11 @@ func (s *Sink) addToBatch(ctx context.Context, moduleName, typeURL string, clock
 		s.batch = &openBatch{payload: NewBatchPayload(moduleName, typeURL), openedAt: now}
 	}
 	s.batch.payload.Append(clock, dataContent)
-	s.batch.lastBlock = clock.Number
+	var cursorStr string
 	if cursor != nil {
-		s.batch.cursor = cursor.String()
+		cursorStr = cursor.String()
 	}
+	s.batch.cursors = append(s.batch.cursors, cursorStr)
 
 	full := len(s.batch.payload.Blocks) >= s.batchMaxBlocks
 	waited := now.Sub(s.batch.openedAt) >= s.batchMaxWait
@@ -459,14 +487,14 @@ func (s *Sink) flushBatch(ctx context.Context) error {
 	pending := &pendingDelivery{
 		Kind:           pendingKindBlock,
 		Batched:        true,
-		Cursor:         batch.cursor,
-		BlockNumber:    batch.lastBlock,
+		Cursor:         batch.cursor(),
+		BlockNumber:    batch.lastBlock(),
 		Payload:        wrappedOut,
 		FirstAttemptAt: time.Now(),
 		Fingerprint:    s.fingerprint,
 	}
 
-	s.logger.Debug("flushing batch", zap.Int("blocks", len(batch.payload.Blocks)), zap.Uint64("last_block", batch.lastBlock))
+	s.logger.Debug("flushing batch", zap.Int("blocks", len(batch.payload.Blocks)), zap.Uint64("last_block", batch.lastBlock()))
 	return s.send(ctx, pending)
 }
 
@@ -495,8 +523,12 @@ func (s *Sink) send(ctx context.Context, pending *pendingDelivery) error {
 // handleBlockUndoSignal moves the cursor back to the last valid block and, when
 // an undo URL is configured, tells the receiver which blocks are gone.
 func (s *Sink) handleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *sink.Cursor) error {
-	// The receiver must see the blocks before it is told some of them are
-	// gone, so an open batch goes out first.
+	// The blocks of the open batch above the last valid one were never
+	// delivered, so they are dropped. The rest must reach the receiver before
+	// the undo notification, so they go out first.
+	if s.batch != nil && undoSignal.LastValidBlock != nil && !s.batch.truncate(undoSignal.LastValidBlock.Number) {
+		s.batch = nil
+	}
 	if s.batch != nil {
 		if err := s.flushBatch(ctx); err != nil {
 			return err

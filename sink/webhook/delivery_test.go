@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -496,11 +497,11 @@ func TestBatch_SparseModuleFlushesOnEmptyBlock(t *testing.T) {
 	assert.Equal(t, opaqueCursor(10), readStateCursor(t, s), "an empty block does not join the batch")
 }
 
-func TestBatch_FlushedBeforeUndo(t *testing.T) {
+func TestBatch_ValidPartFlushedBeforeUndo(t *testing.T) {
 	var order []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		order = append(order, r.URL.Path+":"+string(body[:12]))
+		order = append(order, r.URL.Path+":"+string(body))
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(server.Close)
@@ -508,13 +509,60 @@ func TestBatch_FlushedBeforeUndo(t *testing.T) {
 	s := newTestSink(t, server.URL+"/blocks", OnFailureExit)
 	s.undoURL = server.URL + "/undo"
 	s.batchMaxBlocks, s.batchMaxWait = 100, time.Minute
-	addBlock(t, s, 10, false, time.Now())
+	for _, num := range []uint64{8, 9, 10, 11} {
+		addBlock(t, s, num, false, time.Now())
+	}
 
 	undo := &pbsubstreamsrpc.BlockUndoSignal{LastValidBlock: &pbsubstreams.BlockRef{Number: 9, Id: "aa"}}
 	require.NoError(t, s.handleBlockUndoSignal(context.Background(), undo, sink.MustNewCursor(opaqueCursor(9))))
 
-	require.Equal(t, []string{`/blocks:{"manifest":`, `/undo:{"lastValidB`}, order)
+	require.Len(t, order, 2)
+	assert.Equal(t, []uint64{8, 9}, batchBlockNumbers(t, strings.TrimPrefix(order[0], "/blocks:")))
+	assert.True(t, strings.HasPrefix(order[1], `/undo:{"lastValidBlock"`), order[1])
+	assert.Nil(t, s.batch)
 	assert.Equal(t, opaqueCursor(9), readStateCursor(t, s))
+}
+
+func TestBatch_UndoWithoutUndoURLDropsBlocksAboveLastValid(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		blocks []uint64
+		want   [][]uint64
+	}{
+		{"batch straddles last valid block", []uint64{8, 9, 10, 11}, [][]uint64{{8, 9}}},
+		{"batch entirely above last valid block", []uint64{10, 11}, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server, requests := captureServer(t, http.StatusOK)
+			s := newTestSink(t, server.URL, OnFailureExit)
+			s.batchMaxBlocks, s.batchMaxWait = 100, time.Minute
+			for _, num := range tc.blocks {
+				addBlock(t, s, num, false, time.Now())
+			}
+
+			undo := &pbsubstreamsrpc.BlockUndoSignal{LastValidBlock: &pbsubstreams.BlockRef{Number: 9, Id: "aa"}}
+			require.NoError(t, s.handleBlockUndoSignal(context.Background(), undo, sink.MustNewCursor(opaqueCursor(9))))
+
+			var got [][]uint64
+			for _, r := range requests() {
+				got = append(got, batchBlockNumbers(t, string(r.body)))
+			}
+			assert.Equal(t, tc.want, got)
+			assert.Nil(t, s.batch)
+			assert.Equal(t, opaqueCursor(9), readStateCursor(t, s))
+		})
+	}
+}
+
+func batchBlockNumbers(t *testing.T, body string) []uint64 {
+	t.Helper()
+	var payload BatchPayload
+	require.NoError(t, json.Unmarshal([]byte(body), &payload))
+	var numbers []uint64
+	for _, b := range payload.Blocks {
+		numbers = append(numbers, b.Clock.Number)
+	}
+	return numbers
 }
 
 func TestBatch_FailureKeepsBatchPendingAndRecovers(t *testing.T) {

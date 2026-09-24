@@ -125,6 +125,9 @@ type Pipeline struct {
 	getHeadBlockNum func() (uint64, error)
 	highestStage    *int
 
+	getRecentFinalBlock func() (uint64, error)
+	lastLagCheckSegment uint64
+
 	forkHandler     *ForkHandler
 	insideReorgUpTo bstream.BlockRef
 
@@ -144,7 +147,12 @@ type Pipeline struct {
 	lastCursor            *bstream.Cursor
 	sentBlocks            uint64
 	quickSaved            bool
+
+	// blockMu is held while a block is processed, so Drain only runs between blocks.
+	blockMu sync.Mutex
+	drained bool
 	sessionInitSent       bool // ensures a single Response_Session per request; see sendSession
+	processingBlocksSet   bool // ensures the active request is marked as processing blocks only once
 
 	blockStepMap         map[bstream.StepType]uint64
 	workerPoolFactory    work.WorkerPoolFactory

@@ -78,7 +78,7 @@ func runDevenv(cmd *cobra.Command, _ []string) error {
 		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 		defer cancel()
 
-		if err := container.Terminate(ctx); err != nil {
+		if err := TerminateDummyBlockchain(ctx, container); err != nil {
 			fmt.Fprintf(os.Stderr, "failed terminating container: %s\n", err)
 		}
 	}()

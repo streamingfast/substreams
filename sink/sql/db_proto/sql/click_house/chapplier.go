@@ -1,12 +1,13 @@
 package clickhouse
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
-	"sort"
+	"slices"
 
 	sink "github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/spool"
@@ -57,8 +58,8 @@ func (a *chApplier) Apply(_ context.Context, dir string, manifest *spool.Manifes
 	// flush uses, so a segment reaches the server the same way an unspooled flush would.
 	tables := make([]spool.TableRecord, len(manifest.Tables))
 	copy(tables, manifest.Tables)
-	sort.SliceStable(tables, func(i, j int) bool {
-		return a.ordinal(tables[i].Name) < a.ordinal(tables[j].Name)
+	slices.SortStableFunc(tables, func(left, right spool.TableRecord) int {
+		return cmp.Compare(a.ordinal(left.Name), a.ordinal(right.Name))
 	})
 
 	for _, table := range tables {

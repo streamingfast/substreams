@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/streamingfast/substreams/squash"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/wasm"
 )
@@ -136,6 +137,25 @@ func WithStoreSizeLimit(limit uint64) Option {
 	}
 }
 
+func WithSquasher(c squash.Client) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.squasher = c
+		}
+	}
+}
+
+// WithRemoteSquashQuietPeriod sets how long tier1 squashes locally after the
+// remote squasher stops answering, before one run tries it again. Zero keeps
+// DefaultRemoteSquashQuietPeriod. A negative duration is rejected at startup.
+func WithRemoteSquashQuietPeriod(d time.Duration) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.remoteSquashQuietPeriod = d
+		}
+	}
+}
+
 func WithStoresBackend(backend string) Option {
 	return func(a anyTierService) {
 		switch s := a.(type) {
@@ -154,6 +174,17 @@ func WithLiveBackFillerFinalBlockDelay(delay uint64) Option {
 	return func(a anyTierService) {
 		if s, ok := a.(*Tier1Service); ok {
 			s.liveBackFillerFinalBlockDelay = delay
+		}
+	}
+}
+
+// WithMaxRequestDuration gracefully ends a tier1 request once it has run for
+// the given duration, quick-saving its stores so the client resumes quickly
+// on reconnection. Zero disables the limit.
+func WithMaxRequestDuration(d time.Duration) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.maxRequestDuration = d
 		}
 	}
 }

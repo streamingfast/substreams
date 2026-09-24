@@ -103,12 +103,12 @@ type activeRequestRecord struct {
 	Stage                  uint32
 	FullKVStoreMemoryBytes uint64
 
-	// ProductionMode and Live classify the request for CPU eviction: dev-mode
-	// requests are evicted before production ones, and production requests still
-	// catching up before those streaming live blocks. Live is only ever flipped
-	// from false to true, under the manager's lock.
-	ProductionMode bool
-	Live           bool
+	// ProductionMode, ProcessingBlocks and Live classify the request for CPU
+	// eviction (see requestClass). ProcessingBlocks and Live are only ever
+	// flipped from false to true, under the manager's lock.
+	ProductionMode   bool
+	ProcessingBlocks bool
+	Live             bool
 	// BurnCores is the CPU consumed by this request's wasm execution over the
 	// last evictor evaluation interval, in cores; refreshed under the manager's
 	// lock by the evictor.
@@ -124,6 +124,17 @@ func (arh *ActiveRequestsHandler) totalLoadedSize() (totalSize uint64) {
 		totalSize += req.FullKVStoreMemoryBytes
 	}
 	return totalSize
+}
+
+// SetProcessingBlocks marks the request as processing blocks itself, as
+// opposed to only streaming outputs cached by tier2. Idempotent; a request
+// never goes back.
+func (arh *ActiveRequestsHandler) SetProcessingBlocks() {
+	arh.manager.Lock()
+	defer arh.manager.Unlock()
+	if req := arh.manager.reqs[arh.uniqueID]; req != nil {
+		req.ProcessingBlocks = true
+	}
 }
 
 // SetLive marks the request as having reached live blocks (fed by the hub

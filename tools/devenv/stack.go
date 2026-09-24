@@ -46,6 +46,10 @@ const BlockType = "sf.acme.type.v1.Block"
 // DefaultImage is the dummy blockchain image the end-to-end tests are pinned to.
 const DefaultImage = "ghcr.io/streamingfast/dummy-blockchain:1cea671"
 
+// storageDir is where the node writes its data inside the container; ChainConfig.TmpDir is
+// bind-mounted there.
+const storageDir = "/app/firehose-data/storage"
+
 // relayerPort is the firehose-core convention for the relayer's block stream server, which is
 // the only port of the container this stack talks to.
 const relayerPort = "10014"
@@ -103,8 +107,74 @@ func (c ChainConfig) readerArgs() string {
 	return args
 }
 
+// startAttempts is how many times StartDummyBlockchain launches the container before giving up.
+const startAttempts = 3
+
 // StartDummyBlockchain runs a reader-node/merger/relayer container producing the dummy chain.
+//
+// The relayer inside the container sometimes connects to the reader in the middle of the burst,
+// before the one-block files it needs to link are written. Its hub then gives up and it never
+// serves, so a container that does not come up is thrown away, along with everything it added
+// to TmpDir, and started again.
 func StartDummyBlockchain(ctx context.Context, config ChainConfig) (testcontainers.Container, error) {
+	existing, err := entryNames(config.TmpDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var container testcontainers.Container
+	for attempt := range startAttempts {
+		container, err = startDummyBlockchainOnce(ctx, config)
+		if err == nil {
+			break
+		}
+		if container != nil {
+			TerminateDummyBlockchain(context.WithoutCancel(ctx), container)
+		}
+		if attempt == startAttempts-1 || ctx.Err() != nil {
+			return nil, err
+		}
+		if cleanErr := removeNewEntries(config.TmpDir, existing); cleanErr != nil {
+			return nil, fmt.Errorf("%w (and cleaning %s for a retry failed: %s)", err, config.TmpDir, cleanErr)
+		}
+	}
+
+	return container, nil
+}
+
+func entryNames(dir string) (map[string]bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	names := make(map[string]bool, len(entries))
+	for _, entry := range entries {
+		names[entry.Name()] = true
+	}
+	return names, nil
+}
+
+// removeNewEntries deletes what appeared in dir since entryNames returned keep, leaving the
+// caller's own files alone.
+func removeNewEntries(dir string, keep map[string]bool) error {
+	current, err := entryNames(dir)
+	if err != nil {
+		return err
+	}
+	for name := range current {
+		if keep[name] {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(dir, name)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// startDummyBlockchainOnce returns the container even when it fails to come up, so the caller
+// can terminate it.
+func startDummyBlockchainOnce(ctx context.Context, config ChainConfig) (testcontainers.Container, error) {
 	req := testcontainers.ContainerRequest{
 		Image: config.image(),
 		Cmd: []string{
@@ -125,7 +195,7 @@ func StartDummyBlockchain(ctx context.Context, config ChainConfig) (testcontaine
 		},
 		ExposedPorts: []string{relayerPort + "/tcp"},
 		Mounts: testcontainers.Mounts(
-			testcontainers.BindMount(config.TmpDir, "/app/firehose-data/storage/"),
+			testcontainers.BindMount(config.TmpDir, storageDir+"/"),
 		),
 		// Deliberately not wait.ForListeningPort: that one execs a probe inside the container,
 		// and the exec itself times out while the node is busy writing a large genesis burst.
@@ -145,18 +215,35 @@ func StartDummyBlockchain(ctx context.Context, config ChainConfig) (testcontaine
 		Started:          true,
 	})
 	if err != nil {
-		return nil, err
+		return container, err
 	}
 
 	endpoint, err := RelayerEndpoint(ctx, container)
 	if err != nil {
-		return nil, err
+		return container, err
 	}
 	if err := waitDialable(ctx, endpoint, config.startupTimeout()); err != nil {
-		return nil, fmt.Errorf("relayer never accepted a connection on %s: %w", endpoint, err)
+		return container, fmt.Errorf("relayer never accepted a connection on %s: %w", endpoint, err)
 	}
 
 	return container, nil
+}
+
+// TerminateDummyBlockchain stops the container, first making everything it wrote into
+// ChainConfig.TmpDir removable by the host user.
+//
+// The node runs as root, so on a Linux host the files it writes into the bind mount are
+// root-owned and the caller cannot delete them afterwards (Docker Desktop maps ownership
+// back to the host user, so this only shows up on Linux). The chmod runs inside the
+// container, as root, and a+rwX covers directories too: unlinking a file needs write
+// permission on its parent directory.
+func TerminateDummyBlockchain(ctx context.Context, container testcontainers.Container) error {
+	if container == nil {
+		return nil
+	}
+
+	_, _, _ = container.Exec(ctx, []string{"chmod", "-R", "a+rwX", storageDir})
+	return container.Terminate(ctx, testcontainers.StopTimeout(0))
 }
 
 func waitDialable(ctx context.Context, endpoint string, timeout time.Duration) error {

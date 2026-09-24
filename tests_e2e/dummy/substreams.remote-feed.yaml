@@ -25,7 +25,11 @@ protobuf:
   importPaths:
     - ./proto
   excludePaths:
-    - sf/substreams
+    # Narrower than "sf/substreams": the sink/sql schema stays, since
+    # contract.proto imports it for the ClickHouse annotations.
+    - sf/substreams/rpc
+    - sf/substreams/v1
+    - sf/substreams/index
     - sf/firehose
     - google
 

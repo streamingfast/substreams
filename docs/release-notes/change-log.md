@@ -9,7 +9,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.23.0
+
+### CLI
+
+- Fixed: `substreams registry login` failed with `no such file or directory` when `~/.config/substreams`
+  did not exist yet. The directory is now created before the token is written, and the token file is
+  written with mode `0600` instead of `0644` (an existing file is tightened on re-login).
+
+- A manifest can now import `sf/substreams/sink/sql/schema/v1/schema.proto` without
+  vendoring a copy of it. The file is a system protobuf, but `protoparse` needs the
+  source on disk to honour its extensions, so an import previously failed with
+  `no such file`. It is now served from an embedded copy, the same way
+  `sf/substreams/options.proto` already was.
 
 ### Sink
 
@@ -49,14 +61,101 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Docs
 
+- Add a Solana how-to on versioned transactions (v0 and v1): what the new `version`,
+  `versioned`, and `transaction_config` fields are, and when a Substreams package
+  needs to rebuild against `substreams-solana` v0.15.1+ to read them.
 - Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can
   hard-delete a batch of keys over gRPC. Missing keys are ignored; later reads return
   `NOT_FOUND`, not a tombstone.
+  
 - Add a Hosted Services how-to that describes Hosted Sinks and Hosted Stores, with
   separate Remote Feed and Substreams Feed hosted-store guides. Move the Hosted
   Sinks how-to under Hosted Services.
 
 ### Server
+
+- Added `MaxRequestDuration` to the tier1 config. When non-zero, a request that has run for that long
+  is ended the same way as on shutdown: its stores are quick-saved (when a quicksave store is set) and
+  the client gets an `Unavailable` error telling it to reconnect. Set it a bit under the stream
+  duration limit of the load balancer in front of tier1, so the request ends cleanly before the load
+  balancer cuts it.
+
+- The `grpc://` / `grpcs://` squasher plugin now lives in this module at
+  `github.com/streamingfast/substreams/squash/grpc`. Firehose-core and chain
+  binaries can import that package and call `Register()` instead of depending
+  on the private `github.com/streamingfast/substreams-squasher` module.
+
+- Tier1 store merging is selected with a plugin DSN, like auth. Empty or `local://`
+  keeps today's in-process squasher. `grpc://` / `grpcs://` are registered by
+  `github.com/streamingfast/substreams/squash/grpc`.
+  When a remote is set, each squash run is one RPC per store module covering every
+  claimed segment, so empty-partial copies and merges happen on the squasher and
+  tier1 does not read store files. The call is a single attempt; transport retries
+  belong to the squasher client. If the remote is unreachable, the run is squashed
+  locally and later runs stay local until an attempt succeeds. That wait defaults
+  to 5 minutes (`Tier1Config.RemoteSquashQuietPeriod`); zero keeps the default. A
+  live remote that returns an application error still fails the request.
+
+- Production-mode requests are disconnected with the same `Unavailable` "endpoint is shutting down, please reconnect" error as a tier1 restart when they are more than
+  2 segments behind the last final block (rounded down to a segment), either when back-processing finishes or, checked
+  at every segment boundary, while streaming final blocks. Clients reconnecting from their
+  cursor then back-process the gap in parallel instead of processing it linearly on tier1. Set
+  `SUBSTREAMS_MAX_LINEAR_HANDOFF_LAG_SEGMENTS` to change the number of segments.
+
+- CPU eviction: new `CPUEviction.Order` config (parse it with `active_requests.ParseEvictionOrder`, e.g.
+  `dev,prod-cached,prod-catchup`) lists the request classes eviction may cancel, least important first. A
+  class left out is never cancelled. The default is `dev,prod-cached,prod-catchup`: live production requests
+  are no longer cancelled unless `prod-live` is added to the order.
+  A new `prod-cached` class covers production requests that only stream outputs cached by tier2 and have
+  not processed a block on tier1. They run no wasm there, so `MinBurnCores` does not apply to them, and
+  since their CPU cost is unknown, a round of eviction stops right after cancelling one of them.
+
+- Per-store lines are now logged at `Debug` instead of `Info`: `using mmap KV store`,
+  `using in-memory KV store`, `flushing store at boundary`, `merged partial into full store`,
+  `deleting partial store`. They fired for every store opened by tier1 and tier2 and for
+  every squash. `squashing time metrics` stays at `Info` as the squash progress signal.
+
+- The tier1 block hub logs `processing block` at `Debug`, except for one line every 10 seconds
+  kept at `Info` to show progress; on flash-block chains it fired several times per block.
+  `linking live block using one blocks` moves up to `Info`, so a one-block store lookup after
+  an unlinkable live block shows in production logs.
+  
+- Tier1 no longer logs `all stores completed, marking stores sync completed` and
+  `waiting for output stream to complete, stores ready` after every tier2 job on requests without stores.
+  It also no longer schedules an extra job lookup each time.
+
+- `substreams-tier1` now asks the relayer for every block from its own LIB when it connects
+  or reconnects, instead of the last 2 blocks. A gap left by a disconnect is filled from the
+  relayer's memory, and only the part older than what the relayer holds is read from the
+  one-block store. On fast chains a tier1 that fell a few seconds behind used to fill the
+  whole gap from the one-block store, long enough for the relayer to drop it again.
+  
+- Fix partial-blocks (flashblocks) streams on a tier1 that is shutting down. The stream now
+  ends with `Unavailable` like a full-block stream does, so the client reconnects elsewhere.
+  It used to stay open but silent, then sent an undo signal at each block boundary naming a
+  block the client had never received.
+  
+- Never send an undo signal for partial-block state whose outputs were never sent.
+
+- `substreams-tier1` now squashes store partials in runs. When a segment is ready to be merged, every
+  following segment whose partial is already there is merged by the same command, up to 1000 segments or 30 s
+  of work, instead of one segment per command. Each command waits for a round trip through the scheduler loop,
+  which also borrows a worker for every job it schedules. On a busy backprocessing request that round trip took
+  3 to 5 s, so squashing was capped at about 15 segments per minute even when a merge took 0.3 s, and it fell
+  tens of thousands of segments behind the tier2 jobs.
+
+- `substreams-tier1` squash runs now copy the previous full store over segments whose partials are all empty,
+  instead of merging and saving each of them: an empty partial leaves the store unchanged. A run lists the sizes
+  of its partials in one go, reads the first decompressed byte of the small ones only, so a large partial is
+  never downloaded, then copies the last written full store to every consecutive empty segment, 32 at a time,
+  server-side on object stores that support it. On a store most segments never touch, a run of 1000 segments
+  goes from about 190 s to a few seconds. A module's first segment and segments shorter than the store interval
+  still go through the regular squash, and so do the segments of a copy that fails.
+
+- `substreams-tier1` no longer releases the squasher's cached stores while a squash is still running. When the
+  scheduler stopped early (a tier2 job failed, or the pod was shutting down), the stores were closed under the
+  in-flight merge, which could panic the process or write an empty full store to storage. Closing now cancels
+  the squash, which stops at its next segment, and waits for it to finish.
 
 - `substreams-tier1` scheduling no longer slows down as a large backprocessing range progresses. Picking the next
   tier2 job walked every segment between the squasher and the job frontier on every call, re-checking
@@ -170,12 +269,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - `substreams-tier1` now names the usage marker it writes in every module cache folder after the request's plan tier: `last_used_<plan>` (lowercase, e.g. `last_used_pro`), still plain `last_used` when unauthenticated. `firecore tools substreams purge` reads the plan back from that name to apply a retention per plan.
 
+### Tools
+
+- `substreams tools prometheus-exporter` now says *why* an endpoint is down. Every failure is classified into a
+  `reason` -- `invalid_config`, `connect_failed`, `connect_timeout`, `invalid_request`, `request_timeout`,
+  `stream_error`, `stale_block`, `invalid_response` or `no_data` -- exposed on the new
+  `substreams_healthcheck_failure_count{reason,grpc_code}` counter and included in the logs. An alert firing on
+  `substreams_healthcheck_status` no longer requires guessing whether the endpoint was unreachable, unauthenticated,
+  overloaded or merely late. A dial that fails outright is reported as `connect_failed`, carrying the dial
+  error where gRPC exposes it (`connection refused`); a hostname that does not resolve surfaces as the balancer's
+  own `no children to pick from`, since it replaces the resolver error. `connect_timeout` is reserved for a
+  connection that is merely slow to come up and never failed a dial.
+
+- Connection establishment gets its own budget, `--connect-timeout` (default 10s), separate from `--timeout`, which
+  now covers the `Blocks` request alone. gRPC dials lazily, so DNS, TLS and load-balancer resolution used to be
+  charged to the request timeout and a slow connection was reported as an endpoint failure -- this is what produced
+  the `received context error while waiting for new LB policy update: context deadline exceeded` errors. The exporter
+  now waits for the channel to be `READY` before issuing the request, and reports the two phases separately as
+  `substreams_healthcheck_connect_duration_ms` and `substreams_healthcheck_stream_duration_ms`.
+  `substreams_healthcheck_duration_ms` keeps its previous meaning of the two combined.
+
+- Every failed poll is logged, not just the transition into `unavailable`. An endpoint that fails repeatedly, or one
+  that flaps between two Prometheus scrapes, previously produced a single line and then nothing. Failure logs carry
+  the reason, the gRPC code, both durations and the consecutive failure count; the recovery log carries how long the
+  endpoint was down and how many polls failed meanwhile. A block age crossing half of `--max-freshness` is reported
+  too, so an alert on `substreams_healthcheck_block_age_ms` is no longer silent. That one is edge-triggered and only
+  after three consecutive polls agree, so a chain whose block interval straddles the threshold stays quiet.
+
+- New `substreams_healthcheck_consecutive_failures` gauge, meant to be alerted on instead of
+  `substreams_healthcheck_status` when single-poll hiccups should be ignored.
+
+- `substreams_healthcheck_block_age_ms` is reset to `NaN` when a poll returns no block, instead of keeping the age of
+  the last block ever seen -- which silently under-reported staleness for as long as an endpoint stayed broken.
+
+- Fixed: endpoints configured with different sets of query-parameter labels (e.g. one with `?namespace=x&region=y`
+  and one with only `?namespace=z`) made the exporter panic on inconsistent label cardinality. Missing labels are now
+  filled with an empty value.
+
+- **Breaking** The exporter now speaks `sf.substreams.rpc.v4.Stream/Blocks` only. The v3-to-v2 fallback is gone --
+  it closed the connection and then kept reading from it, double-counting the failure -- and
+  `--force-protocol-version` accepts only `4` (or `0`), the flag being kept for the protocol versions to come. An
+  invalid value used to be parsed and then silently ignored, it is now rejected at startup, so an invocation passing
+  `--force-protocol-version 2` or `3` must drop the flag.
+
 ### Dependencies
 
-- `google.golang.org/grpc` is at v1.83.1, which clears GHSA-vp52-pcj8-j9qc, reported as HIGH: a peer could exhaust
-  server heap by fragmenting HTTP/2 DATA frames.
+- `google.golang.org/grpc` is at `v1.85.0-dev.0.20260825072537-93e31b48545e`. That clears
+  GHSA-vp52-pcj8-j9qc and CVE-2026-84445 (an xDS server panics on a request with neither
+  `:authority` nor `Host`). v1.84.0 is still inside the range Docker Scout reports, which
+  failed the image build.
 
 ### Tests
+
+- The `tests_e2e/dummy` directory gains a `substreams.clickhouse.yaml` sibling manifest
+  packing `e2e_clickhouse`, whose `map_events_clickhouse` module emits
+  `test.clickhouse.Events`. That message carries the `(schema.table)` ClickHouse
+  annotations, so the package sinks with `substreams sink clickhouse` without further
+  setup. Kept out of `substreams.yaml` and given its own message so the annotations do
+  not change the module hashes of the existing e2e modules.
 
 - The `tests_e2e/dummy` package gains three modules for exercising Hosted Stores against a
   staging environment. `map_hosted_store_feed`, packed into `e2e-v0.3.0.spkg`, emits
@@ -506,7 +657,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Dependencies
 
 - Bumped notably `github.com/ClickHouse/clickhouse-go/v2` to v2.48.0, `github.com/AfterShip/clickhouse-sql-parser` to
-  v0.5.5, `google.golang.org/grpc` to v1.83.0 and the OpenTelemetry SDK to v1.45.0.
+  v0.5.5, `google.golang.org/grpc` to v1.83.2 and the OpenTelemetry SDK to v1.45.0.
+
+- `google.golang.org/grpc` is at v1.83.2, which clears CVE-2026-84304 and CVE-2026-84445, and
+  `golang.org/x/crypto` is at v0.56.0, which clears CVE-2026-78662 and CVE-2026-56855, all reported as HIGH against the
+  published `ghcr.io/streamingfast/substreams` image.
 
 - `golang.org/x/mod` is at v0.40.0, which clears CVE-2026-56864 and CVE-2026-56865, both reported as HIGH against the
   published `ghcr.io/streamingfast/substreams` image.

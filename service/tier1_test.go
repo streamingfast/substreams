@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/shutter"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/stretchr/testify/assert"
@@ -266,4 +268,30 @@ func TestLastUsedFilename(t *testing.T) {
 	assert.Equal(t, "last_used", lastUsedFilename(""))
 	assert.Equal(t, "last_used_pro", lastUsedFilename("PRO"))
 	assert.Equal(t, "last_used_enterprise", lastUsedFilename("ENTERPRISE"))
+}
+
+func TestPendingShutdownCheck(t *testing.T) {
+	t.Run("no max request duration follows service termination", func(t *testing.T) {
+		s := &Tier1Service{Shutter: shutter.New()}
+		check := s.pendingShutdownCheck(time.Time{}, zap.NewNop())
+		assert.False(t, check())
+		s.Shutdown(nil)
+		assert.True(t, check())
+	})
+
+	t.Run("max request duration drains once elapsed", func(t *testing.T) {
+		s := &Tier1Service{Shutter: shutter.New()}
+		check := s.pendingShutdownCheck(time.Now().Add(50*time.Millisecond), zap.NewNop())
+		assert.False(t, check())
+		time.Sleep(60 * time.Millisecond)
+		assert.True(t, check())
+	})
+
+	t.Run("max request duration still drains on service termination", func(t *testing.T) {
+		s := &Tier1Service{Shutter: shutter.New()}
+		check := s.pendingShutdownCheck(time.Now().Add(time.Hour), zap.NewNop())
+		assert.False(t, check())
+		s.Shutdown(nil)
+		assert.True(t, check())
+	})
 }

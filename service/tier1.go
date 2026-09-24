@@ -49,6 +49,7 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/active_requests"
 	"github.com/streamingfast/substreams/service/config"
+	"github.com/streamingfast/substreams/squash"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
@@ -64,6 +65,23 @@ var errShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 var fallbackDuration time.Duration
 var useBlockNumberDuration time.Duration
 var deterministicErrorMaxAge = time.Hour
+
+// DefaultRemoteSquashQuietPeriod is how long tier1 squashes locally after the
+// remote squasher stops answering, before one run tries it again. A configured
+// quiet period of zero selects this.
+const DefaultRemoteSquashQuietPeriod = 5 * time.Minute
+
+// ResolveRemoteSquashQuietPeriod returns d, or DefaultRemoteSquashQuietPeriod
+// when d is zero. A negative duration is rejected.
+func ResolveRemoteSquashQuietPeriod(d time.Duration) (time.Duration, error) {
+	if d < 0 {
+		return 0, fmt.Errorf("remote squash quiet period must not be negative, got %s", d)
+	}
+	if d == 0 {
+		return DefaultRemoteSquashQuietPeriod, nil
+	}
+	return d, nil
+}
 
 func init() {
 	if v := os.Getenv(EnvDeterministicErrorMaxAge); v != "" {
@@ -134,6 +152,19 @@ type Tier1Service struct {
 	// live backfiller waits past a segment end before concluding merged blocks
 	// are safely written. 0 means use the default.
 	liveBackFillerFinalBlockDelay uint64
+
+	// maxRequestDuration, if non-zero, is how long a request may run before
+	// it is gracefully ended the same way as on shutdown (stores quick-saved,
+	// client told to reconnect).
+	maxRequestDuration time.Duration
+
+	squasher squash.Client
+	// remoteSquashQuietPeriod is how long a down remote is left alone. Zero
+	// means DefaultRemoteSquashQuietPeriod; set by WithRemoteSquashQuietPeriod.
+	remoteSquashQuietPeriod time.Duration
+	// remoteSquashAvailability is shared by every request. Nil when no remote
+	// squasher is configured.
+	remoteSquashAvailability *reqctx.RemoteAvailability
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -366,6 +397,15 @@ func NewTier1(
 
 	for _, opt := range opts {
 		opt(s)
+	}
+
+	quiet, err := ResolveRemoteSquashQuietPeriod(s.remoteSquashQuietPeriod)
+	if err != nil {
+		return nil, err
+	}
+	if s.squasher != nil {
+		logger.Info("remote squasher configured", zap.Duration("quiet_period", quiet))
+		s.remoteSquashAvailability = reqctx.NewRemoteAvailability(quiet, nil)
 	}
 
 	return s, nil
@@ -853,10 +893,28 @@ func (s *Tier1Service) blocks(
 		opts = append(opts, pipeline.WithHeadBlockGetter(s.getHeadBlock))
 	}
 	opts = append(opts, pipeline.WithExecOutPrefetch(s.execOutPrefetch))
+	if requestDetails.ProductionMode && s.getRecentFinalBlock != nil {
+		opts = append(opts, pipeline.WithFinalBlockLagCheck(s.getRecentFinalBlock, requestDetails.LinearHandoffBlockNum))
+	}
+
+	if s.squasher != nil {
+		ctx = reqctx.WithRemoteSquasher(ctx, &reqctx.RemoteSquasher{
+			Client:         s.squasher,
+			StateStoreURL:  s.tier2RequestParameters.StateStoreURL,
+			CacheTag:       cacheTag,
+			StoreSizeLimit: s.runtimeConfig.StoreSizeLimit,
+			Availability:   s.remoteSquashAvailability,
+		})
+	}
 
 	ctx, resolvedEndpoints, err := s.resolveFoundationalStores(ctx, execGraph, reqStats)
 	if err != nil {
 		return err
+	}
+
+	var deadline time.Time
+	if s.maxRequestDuration != 0 {
+		deadline = time.Now().Add(s.maxRequestDuration)
 	}
 
 	pipe := pipeline.New(
@@ -873,9 +931,7 @@ func (s *Tier1Service) blocks(
 		s.runtimeConfig.WorkerPoolFactory,
 		respFunc,
 		s.blockExecutionTimeout,
-		func() bool {
-			return s.IsTerminating() // pipeline starts draining when the service is actually terminating, (after the global shutdown-signal-delay)
-		},
+		s.pendingShutdownCheck(deadline, logger),
 		resolvedEndpoints,
 		execOutMessageBufferSize,
 		supportBuffering,
@@ -1027,6 +1083,20 @@ func (s *Tier1Service) blocks(
 		return pipe.OnStreamTerminated(ctx, io.EOF)
 	}
 
+	if requestDetails.ProductionMode && !loadedFromQuicksave && reqPlan.RequiresParallelProcessing() {
+		if lastFinalBlock, err := s.getRecentFinalBlock(); err != nil {
+			logger.Warn("cannot get last final block to check linear handoff lag", zap.Error(err))
+		} else if target, tooFarBehind := pipeline.LinearHandoffLagTarget(requestDetails.LinearHandoffBlockNum, request.StopBlockNum, lastFinalBlock, segmentSize, pipeline.MaxLinearHandoffLagSegments); tooFarBehind {
+			logger.Info("linear handoff block is too far behind the last final block, disconnecting client so it back-processes the gap on reconnection",
+				zap.Uint64("handoff_block", requestDetails.LinearHandoffBlockNum),
+				zap.Uint64("new_handoff_block", target),
+				zap.Uint64("last_final_block", lastFinalBlock),
+				zap.Uint64("max_lag_segments", pipeline.MaxLinearHandoffLagSegments),
+			)
+			return pipe.OnStreamTerminated(ctx, connect.NewError(connect.CodeUnavailable, errShuttingDown))
+		}
+	}
+
 	var streamErr error
 	cursor := requestDetails.ResolvedCursor
 	var processBlocksBeforeCursor bool
@@ -1093,6 +1163,22 @@ func (s *Tier1Service) blocks(
 		return fmt.Errorf("error getting stream: %w", err)
 	}
 
+	if !deadline.IsZero() && cancelRunning != nil {
+		// The pipeline checks the deadline on every block, but on a slow chain the next
+		// block can be far away, so also end the stream as soon as the deadline passes.
+		go func() {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Until(deadline)):
+			}
+			if err := pipe.Drain("max request duration reached"); err != nil {
+				logger.Warn("draining pipeline on max request duration", zap.Error(err))
+			}
+			cancelRunning(errShuttingDown)
+		}()
+	}
+
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/pipeline/blocks_stream")
 	for {
 		streamErr = blockStream.Run(ctx)
@@ -1129,6 +1215,30 @@ func (s *Tier1Service) blocks(
 	span.EndWithErr(&streamErr)
 
 	return pipe.OnStreamTerminated(ctx, streamErr)
+}
+
+// pendingShutdownCheck returns the function the pipeline polls to know when to
+// drain: when the service is actually terminating (after the global
+// shutdown-signal-delay), or when the request deadline has passed. A zero
+// deadline means no limit.
+func (s *Tier1Service) pendingShutdownCheck(deadline time.Time, logger *zap.Logger) func() bool {
+	if deadline.IsZero() {
+		return s.IsTerminating
+	}
+
+	var logOnce sync.Once
+	return func() bool {
+		if s.IsTerminating() {
+			return true
+		}
+		if time.Now().Before(deadline) {
+			return false
+		}
+		logOnce.Do(func() {
+			logger.Info("request reached max request duration, ending it gracefully", zap.Duration("max_request_duration", s.maxRequestDuration))
+		})
+		return true
+	}
 }
 
 // configureLiveBackFillerFromQuickload will ensure that any used store

@@ -70,6 +70,19 @@ func (p *Pipeline) ProcessFromExecOutput(
 func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err error) {
 	ctx := p.ctx
 
+	p.blockMu.Lock()
+	defer p.blockMu.Unlock()
+	if p.drained {
+		return ErrShuttingDown
+	}
+
+	if !p.processingBlocksSet {
+		p.processingBlocksSet = true
+		if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
+			reqHandler.SetProcessingBlocks()
+		}
+	}
+
 	metrics.BlockBeginProcess.Inc()
 	defer metrics.BlockEndProcess.Inc()
 
@@ -344,6 +357,13 @@ func (p *Pipeline) handleStepUndoPartial(ctx context.Context, cursor *bstream.Cu
 		return nil
 	}
 
+	if len(p.partialProcessingState.processedPartials) == 0 {
+		// no output was sent for this block: the client has nothing to undo, and an undo
+		// signal here would name a block it never received
+		p.partialProcessingState = nil
+		return nil
+	}
+
 	clock := &pbsubstreams.Clock{
 		Id:     p.partialProcessingState.lastBlockID,
 		Number: p.partialProcessingState.num,
@@ -372,10 +392,52 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 		return fmt.Errorf("exec output cache: handle final: %w", err)
 	}
 	p.forkHandler.removeReversibleOutput(clock.Id)
-	return nil
+	return p.checkFinalBlockLag(clock.Number)
+}
+
+// checkFinalBlockLag runs once per segment. Block numbers can be skipped, so the boundary is
+// detected by a change of segment rather than by a block number divisible by the segment size.
+func (p *Pipeline) checkFinalBlockLag(blockNum uint64) error {
+	if p.getRecentFinalBlock == nil {
+		return nil
+	}
+	segment := blockNum / p.stateBundleSize
+	if segment <= p.lastLagCheckSegment {
+		return nil
+	}
+	p.lastLagCheckSegment = segment
+
+	logger := reqctx.Logger(p.ctx)
+	lastFinalBlock, err := p.getRecentFinalBlock()
+	if err != nil {
+		logger.Warn("cannot get last final block to check final block lag", zap.Error(err))
+		return nil
+	}
+
+	target, tooFarBehind := LinearHandoffLagTarget(segment*p.stateBundleSize, reqctx.Details(p.ctx).StopBlockNum, lastFinalBlock, p.stateBundleSize, MaxLinearHandoffLagSegments)
+	if !tooFarBehind {
+		return nil
+	}
+	logger.Info("final block is too far behind the last final block, disconnecting client so it back-processes the gap on reconnection",
+		zap.Uint64("final_block", blockNum),
+		zap.Uint64("new_handoff_block", target),
+		zap.Uint64("last_final_block", lastFinalBlock),
+		zap.Uint64("max_lag_segments", MaxLinearHandoffLagSegments),
+	)
+	return ErrShuttingDown
 }
 
 func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, parentBlock bstream.BlockRef, idx int32, isLast bool) (err error) {
+	if p.isTier1 && p.checkPendingShutdown() {
+		// same as handleStepNew: end the stream so the client reconnects elsewhere. Going silent
+		// instead would leave the stream open, sending nothing but an undo signal at every block
+		// boundary until the process exits.
+		if err := p.quickSaveStores(ctx, "shutting down"); err != nil {
+			return err
+		}
+		return ErrShuttingDown
+	}
+
 	if p.lastProcessedBlockRef != nil && clock.Number <= p.lastProcessedBlockRef.Num() {
 		// this can happen if we got the full block and used it as the 'last partial block'
 		return nil
@@ -435,9 +497,6 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 
 	reqDetails := reqctx.Details(ctx)
 	if isBlockOverStopBlock(clock.Number, reqDetails.StopBlockNum) {
-		return nil
-	}
-	if p.isTier1 && p.checkPendingShutdown() {
 		return nil
 	}
 	if p.pendingUndoMessage != nil && p.gate.shouldSendOutputs() {
@@ -502,6 +561,20 @@ func normalizeModuleOutput(in *pbsubstreamsrpc.MapModuleOutput, outputModule str
 		in.Name = outputModule
 	}
 	return in
+}
+
+// Drain waits for the block being processed (if any) to finish, quick-saves the stores
+// and makes every later ProcessBlock call return ErrShuttingDown. It lets the caller end
+// the stream on a timer without waiting for the next block, which can take a long time
+// on slow chains. The caller is expected to cancel the stream right after.
+func (p *Pipeline) Drain(reason string) error {
+	p.blockMu.Lock()
+	defer p.blockMu.Unlock()
+	if p.drained {
+		return nil
+	}
+	p.drained = true
+	return p.quickSaveStores(p.ctx, reason)
 }
 
 // quickSaveStores writes the current store state to the temporary quicksave store so a

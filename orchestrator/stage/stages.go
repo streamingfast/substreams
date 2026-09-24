@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -38,7 +39,14 @@ import (
 
 type Stages struct {
 	ctx    context.Context
+	cancel context.CancelFunc
 	logger *zap.Logger
+
+	// A squash run holds squashMu shared for its whole duration and Close takes it
+	// exclusively, so a store is never closed under a merge or a save. closed tells a
+	// run that gets the lock after Close to do nothing.
+	squashMu sync.RWMutex
+	closed   bool
 
 	globalSegmenter   *block.Segmenter // This segmenter covers both the stores and the mapper
 	storeSegmenter    *block.Segmenter // This segmenter covers only jobs needed to build up stores according to the RequestPlan.
@@ -70,6 +78,9 @@ type Stages struct {
 	allStoresDone   bool
 	allStoresCursor []int
 
+	// allStoresCompletedSent makes MsgAllStoresCompleted a one-time signal.
+	allStoresCompletedSent bool
+
 	// nextJobCursor is the lowest segment that may still yield a job. NextJob
 	// starts its scan here instead of at globalSegmenter.FirstIndex(), so it no
 	// longer re-walks the (ever-growing) prefix of finished segments on every
@@ -96,9 +107,11 @@ func NewStages(
 ) (out *Stages) {
 
 	logger := reqctx.Logger(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 	out = &Stages{
 		ctx:                 ctx,
-		logger:              reqctx.Logger(ctx),
+		cancel:              cancel,
+		logger:              logger,
 		globalSegmenter:     reqPlan.BackprocessSegmenter(),
 		outputModuleIsIndex: execGraph.OutputModule().GetKindBlockIndex() != nil,
 		execoutConfigs:      execoutConfigs,
@@ -171,7 +184,15 @@ func NewStages(
 	return out
 }
 
+// Close releases the cached stores. It first cancels the stages context, so the
+// in-flight squash run stops at its next unit, then waits for that run to finish:
+// closing a store under a merge would panic, and under a save would write an empty
+// full store to storage.
 func (s *Stages) Close() {
+	s.cancel()
+	s.squashMu.Lock()
+	defer s.squashMu.Unlock()
+	s.closed = true
 	for _, stage := range s.stages {
 		for _, modState := range stage.storeModuleStates {
 			modState.Close()
@@ -436,27 +457,29 @@ func (s *Stages) CmdStartMerge() loop.Cmd {
 	return loop.Batch(cmds...)
 }
 
+// CmdAllStoresCompletedOnce returns a command sending MsgAllStoresCompleted the first
+// time it is called with all stores completed, and nil otherwise.
+func (s *Stages) CmdAllStoresCompletedOnce() loop.Cmd {
+	if s.allStoresCompletedSent || !s.AllStoresCompleted() {
+		return nil
+	}
+	s.allStoresCompletedSent = true
+	return CmdAllStoresCompleted()
+}
+
 func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 	// TODO: this function needs to be broken into a message and a few
 	// functions, and be called directly within the Scheduler's Update()
 	// function, similar to the CmdDownloadCurrentSegment flow, and the
 	// NextJob thing.
 
-	if s.AllStoresCompleted() {
-		// FIXME: this CmdTryMerge function is called once for each stage,
-		// so we could receive multiple such calls, and thus
-		// issue multiple MsgAllStoresCompleted. But this signal
-		// should be unique, once and for all (it is an indicator that the
-		// full job of the Scheduler is done in a way).
-		// Here we risk putting out multiple messages of that kind,
-		// However, it's probably all right, because it produces a QuitMsg
-		// and duplicates of that might just be piled and not read.
-		return CmdAllStoresCompleted()
-	}
-
 	stage := s.stages[stageIdx]
 	if stage.kind != KindStore {
 		return nil
+	}
+
+	if s.AllStoresCompleted() {
+		return s.CmdAllStoresCompletedOnce()
 	}
 
 	mergeUnit := stage.nextUnit()
@@ -474,18 +497,47 @@ func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 	}
 
 	s.MarkSegmentMerging(mergeUnit)
+	run := s.claimMergeRun(stage, mergeUnit, maxSquashRunSegments)
 
 	return func() loop.Msg {
-		if err := s.multiSquash(stage, mergeUnit); err != nil {
-			return MsgMergeFailed{Unit: mergeUnit, Error: err}
-		}
-		return MsgMergeFinished{Unit: mergeUnit}
+		return s.guardSquash(func() loop.Msg {
+			merged, unmerged, err := s.squashStage(stage, run)
+			if err != nil {
+				return MsgMergeFailed{Unit: run[len(merged)], Error: err}
+			}
+			return MsgMergeFinished{Stage: stageIdx, Merged: merged, Unmerged: unmerged}
+		})
 	}
+}
+
+// guardSquash runs squash while holding squashMu shared, which keeps Close from
+// releasing the stores underneath it. Once Close has run, the stores are gone and
+// the scheduler loop that would receive the message is too, so squash is skipped.
+func (s *Stages) guardSquash(squash func() loop.Msg) loop.Msg {
+	s.squashMu.RLock()
+	defer s.squashMu.RUnlock()
+	if s.closed {
+		return MsgMergeFailed{Error: context.Canceled}
+	}
+	return squash()
 }
 
 func (s *Stages) MergeCompleted(mergeUnit Unit) {
 	s.markSegmentCompleted(mergeUnit)
 	s.MoveSegmentCompletedForward(mergeUnit.Stage)
+}
+
+// MergeRunCompleted records the outcome of a squash run on a stage: the merged units are
+// complete, and the unmerged ones go back to having only their partial, for the next run
+// to pick up.
+func (s *Stages) MergeRunCompleted(stageIdx int, merged, unmerged []Unit) {
+	for _, u := range merged {
+		s.markSegmentCompleted(u)
+	}
+	for _, u := range unmerged {
+		s.transition(u, UnitPartialPresent, UnitMerging)
+	}
+	s.MoveSegmentCompletedForward(stageIdx)
 }
 
 func (s *Stages) MoveSegmentCompletedForward(stageIdx int) {

@@ -30,6 +30,7 @@ package tests_e2e
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -39,6 +40,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/pprof"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -55,7 +57,6 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tools/devenv"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
 )
 
 const (
@@ -116,7 +117,7 @@ func startThinstoreStack(t *testing.T, blocks uint64) *thinstoreStack {
 		StartupTimeout: 10 * time.Minute,
 	})
 	require.NoError(t, err)
-	t.Cleanup(func() { container.Terminate(ctx, testcontainers.StopTimeout(0)) })
+	t.Cleanup(func() { devenv.TerminateDummyBlockchain(ctx, container) })
 
 	// Wait for the merger to have written every bundle of the baseline range before tier1
 	// starts: its block hub bootstraps from the merged blocks, and joining the live stream
@@ -277,8 +278,8 @@ func (s *thinstoreStack) expect(t *testing.T, got map[uint64]string, start, stop
 			extra = append(extra, b)
 		}
 	}
-	sort.Slice(missing, func(i, j int) bool { return missing[i] < missing[j] })
-	sort.Slice(differing, func(i, j int) bool { return differing[i] < differing[j] })
+	slices.Sort(missing)
+	slices.Sort(differing)
 	if len(missing)+len(extra)+len(differing) == 0 {
 		return
 	}
@@ -318,7 +319,7 @@ func (s *thinstoreStack) files(module, folder string) []cacheFile {
 		block, _ := strconv.ParseUint(m[1], 10, 64)
 		out = append(out, cacheFile{path: filepath.Join(dir, entry.Name()), block: block, kind: m[3]})
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].block < out[j].block })
+	slices.SortFunc(out, func(a, b cacheFile) int { return cmp.Compare(a.block, b.block) })
 	return out
 }
 

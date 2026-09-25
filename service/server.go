@@ -78,7 +78,7 @@ func ListenTier1(
 			h2s := &http2.Server{
 				MaxConcurrentStreams: 1000,
 			}
-			handler := h2c.NewHandler(rootMux, h2s)
+			handler := h2c.NewHandler(drainRejectedRequestBody(rootMux), h2s)
 
 			if strings.Contains(addr, "*") {
 				cleanAddr := strings.ReplaceAll(addr, "*", "")

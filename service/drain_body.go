@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	drainBodyMaxBytes = 4 * 1024 * 1024
-	drainBodyTimeout  = 2 * time.Second
+	drainBodyMaxBytes = 25 * 1024 * 1024 // 25 MiB should be enough for even bigger packages. More than that could be abuse.
+	drainBodyTimeout  = 5 * time.Second
 )
 
 // drainRejectedRequestBody reads and discards what is left of a request body once

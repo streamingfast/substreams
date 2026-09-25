@@ -69,9 +69,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   batch shape, `{"manifest": {...}, "blocks": [{"clock", "data"}, ...]}`, a batch of one included. A batch is sent
   when it is full, when `--webhook-batch-max-wait` (1s) has passed and the next block arrives, when the chain is
   live, before an undo notification, and when the stream ends. On an undo, the blocks of the open batch above
-  the last valid block are dropped unsent. A failed batch is kept and resumed as one payload. Switching
-  batching on or off while the sink is stopped discards a pending payload of the other shape; its blocks come back
-  through the stream. Default is off, one block per call as before.
+  the last valid block are dropped unsent. `--webhook-batch-max-bytes` caps the size of a batch body (no limit
+  by default); a block larger than the cap is sent alone. A failed batch is kept and resumed as one payload.
+  Switching batching on or off while the sink is stopped discards a pending payload of the other shape; its blocks
+  come back through the stream. Default is off, one block per call as before.
 
 ### Docs
 

@@ -721,3 +721,72 @@ func TestRecoverPending_SkipModeRetriesUndoUntilDelivered(t *testing.T) {
 	assert.Equal(t, []string{"/undo", "/undo", "/undo", "/undo"}, paths())
 	assert.NoFileExists(t, s.pendingFile)
 }
+
+func addBlockWithData(t *testing.T, s *Sink, num uint64, data string) {
+	t.Helper()
+	require.NoError(t, s.addToBatch(context.Background(), "map_events", "type.googleapis.com/sf.test.v1.Out", protoClock(num), json.RawMessage(data), sink.MustNewCursor(opaqueCursor(num)), false, time.Now()))
+}
+
+func TestBatch_MaxBytes(t *testing.T) {
+	server, requests := captureServer(t, http.StatusOK)
+	s := newTestSink(t, server.URL, OnFailureExit)
+	s.batchMaxBlocks, s.batchMaxWait = 100, time.Minute
+
+	data := `{"v":"` + strings.Repeat("x", 100) + `"}`
+	oneBlock, err := json.Marshal(BatchPayload{Manifest: newManifest("map_events", "sf.test.v1.Out"), Blocks: []BlockEntry{{Clock: newClock(protoClock(10)), Data: json.RawMessage(data)}}})
+	require.NoError(t, err)
+	// Room for two blocks and a bit, not three.
+	s.batchMaxBytes = 2*len(oneBlock) - 50
+
+	for num := uint64(10); num < 15; num++ {
+		addBlockWithData(t, s, num, data)
+	}
+	require.NotNil(t, s.batch)
+	assert.Equal(t, []uint64{14}, batchBlockNumbers(t, mustBatchJSON(t, s)))
+	assert.Equal(t, len(mustBatchJSON(t, s)), s.batch.size, "the tracked size is the serialized size")
+
+	got := requests()
+	require.Len(t, got, 2)
+	for i, want := range [][]uint64{{10, 11}, {12, 13}} {
+		assert.Equal(t, want, batchBlockNumbers(t, string(got[i].body)))
+		assert.LessOrEqual(t, len(got[i].body), s.batchMaxBytes)
+	}
+}
+
+func TestBatch_MaxBytesSendsOversizedBlockAlone(t *testing.T) {
+	server, requests := captureServer(t, http.StatusOK)
+	s := newTestSink(t, server.URL, OnFailureExit)
+	s.batchMaxBlocks, s.batchMaxWait, s.batchMaxBytes = 100, time.Minute, 200
+
+	addBlockWithData(t, s, 10, `{}`)
+	addBlockWithData(t, s, 11, `{"v":"`+strings.Repeat("x", 300)+`"}`)
+	addBlockWithData(t, s, 12, `{}`)
+
+	var got [][]uint64
+	for _, r := range requests() {
+		got = append(got, batchBlockNumbers(t, string(r.body)))
+	}
+	assert.Equal(t, [][]uint64{{10}, {11}}, got)
+	assert.Equal(t, []uint64{12}, batchBlockNumbers(t, mustBatchJSON(t, s)))
+}
+
+func mustBatchJSON(t *testing.T, s *Sink) string {
+	t.Helper()
+	out, err := s.batch.payload.ToJSON()
+	require.NoError(t, err)
+	return string(out)
+}
+
+func TestOpenBatch_TruncateKeepsSize(t *testing.T) {
+	server, _ := captureServer(t, http.StatusOK)
+	s := newTestSink(t, server.URL, OnFailureExit)
+	s.batchMaxBlocks, s.batchMaxWait = 100, time.Minute
+	for num := uint64(8); num < 12; num++ {
+		addBlockWithData(t, s, num, `{"n":`+jsonNumber(num)+`}`)
+	}
+
+	require.True(t, s.batch.truncate(9))
+	assert.Equal(t, []uint64{8, 9}, batchBlockNumbers(t, mustBatchJSON(t, s)))
+	assert.Equal(t, len(mustBatchJSON(t, s)), s.batch.size)
+	assert.Equal(t, opaqueCursor(9), s.batch.cursor())
+}

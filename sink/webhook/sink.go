@@ -81,6 +81,7 @@ type Sink struct {
 	terminationLog string
 	fingerprint    string
 	batchMaxBlocks int
+	batchMaxBytes  int
 	batchMaxWait   time.Duration
 	batch          *openBatch
 	client         *Client
@@ -90,14 +91,19 @@ type Sink struct {
 }
 
 // openBatch is the batch being filled. It is flushed when it holds
-// batchMaxBlocks blocks, when batchMaxWait has passed since it was opened,
+// batchMaxBlocks blocks, before the next block would take it past
+// batchMaxBytes, when batchMaxWait has passed since it was opened,
 // when a live block arrives, when an undo signal arrives, or when the stream
 // ends cleanly.
 type openBatch struct {
 	payload *BatchPayload
 	// cursors holds the cursor of each entry in payload.Blocks, so an undo
 	// can cut the batch at any block.
-	cursors  []string
+	cursors []string
+	// sizes holds the serialized size of each entry in payload.Blocks, and
+	// size the serialized size of the whole payload.
+	sizes    []int
+	size     int
 	openedAt time.Time
 }
 
@@ -122,8 +128,12 @@ func (b *openBatch) truncate(lastValid uint64) bool {
 	for n > 0 && b.payload.Blocks[n-1].Clock.Number > lastValid {
 		n--
 	}
+	for _, dropped := range b.sizes[n:] {
+		b.size -= dropped
+	}
 	b.payload.Blocks = b.payload.Blocks[:n]
 	b.cursors = b.cursors[:n]
+	b.sizes = b.sizes[:n]
 	return n > 0
 }
 
@@ -144,6 +154,10 @@ type SinkConfig struct {
 	// and sends up to that many blocks per call. Zero sends one WebhookPayload
 	// per block.
 	BatchMaxBlocks int
+	// BatchMaxBytes above zero bounds the size of a batch payload: a batch is
+	// sent before the next block would take it past this many bytes. A block
+	// larger than the limit on its own is sent alone. Zero means no limit.
+	BatchMaxBytes int
 	// BatchMaxWait bounds how long a batch waits for more blocks. It is
 	// checked when the next block arrives. Defaults to one second.
 	BatchMaxWait time.Duration
@@ -182,6 +196,7 @@ func NewSink(config SinkConfig) (*Sink, error) {
 
 	return &Sink{
 		batchMaxBlocks: max(config.BatchMaxBlocks, 0),
+		batchMaxBytes:  max(config.BatchMaxBytes, 0),
 		batchMaxWait:   batchMaxWait,
 		webhookURL:     config.WebhookURL,
 		undoURL:        config.UndoURL,
@@ -453,17 +468,39 @@ func (s *Sink) sendBlock(ctx context.Context, moduleName, typeURL string, clock 
 // full, when it waited long enough, or when the chain is live and holding the
 // block back would only add latency.
 func (s *Sink) addToBatch(ctx context.Context, moduleName, typeURL string, clock *pbsubstreams.Clock, dataContent json.RawMessage, cursor *sink.Cursor, live bool, now time.Time) error {
-	if s.batch == nil {
-		s.batch = &openBatch{payload: NewBatchPayload(moduleName, typeURL), openedAt: now}
+	entry := BlockEntry{Clock: newClock(clock), Data: dataContent}
+	encoded, err := json.Marshal(entry)
+	if err != nil {
+		return fmt.Errorf("failed to serialize batch entry: %w", err)
 	}
-	s.batch.payload.Append(clock, dataContent)
+	// Entries after the first are preceded by a comma.
+	entrySize := len(encoded) + 1
+
+	if s.batch != nil && s.batchMaxBytes > 0 && s.batch.size+entrySize > s.batchMaxBytes {
+		if err := s.flushBatch(ctx); err != nil {
+			return err
+		}
+	}
+
+	if s.batch == nil {
+		payload := NewBatchPayload(moduleName, typeURL)
+		payload.Blocks = []BlockEntry{}
+		empty, err := payload.ToJSON()
+		if err != nil {
+			return fmt.Errorf("failed to serialize batch payload: %w", err)
+		}
+		s.batch = &openBatch{payload: payload, size: len(empty) - 1, openedAt: now} // the first entry needs no comma
+	}
+	s.batch.payload.Blocks = append(s.batch.payload.Blocks, entry)
 	var cursorStr string
 	if cursor != nil {
 		cursorStr = cursor.String()
 	}
 	s.batch.cursors = append(s.batch.cursors, cursorStr)
+	s.batch.sizes = append(s.batch.sizes, entrySize)
+	s.batch.size += entrySize
 
-	full := len(s.batch.payload.Blocks) >= s.batchMaxBlocks
+	full := len(s.batch.payload.Blocks) >= s.batchMaxBlocks || (s.batchMaxBytes > 0 && s.batch.size >= s.batchMaxBytes)
 	waited := now.Sub(s.batch.openedAt) >= s.batchMaxWait
 	if full || waited || live {
 		return s.flushBatch(ctx)

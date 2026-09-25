@@ -78,11 +78,6 @@ func NewBatchPayload(moduleName string, msgType string) *BatchPayload {
 	return &BatchPayload{Manifest: newManifest(moduleName, msgType)}
 }
 
-// Append adds one block to the batch.
-func (p *BatchPayload) Append(clock *pbsubstreams.Clock, data json.RawMessage) {
-	p.Blocks = append(p.Blocks, BlockEntry{Clock: newClock(clock), Data: data})
-}
-
 // ToJSON serializes the batch payload to JSON bytes
 func (p *BatchPayload) ToJSON() ([]byte, error) {
 	return json.Marshal(p)

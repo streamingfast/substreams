@@ -36,6 +36,7 @@ func init() {
 	sinkWebhookCmd.Flags().Duration("webhook-max-retry-interval", 30*time.Second, "Maximum interval between webhook retries (exponential backoff cap)")
 	sinkWebhookCmd.Flags().String("webhook-on-failure", string(webhook.OnFailureSkip), fmt.Sprintf("What to do once every retry for a block has failed: %q drops the block and continues (an undo notification is instead retried until it goes through), %q keeps the block on disk, writes the reason to the termination log and exits with status %d; the next start delivers that block before it connects to Substreams", webhook.OnFailureSkip, webhook.OnFailureExit, webhook.ExitCodeDeliveryFailed))
 	sinkWebhookCmd.Flags().Int("webhook-batch-max-blocks", 0, "Send up to this many blocks per call, in the batch payload shape (see below). 0 sends one block per call in the single-block shape")
+	sinkWebhookCmd.Flags().Int("webhook-batch-max-bytes", 0, "With --webhook-batch-max-blocks, send a batch before the next block would take its body past this many bytes. A block larger than this on its own is sent alone. 0 means no limit")
 	sinkWebhookCmd.Flags().Duration("webhook-batch-max-wait", time.Second, "Longest a batch waits for more blocks before it is sent, checked when the next block arrives. A batch is also sent when the chain is live, before an undo notification, and when the stream ends")
 	sinkWebhookCmd.Flags().String("webhook-undo-url", "", "URL that receives a POST for each chain reorganization, with body {\"lastValidBlock\": {\"number\": ..., \"id\": \"...\"}, \"manifest\": {\"moduleName\": \"...\"}}. Empty disables the notification; the blocks that replace the undone ones are still delivered to <url>")
 	sinkWebhookCmd.Flags().String("webhook-termination-log", "/dev/termination-log", "File that receives the reason for a delivery-failure exit, written only when the file already exists (Kubernetes creates it)")
@@ -57,7 +58,8 @@ var sinkWebhookCmd = &cobra.Command{
 		   "manifest": {"moduleName": "...", "type": "..."},
 		   "data": {...}}
 
-		With --webhook-batch-max-blocks=N every call carries up to N blocks, a batch of one included, as:
+		With --webhook-batch-max-blocks=N every call carries up to N blocks, a batch of one included, and at
+		most --webhook-batch-max-bytes bytes when that is set, as:
 
 		  {"manifest": {"moduleName": "...", "type": "..."},
 		   "blocks": [{"clock": {...}, "data": {...}}, ...]}
@@ -124,6 +126,7 @@ func sinkWebhookE(cmd *cobra.Command, args []string) error {
 		OnFailure:      onFailure,
 		SinkerConfig:   sinkerConfig,
 		BatchMaxBlocks: sflags.MustGetInt(cmd, "webhook-batch-max-blocks"),
+		BatchMaxBytes:  sflags.MustGetInt(cmd, "webhook-batch-max-bytes"),
 		BatchMaxWait:   sflags.MustGetDuration(cmd, "webhook-batch-max-wait"),
 		ClientConfig: webhook.Config{
 			Timeout:         sflags.MustGetDuration(cmd, "webhook-timeout"),

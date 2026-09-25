@@ -18,30 +18,22 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
+//go:generate go-enum -f=$GOFILE --names
+
 // OnFailure selects what the sink does once every attempt to deliver a block
 // has failed.
+//
+// OnFailureSkip logs the failure, drops the block and moves on to the next
+// one. The cursor is not advanced past the dropped block, so a later restart
+// replays it. An undo notification is never dropped: it is retried until it
+// goes through.
+//
+// OnFailureExit keeps the block in the pending file, writes a termination
+// message and stops the sink with ExitCodeDeliveryFailed. The next start
+// delivers the pending block before it opens a Substreams stream.
+//
+// ENUM(skip, exit)
 type OnFailure string
-
-const (
-	// OnFailureSkip logs the failure, drops the block and moves on to the next
-	// one. The cursor is not advanced past the dropped block, so a later
-	// restart replays it. An undo notification is never dropped: it is
-	// retried until it goes through.
-	OnFailureSkip OnFailure = "skip"
-	// OnFailureExit keeps the block in the pending file, writes a termination
-	// message and stops the sink with ExitCodeDeliveryFailed. The next start
-	// delivers the pending block before it opens a Substreams stream.
-	OnFailureExit OnFailure = "exit"
-)
-
-func ParseOnFailure(value string) (OnFailure, error) {
-	switch OnFailure(value) {
-	case OnFailureSkip, OnFailureExit:
-		return OnFailure(value), nil
-	default:
-		return "", fmt.Errorf("invalid on-failure value %q, expected %q or %q", value, OnFailureSkip, OnFailureExit)
-	}
-}
 
 // ExitCodeDeliveryFailed is the process exit status for a delivery failure in
 // OnFailureExit mode. It is EX_TEMPFAIL from sysexits: the input was fine,
@@ -51,9 +43,8 @@ const ExitCodeDeliveryFailed = 75
 // DeliveryFailedError is returned from Sink.Run in OnFailureExit mode. The
 // pending block stays on disk for the next start.
 type DeliveryFailedError struct {
-	Delivery *DeliveryError
-	// Kind is "block" for a block payload and "undo" for a reorg notification.
-	Kind           string
+	Delivery       *DeliveryError
+	Kind           DeliveryKind
 	FirstAttemptAt time.Time
 }
 
@@ -379,7 +370,7 @@ func (s *Sink) deliveryFailed(pending *pendingDelivery, err error) error {
 	}
 	kind := pending.Kind
 	if kind == "" {
-		kind = pendingKindBlock
+		kind = DeliveryKindBlock
 	}
 	failed := &DeliveryFailedError{Delivery: deliveryErr, Kind: kind, FirstAttemptAt: pending.FirstAttemptAt}
 
@@ -445,7 +436,7 @@ func (s *Sink) sendBlock(ctx context.Context, moduleName, typeURL string, clock 
 	}
 
 	pending := &pendingDelivery{
-		Kind:           pendingKindBlock,
+		Kind:           DeliveryKindBlock,
 		BlockNumber:    clock.Number,
 		Payload:        wrappedOut,
 		FirstAttemptAt: now,
@@ -493,7 +484,7 @@ func (s *Sink) flushBatch(ctx context.Context) error {
 	}
 
 	pending := &pendingDelivery{
-		Kind:           pendingKindBlock,
+		Kind:           DeliveryKindBlock,
 		Batched:        true,
 		Cursor:         batch.cursor(),
 		BlockNumber:    batch.lastBlock(),
@@ -508,7 +499,7 @@ func (s *Sink) flushBatch(ctx context.Context) error {
 
 // send delivers the payload and applies the on-failure policy.
 func (s *Sink) send(ctx context.Context, pending *pendingDelivery) error {
-	s.logger.Info("calling webhook", zap.String("kind", pending.Kind), zap.Uint64("block", pending.BlockNumber))
+	s.logger.Info("calling webhook", zap.Stringer("kind", pending.Kind), zap.Uint64("block", pending.BlockNumber))
 
 	err := s.deliver(ctx, pending)
 	if err == nil {
@@ -603,7 +594,7 @@ func (s *Sink) handleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstrea
 	}
 
 	pending := &pendingDelivery{
-		Kind:           pendingKindUndo,
+		Kind:           DeliveryKindUndo,
 		Payload:        payload,
 		FirstAttemptAt: time.Now(),
 		Fingerprint:    s.fingerprint,

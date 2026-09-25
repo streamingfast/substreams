@@ -312,7 +312,7 @@ func TestRecoverPending_UndoWithoutUndoURLIsDropped(t *testing.T) {
 	require.NoError(t, sink.WriteCursor(s.stateFile, sink.MustNewCursor(opaqueCursor(12))))
 
 	p := newPending(10)
-	p.Kind = pendingKindUndo
+	p.Kind = DeliveryKindUndo
 	p.Fingerprint = s.fingerprint
 	require.NoError(t, writePending(s.pendingFile, p))
 
@@ -416,13 +416,13 @@ func TestUndo_FailureFollowsOnFailurePolicy(t *testing.T) {
 
 	var failed *DeliveryFailedError
 	require.ErrorAs(t, err, &failed)
-	assert.Equal(t, pendingKindUndo, failed.Kind)
+	assert.Equal(t, DeliveryKindUndo, failed.Kind)
 	assert.Equal(t, undos.URL, failed.Delivery.URL)
 	assert.Equal(t, opaqueCursor(12), readStateCursor(t, s), "cursor stays until the receiver knows about the reorg")
 
 	kept, err := readPending(s.pendingFile)
 	require.NoError(t, err)
-	assert.Equal(t, pendingKindUndo, kept.Kind)
+	assert.Equal(t, DeliveryKindUndo, kept.Kind)
 
 	msg, err := os.ReadFile(s.terminationLog)
 	require.NoError(t, err)
@@ -624,7 +624,7 @@ func TestRecoverPending_DiscardsOtherBatchingMode(t *testing.T) {
 		s.batchMaxBlocks = 10
 
 		p := newPending(10)
-		p.Kind = pendingKindUndo
+		p.Kind = DeliveryKindUndo
 		p.Fingerprint = s.fingerprint
 		require.NoError(t, writePending(s.pendingFile, p))
 
@@ -711,7 +711,7 @@ func TestRecoverPending_SkipModeRetriesUndoUntilDelivered(t *testing.T) {
 	s.undoURL = server.URL + "/undo"
 
 	p := newPending(9)
-	p.Kind = pendingKindUndo
+	p.Kind = DeliveryKindUndo
 	p.Fingerprint = s.fingerprint
 	require.NoError(t, writePending(s.pendingFile, p))
 

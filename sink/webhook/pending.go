@@ -18,9 +18,9 @@ import (
 // middle of a call leaves no file: the cursor was not advanced, so the stream
 // re-sends that block.
 type pendingDelivery struct {
-	// Kind is pendingKindBlock or pendingKindUndo and selects the URL the
-	// payload goes to. Empty reads as pendingKindBlock.
-	Kind string `json:"kind,omitempty"`
+	// Kind selects the URL the payload goes to. Empty reads as
+	// DeliveryKindBlock.
+	Kind DeliveryKind `json:"kind,omitempty"`
 	// Batched marks a block payload in the BatchPayload shape. A pending
 	// payload whose shape does not match the mode the sink now runs in is
 	// discarded on start and its blocks come back through the stream.
@@ -39,12 +39,13 @@ type pendingDelivery struct {
 	Fingerprint string `json:"fingerprint"`
 }
 
-const (
-	pendingKindBlock = "block"
-	pendingKindUndo  = "undo"
-)
+//go:generate go-enum -f=$GOFILE
 
-func (p *pendingDelivery) isUndo() bool { return p.Kind == pendingKindUndo }
+// DeliveryKind tells a block payload from a reorg notification.
+// ENUM(block, undo)
+type DeliveryKind string
+
+func (p *pendingDelivery) isUndo() bool { return p.Kind == DeliveryKindUndo }
 
 // pendingFilePath derives the pending file from the state file. Both must
 // live on the same persistent volume, so one setting places the two.

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -113,7 +114,7 @@ func sinkWebhookE(cmd *cobra.Command, args []string) error {
 
 	onFailure, err := webhook.ParseOnFailure(sflags.MustGetString(cmd, "webhook-on-failure"))
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid --webhook-on-failure: %w, expected one of %s", err, strings.Join(webhook.OnFailureNames(), ", "))
 	}
 
 	sinkConfig := webhook.SinkConfig{

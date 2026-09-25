@@ -23,6 +23,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `no such file`. It is now served from an embedded copy, the same way
   `sf/substreams/options.proto` already was.
 
+### Sink
+
+- Add authentication to `substreams sink webhook` calls. The value of the environment variable named by
+  `--webhook-auth-header-value-envvar` is sent in the header named by `--webhook-auth-header-name`
+  (`Authorization` by default), and the secret named by `--webhook-signing-secret-envvar` signs every body
+  with HMAC-SHA256 in the `X-Substreams-Signature` header as `t=<unix seconds>,v1=<hex>` over `<t>.<body>`.
+  Receivers can verify with `webhook.VerifySignature`. Once every retry has failed, `Client.Call` returns a
+  `*webhook.DeliveryError` carrying the last HTTP status and the attempt count.
+
+- `substreams sink webhook` no longer follows redirects. A 3xx response is a failed delivery and is not retried,
+  so the auth header and the body never reach another host. Point `<url>` at the final address.
+
+- `substreams sink webhook` now reuses its connection between calls instead of opening a new one, with a new
+  TLS handshake, for every block. A failed call's error now includes the start of the receiver's response
+  body. Connecting to the receiver times out after 5s instead of 30s, and idle connections are closed after
+  30s so they are not reused after a load balancer has dropped them.
+
+- Add `--webhook-on-failure=exit` to `substreams sink webhook`. Once every retry for a block has failed the
+  sink keeps that block in `<state-file>.pending`, writes a JSON reason (URL, block, status, attempts,
+  `first_attempt_at`) to `--webhook-termination-log` when that file exists, and exits with status 75. The next
+  start delivers the pending block before it opens a Substreams stream, so retrying against a dead endpoint costs
+  no egress. The default `skip` keeps the old behaviour of dropping the block. A changed URL or secret resets
+  `first_attempt_at`. A kill in the middle of a call leaves no pending file: the cursor was not saved, so the
+  stream re-sends that block. The sink now also exposes `substreams_sink_webhook_last_delivered_block`, the
+  last delivered block.
+
+- Rename the `substreams sink webhook` metrics `webhook_calls` and `webhook_bytes_sent` to
+  `substreams_sink_webhook_calls` and `substreams_sink_webhook_bytes_sent`.
+
+- Sinks running with `--undo-buffer-size` now receive an undo signal that reaches below the buffer when the buffer
+  has emitted nothing yet, which is what a restart from a cursor sitting on a fork produces. Before, the buffer
+  swallowed it and the handler never rolled back blocks the previous run had emitted.
+
+- Add `--webhook-undo-url` to `substreams sink webhook`. When set, every undo signal is POSTed there as
+  `{"lastValidBlock": {"number", "id"}, "manifest": {"moduleName"}}` so the receiver can drop the blocks above
+  the last valid one before the replacements arrive. The notification carries the same auth header and
+  signature as blocks and follows the same retry, `--webhook-on-failure` and pending-file rules, except that
+  `--webhook-on-failure=skip` never drops one: it is retried until it goes through, and no replacement block is
+  sent before then. Without it the cursor still moves back and only the replacement blocks are delivered, as
+  before. Pair with `--undo-buffer-size` to hold back a few blocks and absorb shallow reorganizations without
+  any notification.
+
+- Add `--webhook-batch-max-blocks=N` to `substreams sink webhook`. Every call then carries up to N blocks in a
+  batch shape, `{"manifest": {...}, "blocks": [{"clock", "data"}, ...]}`, a batch of one included. A batch is sent
+  when it is full, when `--webhook-batch-max-wait` (1s) has passed and the next block arrives, when the chain is
+  live, before an undo notification, and when the stream ends. On an undo, the blocks of the open batch above
+  the last valid block are dropped unsent. `--webhook-batch-max-bytes` caps the size of a batch body (no limit
+  by default); a block larger than the cap is sent alone. A failed batch is kept and resumed as one payload.
+  Switching batching on or off while the sink is stopped discards a pending payload of the other shape; its blocks
+  come back through the stream. Default is off, one block per call as before.
+
 ### Docs
 
 - Add a Solana how-to on versioned transactions (v0 and v1): what the new `version`,

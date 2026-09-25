@@ -447,36 +447,6 @@ func TestClient_Call_HTTPSEndpoint(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestClient_Call_RedirectResponse(t *testing.T) {
-	redirectCount := 0
-	finalServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer finalServer.Close()
-
-	redirectServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		redirectCount++
-		if redirectCount <= 2 {
-			http.Redirect(w, r, finalServer.URL, http.StatusFound)
-		} else {
-			w.WriteHeader(http.StatusOK)
-		}
-	}))
-	defer redirectServer.Close()
-
-	config := Config{
-		Timeout:     30 * time.Second,
-		MaxRetries:  3,
-		MaxInterval: 30 * time.Second,
-	}
-	client := NewClient(config, zap.NewNop())
-	payload := []byte(`{"test": "data"}`)
-
-	err := client.Call(context.Background(), redirectServer.URL, payload, 123)
-	assert.NoError(t, err)
-	assert.Greater(t, redirectCount, 0, "Expected at least one redirect")
-}
-
 func TestClient_Call_SlowServerWithTimeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
@@ -723,4 +693,38 @@ func TestClient_Call_ConfigValidation(t *testing.T) {
 			assert.Equal(t, tc.maxRetries, client.maxRetries)
 		})
 	}
+}
+
+func TestClient_Call_ReusesConnection(t *testing.T) {
+	var mu sync.Mutex
+	remoteAddrs := map[string]bool{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		remoteAddrs[r.RemoteAddr] = true
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"accepted"}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Timeout: time.Second}, zap.NewNop())
+	for i := uint64(0); i < 3; i++ {
+		require.NoError(t, client.Call(context.Background(), server.URL, []byte(`{}`), i))
+	}
+
+	assert.Len(t, remoteAddrs, 1, "every call goes over the same connection")
+}
+
+func TestClient_Call_ErrorIncludesResponseBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("missing field clock\n"))
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Timeout: time.Second}, zap.NewNop())
+	err := client.Call(context.Background(), server.URL, []byte(`{}`), 7)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `webhook returned client error status 400 for block 7: "missing field clock"`)
 }

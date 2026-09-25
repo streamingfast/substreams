@@ -83,25 +83,36 @@ func (b *blockDataBuffer) HandleBlockScopedData(blockData *pbsubstreamsrpc.Block
 	return finalBlocks, nil
 }
 
-func (b *blockDataBuffer) HandleBlockUndoSignal(undoSignal *pbsubstreamsrpc.BlockUndoSignal) error {
+// HandleBlockUndoSignal drops the buffered blocks after the last valid block.
+//
+// The returned absorbed flag is false when the buffer cannot vouch that the
+// undo touched only blocks it held: it has emitted nothing yet in this process
+// and holds no block at or below the last valid one. A previous process may
+// have emitted blocks after the last valid block, which happens when a sink
+// restarts from a cursor that sits on a fork. Only the downstream handler
+// knows what was emitted before, so the caller must forward the signal to it.
+func (b *blockDataBuffer) HandleBlockUndoSignal(undoSignal *pbsubstreamsrpc.BlockUndoSignal) (absorbed bool, err error) {
 	lastValidBlock := asBlockRef(undoSignal.LastValidBlock)
 
 	if b.lastEmittedBlock != nil && b.lastEmittedBlock.Num() >= lastValidBlock.Num() {
 		// We might have actually sent exactly the last valid block, in which case no error should occur since the chain
 		// ordering is respected
 		if !bstream.EqualsBlockRefs(b.lastEmittedBlock, lastValidBlock) {
-			return fmt.Errorf("cannot undo down to last valid Block %s because we already sent you Block %s which is after last valid block", lastValidBlock, b.lastEmittedBlock)
+			return false, fmt.Errorf("cannot undo down to last valid Block %s because we already sent you Block %s which is after last valid block", lastValidBlock, b.lastEmittedBlock)
 		}
 	}
 
+	newestValidBlockAt := b.findNewestValidBlockIndex(lastValidBlock.Num())
+	absorbed = b.lastEmittedBlock != nil || newestValidBlockAt != -1
+
 	// There is nothing to do, we are already emptied due to a previous undo signal
 	if b.dataEmptyAt == 0 {
-		return nil
+		return absorbed, nil
 	}
 
 	// If last valid block is not found, `dataEmptyAt` will become 0 (-1 + 1) which "clears" all our block
-	b.dataEmptyAt = b.findNewestValidBlockIndex(lastValidBlock.Num()) + 1
-	return nil
+	b.dataEmptyAt = newestValidBlockAt + 1
+	return absorbed, nil
 }
 
 func (b *blockDataBuffer) findNewestValidBlockIndex(lastValidBlockHeight uint64) int {

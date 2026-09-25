@@ -135,7 +135,7 @@ func TestSend_SuccessCommitsCursorAndClearsPending(t *testing.T) {
 	assert.NoFileExists(t, s.pendingFile)
 }
 
-func TestSend_ExitModeKeepsPendingAndWritesTerminationMessage(t *testing.T) {
+func TestSend_ExitModeKeepsPendingAndWritesTerminationReason(t *testing.T) {
 	server := newTogglingServer(t, http.StatusServiceUnavailable)
 	s := newTestSink(t, server.URL, OnFailureExit)
 
@@ -216,11 +216,11 @@ func TestSend_CursorWriteFailureAfterDeliveryIsNotADeliveryFailure(t *testing.T)
 	assert.Empty(t, msg)
 }
 
-func TestTerminationMessage_OnlyWrittenWhenFileExists(t *testing.T) {
+func TestTerminationReason_OnlyWrittenWhenFileExists(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "absent")
-	require.NoError(t, writeTerminationMessage(path, []byte("x")))
+	require.NoError(t, writeTerminationReason(path, []byte("x")))
 	assert.NoFileExists(t, path)
-	require.NoError(t, writeTerminationMessage("", []byte("x")))
+	require.NoError(t, writeTerminationReason("", []byte("x")))
 }
 
 func TestRecoverPending_NothingPending(t *testing.T) {

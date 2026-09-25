@@ -29,7 +29,7 @@ import (
 // goes through.
 //
 // OnFailureExit keeps the block in the pending file, writes a termination
-// message and stops the sink with ExitCodeDeliveryFailed. The next start
+// reason and stops the sink with ExitCodeDeliveryFailed. The next start
 // delivers the pending block before it opens a Substreams stream.
 //
 // ENUM(skip, exit)
@@ -54,9 +54,9 @@ func (e *DeliveryFailedError) Error() string {
 
 func (e *DeliveryFailedError) Unwrap() error { return e.Delivery }
 
-// TerminationMessage is the one-line JSON written to the termination log so
+// TerminationReason is the one-line JSON written to the termination log so
 // an orchestrator can read why the process stopped and since when.
-func (e *DeliveryFailedError) TerminationMessage() []byte {
+func (e *DeliveryFailedError) TerminationReason() []byte {
 	msg, _ := json.Marshal(map[string]any{
 		"reason":           "webhook_delivery_failed",
 		"kind":             e.Kind,
@@ -356,7 +356,7 @@ func (s *Sink) commit(pending *pendingDelivery) {
 
 // deliveryFailed keeps the payload on disk for the next start and turns the
 // failure into the error Run returns in exit mode, after writing the
-// termination message.
+// termination reason.
 func (s *Sink) deliveryFailed(pending *pendingDelivery, err error) error {
 	if writeErr := writePending(s.pendingFile, pending); writeErr != nil {
 		// Not fatal for the data: the cursor was not advanced, so the stream
@@ -374,15 +374,15 @@ func (s *Sink) deliveryFailed(pending *pendingDelivery, err error) error {
 	}
 	failed := &DeliveryFailedError{Delivery: deliveryErr, Kind: kind, FirstAttemptAt: pending.FirstAttemptAt}
 
-	if err := writeTerminationMessage(s.terminationLog, failed.TerminationMessage()); err != nil {
-		s.logger.Warn("failed to write termination message", zap.String("path", s.terminationLog), zap.Error(err))
+	if err := writeTerminationReason(s.terminationLog, failed.TerminationReason()); err != nil {
+		s.logger.Warn("failed to write termination reason", zap.String("path", s.terminationLog), zap.Error(err))
 	}
 	return failed
 }
 
-// writeTerminationMessage writes msg to path when path already exists. Under
+// writeTerminationReason writes msg to path when path already exists. Under
 // Kubernetes the kubelet creates the file; anywhere else nothing is written.
-func writeTerminationMessage(path string, msg []byte) error {
+func writeTerminationReason(path string, msg []byte) error {
 	if path == "" {
 		return nil
 	}

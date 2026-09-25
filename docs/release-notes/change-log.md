@@ -46,8 +46,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   start delivers the pending block before it opens a Substreams stream, so retrying against a dead endpoint costs
   no egress. The default `skip` keeps the old behaviour of dropping the block. A changed URL or secret resets
   `first_attempt_at`. A kill in the middle of a call leaves no pending file: the cursor was not saved, so the
-  stream re-sends that block. The sink now also exposes `substreams_sink_progress_block`, the last delivered
-  block.
+  stream re-sends that block. The sink now also exposes `substreams_sink_webhook_last_delivered_block`, the
+  last delivered block.
+
+- Rename the `substreams sink webhook` metrics `webhook_calls` and `webhook_bytes_sent` to
+  `substreams_sink_webhook_calls` and `substreams_sink_webhook_bytes_sent`.
 
 - Sinks running with `--undo-buffer-size` now receive an undo signal that reaches below the buffer when the buffer
   has emitted nothing yet, which is what a restart from a cursor sitting on a fork produces. Before, the buffer

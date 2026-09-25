@@ -154,9 +154,9 @@ type SinkConfig struct {
 	Logger             *zap.Logger
 }
 
-var WebhookCallsCounter = sink.Metrics.NewCounter("webhook_calls", "Number of calls made to the webhook")
-var WebhookSizeBytes = sink.Metrics.NewCounter("webhook_bytes_sent", "Number of bytes sent via webhook")
-var WebhookProgressBlock = sink.Metrics.NewGauge("substreams_sink_progress_block", "Last block number delivered to the webhook")
+var WebhookCallsCounter = sink.Metrics.NewCounter("substreams_sink_webhook_calls", "Number of calls made to the webhook")
+var WebhookSizeBytes = sink.Metrics.NewCounter("substreams_sink_webhook_bytes_sent", "Number of bytes sent via webhook")
+var WebhookLastDeliveredBlock = sink.Metrics.NewGauge("substreams_sink_webhook_last_delivered_block", "Last block number delivered to the webhook")
 
 // NewSink creates a new webhook sink
 func NewSink(config SinkConfig) (*Sink, error) {
@@ -351,7 +351,7 @@ func (s *Sink) commit(pending *pendingDelivery) {
 		s.logger.Warn("failed to remove pending delivery", zap.String("file", s.pendingFile), zap.Error(err))
 	}
 
-	WebhookProgressBlock.SetUint64(pending.BlockNumber)
+	WebhookLastDeliveredBlock.SetUint64(pending.BlockNumber)
 }
 
 // deliveryFailed keeps the payload on disk for the next start and turns the

@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Fix tier1 requests rejected before their body is read (authentication, compression enforcement) sometimes
   failing at a load balancer with HTTP 502 or `INTERNAL` instead of returning their error.
 
+### Dependencies
+
+- Bumped `github.com/streamingfast/firehose-networks` to v0.3.0.
+
 ## v1.23.0
 
 ### CLI

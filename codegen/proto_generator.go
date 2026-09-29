@@ -17,10 +17,10 @@ import (
 )
 
 type ProtoGenerator struct {
-	excludedPaths                   []string
-	outputPath                      string
-	generateMod                     bool
-	hasNonDeterministicDescriptors  bool
+	excludedPaths                  []string
+	outputPath                     string
+	generateMod                    bool
+	hasNonDeterministicDescriptors bool
 }
 
 func NewProtoGenerator(outputPath string, excludedPaths []string, generateMod bool) *ProtoGenerator {
@@ -175,6 +175,11 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 		// Check if we can skip generation
 		if lastHash != "" && lastHash == currentHash && g.hasGeneratedFiles() {
 			fmt.Printf("⚡ Protobuf generation skipped (no changes detected)\n")
+			if g.generateMod {
+				if err := g.writeModuleTree(pkg); err != nil {
+					return fmt.Errorf("writing module tree: %w", err)
+				}
+			}
 			return nil
 		}
 	}
@@ -197,29 +202,20 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 
 	_, err = os.Stat("buf.gen.yaml")
 	bufFileNotFound := errors.Is(err, os.ErrNotExist)
-	prostVersion := "v0.4.0"
-	prostCrateVersion := "v0.4.1"
+	buffaVersion := "v0.9.2"
 
 	if bufFileNotFound {
 		// Beware, the indentation after initial column is important, it's 2 spaces!
 		content := dedent.Dedent(`
 		    version: v1
 		    plugins:
-		    - plugin: buf.build/community/neoeinstein-prost:` + prostVersion + `
+		    - plugin: buf.build/anthropics/buffa:` + buffaVersion + `
 		      out: ` + g.outputPath + `
 		      opt:
-		        - file_descriptor_set=false
+		        - lazy_views=true
+		        - unknown_fields=false
+		        - idiomatic_field_names=true
 		`)
-
-		if g.generateMod {
-			// Beware, the indentation after initial column is important, it's 2 spaces!
-			content += dedent.Dedent(`
-				- plugin: buf.build/community/neoeinstein-prost-crate:` + prostCrateVersion + `
-				  out: ` + g.outputPath + `
-				  opt:
-				    - no_features
-			`)
-		}
 
 		if err := os.WriteFile("buf.gen.yaml", []byte(content), 0644); err != nil {
 			return fmt.Errorf("error writing buf.gen.yaml: %w", err)
@@ -237,7 +233,7 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 	cmdArgs = append(cmdArgs, "--include-imports")
 
 	if bufFileNotFound {
-		fmt.Printf("📋 Generated buf.gen.yaml using neoeinstein-prost %s and neoeinstein-prost-crate %s\n", prostVersion, prostCrateVersion)
+		fmt.Printf("📋 Generated buf.gen.yaml using buffa %s\n", buffaVersion)
 	} else {
 		fmt.Printf("📋 Using existing buf.gen.yaml configuration\n")
 	}
@@ -270,6 +266,89 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 		}
 	}
 
+	if g.generateMod {
+		if err := g.writeModuleTree(pkg); err != nil {
+			return fmt.Errorf("writing module tree: %w", err)
+		}
+	}
+
 	fmt.Printf("🎯 Protobuf generation complete\n")
 	return nil
+}
+
+// writeModuleTree writes the `mod.rs` wiring buffa's per-package files into the crate.
+//
+// Every package in the descriptor set is wired up, transitive imports included: buffa
+// refers to a type in another package through a relative `super::...::other_pkg` path,
+// so leaving a package out breaks the packages that reference it. A descriptor with no
+// `package` sits at the root, where buffa's own codegen puts it.
+//
+// A `mod.rs` this function did not write is left untouched: it may be hand-written or
+// hand-edited, and silently replacing it would produce a spurious diff.
+func (g *ProtoGenerator) writeModuleTree(pkg *pbsubstreams.Package) error {
+	modPath := filepath.Join(g.outputPath, "mod.rs")
+
+	if existing, err := os.ReadFile(modPath); err == nil {
+		if !strings.HasPrefix(string(existing), generatedModHeader+"\n") {
+			return nil
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("reading %q: %w", modPath, err)
+	}
+
+	packages, rootFiles := g.treePackages(pkg)
+	if len(packages) == 0 && len(rootFiles) == 0 {
+		return nil
+	}
+
+	content := renderModuleTree(packages, rootFiles)
+
+	// Only write when the content actually changes, so an unchanged build does not
+	// touch the file and force a recompile.
+	if existing, err := os.ReadFile(modPath); err == nil && string(existing) == content {
+		return nil
+	}
+
+	return os.WriteFile(modPath, []byte(content), 0644)
+}
+
+// treePackages returns the proto packages to wire up, plus the generated files for
+// descriptors that declare no package (buffa writes those to `__buffa.mod.rs` and
+// expects them at the root of the tree).
+func (g *ProtoGenerator) treePackages(pkg *pbsubstreams.Package) (packages []string, rootFiles []string) {
+	seen := map[string]bool{}
+
+	for _, protoFile := range pkg.GetProtoFiles() {
+		// buffa writes a descriptor with no `package` to `__buffa.mod.rs`.
+		name := protoFile.GetPackage()
+		if name == "" {
+			name = rootModuleFile
+		}
+		if seen[name] {
+			continue
+		}
+
+		if !g.hasModuleFile(name) {
+			continue
+		}
+
+		seen[name] = true
+		if name == rootModuleFile {
+			rootFiles = append(rootFiles, name)
+		} else {
+			packages = append(packages, name)
+		}
+	}
+
+	sort.Strings(packages)
+	sort.Strings(rootFiles)
+	return packages, rootFiles
+}
+
+// hasModuleFile reports whether buffa emitted a module file for this package. A
+// descriptor can be present without generated output, such as an excluded path or one
+// the plugin skipped, and wiring up a missing file would not compile.
+func (g *ProtoGenerator) hasModuleFile(name string) bool {
+	_, err := os.Stat(filepath.Join(g.outputPath, name+".mod.rs"))
+	return err == nil
 }

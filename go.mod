@@ -12,7 +12,7 @@ require (
 	github.com/streamingfast/dauth v0.0.0-20260304175046-02898e30442d
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7
-	github.com/streamingfast/dgrpc v0.0.0-20260801042045-4c4ac6a8e41a
+	github.com/streamingfast/dgrpc v0.0.0-20260929191947-99e20897ecc7
 	github.com/streamingfast/dhttp v0.1.3-0.20251218140957-6d46b8f12eb1
 	github.com/streamingfast/dstore v0.2.4-0.20260825160629-56e87480522c
 	github.com/streamingfast/logging v1.2.3-0.20260810132752-360563ac68a9

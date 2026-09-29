@@ -273,7 +273,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	if s.isOverloaded() {
 		err := status.Error(codes.ResourceExhausted, "service currently overloaded")
 		fields = append(fields, zap.Error(err))
-		logger.Info("refusing Substreams ProcessRange request", fields...)
+		logger.Debug("refusing Substreams ProcessRange request", fields...)
 		return err
 	}
 
@@ -297,7 +297,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	if request.Modules == nil {
 		err := status.Error(codes.InvalidArgument, "missing modules in request")
 		fields = append(fields, zap.Error(err))
-		logger.Info("refusing Substreams ProcessRange request", fields...)
+		logger.Debug("refusing Substreams ProcessRange request", fields...)
 		return err
 	}
 	moduleNames := make([]string, len(request.Modules.Modules))
@@ -309,7 +309,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	if err := ValidateTier2Request(request); err != nil {
 		err = status.Errorf(codes.InvalidArgument, "validate request: %s", err)
 		fields = append(fields, zap.Error(err))
-		logger.Info("refusing Substreams ProcessRange request", fields...)
+		logger.Debug("refusing Substreams ProcessRange request", fields...)
 		return err
 	}
 
@@ -317,7 +317,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	if err != nil {
 		err = bsstream.NewErrInvalidArg("%s", err.Error())
 		fields = append(fields, zap.Error(err))
-		logger.Info("refusing Substreams ProcessRange request", fields...)
+		logger.Debug("refusing Substreams ProcessRange request", fields...)
 		return err
 	}
 	outputModuleHash := execGraph.ModuleHashes()[request.OutputModule]

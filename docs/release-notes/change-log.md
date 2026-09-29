@@ -16,9 +16,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Fix tier1 requests rejected before their body is read (authentication, compression enforcement) sometimes
   failing at a load balancer with HTTP 502 or `INTERNAL` instead of returning their error.
 
+- Demoted the tier2 "refusing Substreams ProcessRange request" log from `Info` to `Debug`. It was the
+  single largest source of Cloud Logging volume on `substreams-workers` under backpressure; the
+  `substreams_tier2_rejected_request_counter` metric (by reason) already tracks refusal rate without it.
+
+- Demoted tier2's gRPC "finished streaming call with code ResourceExhausted" completion log from `Info`
+  to `Debug`, using the newly added `dgrpc` `server.WithCodeLevelFunc` override. It was the second largest
+  source of Cloud Logging volume on `substreams-workers`, logged on every backpressure refusal alongside
+  the line above.
+
 ### Dependencies
 
 - Bumped `github.com/streamingfast/firehose-networks` to v0.3.0.
+- Bumped `github.com/streamingfast/dgrpc` to pick up `server.WithCodeLevelFunc`.
 
 ## v1.23.0
 

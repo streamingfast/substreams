@@ -79,7 +79,7 @@ require (
 	github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62
 	github.com/streamingfast/dregistry v0.0.0-20260818204944-2fed3956d4e1
 	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
-	github.com/streamingfast/dummy-blockchain v1.7.7
+	github.com/streamingfast/dummy-blockchain v1.7.8
 	github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a
 	github.com/streamingfast/firehose-networks v0.3.0
 	github.com/streamingfast/sf-tracing v0.0.0-20251218140752-bafd5572499f

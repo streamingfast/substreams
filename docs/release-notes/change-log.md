@@ -34,6 +34,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Bumped `github.com/streamingfast/firehose-networks` to v0.3.0.
 - Bumped `github.com/streamingfast/dgrpc` to pick up `server.WithCodeLevelFunc`.
+- Bumped `github.com/streamingfast/dummy-blockchain` to v1.7.8, and `substreams tools devenv` now defaults to the
+  `ghcr.io/streamingfast/dummy-blockchain:v1.7.8` image. Its relayer no longer sometimes drops a block around
+  the chain's forks, which could make tier1 exit with `received 5 consecutive unlinkable blocks`.
 
 ## v1.23.0
 

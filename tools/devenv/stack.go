@@ -44,7 +44,7 @@ import (
 const BlockType = "sf.acme.type.v1.Block"
 
 // DefaultImage is the dummy blockchain image the end-to-end tests are pinned to.
-const DefaultImage = "ghcr.io/streamingfast/dummy-blockchain:1cea671"
+const DefaultImage = "ghcr.io/streamingfast/dummy-blockchain:v1.7.8"
 
 // storageDir is where the node writes its data inside the container; ChainConfig.TmpDir is
 // bind-mounted there.

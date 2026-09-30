@@ -134,3 +134,41 @@ func TestGeneratedFileOwnershipSurfacesReadErrors(t *testing.T) {
 		t.Error("expected an error when the path is not a regular file")
 	}
 }
+
+// Only the plugin entries decide which implementation a configuration generates for. A
+// configuration is also read from wherever it sits, which is not always beside the manifest.
+func TestGeneratesBuffaOutput(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		config string
+		want   bool
+	}{
+		{"buffa, v1 spelling", "version: v1\nplugins:\n- plugin: buf.build/anthropics/buffa:v0.9.2\n", true},
+		{"buffa, v2 remote spelling", "version: v2\nplugins:\n  - remote: buf.build/anthropics/buffa:v0.9.2\n", true},
+		{"buffa, local plugin", "version: v2\nplugins:\n  - local: protoc-gen-buffa\n", true},
+		{"prost", "version: v1\nplugins:\n- plugin: buf.build/community/neoeinstein-prost:v0.4.0\n", false},
+		{"prost with prost-crate", "version: v1\nplugins:\n- plugin: buf.build/community/neoeinstein-prost:v0.4.0\n- plugin: buf.build/community/neoeinstein-prost-crate:v0.4.1\n", false},
+		{"another language entirely", "version: v1\nplugins:\n- plugin: buf.build/bufbuild/es\n", false},
+		// A note about migrating is not a configuration change.
+		{"prost, with buffa named in a comment", "# TODO migrate to buf.build/anthropics/buffa\nversion: v1\nplugins:\n- plugin: buf.build/community/neoeinstein-prost:v0.4.0\n", false},
+		{"no plugins at all", "version: v1\n", false},
+		{"not valid yaml", "plugins: [oh no\n", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "buf.gen.yaml")
+			if err := os.WriteFile(path, []byte(tt.config), 0644); err != nil {
+				t.Fatalf("writing config: %v", err)
+			}
+
+			if got := generatesBuffaOutput(path); got != tt.want {
+				t.Errorf("generatesBuffaOutput = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGeneratesBuffaOutputWithoutAConfig(t *testing.T) {
+	if generatesBuffaOutput(filepath.Join(t.TempDir(), "buf.gen.yaml")) {
+		t.Error("a missing configuration should not read as buffa")
+	}
+}

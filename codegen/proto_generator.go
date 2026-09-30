@@ -17,26 +17,105 @@ import (
 )
 
 type ProtoGenerator struct {
-	excludedPaths                  []string
-	outputPath                     string
+	excludedPaths []string
+	outputPath    string
+	// projectPath is the directory holding `buf.gen.yaml` and `Cargo.toml`. It is the
+	// manifest's directory, which is not necessarily the working directory.
+	projectPath                    string
 	generateMod                    bool
 	hasNonDeterministicDescriptors bool
 }
 
 func NewProtoGenerator(outputPath string, excludedPaths []string, generateMod bool) *ProtoGenerator {
-	if filepath.IsAbs(outputPath) {
-		if wd, err := os.Getwd(); err == nil {
-			if rel, err := filepath.Rel(wd, outputPath); err == nil {
-				outputPath = rel
-			}
-		}
-	}
-
 	return &ProtoGenerator{
 		outputPath:    outputPath,
 		excludedPaths: excludedPaths,
 		generateMod:   generateMod,
 	}
+}
+
+// SetProjectPath sets the project directory: where `buf.gen.yaml` and `Cargo.toml` are read
+// from, where `buf` runs, and what the configuration's `out:` is relative to. It defaults to
+// the working directory.
+//
+// `buf` resolves `buf.gen.yaml` and the paths inside it against its own working directory, so
+// every path has to share one base or the configuration written for one run does not mean the
+// same thing on the next.
+func (g *ProtoGenerator) SetProjectPath(path string) {
+	g.projectPath = path
+
+	// Only an absolute output path needs rebasing. A relative one was already given
+	// relative to the project, which is what `buf.gen.yaml` needs it to be.
+	if !filepath.IsAbs(g.outputPath) {
+		return
+	}
+
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return
+	}
+	if rel, err := filepath.Rel(abs, g.outputPath); err == nil {
+		g.outputPath = rel
+	}
+}
+
+// projectFile resolves name against the project directory.
+func (g *ProtoGenerator) projectFile(name string) string {
+	return filepath.Join(g.projectPath, name)
+}
+
+// bufConfigDir is the directory `buf` runs in, which is the nearest one at or above the project
+// holding a `buf.gen.yaml`.
+//
+// A repository can keep one configuration above several manifests. `buf` resolves both the
+// configuration and the `out:` paths inside it against its own working directory, so running
+// anywhere else would ignore that configuration and write a second one beside the manifest.
+func (g *ProtoGenerator) bufConfigDir() string {
+	current, err := filepath.Abs(g.projectPath)
+	if err != nil {
+		return g.projectPath
+	}
+
+	for {
+		if _, err := os.Stat(filepath.Join(current, "buf.gen.yaml")); err == nil {
+			return current
+		}
+
+		parent := filepath.Dir(current)
+		if parent == current {
+			return g.projectPath
+		}
+		current = parent
+	}
+}
+
+// bufConfigFile is the `buf.gen.yaml` this project generates with, whether or not it exists yet.
+func (g *ProtoGenerator) bufConfigFile() string {
+	return filepath.Join(g.bufConfigDir(), "buf.gen.yaml")
+}
+
+// outputDir is the generated-code directory as this process must open it. `outputPath` is
+// relative to the project because it is written into `buf.gen.yaml`, where `buf` resolves it.
+func (g *ProtoGenerator) outputDir() string {
+	return g.projectFile(g.outputPath)
+}
+
+// bufOutputPath is the generated-code directory as `buf` must see it: relative to the directory
+// `buf` runs in, which is not always the project directory.
+func (g *ProtoGenerator) bufOutputPath() string {
+	dir, err := filepath.Abs(g.bufConfigDir())
+	if err != nil {
+		return g.outputPath
+	}
+	out, err := filepath.Abs(g.outputDir())
+	if err != nil {
+		return g.outputPath
+	}
+	rel, err := filepath.Rel(dir, out)
+	if err != nil {
+		return g.outputPath
+	}
+	return rel
 }
 
 // SetHasNonDeterministicDescriptors sets whether the manifest has non-deterministic
@@ -88,7 +167,7 @@ func (g *ProtoGenerator) calculateHash(pkg *pbsubstreams.Package) (string, error
 
 // readLastGeneratedHash reads the hash from .last_generated_hash file
 func (g *ProtoGenerator) readLastGeneratedHash() (string, error) {
-	hashFilePath := filepath.Join(g.outputPath, ".last_generated_hash")
+	hashFilePath := filepath.Join(g.outputDir(), ".last_generated_hash")
 	content, err := os.ReadFile(hashFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -102,11 +181,11 @@ func (g *ProtoGenerator) readLastGeneratedHash() (string, error) {
 // writeLastGeneratedHash writes the hash to .last_generated_hash file
 func (g *ProtoGenerator) writeLastGeneratedHash(hash string) error {
 	// Ensure output directory exists
-	if err := os.MkdirAll(g.outputPath, 0755); err != nil {
+	if err := os.MkdirAll(g.outputDir(), 0755); err != nil {
 		return fmt.Errorf("creating output directory: %w", err)
 	}
 
-	hashFilePath := filepath.Join(g.outputPath, ".last_generated_hash")
+	hashFilePath := filepath.Join(g.outputDir(), ".last_generated_hash")
 	if err := os.WriteFile(hashFilePath, []byte(hash), 0644); err != nil {
 		return fmt.Errorf("writing hash file: %w", err)
 	}
@@ -115,7 +194,7 @@ func (g *ProtoGenerator) writeLastGeneratedHash(hash string) error {
 
 // hasGeneratedFiles checks if the output directory contains generated files
 func (g *ProtoGenerator) hasGeneratedFiles() bool {
-	entries, err := os.ReadDir(g.outputPath)
+	entries, err := os.ReadDir(g.outputDir())
 	if err != nil {
 		return false
 	}
@@ -172,11 +251,30 @@ func (g *ProtoGenerator) canSkipGeneration(pkg *pbsubstreams.Package, currentHas
 		return false, nil
 	}
 
-	if !g.generateMod {
+	if !g.generateMod || !generatesBuffaOutput(g.bufConfigFile()) {
 		return true, nil
 	}
 
 	return g.moduleTreeIsComplete(pkg)
+}
+
+// warnOnStackMismatch reports a `buf.gen.yaml` that generates for a different protobuf
+// implementation than the one `Cargo.toml` depends on, which does not compile.
+func (g *ProtoGenerator) warnOnStackMismatch() {
+	config := g.bufConfigFile()
+	if _, err := os.Stat(config); err != nil {
+		return
+	}
+
+	usesBuffa := generatesBuffaOutput(config)
+	switch stack := detectProtobufStack(findCargoManifest(g.projectPath)); {
+	case stack == stackBuffa && !usesBuffa:
+		fmt.Printf("⚠️  Cargo.toml depends on buffa but buf.gen.yaml generates prost bindings\n")
+		fmt.Printf("   Point buf.gen.yaml at %s, or delete it to have one generated\n", buffaPlugin)
+	case stack == stackProst && usesBuffa:
+		fmt.Printf("⚠️  Cargo.toml depends on prost but buf.gen.yaml generates buffa bindings\n")
+		fmt.Printf("   Point buf.gen.yaml at %s, or delete it to have one generated\n", prostPlugin)
+	}
 }
 
 func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
@@ -197,6 +295,7 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 				return fmt.Errorf("writing module tree: %w", err)
 			}
 		}
+		g.warnOnStackMismatch()
 		fmt.Printf("⚡ Protobuf generation skipped (no changes detected)\n")
 		return nil
 	}
@@ -217,27 +316,59 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 		return fmt.Errorf("writing %q: %w", spkgTemporaryFilePath, err)
 	}
 
-	_, err = os.Stat("buf.gen.yaml")
+	_, err = os.Stat(g.bufConfigFile())
 	bufFileNotFound := errors.Is(err, os.ErrNotExist)
 	buffaVersion := "v0.9.2"
+	prostVersion := "v0.4.0"
+	prostCrateVersion := "v0.4.1"
+
+	// Generating buffa bindings for a project whose code is written against prost does not
+	// compile, so buffa is used only where the manifest asks for it. Anything else, including a
+	// manifest that names neither and one that cannot be read, keeps the prost output the CLI
+	// has always produced.
+	generateWithProst := detectProtobufStack(findCargoManifest(g.projectPath)) != stackBuffa
 
 	if bufFileNotFound {
-		// Beware, the indentation after initial column is important, it's 2 spaces!
-		content := dedent.Dedent(`
-		    version: v1
-		    plugins:
-		    - plugin: buf.build/anthropics/buffa:` + buffaVersion + `
-		      out: ` + g.outputPath + `
-		      opt:
-		        - lazy_views=true
-		        - unknown_fields=false
-		        - idiomatic_field_names=true
-		`)
+		var content string
+		if generateWithProst {
+			// Beware, the indentation after initial column is important, it's 2 spaces!
+			content = dedent.Dedent(`
+			    version: v1
+			    plugins:
+			    - plugin: ` + prostPlugin + `:` + prostVersion + `
+			      out: ` + g.bufOutputPath() + `
+			      opt:
+			        - file_descriptor_set=false
+			`)
 
-		if err := os.WriteFile("buf.gen.yaml", []byte(content), 0644); err != nil {
+			if g.generateMod {
+				content += dedent.Dedent(`
+					- plugin: ` + prostCratePlugin + `:` + prostCrateVersion + `
+					  out: ` + g.bufOutputPath() + `
+					  opt:
+					    - no_features
+				`)
+			}
+		} else {
+			// Beware, the indentation after initial column is important, it's 2 spaces!
+			content = dedent.Dedent(`
+			    version: v1
+			    plugins:
+			    - plugin: ` + buffaPlugin + `:` + buffaVersion + `
+			      out: ` + g.bufOutputPath() + `
+			      opt:
+			        - lazy_views=true
+			        - unknown_fields=false
+			        - idiomatic_field_names=true
+			`)
+		}
+
+		if err := os.WriteFile(g.bufConfigFile(), []byte(content), 0644); err != nil {
 			return fmt.Errorf("error writing buf.gen.yaml: %w", err)
 		}
 	}
+
+	g.warnOnStackMismatch()
 
 	cmdArgs := []string{
 		"generate", spkgTemporaryFilePath + "#format=bin",
@@ -249,7 +380,9 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 
 	cmdArgs = append(cmdArgs, "--include-imports")
 
-	if bufFileNotFound {
+	if bufFileNotFound && generateWithProst {
+		fmt.Printf("📋 Generated buf.gen.yaml using neoeinstein-prost %s (Cargo.toml depends on prost)\n", prostVersion)
+	} else if bufFileNotFound {
 		fmt.Printf("📋 Generated buf.gen.yaml using buffa %s\n", buffaVersion)
 	} else {
 		fmt.Printf("📋 Using existing buf.gen.yaml configuration\n")
@@ -257,6 +390,7 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 
 	fmt.Printf("📦 Generating protobuf code \033[90m(buf %s)\033[0m\n", formatBufCommand(cmdArgs))
 	c := exec.Command("buf", cmdArgs...)
+	c.Dir = g.bufConfigDir()
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -275,7 +409,7 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 	if g.hasNonDeterministicDescriptors {
 		// Remove the hash file if it exists, since we can't reliably cache
 		// when descriptor sets may change without version changes
-		hashFilePath := filepath.Join(g.outputPath, ".last_generated_hash")
+		hashFilePath := filepath.Join(g.outputDir(), ".last_generated_hash")
 		os.Remove(hashFilePath) // Ignore errors, file may not exist
 	} else {
 		if err := g.writeLastGeneratedHash(currentHash); err != nil {
@@ -303,6 +437,10 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 // A `mod.rs` this function did not write is left untouched: it may be hand-written or
 // hand-edited, and silently replacing it would produce a spurious diff.
 func (g *ProtoGenerator) writeModuleTree(pkg *pbsubstreams.Package) error {
+	if !generatesBuffaOutput(g.bufConfigFile()) {
+		return nil
+	}
+
 	packages, rootFiles := g.treePackages(pkg)
 	if len(packages) == 0 && len(rootFiles) == 0 {
 		return nil
@@ -314,7 +452,7 @@ func (g *ProtoGenerator) writeModuleTree(pkg *pbsubstreams.Package) error {
 
 // moduleTreeFile is the `mod.rs` this generator owns.
 func (g *ProtoGenerator) moduleTreeFile() *generatedFile {
-	return newGeneratedFile(filepath.Join(g.outputPath, "mod.rs"), generatedModHeader)
+	return newGeneratedFile(filepath.Join(g.outputDir(), "mod.rs"), generatedModHeader)
 }
 
 // moduleTreeIsComplete reports whether the packages buf generated files for are wired
@@ -374,6 +512,6 @@ func (g *ProtoGenerator) treePackages(pkg *pbsubstreams.Package) (packages []str
 // descriptor can be present without generated output, such as an excluded path or one
 // the plugin skipped, and wiring up a missing file would not compile.
 func (g *ProtoGenerator) hasModuleFile(name string) bool {
-	_, err := os.Stat(filepath.Join(g.outputPath, name+".mod.rs"))
+	_, err := os.Stat(filepath.Join(g.outputDir(), name+".mod.rs"))
 	return err == nil
 }

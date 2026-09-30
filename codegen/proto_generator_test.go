@@ -277,6 +277,19 @@ func pkgWith(pairs ...[2]string) *pbsubstreams.Package {
 	return pkg
 }
 
+// inBuffaProject runs the test from a temporary directory holding a buf configuration for the
+// buffa plugin, which is what makes `mod.rs` this tool's responsibility.
+func inBuffaProject(t *testing.T) {
+	t.Helper()
+
+	dir := t.TempDir()
+	config := "version: v1\nplugins:\n- plugin: " + buffaPlugin + ":v0.9.2\n"
+	if err := os.WriteFile(filepath.Join(dir, "buf.gen.yaml"), []byte(config), 0644); err != nil {
+		t.Fatalf("writing buf.gen.yaml: %v", err)
+	}
+	t.Chdir(dir)
+}
+
 func touchModFiles(t *testing.T, outDir string, packages ...string) {
 	t.Helper()
 	if err := os.MkdirAll(outDir, 0755); err != nil {
@@ -294,6 +307,8 @@ func touchModFiles(t *testing.T, outDir string, packages ...string) {
 // cross-package type is referenced through a relative `super::` path, so omitting
 // a package breaks the packages that reference it.
 func TestWriteModuleTreeIncludesEveryEmittedPackage(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	touchModFiles(t, out, "mydata.v1", "sf.firehose.v2", "google.protobuf")
 	pkg := pkgWith(
@@ -318,6 +333,8 @@ func TestWriteModuleTreeIncludesEveryEmittedPackage(t *testing.T) {
 }
 
 func TestWriteModuleTreeNestsSiblingPackages(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	touchModFiles(t, out, "a.b.c", "a.b.d", "solo")
 	pkg := pkgWith(
@@ -357,6 +374,8 @@ pub mod solo {
 }
 
 func TestWriteModuleTreeLeavesHandWrittenFileAlone(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	touchModFiles(t, out, "mydata.v1")
 
@@ -383,6 +402,8 @@ func TestWriteModuleTreeLeavesHandWrittenFileAlone(t *testing.T) {
 // A prost-crate generated tree starts with a bare `// @generated`, not our header,
 // so it counts as hand-maintained and must survive too.
 func TestWriteModuleTreeLeavesProstCrateFileAlone(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	touchModFiles(t, out, "mydata.v1", "sf.firehose.v2")
 
@@ -409,6 +430,8 @@ func TestWriteModuleTreeLeavesProstCrateFileAlone(t *testing.T) {
 // Our own output carries the header, so a new package must make it into the tree
 // rather than leaving a stale file in place.
 func TestWriteModuleTreeRefreshesItsOwnOutput(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	touchModFiles(t, out, "mydata.v1")
 
@@ -438,6 +461,8 @@ func TestWriteModuleTreeRefreshesItsOwnOutput(t *testing.T) {
 
 // Regeneration in place, without removing the file first, must be byte-identical.
 func TestWriteModuleTreeIsIdempotent(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	touchModFiles(t, out, "mydata.v1", "sf.firehose.v2")
 
@@ -468,6 +493,8 @@ func TestWriteModuleTreeIsIdempotent(t *testing.T) {
 }
 
 func TestWriteModuleTreeNoGeneratedPackages(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	if err := os.MkdirAll(out, 0755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -484,6 +511,8 @@ func TestWriteModuleTreeNoGeneratedPackages(t *testing.T) {
 // `buf` never removes stale output, so a package whose `.proto` was deleted or renamed
 // still has a `.mod.rs` on disk. Wiring it back up breaks the build.
 func TestWriteModuleTreeIgnoresStaleModFiles(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	touchModFiles(t, out, "a", "a.b")
 
@@ -509,6 +538,8 @@ func TestWriteModuleTreeIgnoresStaleModFiles(t *testing.T) {
 // buffa writes a descriptor with no `package` to `__buffa.mod.rs` and expects it at the
 // root; nesting it under `pub mod __buffa` does not compile.
 func TestWriteModuleTreePlacesPackagelessFilesAtRoot(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	touchModFiles(t, out, "__buffa", "mydata.v1")
 
@@ -535,6 +566,8 @@ func TestWriteModuleTreePlacesPackagelessFilesAtRoot(t *testing.T) {
 
 // Rewriting an unchanged mod.rs bumps its timestamp and forces a needless recompile.
 func TestWriteModuleTreeDoesNotRewriteUnchangedContent(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	touchModFiles(t, out, "mydata.v1")
 	pkg := pkgWith([2]string{"mydata/v1/events.proto", "mydata.v1"})
@@ -571,6 +604,8 @@ func TestWriteModuleTreeDoesNotRewriteUnchangedContent(t *testing.T) {
 
 // A package listed in the descriptors but never emitted by buffa must not be wired up.
 func TestWriteModuleTreeSkipsPackagesWithoutOutput(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	touchModFiles(t, out, "mydata.v1")
 
@@ -595,6 +630,8 @@ func TestWriteModuleTreeSkipsPackagesWithoutOutput(t *testing.T) {
 // An excluded path is never generated, so buffa emits no module file for it and the
 // tree leaves it out without needing to reimplement buf's path matching.
 func TestWriteModuleTreeOmitsPackagesBufDidNotGenerate(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	// Only the module's own package was generated; sf.substreams was excluded.
 	touchModFiles(t, out, "mydata.v1")
@@ -625,6 +662,8 @@ func TestWriteModuleTreeOmitsPackagesBufDidNotGenerate(t *testing.T) {
 // them into one `<pkg>.mod.rs`, so the tree must include it exactly once; a second
 // `include!` defines every type in the package twice and the crate stops compiling.
 func TestWriteModuleTreeIncludesEachPackageOnce(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	if err := os.MkdirAll(out, 0755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -650,6 +689,8 @@ func TestWriteModuleTreeIncludesEachPackageOnce(t *testing.T) {
 // by a clean, a .gitignore, or an interrupted run. Skipping generation then leaves a
 // crate that cannot compile.
 func TestModuleTreeIsComplete(t *testing.T) {
+	inBuffaProject(t)
+
 	const ourMod = generatedModHeader + "\npub mod a { pub mod v1 { include!(\"a.v1.mod.rs\"); } }\n"
 
 	for _, tt := range []struct {
@@ -724,6 +765,8 @@ func TestModuleTreeIsComplete(t *testing.T) {
 
 // An unreadable mod.rs must surface rather than be guessed at in either direction.
 func TestModuleTreeIsCompleteSurfacesReadErrors(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	if err := os.MkdirAll(filepath.Join(out, "mod.rs"), 0755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -737,6 +780,8 @@ func TestModuleTreeIsCompleteSurfacesReadErrors(t *testing.T) {
 // writeModuleTree must not swallow a failed write: reporting success over a crate with
 // no mod.rs turns a clear failure into a confusing cargo error later.
 func TestWriteModuleTreeReportsWriteFailures(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	if err := os.MkdirAll(filepath.Join(out, "mod.rs"), 0755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -753,6 +798,8 @@ func TestWriteModuleTreeReportsWriteFailures(t *testing.T) {
 // output has gone. Skipping then leaves a crate that cannot compile, and re-running
 // never repairs it because the cache keeps hitting.
 func TestCanSkipGeneration(t *testing.T) {
+	inBuffaProject(t)
+
 	descriptor := pkgWith([2]string{"a/v1/a.proto", "a.v1"})
 
 	for _, tt := range []struct {
@@ -841,6 +888,8 @@ func TestCanSkipGeneration(t *testing.T) {
 // A non-deterministic descriptor set can change without changing the hash, so the
 // cache must never be trusted for one.
 func TestCanSkipGenerationNeverSkipsNonDeterministicDescriptors(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	if err := os.MkdirAll(out, 0755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -865,5 +914,75 @@ func TestCanSkipGenerationNeverSkipsNonDeterministicDescriptors(t *testing.T) {
 	}
 	if skip {
 		t.Error("generation was skipped for a non-deterministic descriptor set")
+	}
+}
+
+// A project configured for prost keeps its own `mod.rs`: `prost-crate` generates one, and the
+// layout it expects differs from buffa's. Writing ours over it would break the build for anyone
+// who updates the CLI without migrating.
+func TestWriteModuleTreeLeavesProstProjectsAlone(t *testing.T) {
+	for _, tt := range []struct{ name, config string }{
+		{"prost with prost-crate", "version: v1\nplugins:\n- plugin: buf.build/community/neoeinstein-prost:v0.4.0\n- plugin: buf.build/community/neoeinstein-prost-crate:v0.4.1\n"},
+		{"prost alone", "version: v1\nplugins:\n- plugin: buf.build/community/neoeinstein-prost:v0.4.0\n"},
+		{"no configuration at all", ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tt.config != "" {
+				if err := os.WriteFile(filepath.Join(dir, "buf.gen.yaml"), []byte(tt.config), 0644); err != nil {
+					t.Fatalf("writing buf.gen.yaml: %v", err)
+				}
+			}
+			t.Chdir(dir)
+
+			out := filepath.Join(dir, "src", "pb")
+			touchModFiles(t, out, "a.v1")
+
+			pkg := pkgWith([2]string{"a/v1/a.proto", "a.v1"})
+			if err := NewProtoGenerator(out, nil, true).writeModuleTree(pkg); err != nil {
+				t.Fatalf("writeModuleTree: %v", err)
+			}
+
+			if _, err := os.Stat(filepath.Join(out, "mod.rs")); !os.IsNotExist(err) {
+				t.Errorf("wrote a mod.rs into a project that does not use buffa, stat err = %v", err)
+			}
+		})
+	}
+}
+
+// The generation cache must not be invalidated over a `mod.rs` we are not responsible for.
+func TestCanSkipGenerationIgnoresModuleTreeForProstProjects(t *testing.T) {
+	dir := t.TempDir()
+	config := "version: v1\nplugins:\n- plugin: buf.build/community/neoeinstein-prost:v0.4.0\n"
+	if err := os.WriteFile(filepath.Join(dir, "buf.gen.yaml"), []byte(config), 0644); err != nil {
+		t.Fatalf("writing buf.gen.yaml: %v", err)
+	}
+	t.Chdir(dir)
+
+	out := filepath.Join(dir, "src", "pb")
+	if err := os.MkdirAll(out, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	// prost's own output shape, and no mod.rs of ours anywhere.
+	if err := os.WriteFile(filepath.Join(out, "a.v1.rs"), []byte("// types\n"), 0644); err != nil {
+		t.Fatalf("seeding a.v1.rs: %v", err)
+	}
+
+	descriptor := pkgWith([2]string{"a/v1/a.proto", "a.v1"})
+	generator := NewProtoGenerator(out, nil, true)
+	hash, err := generator.calculateHash(descriptor)
+	if err != nil {
+		t.Fatalf("calculateHash: %v", err)
+	}
+	if err := generator.writeLastGeneratedHash(hash); err != nil {
+		t.Fatalf("writeLastGeneratedHash: %v", err)
+	}
+
+	skip, err := generator.canSkipGeneration(descriptor, hash)
+	if err != nil {
+		t.Fatalf("canSkipGeneration: %v", err)
+	}
+	if !skip {
+		t.Error("regenerated a prost project whose inputs had not changed")
 	}
 }

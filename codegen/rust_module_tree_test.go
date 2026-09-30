@@ -28,6 +28,8 @@ func TestEscapeModIdent(t *testing.T) {
 // `sf.solana.type.v1` is a real package: `type` is a Rust keyword and has to be
 // escaped or the file does not parse.
 func TestWriteModuleTreeEscapesRustKeywords(t *testing.T) {
+	inBuffaProject(t)
+
 	out := filepath.Join(t.TempDir(), "src", "pb")
 	touchModFiles(t, out, "sf.solana.type.v1", "a.mod.v1", "b.self.v1", "c.crate.v1", "d.async.v1")
 	pkg := pkgWith(

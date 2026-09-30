@@ -10,7 +10,6 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/codegen"
 	"github.com/streamingfast/substreams/manifest"
-	"go.uber.org/zap"
 )
 
 var protogenCmd = &cobra.Command{
@@ -80,22 +79,19 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 
 	// For relative output paths with local manifests, make the path relative to the manifest directory
 	// For stdin ("-"), use current working directory
-	if manifestReader.IsLocalManifest() && !filepath.IsAbs(outputPath) {
-		var manifestDir string
+	projectPath := ""
+	if manifestReader.IsLocalManifest() {
 		if manifestPath == "-" {
 			// For stdin, use current working directory
 			if wd, err := os.Getwd(); err == nil {
-				manifestDir = wd
+				projectPath = wd
 			} else {
-				manifestDir = "."
+				projectPath = "."
 			}
 		} else {
-			manifestDir = filepath.Dir(manifestPath)
+			projectPath = filepath.Dir(manifestPath)
 		}
 
-		newOutputPath := filepath.Join(manifestDir, outputPath)
-		zlog.Debug("manifest path is a local manifest, making output path relative to it", zap.String("old", outputPath), zap.String("new", newOutputPath))
-		outputPath = newOutputPath
 	}
 
 	pkgBundle, err := manifestReader.Read()
@@ -110,6 +106,7 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 	}
 
 	generator := codegen.NewProtoGenerator(outputPath, excludePaths, generateMod)
+	generator.SetProjectPath(projectPath)
 
 	// Check for non-deterministic descriptor sets and warn the user
 	if pkgBundle != nil && pkgBundle.Manifest != nil {

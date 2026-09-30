@@ -156,6 +156,45 @@ func formatBufCommand(cmdArgs []string) string {
 	return strings.Join(result, " ")
 }
 
+// canSkipGeneration reports whether the generated output already matches the inputs,
+// so running `buf` again would be wasted work.
+//
+// The hash covers the inputs, not the output, so a match alone is not enough: the
+// generated files may have been removed since by a clean, a `.gitignore` that excludes
+// them, or an interrupted run. The output is therefore checked as well, and the
+// `mod.rs` is refreshed while we are here, since nothing else will write it when
+// generation is skipped.
+func (g *ProtoGenerator) canSkipGeneration(pkg *pbsubstreams.Package, currentHash string) (bool, error) {
+	// A non-deterministic descriptor set can change without the hash changing, so the
+	// cache cannot be trusted at all.
+	if g.hasNonDeterministicDescriptors {
+		return false, nil
+	}
+
+	lastHash, err := g.readLastGeneratedHash()
+	if err != nil {
+		return false, fmt.Errorf("reading last generated hash: %w", err)
+	}
+
+	if lastHash == "" || lastHash != currentHash || !g.hasGeneratedFiles() {
+		return false, nil
+	}
+
+	if !g.generateMod {
+		return true, nil
+	}
+
+	if err := g.writeModuleTree(pkg); err != nil {
+		return false, fmt.Errorf("writing module tree: %w", err)
+	}
+
+	complete, err := g.moduleTreeIsComplete(pkg)
+	if err != nil {
+		return false, fmt.Errorf("checking module tree: %w", err)
+	}
+	return complete, nil
+}
+
 func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 	// Calculate current hash of inputs
 	currentHash, err := g.calculateHash(pkg)
@@ -163,25 +202,13 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 		return fmt.Errorf("calculating hash: %w", err)
 	}
 
-	// Skip hash comparison if there are non-deterministic descriptor sets
-	// since the content may have changed without the manifest changing
-	if !g.hasNonDeterministicDescriptors {
-		// Read last generated hash
-		lastHash, err := g.readLastGeneratedHash()
-		if err != nil {
-			return fmt.Errorf("reading last generated hash: %w", err)
-		}
-
-		// Check if we can skip generation
-		if lastHash != "" && lastHash == currentHash && g.hasGeneratedFiles() {
-			fmt.Printf("⚡ Protobuf generation skipped (no changes detected)\n")
-			if g.generateMod {
-				if err := g.writeModuleTree(pkg); err != nil {
-					return fmt.Errorf("writing module tree: %w", err)
-				}
-			}
-			return nil
-		}
+	skip, err := g.canSkipGeneration(pkg, currentHash)
+	if err != nil {
+		return err
+	}
+	if skip {
+		fmt.Printf("⚡ Protobuf generation skipped (no changes detected)\n")
+		return nil
 	}
 
 	tmpDir, err := os.MkdirTemp("", "substreams_protogen")
@@ -286,30 +313,39 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 // A `mod.rs` this function did not write is left untouched: it may be hand-written or
 // hand-edited, and silently replacing it would produce a spurious diff.
 func (g *ProtoGenerator) writeModuleTree(pkg *pbsubstreams.Package) error {
-	modPath := filepath.Join(g.outputPath, "mod.rs")
-
-	if existing, err := os.ReadFile(modPath); err == nil {
-		if !strings.HasPrefix(string(existing), generatedModHeader+"\n") {
-			return nil
-		}
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("reading %q: %w", modPath, err)
-	}
-
 	packages, rootFiles := g.treePackages(pkg)
 	if len(packages) == 0 && len(rootFiles) == 0 {
 		return nil
 	}
 
-	content := renderModuleTree(packages, rootFiles)
+	_, err := g.moduleTreeFile().write(renderModuleTree(packages, rootFiles))
+	return err
+}
 
-	// Only write when the content actually changes, so an unchanged build does not
-	// touch the file and force a recompile.
-	if existing, err := os.ReadFile(modPath); err == nil && string(existing) == content {
-		return nil
+// moduleTreeFile is the `mod.rs` this generator owns.
+func (g *ProtoGenerator) moduleTreeFile() *generatedFile {
+	return newGeneratedFile(filepath.Join(g.outputPath, "mod.rs"), generatedModHeader)
+}
+
+// moduleTreeIsComplete reports whether the packages buf generated files for are wired
+// up in the `mod.rs` currently on disk. A `mod.rs` belonging to someone else is their
+// business, so it counts as complete.
+func (g *ProtoGenerator) moduleTreeIsComplete(pkg *pbsubstreams.Package) (bool, error) {
+	owner, err := g.moduleTreeFile().ownership()
+	if err != nil {
+		return false, err
+	}
+	if owner == ownershipForeign {
+		return true, nil
+	}
+	if owner == ownershipAbsent {
+		return false, nil
 	}
 
-	return os.WriteFile(modPath, []byte(content), 0644)
+	// treePackages keeps only the packages whose generated file is present, so an
+	// empty tree for a descriptor that declares packages means the output is gone.
+	packages, rootFiles := g.treePackages(pkg)
+	return len(packages) > 0 || len(rootFiles) > 0 || len(pkg.GetProtoFiles()) == 0, nil
 }
 
 // treePackages returns the proto packages to wire up, plus the generated files for

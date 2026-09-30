@@ -28,7 +28,7 @@ var rustKeywords = map[string]bool{
 	"pub": true, "ref": true, "return": true, "self": true, "Self": true,
 	"static": true, "struct": true, "super": true, "trait": true, "true": true,
 	"type": true, "unsafe": true, "use": true, "where": true, "while": true,
-	"async": true, "await": true, "dyn_": true, "abstract": true, "become": true,
+	"async": true, "await": true, "abstract": true, "become": true,
 	"box": true, "do": true, "final": true, "macro": true, "override": true,
 	"priv": true, "typeof": true, "unsized": true, "virtual": true, "yield": true,
 	"try": true, "gen": true,

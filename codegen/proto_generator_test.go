@@ -620,3 +620,248 @@ func TestWriteModuleTreeOmitsPackagesBufDidNotGenerate(t *testing.T) {
 		t.Errorf("the generated package is missing, got:\n%s", got)
 	}
 }
+
+// A package split across several `.proto` files is an ordinary layout. buffa merges
+// them into one `<pkg>.mod.rs`, so the tree must include it exactly once; a second
+// `include!` defines every type in the package twice and the crate stops compiling.
+func TestWriteModuleTreeIncludesEachPackageOnce(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "src", "pb")
+	if err := os.MkdirAll(out, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	touchModFiles(t, out, "a.v1")
+
+	pkg := pkgWith([2]string{"a/v1/one.proto", "a.v1"}, [2]string{"a/v1/two.proto", "a.v1"})
+	if err := NewProtoGenerator(out, nil, true).writeModuleTree(pkg); err != nil {
+		t.Fatalf("writeModuleTree: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(out, "mod.rs"))
+	if err != nil {
+		t.Fatalf("reading mod.rs: %v", err)
+	}
+	if got := strings.Count(string(content), `include!("a.v1.mod.rs")`); got != 1 {
+		t.Errorf("include count = %d, want 1\n%s", got, content)
+	}
+}
+
+// moduleTreeIsComplete is what makes the generation-hash cache trustworthy: the hash
+// covers the inputs, so it still matches after the generated output has been removed
+// by a clean, a .gitignore, or an interrupted run. Skipping generation then leaves a
+// crate that cannot compile.
+func TestModuleTreeIsComplete(t *testing.T) {
+	const ourMod = generatedModHeader + "\npub mod a { pub mod v1 { include!(\"a.v1.mod.rs\"); } }\n"
+
+	for _, tt := range []struct {
+		name     string
+		modFile  string   // contents of mod.rs, "" to leave it absent
+		emitted  []string // packages buf has generated a file for
+		descript *pbsubstreams.Package
+		want     bool
+	}{
+		{
+			name:     "ours and fully generated",
+			modFile:  ourMod,
+			emitted:  []string{"a.v1"},
+			descript: pkgWith([2]string{"a/v1/a.proto", "a.v1"}),
+			want:     true,
+		},
+		{
+			// The case the function exists for.
+			name:     "ours but the generated output is gone",
+			modFile:  ourMod,
+			emitted:  nil,
+			descript: pkgWith([2]string{"a/v1/a.proto", "a.v1"}),
+			want:     false,
+		},
+		{
+			name:     "mod.rs missing entirely",
+			modFile:  "",
+			emitted:  []string{"a.v1"},
+			descript: pkgWith([2]string{"a/v1/a.proto", "a.v1"}),
+			want:     false,
+		},
+		{
+			// Someone else's file is their business; never force a regeneration on it.
+			name:     "hand written mod.rs",
+			modFile:  "// mine\n",
+			emitted:  nil,
+			descript: pkgWith([2]string{"a/v1/a.proto", "a.v1"}),
+			want:     true,
+		},
+		{
+			name:     "descriptor declares no proto files",
+			modFile:  ourMod,
+			emitted:  nil,
+			descript: pkgWith(),
+			want:     true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			out := filepath.Join(t.TempDir(), "src", "pb")
+			if err := os.MkdirAll(out, 0755); err != nil {
+				t.Fatalf("mkdir: %v", err)
+			}
+			if tt.modFile != "" {
+				if err := os.WriteFile(filepath.Join(out, "mod.rs"), []byte(tt.modFile), 0644); err != nil {
+					t.Fatalf("seeding mod.rs: %v", err)
+				}
+			}
+			touchModFiles(t, out, tt.emitted...)
+
+			got, err := NewProtoGenerator(out, nil, true).moduleTreeIsComplete(tt.descript)
+			if err != nil {
+				t.Fatalf("moduleTreeIsComplete: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("moduleTreeIsComplete = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// An unreadable mod.rs must surface rather than be guessed at in either direction.
+func TestModuleTreeIsCompleteSurfacesReadErrors(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "src", "pb")
+	if err := os.MkdirAll(filepath.Join(out, "mod.rs"), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	if _, err := NewProtoGenerator(out, nil, true).moduleTreeIsComplete(pkgWith()); err == nil {
+		t.Error("expected an error when mod.rs cannot be read")
+	}
+}
+
+// writeModuleTree must not swallow a failed write: reporting success over a crate with
+// no mod.rs turns a clear failure into a confusing cargo error later.
+func TestWriteModuleTreeReportsWriteFailures(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "src", "pb")
+	if err := os.MkdirAll(filepath.Join(out, "mod.rs"), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	touchModFiles(t, out, "a.v1")
+
+	err := NewProtoGenerator(out, nil, true).writeModuleTree(pkgWith([2]string{"a/v1/a.proto", "a.v1"}))
+	if err == nil {
+		t.Error("expected an error when mod.rs cannot be written")
+	}
+}
+
+// The generation cache keys on the inputs, so it still matches after the generated
+// output has gone. Skipping then leaves a crate that cannot compile, and re-running
+// never repairs it because the cache keeps hitting.
+func TestCanSkipGeneration(t *testing.T) {
+	descriptor := pkgWith([2]string{"a/v1/a.proto", "a.v1"})
+
+	for _, tt := range []struct {
+		name        string
+		generateMod bool
+		writeHash   bool
+		modFile     string
+		emitted     []string
+		want        bool
+	}{
+		{
+			name:        "everything present",
+			generateMod: true,
+			writeHash:   true,
+			modFile:     generatedModHeader + "\npub mod a { pub mod v1 { include!(\"a.v1.mod.rs\"); } }\n",
+			emitted:     []string{"a.v1"},
+			want:        true,
+		},
+		{
+			// The regression this guards: hash matches, a stray .rs satisfies
+			// hasGeneratedFiles, but the package output is gone.
+			name:        "hash matches but the package output was removed",
+			generateMod: true,
+			writeHash:   true,
+			modFile:     generatedModHeader + "\npub mod a { pub mod v1 { include!(\"a.v1.mod.rs\"); } }\n",
+			emitted:     nil,
+			want:        false,
+		},
+		{
+			name:        "no hash recorded yet",
+			generateMod: true,
+			writeHash:   false,
+			modFile:     "",
+			emitted:     []string{"a.v1"},
+			want:        false,
+		},
+		{
+			// Without mod.rs generation there is nothing extra to verify.
+			name:        "mod.rs generation disabled",
+			generateMod: false,
+			writeHash:   true,
+			modFile:     "",
+			emitted:     []string{"a.v1"},
+			want:        true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			out := filepath.Join(t.TempDir(), "src", "pb")
+			if err := os.MkdirAll(out, 0755); err != nil {
+				t.Fatalf("mkdir: %v", err)
+			}
+			// hasGeneratedFiles only looks for any *.rs, so keep one around to make
+			// sure the completeness check is what decides, not that guard.
+			if err := os.WriteFile(filepath.Join(out, "a.rs"), []byte("// types\n"), 0644); err != nil {
+				t.Fatalf("seeding a.rs: %v", err)
+			}
+			if tt.modFile != "" {
+				if err := os.WriteFile(filepath.Join(out, "mod.rs"), []byte(tt.modFile), 0644); err != nil {
+					t.Fatalf("seeding mod.rs: %v", err)
+				}
+			}
+			touchModFiles(t, out, tt.emitted...)
+
+			generator := NewProtoGenerator(out, nil, tt.generateMod)
+			hash, err := generator.calculateHash(descriptor)
+			if err != nil {
+				t.Fatalf("calculateHash: %v", err)
+			}
+			if tt.writeHash {
+				if err := generator.writeLastGeneratedHash(hash); err != nil {
+					t.Fatalf("writeLastGeneratedHash: %v", err)
+				}
+			}
+
+			got, err := generator.canSkipGeneration(descriptor, hash)
+			if err != nil {
+				t.Fatalf("canSkipGeneration: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("canSkipGeneration = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// A non-deterministic descriptor set can change without changing the hash, so the
+// cache must never be trusted for one.
+func TestCanSkipGenerationNeverSkipsNonDeterministicDescriptors(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "src", "pb")
+	if err := os.MkdirAll(out, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	touchModFiles(t, out, "a.v1")
+
+	descriptor := pkgWith([2]string{"a/v1/a.proto", "a.v1"})
+	generator := NewProtoGenerator(out, nil, true)
+	hash, err := generator.calculateHash(descriptor)
+	if err != nil {
+		t.Fatalf("calculateHash: %v", err)
+	}
+	if err := generator.writeLastGeneratedHash(hash); err != nil {
+		t.Fatalf("writeLastGeneratedHash: %v", err)
+	}
+
+	generator.SetHasNonDeterministicDescriptors(true)
+
+	skip, err := generator.canSkipGeneration(descriptor, hash)
+	if err != nil {
+		t.Fatalf("canSkipGeneration: %v", err)
+	}
+	if skip {
+		t.Error("generation was skipped for a non-deterministic descriptor set")
+	}
+}

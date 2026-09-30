@@ -28,6 +28,7 @@ require (
 	buf.build/gen/go/bufbuild/reflect/connectrpc/go v1.21.0-20240117202343-bf8f65e8876c.1
 	buf.build/gen/go/bufbuild/reflect/protocolbuffers/go v1.36.12-20240117202343-bf8f65e8876c.2
 	buf.build/go/hyperpb v0.1.3
+	cloud.google.com/go/pubsub/v2 v2.7.0
 	connectrpc.com/connect v1.21.0
 	github.com/AfterShip/clickhouse-sql-parser v0.5.6
 	github.com/ClickHouse/ch-go v0.74.0
@@ -251,7 +252,7 @@ require (
 require (
 	cloud.google.com/go v0.123.0 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
-	cloud.google.com/go/iam v1.7.0 // indirect
+	cloud.google.com/go/iam v1.11.0 // indirect
 	cloud.google.com/go/monitoring v1.24.3 // indirect
 	cloud.google.com/go/storage v1.62.0 // indirect
 	cloud.google.com/go/trace v1.11.7 // indirect

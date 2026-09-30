@@ -3,7 +3,7 @@ module github.com/streamingfast/substreams/tests_e2e
 go 1.26.0
 
 require (
-	github.com/streamingfast/bstream v0.0.2-0.20260921191230-ea57fcbd4fbb
+	github.com/streamingfast/bstream v0.0.2-0.20260930141647-3dd2b9bd72d7
 	github.com/streamingfast/dmetering v0.0.0-20260901152443-1ff4cd0d617d
 	github.com/streamingfast/dregistry v0.0.0-20260818204944-2fed3956d4e1
 	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142

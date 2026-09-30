@@ -156,17 +156,9 @@ func formatBufCommand(cmdArgs []string) string {
 	return strings.Join(result, " ")
 }
 
-// canSkipGeneration reports whether the generated output already matches the inputs,
-// so running `buf` again would be wasted work.
-//
-// The hash covers the inputs, not the output, so a match alone is not enough: the
-// generated files may have been removed since by a clean, a `.gitignore` that excludes
-// them, or an interrupted run. The output is therefore checked as well, and the
-// `mod.rs` is refreshed while we are here, since nothing else will write it when
-// generation is skipped.
+// canSkipGeneration reports whether the output on disk already matches the inputs.
 func (g *ProtoGenerator) canSkipGeneration(pkg *pbsubstreams.Package, currentHash string) (bool, error) {
-	// A non-deterministic descriptor set can change without the hash changing, so the
-	// cache cannot be trusted at all.
+	// A non-deterministic descriptor set can change without the hash changing.
 	if g.hasNonDeterministicDescriptors {
 		return false, nil
 	}
@@ -184,15 +176,7 @@ func (g *ProtoGenerator) canSkipGeneration(pkg *pbsubstreams.Package, currentHas
 		return true, nil
 	}
 
-	if err := g.writeModuleTree(pkg); err != nil {
-		return false, fmt.Errorf("writing module tree: %w", err)
-	}
-
-	complete, err := g.moduleTreeIsComplete(pkg)
-	if err != nil {
-		return false, fmt.Errorf("checking module tree: %w", err)
-	}
-	return complete, nil
+	return g.moduleTreeIsComplete(pkg)
 }
 
 func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
@@ -207,6 +191,12 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 		return err
 	}
 	if skip {
+		// Nothing else writes mod.rs on this path.
+		if g.generateMod {
+			if err := g.writeModuleTree(pkg); err != nil {
+				return fmt.Errorf("writing module tree: %w", err)
+			}
+		}
 		fmt.Printf("⚡ Protobuf generation skipped (no changes detected)\n")
 		return nil
 	}
@@ -338,12 +328,11 @@ func (g *ProtoGenerator) moduleTreeIsComplete(pkg *pbsubstreams.Package) (bool, 
 	if owner == ownershipForeign {
 		return true, nil
 	}
-	if owner == ownershipAbsent {
-		return false, nil
-	}
 
 	// treePackages keeps only the packages whose generated file is present, so an
 	// empty tree for a descriptor that declares packages means the output is gone.
+	// A missing mod.rs is not itself a reason to rerun buf, since writeModuleTree
+	// restores it from the files already on disk.
 	packages, rootFiles := g.treePackages(pkg)
 	return len(packages) > 0 || len(rootFiles) > 0 || len(pkg.GetProtoFiles()) == 0, nil
 }

@@ -675,11 +675,13 @@ func TestModuleTreeIsComplete(t *testing.T) {
 			want:     false,
 		},
 		{
-			name:     "mod.rs missing entirely",
+			// writeModuleTree restores it from the files already on disk, so this is
+			// not a reason to rerun buf.
+			name:     "mod.rs missing but the packages are generated",
 			modFile:  "",
 			emitted:  []string{"a.v1"},
 			descript: pkgWith([2]string{"a/v1/a.proto", "a.v1"}),
-			want:     false,
+			want:     true,
 		},
 		{
 			// Someone else's file is their business; never force a regeneration on it.

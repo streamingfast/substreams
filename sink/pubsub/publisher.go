@@ -15,11 +15,11 @@ import (
 const AttributeType = "type"
 
 const (
-	// TypeBlock is one block in the webhook single-block JSON shape.
+	// TypeBlock is one WebhookPayload. The JSON matches the webhook sink.
 	TypeBlock = "block"
-	// TypeBatch is one or more blocks in the webhook batch JSON shape.
+	// TypeBatch is one BatchPayload. The JSON matches the webhook sink.
 	TypeBatch = "batch"
-	// TypeUndo is a reorg notification in the webhook undo JSON shape.
+	// TypeUndo is one UndoPayload. The JSON matches the webhook sink.
 	TypeUndo = "undo"
 )
 

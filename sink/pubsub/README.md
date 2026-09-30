@@ -1,6 +1,6 @@
 # Substreams Pub/Sub sink
 
-`substreams sink pubsub` publishes the output of any module to a Google Cloud Pub/Sub topic. The message body is the same JSON `substreams sink webhook` sends.
+`substreams sink pubsub` publishes the output of any module to a Google Cloud Pub/Sub topic. The message body is the [webhook sink](../webhook)'s JSON, the same body `substreams sink webhook` sends.
 
 ## Usage
 
@@ -43,8 +43,8 @@ Without `--pubsub-undo` the cursor still moves back, and the blocks that replace
 
 Publish errors are retried with exponential backoff up to `--pubsub-max-retries` (default 3; `-1` retries until the process stops). `--pubsub-timeout` bounds one attempt.
 
-`--pubsub-on-failure=exit` (the default) keeps the payload in `<state-file>.pending` (default `./state.cursor.pending`), writes the reason to `--pubsub-termination-log` when that file already exists, and exits with status 75. The next start publishes the pending payload before it opens a Substreams stream. No block is dropped.
+`--pubsub-on-failure=exit` (the default) keeps the payload in `<state-file>.pending` (default `./state.cursor.pending`), writes the reason to `--pubsub-termination-log` when that file already exists, and exits with status 75. The next start publishes the pending payload before it opens a Substreams stream. No block is dropped. The pending file and the exit status match the webhook sink.
 
-`--pubsub-on-failure=skip` drops a block after the last retry and continues. The cursor is not advanced past it, so a later start replays it. An undo notification is never dropped.
+`--pubsub-on-failure=skip` drops a block after the last retry and continues. The block stays dropped once a later block saves its cursor. A restart before that save sends the block again, because the cursor still points at the earlier one. An undo notification is never dropped: it is retried until it is published, and it is not written to the pending file.
 
 The cursor is `<state-file>`. Point it at durable storage: the default is a local path.

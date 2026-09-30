@@ -16,14 +16,15 @@ import (
 // OnFailureExit mode and removed once the payload goes through, so the next
 // start publishes it before a Substreams stream is opened. A kill in the
 // middle of a publish leaves no file: the cursor was not advanced, so the
-// stream re-sends that block.
+// stream re-sends that block. The record must stay in sync with the webhook
+// sink's pending delivery (sink/webhook).
 type pendingDelivery struct {
 	// Kind selects a block payload from a reorg notification. Empty reads as
 	// DeliveryKindBlock.
 	Kind DeliveryKind `json:"kind,omitempty"`
-	// Batched marks a block payload in the batch JSON shape. A pending payload
-	// whose shape does not match the mode the sink now runs in is discarded on
-	// start and its blocks come back through the stream.
+	// Batched marks a block payload in the BatchPayload shape. A pending
+	// payload whose shape does not match the mode the sink now runs in is
+	// discarded on start and its blocks come back through the stream.
 	Batched     bool            `json:"batched,omitempty"`
 	Cursor      string          `json:"cursor"`
 	BlockNumber uint64          `json:"block_number"`

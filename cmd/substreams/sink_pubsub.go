@@ -35,10 +35,10 @@ func init() {
 	sinkPubsubCmd.Flags().Duration("pubsub-timeout", 30*time.Second, "Timeout for one publish attempt")
 	sinkPubsubCmd.Flags().Duration("pubsub-max-retry-interval", 30*time.Second, "Maximum interval between publish retries (exponential backoff cap)")
 	sinkPubsubCmd.Flags().String("pubsub-on-failure", string(pubsub.OnFailureExit), fmt.Sprintf("What to do once every retry for a block has failed: %q (the default) keeps the block on disk, writes the reason to the termination log and exits with status %d; the next start publishes that block before it connects to Substreams. %q drops the block and continues (an undo notification is instead retried until it goes through)", pubsub.OnFailureExit, pubsub.ExitCodeDeliveryFailed, pubsub.OnFailureSkip))
-	sinkPubsubCmd.Flags().Int("pubsub-batch-max-blocks", 0, "Publish up to this many blocks per message, in the batch payload shape (see below). 0 publishes one block per message in the single-block shape")
+	sinkPubsubCmd.Flags().Int("pubsub-batch-max-blocks", 0, "Publish up to this many blocks per message, in the webhook sink's batch payload (see below). 0 publishes one block per message in the single-block shape")
 	sinkPubsubCmd.Flags().Int("pubsub-batch-max-bytes", 0, "With --pubsub-batch-max-blocks, publish a batch before the next block would take its body past this many bytes. A block larger than this on its own is published alone. 0 means no limit")
 	sinkPubsubCmd.Flags().Duration("pubsub-batch-max-wait", time.Second, "Longest a batch waits for more blocks before it is published, checked when the next block arrives. A batch is also published when the chain is live, before an undo notification, and when the stream ends")
-	sinkPubsubCmd.Flags().Bool("pubsub-undo", false, "Publish a reorg notification on the same topic for each chain reorganization, with attribute type=undo and body {\"lastValidBlock\": {\"number\": ..., \"id\": \"...\"}, \"manifest\": {\"moduleName\": \"...\"}}. Without it the cursor still moves back and the replacement blocks are published as usual")
+	sinkPubsubCmd.Flags().Bool("pubsub-undo", false, "Publish a reorg notification on the same topic for each chain reorganization, with attribute type=undo and the webhook sink's undo body {\"lastValidBlock\": {\"number\": ..., \"id\": \"...\"}, \"manifest\": {\"moduleName\": \"...\"}}. Without it the cursor still moves back and the replacement blocks are published as usual")
 	sinkPubsubCmd.Flags().String("pubsub-termination-log", "/dev/termination-log", "File that receives the reason for a delivery-failure exit, written only when the file already exists (Kubernetes creates it)")
 
 	SinkCmd.AddCommand(sinkPubsubCmd)
@@ -48,8 +48,8 @@ var sinkPubsubCmd = &cobra.Command{
 	Use:   "pubsub <topic> [<manifest> [<module_name>]]",
 	Short: "Publish the output of a substreams module to a Google Cloud Pub/Sub topic",
 	Long: cli.Dedent(`
-		Publish the output of a substreams module to a Google Cloud Pub/Sub topic. The message
-		body is the same JSON 'substreams sink webhook' sends.
+		Publish the output of a substreams module to a Google Cloud Pub/Sub topic. The block,
+		batch, and undo bodies are the webhook sink's JSON ('substreams sink webhook').
 
 		<topic> is a topic id, together with --project, or a full projects/<project>/topics/<topic>
 		path. Credentials are application default credentials. When PUBSUB_EMULATOR_HOST is set,
@@ -74,11 +74,10 @@ var sinkPubsubCmd = &cobra.Command{
 
 		Once retries are exhausted the sink keeps the payload on disk and exits with status 75.
 		--pubsub-on-failure=skip drops that block and continues instead. An undo notification
-		is never dropped: it is retried until it goes through, and no replacement block is
-		published before then.
+		is never dropped: it is retried until it is published, and no replacement block is
+		published before then. That retry does not write a pending file.
 
 		--pubsub-undo publishes a reorg notification on the same topic, attribute type=undo.
-		It follows the same retry, --pubsub-on-failure and pending-file rules as blocks.
 	`),
 	RunE: sinkPubsubE,
 	Args: cobra.RangeArgs(1, 3),

@@ -15,7 +15,6 @@ import (
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/sink"
-	"github.com/streamingfast/substreams/sink/webhook"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -160,7 +159,7 @@ func TestSendBlock_PublishesWebhookJSONOnOneOrderingKey(t *testing.T) {
 	assert.Equal(t, "map_events", msgs[0].OrderingKey)
 	assert.Equal(t, TypeBlock, msgs[0].Attributes[AttributeType])
 
-	want, err := webhook.NewWebhookPayload("map_events", clock, "type.googleapis.com/sf.test.v1.Out", data)
+	want, err := NewWebhookPayload("map_events", clock, "type.googleapis.com/sf.test.v1.Out", data)
 	require.NoError(t, err)
 	wantJSON, err := want.ToJSON()
 	require.NoError(t, err)
@@ -213,6 +212,33 @@ func TestSend_SkipModeDropsBlock(t *testing.T) {
 	msg, err := os.ReadFile(s.terminationLog)
 	require.NoError(t, err)
 	assert.Empty(t, msg, "skip mode is not an exit, nothing to report")
+}
+
+func TestDeliver_CountsOnlyASuccessfulPublish(t *testing.T) {
+	publishes := PublishesCounter.Get()
+	sent := PublishedBytes.Get()
+
+	failing := &fakePublisher{fail: -1}
+	s := newTestSink(t, failing, OnFailureSkip)
+	pending := newPending(10)
+	require.NoError(t, s.send(context.Background(), pending))
+	assert.Equal(t, publishes, PublishesCounter.Get())
+	assert.Equal(t, sent, PublishedBytes.Get())
+
+	s.publisher = &fakePublisher{}
+	require.NoError(t, s.send(context.Background(), pending))
+	assert.Equal(t, publishes+1, PublishesCounter.Get())
+	assert.Equal(t, sent+float64(len(pending.Payload)), PublishedBytes.Get())
+
+	// Two failed undo rounds, then the publish. Only the publish is counted.
+	s.enableUndo()
+	undoPublisher := &fakePublisher{fail: 2}
+	s.publisher = undoPublisher
+	undo := &pbsubstreamsrpc.BlockUndoSignal{LastValidBlock: &pbsubstreams.BlockRef{Number: 9, Id: "aa"}}
+	require.NoError(t, s.handleBlockUndoSignal(context.Background(), undo, sink.MustNewCursor(opaqueCursor(9))))
+	assert.Equal(t, 3, undoPublisher.callCount())
+	assert.Equal(t, publishes+2, PublishesCounter.Get())
+	assert.Equal(t, sent+float64(len(pending.Payload)+len(undoPublisher.messages()[0].Data)), PublishedBytes.Get())
 }
 
 func TestSend_ShutdownIsNotADeliveryFailure(t *testing.T) {
@@ -312,7 +338,7 @@ func TestUndo_PublishesWebhookJSONWithUndoAttribute(t *testing.T) {
 	require.Len(t, msgs, 1)
 	assert.Equal(t, TypeUndo, msgs[0].Attributes[AttributeType])
 	assert.Equal(t, "map_events", msgs[0].OrderingKey)
-	want, err := webhook.NewUndoPayload("map_events", &pbsubstreams.BlockRef{Number: 10, Id: "aa"}).ToJSON()
+	want, err := NewUndoPayload("map_events", &pbsubstreams.BlockRef{Number: 10, Id: "aa"}).ToJSON()
 	require.NoError(t, err)
 	assert.JSONEq(t, string(want), string(msgs[0].Data))
 	assert.Equal(t, opaqueCursor(10), readStateCursor(t, s))
@@ -378,7 +404,7 @@ func addBlock(t *testing.T, s *Sink, num uint64, live bool, now time.Time) {
 
 func batchBlockNumbers(t *testing.T, body []byte) []uint64 {
 	t.Helper()
-	var payload webhook.BatchPayload
+	var payload BatchPayload
 	require.NoError(t, json.Unmarshal(body, &payload))
 	var numbers []uint64
 	for _, b := range payload.Blocks {
@@ -405,7 +431,7 @@ func TestBatch_FlushesWebhookShapeWhenFull(t *testing.T) {
 	assert.Equal(t, opaqueCursor(11), readStateCursor(t, s))
 	assert.Nil(t, s.batch)
 
-	var got webhook.BatchPayload
+	var got BatchPayload
 	require.NoError(t, json.Unmarshal(msgs[0].Data, &got))
 	assert.Equal(t, "map_events", got.Manifest.ModuleName)
 	assert.Equal(t, "sf.test.v1.Out", got.Manifest.Type)
@@ -453,6 +479,22 @@ func TestBatch_FlushesWhenLiveOrWaited(t *testing.T) {
 	msgs := pub.messages()
 	require.Len(t, msgs, 2)
 	assert.Equal(t, []uint64{11, 12}, batchBlockNumbers(t, msgs[1].Data))
+}
+
+func TestHandleBlockScopedData_NilOutputDoesNotPanic(t *testing.T) {
+	pub := &fakePublisher{}
+	s := newTestSink(t, pub, OnFailureExit)
+	s.batchMaxBlocks, s.batchMaxWait = 100, time.Second
+	addBlock(t, s, 10, false, time.Now().Add(-2*time.Second))
+
+	// --noop-mode replaces the output with an empty MapModuleOutput.
+	noop := &pbsubstreamsrpc.BlockScopedData{Clock: protoClock(11), Output: &pbsubstreamsrpc.MapModuleOutput{}}
+	require.NoError(t, s.handleBlockScopedData(context.Background(), noop, nil, sink.MustNewCursor(opaqueCursor(11))))
+	require.NoError(t, s.handleBlockScopedData(context.Background(), &pbsubstreamsrpc.BlockScopedData{Clock: protoClock(12)}, nil, nil))
+
+	msgs := pub.messages()
+	require.Len(t, msgs, 1, "a block with no output still flushes a batch that has waited")
+	assert.Equal(t, []uint64{10}, batchBlockNumbers(t, msgs[0].Data))
 }
 
 func TestBatch_SparseModuleFlushesOnEmptyBlock(t *testing.T) {

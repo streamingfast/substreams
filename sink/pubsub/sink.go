@@ -12,7 +12,6 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/substreams/protodecode"
 	"github.com/streamingfast/substreams/sink"
-	"github.com/streamingfast/substreams/sink/webhook"
 	"go.uber.org/zap"
 
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -25,12 +24,14 @@ import (
 //
 // OnFailureExit keeps the block in the pending file, writes a termination
 // reason and stops the sink with ExitCodeDeliveryFailed. The next start
-// publishes the pending block before it opens a Substreams stream.
+// publishes the pending block before it opens a Substreams stream. The
+// pending file and this exit match the webhook sink (sink/webhook).
 //
 // OnFailureSkip logs the failure, drops the block and moves on to the next
-// one. The cursor is not advanced past the dropped block, so a later restart
-// replays it. An undo notification is never dropped: it is retried until it
-// goes through.
+// one. The block stays dropped once a later block saves its cursor. A restart
+// before that save sends the block again, because the cursor still points at
+// the earlier one. An undo notification is never dropped: it is retried until
+// it is published, and it is not written to the pending file.
 type OnFailure string
 
 const (
@@ -100,7 +101,9 @@ func (e *DeliveryFailedError) TerminationReason() []byte {
 }
 
 // Sink publishes substreams module output to a Google Cloud Pub/Sub topic.
-// The message body is the webhook sink's JSON.
+// The message body is WebhookPayload, BatchPayload, and UndoPayload in this
+// package. That JSON matches the webhook sink and must stay in sync with
+// sink/webhook/payload.go.
 type Sink struct {
 	projectID      string
 	topicID        string
@@ -130,7 +133,7 @@ type Sink struct {
 // when a live block arrives, when an undo signal arrives, or when the stream
 // ends cleanly.
 type openBatch struct {
-	payload *webhook.BatchPayload
+	payload *BatchPayload
 	// cursors holds the cursor of each entry in payload.Blocks, so an undo
 	// can cut the batch at any block.
 	cursors []string
@@ -206,7 +209,7 @@ type SinkConfig struct {
 	Logger             *zap.Logger
 }
 
-var PublishesCounter = sink.Metrics.NewCounter("substreams_sink_pubsub_publishes", "Number of publish calls made to Pub/Sub")
+var PublishesCounter = sink.Metrics.NewCounter("substreams_sink_pubsub_publishes", "Number of successful publishes to Pub/Sub")
 var PublishedBytes = sink.Metrics.NewCounter("substreams_sink_pubsub_bytes_sent", "Number of bytes published to Pub/Sub")
 var LastDeliveredBlock = sink.Metrics.NewGauge("substreams_sink_pubsub_last_delivered_block", "Last block number published to Pub/Sub")
 
@@ -408,9 +411,6 @@ func pendingCursor(pending *pendingDelivery) (*sink.Cursor, error) {
 // deliver publishes the pending payload and, on success, commits it. The
 // returned error is the publisher's delivery error.
 func (s *Sink) deliver(ctx context.Context, pending *pendingDelivery) error {
-	PublishesCounter.Inc()
-	PublishedBytes.AddInt(len(pending.Payload))
-
 	err := s.publisher.Publish(ctx, Message{
 		Data:        pending.Payload,
 		Attributes:  map[string]string{AttributeType: pending.messageType()},
@@ -429,6 +429,11 @@ func (s *Sink) deliver(ctx context.Context, pending *pendingDelivery) error {
 		}
 		return err
 	}
+
+	// Count a publish only after it succeeds. Retries inside Publish are not
+	// counted again.
+	PublishesCounter.Inc()
+	PublishedBytes.AddInt(len(pending.Payload))
 
 	s.commit(pending)
 	return nil
@@ -509,7 +514,9 @@ func (s *Sink) handleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 		}
 	}
 
-	if data.Output.MapOutput.Value == nil {
+	// MapOutput is nil when the block has nothing to publish. --noop-mode
+	// sends an empty MapModuleOutput, so reading Value unguarded panics.
+	if data.Output == nil || data.Output.MapOutput == nil || data.Output.MapOutput.Value == nil {
 		return nil
 	}
 
@@ -523,9 +530,9 @@ func (s *Sink) handleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 	return s.sendBlock(ctx, data.Output.Name, data.Output.MapOutput.TypeUrl, data.Clock, dataContent, cursor, now)
 }
 
-// sendBlock publishes one block as the webhook single-block JSON.
+// sendBlock publishes one block as a WebhookPayload.
 func (s *Sink) sendBlock(ctx context.Context, moduleName, typeURL string, clock *pbsubstreams.Clock, dataContent json.RawMessage, cursor *sink.Cursor, now time.Time) error {
-	payload, err := webhook.NewWebhookPayload(moduleName, clock, typeURL, dataContent)
+	payload, err := NewWebhookPayload(moduleName, clock, typeURL, dataContent)
 	if err != nil {
 		return fmt.Errorf("creating block payload: %w", err)
 	}
@@ -551,11 +558,11 @@ func (s *Sink) sendBlock(ctx context.Context, moduleName, typeURL string, clock 
 // full, when it waited long enough, or when the chain is live and holding the
 // block back would only add latency.
 func (s *Sink) addToBatch(ctx context.Context, moduleName, typeURL string, clock *pbsubstreams.Clock, dataContent json.RawMessage, cursor *sink.Cursor, live bool, now time.Time) error {
-	single, err := webhook.NewWebhookPayload(moduleName, clock, typeURL, dataContent)
+	single, err := NewWebhookPayload(moduleName, clock, typeURL, dataContent)
 	if err != nil {
 		return fmt.Errorf("creating batch entry: %w", err)
 	}
-	entry := webhook.BlockEntry{Clock: single.Clock, Data: dataContent}
+	entry := BlockEntry{Clock: single.Clock, Data: dataContent}
 	encoded, err := json.Marshal(entry)
 	if err != nil {
 		return fmt.Errorf("serializing batch entry: %w", err)
@@ -570,8 +577,8 @@ func (s *Sink) addToBatch(ctx context.Context, moduleName, typeURL string, clock
 	}
 
 	if s.batch == nil {
-		payload := webhook.NewBatchPayload(moduleName, typeURL)
-		payload.Blocks = []webhook.BlockEntry{}
+		payload := NewBatchPayload(moduleName, typeURL)
+		payload.Blocks = []BlockEntry{}
 		empty, err := payload.ToJSON()
 		if err != nil {
 			return fmt.Errorf("serializing batch payload: %w", err)
@@ -715,7 +722,7 @@ func (s *Sink) handleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstrea
 		return nil
 	}
 
-	payload, err := webhook.NewUndoPayload(s.moduleName, undoSignal.LastValidBlock).ToJSON()
+	payload, err := NewUndoPayload(s.moduleName, undoSignal.LastValidBlock).ToJSON()
 	if err != nil {
 		return fmt.Errorf("serializing undo payload: %w", err)
 	}

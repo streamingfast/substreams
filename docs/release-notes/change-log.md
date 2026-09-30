@@ -19,10 +19,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Sink
 
 - Add `substreams sink pubsub`, which publishes any module output to a Google Cloud Pub/Sub topic as the
-  same JSON `substreams sink webhook` sends. `--pubsub-undo` publishes reorg notifications on that topic,
-  and message ordering uses the module name as the ordering key. A publish that still fails after retries
-  stops the process with status 75 and keeps the payload for the next start. `--pubsub-on-failure=skip`
-  is the opt-in that drops a block and continues.
+  webhook sink's JSON, the same body `substreams sink webhook` sends. `--pubsub-undo` publishes reorg
+  notifications on that topic, and message ordering uses the module name as the ordering key. A publish
+  that still fails after retries stops the process with status 75 and keeps the payload for the next start.
+  `--pubsub-on-failure=skip` is the opt-in that drops a block and continues.
+- Fix `substreams sink pubsub` panicking when a block has no module output, including under
+  `--noop-mode`.
+- Count a Pub/Sub message in the sink totals only after it is published.
 
 ### Dependencies
 

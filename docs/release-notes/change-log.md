@@ -23,6 +23,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   notifications on that topic, and message ordering uses the module name as the ordering key. A publish
   that still fails after retries stops the process with status 75 and keeps the payload for the next start.
   `--pubsub-on-failure=skip` is the opt-in that drops a block and continues.
+- Publish a module that emits `sf.substreams.sink.pubsub.v1.Publish` in the `substreams-sink-pubsub`
+  format: one Pub/Sub message per `Publish.Message`, with that message's bytes and attributes, attribute
+  `Cursor`, and an ordering key of the zero-padded block number and message index. A reorg on that module
+  is published with attributes `LastValidBlock`, `Step=Undo`, and `Cursor`. Any other module is published
+  as the webhook sink's JSON.
 - Fix `substreams sink pubsub` panicking when a block has no module output, including under
   `--noop-mode`.
 - Count a Pub/Sub message in the sink totals only after it is published.

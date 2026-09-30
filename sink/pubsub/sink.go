@@ -103,11 +103,14 @@ func (e *DeliveryFailedError) TerminationReason() []byte {
 // Sink publishes substreams module output to a Google Cloud Pub/Sub topic.
 // The message body is WebhookPayload, BatchPayload, and UndoPayload in this
 // package. That JSON matches the webhook sink and must stay in sync with
-// sink/webhook/payload.go.
+// sink/webhook/payload.go. A module that emits
+// sf.substreams.sink.pubsub.v1.Publish is published in the
+// substreams-sink-pubsub wire format.
 type Sink struct {
 	projectID      string
 	topicID        string
 	publishUndo    bool
+	legacyPublish  bool
 	moduleName     string
 	orderingKey    string
 	stateFile      string
@@ -255,14 +258,17 @@ func newSink(config SinkConfig, projectID, topicID string, publisher Publisher, 
 	}
 
 	moduleName := ""
+	legacyPublish := false
 	if sinker != nil {
 		moduleName = sinker.OutputModuleName()
+		legacyPublish = isLegacyPublishType(sinker.OutputModuleTypeUnprefixed())
 	}
 
 	return &Sink{
 		projectID:      projectID,
 		topicID:        topicID,
 		publishUndo:    config.PublishUndo,
+		legacyPublish:  legacyPublish,
 		moduleName:     moduleName,
 		orderingKey:    moduleName,
 		stateFile:      config.StateFile,
@@ -346,7 +352,14 @@ func (s *Sink) recoverPending(ctx context.Context, startCursor *sink.Cursor) (*s
 		return startCursor, nil
 	}
 
-	if !pending.isUndo() && pending.Batched != s.batching() {
+	if pending.Legacy {
+		// The messages are already in the substreams-sink-pubsub wire format.
+		// Batching flags and --pubsub-undo do not change that format, so a
+		// restart publishes the same messages, including a reorg.
+		s.legacyPublish = true
+	}
+
+	if !pending.Legacy && !pending.isUndo() && pending.Batched != s.batching() {
 		// The user switched batching on or off while the sink was down. The
 		// subscriber expects the new shape, and the cursor was not advanced
 		// past these blocks, so the stream sends them again in that shape.
@@ -355,7 +368,7 @@ func (s *Sink) recoverPending(ctx context.Context, startCursor *sink.Cursor) (*s
 		return startCursor, removePending(s.pendingFile)
 	}
 
-	if pending.isUndo() && !s.publishUndo {
+	if pending.isUndo() && !pending.Legacy && !s.publishUndo {
 		// Undo publishing was turned off while the sink was down. Without it
 		// an undo only moves the cursor back, so do that and drop the
 		// notification.
@@ -411,32 +424,42 @@ func pendingCursor(pending *pendingDelivery) (*sink.Cursor, error) {
 // deliver publishes the pending payload and, on success, commits it. The
 // returned error is the publisher's delivery error.
 func (s *Sink) deliver(ctx context.Context, pending *pendingDelivery) error {
-	err := s.publisher.Publish(ctx, Message{
-		Data:        pending.Payload,
-		Attributes:  map[string]string{AttributeType: pending.messageType()},
-		OrderingKey: s.orderingKey,
-	})
-	if err != nil {
-		var delivery *DeliveryError
-		if errors.As(err, &delivery) {
-			delivery.BlockNumber = pending.BlockNumber
-			if delivery.Project == "" {
-				delivery.Project = s.projectID
+	for _, msg := range pending.outbound(s.orderingKey) {
+		err := s.publisher.Publish(ctx, msg)
+		if err != nil {
+			var delivery *DeliveryError
+			if errors.As(err, &delivery) {
+				delivery.BlockNumber = pending.BlockNumber
+				if delivery.Project == "" {
+					delivery.Project = s.projectID
+				}
+				if delivery.Topic == "" {
+					delivery.Topic = s.topicID
+				}
 			}
-			if delivery.Topic == "" {
-				delivery.Topic = s.topicID
-			}
+			return err
 		}
-		return err
+		// Count a publish only after it succeeds. Retries inside Publish are not
+		// counted again.
+		PublishesCounter.Inc()
+		PublishedBytes.AddInt(len(msg.Data))
 	}
-
-	// Count a publish only after it succeeds. Retries inside Publish are not
-	// counted again.
-	PublishesCounter.Inc()
-	PublishedBytes.AddInt(len(pending.Payload))
 
 	s.commit(pending)
 	return nil
+}
+
+// outbound is the Pub/Sub messages for one delivery. Legacy messages already
+// carry their attributes and ordering key. The webhook JSON is one message.
+func (p *pendingDelivery) outbound(orderingKey string) []Message {
+	if p.Legacy {
+		return p.Messages
+	}
+	return []Message{{
+		Data:        p.Payload,
+		Attributes:  map[string]string{AttributeType: p.messageType()},
+		OrderingKey: orderingKey,
+	}}
 }
 
 // commit records a published payload: cursor written, pending file removed,
@@ -520,6 +543,11 @@ func (s *Sink) handleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 		return nil
 	}
 
+	if isLegacyPublishType(data.Output.MapOutput.TypeUrl) {
+		s.legacyPublish = true
+		return s.sendLegacyBlock(ctx, data.Clock, data.Output.MapOutput.Value, cursor, now)
+	}
+
 	msgDesc := s.decoder.GetMessageDescriptor(data.Output.Name)
 	dataContent := s.decoder.DecodeDynamicMessage(msgDesc, data.Output.MapOutput)
 
@@ -528,6 +556,54 @@ func (s *Sink) handleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 		return s.addToBatch(ctx, data.Output.Name, data.Output.MapOutput.TypeUrl, data.Clock, dataContent, cursor, live, now)
 	}
 	return s.sendBlock(ctx, data.Output.Name, data.Output.MapOutput.TypeUrl, data.Clock, dataContent, cursor, now)
+}
+
+// sendLegacyBlock publishes one block the way substreams-sink-pubsub does.
+// Batching does not apply: each Publish.Message is its own Pub/Sub message.
+func (s *Sink) sendLegacyBlock(ctx context.Context, clock *pbsubstreams.Clock, raw []byte, cursor *sink.Cursor, now time.Time) error {
+	var blockNum uint64
+	if clock != nil {
+		blockNum = clock.Number
+	}
+	var cursorStr string
+	if cursor != nil {
+		cursorStr = cursor.String()
+	}
+	messages, err := legacyBlockMessages(blockNum, cursorStr, raw)
+	if err != nil {
+		return err
+	}
+	return s.send(ctx, &pendingDelivery{
+		Kind:           DeliveryKindBlock,
+		Legacy:         true,
+		Messages:       messages,
+		BlockNumber:    blockNum,
+		Cursor:         cursorStr,
+		FirstAttemptAt: now,
+		Fingerprint:    s.fingerprint,
+	})
+}
+
+// sendLegacyUndo publishes the substreams-sink-pubsub undo message. That sink
+// always emits it, so --pubsub-undo is not required for a Publish module.
+func (s *Sink) sendLegacyUndo(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *sink.Cursor) error {
+	var blockNum uint64
+	if undoSignal.LastValidBlock != nil {
+		blockNum = undoSignal.LastValidBlock.Number
+	}
+	var cursorStr string
+	if cursor != nil {
+		cursorStr = cursor.String()
+	}
+	return s.send(ctx, &pendingDelivery{
+		Kind:           DeliveryKindUndo,
+		Legacy:         true,
+		Messages:       []Message{legacyUndoMessage(blockNum, cursorStr)},
+		BlockNumber:    blockNum,
+		Cursor:         cursorStr,
+		FirstAttemptAt: time.Now(),
+		Fingerprint:    s.fingerprint,
+	})
 }
 
 // sendBlock publishes one block as a WebhookPayload.
@@ -696,8 +772,9 @@ func (s *Sink) retryUndo(ctx context.Context, pending *pendingDelivery, err erro
 	}
 }
 
-// handleBlockUndoSignal moves the cursor back to the last valid block and,
-// when undo publishing is on, tells the subscriber which blocks are gone.
+// handleBlockUndoSignal moves the cursor back to the last valid block.
+// A Publish module always emits the substreams-sink-pubsub reorg message.
+// Any other module emits the webhook undo JSON when undo publishing is on.
 func (s *Sink) handleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *sink.Cursor) error {
 	// The blocks of the open batch above the last valid one were never
 	// published, so they are dropped. The rest must reach the subscriber
@@ -709,6 +786,10 @@ func (s *Sink) handleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstrea
 		if err := s.flushBatch(ctx); err != nil {
 			return err
 		}
+	}
+
+	if s.legacyPublish {
+		return s.sendLegacyUndo(ctx, undoSignal, cursor)
 	}
 
 	if !s.publishUndo {

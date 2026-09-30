@@ -29,7 +29,7 @@ One message per block carries attribute `type=block`:
  "blocks": [{"clock": {"number": 12000000, "id": "0xabc", "timestamp": "2024-01-01T00:00:00Z"}, "data": {}}]}
 ```
 
-Message ordering is on. Every message uses the output module name as its ordering key. A subscription created with message ordering enabled receives that module's messages in publish order.
+Message ordering is on. For the webhook JSON, every message uses the output module name as its ordering key. A subscription created with message ordering enabled receives that module's messages in publish order.
 
 `--pubsub-undo` also publishes a reorg notification on the same topic, attribute `type=undo`:
 
@@ -38,6 +38,12 @@ Message ordering is on. Every message uses the output module name as its orderin
 ```
 
 Without `--pubsub-undo` the cursor still moves back, and the blocks that replace the undone ones are published as usual.
+
+## Modules that emit Publish
+
+A module whose output type is `sf.substreams.sink.pubsub.v1.Publish` is published in the [substreams-sink-pubsub](https://github.com/streamingfast/substreams-sink-pubsub) format. Each `Publish.Message` is one Pub/Sub message. Its bytes and attributes are kept, attribute `Cursor` is set to the sink cursor, and the ordering key is the zero-padded block number and the message index (`000000012_00000`). A reorg is one message with attributes `LastValidBlock`, `Step=Undo`, and `Cursor`, and no body. That reorg message is published whether or not `--pubsub-undo` is set. `--pubsub-batch-max-blocks` does not apply to this module.
+
+Any other module is published as the webhook JSON.
 
 ## Failure handling
 

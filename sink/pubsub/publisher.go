@@ -23,13 +23,13 @@ const (
 	TypeUndo = "undo"
 )
 
-// Message is one publish. OrderingKey is the output module name for every
-// message of a sink: Pub/Sub orders only the messages that share a key, so a
-// per-block key would not order the stream.
+// Message is one publish. OrderingKey is the output module name for the
+// webhook JSON. A module that emits Publish uses the substreams-sink-pubsub
+// key instead: the zero-padded block number and the message index.
 type Message struct {
-	Data        []byte
-	Attributes  map[string]string
-	OrderingKey string
+	Data        []byte            `json:"data,omitempty"`
+	Attributes  map[string]string `json:"attributes,omitempty"`
+	OrderingKey string            `json:"ordering_key,omitempty"`
 }
 
 // Publisher publishes one message, retrying transient failures. A *DeliveryError

@@ -1,6 +1,6 @@
 ## PubSub
 
-`substreams sink pubsub` publishes the output of any module to a [Google Cloud Pub/Sub](https://cloud.google.com/pubsub) topic. The message body is the [webhook sink](https://github.com/streamingfast/substreams/tree/develop/sink/webhook)'s JSON, the same body `substreams sink webhook` sends.
+`substreams sink pubsub` publishes the output of any module to a [Google Cloud Pub/Sub](https://cloud.google.com/pubsub) topic. The message body is the [webhook sink](https://github.com/streamingfast/substreams/tree/develop/sink/webhook)'s JSON, the same body `substreams sink webhook` sends. A module that emits `sf.substreams.sink.pubsub.v1.Publish` is published in the [substreams-sink-pubsub](https://github.com/streamingfast/substreams-sink-pubsub) format described under [Modules that emit Publish](#modules-that-emit-publish).
 
 ```bash
 substreams sink pubsub --project my-gcp-project my-topic ./my-substreams.spkg map_events -e <endpoint>
@@ -20,7 +20,7 @@ Each block is one message with attribute `type=block`:
 
 `--pubsub-batch-max-blocks=N` puts up to N blocks in one message (`type=batch`). `--pubsub-batch-max-bytes` caps that body, and `--pubsub-batch-max-wait` bounds how long a batch waits.
 
-Message ordering is enabled. Every message uses the output module's name as its ordering key, so a subscription created with message ordering enabled receives that module's messages in publish order.
+Message ordering is enabled. For the webhook JSON, every message uses the output module's name as its ordering key, so a subscription created with message ordering enabled receives that module's messages in publish order.
 
 `--pubsub-undo` publishes a reorg notification on the same topic (`type=undo`) naming the last valid block. Without it, the cursor still moves back and the blocks that replace the undone ones are published as usual.
 
@@ -39,25 +39,17 @@ substreams sink pubsub --project <project_id> <topic_name> <substreams_manifest>
 - `endpoint`: the Substreams endpoint. [Chains & Endpoints](../../references/chains-and-endpoints.md) lists them.
 - `project_id`: the Google Cloud project ID. Omit `--project` when `<topic_name>` is a full `projects/<project>/topics/<topic>` path.
 - `substreams_manifest`: path to the Substreams manifest or package.
-- `substreams_module_name`: the output module. Any module works. Its output is published as the webhook sink's JSON, the same body `substreams sink webhook` sends.
+- `substreams_module_name`: the output module. Any module works. Its output is published as the webhook sink's JSON, the same body `substreams sink webhook` sends. A module that emits `sf.substreams.sink.pubsub.v1.Publish` is published in the substreams-sink-pubsub format. See [Modules that emit Publish](#modules-that-emit-publish).
 - `topic_name`: the Pub/Sub topic ID.
 
 ### Modules that emit Publish
 
-The standalone [`substreams-sink-pubsub`](https://github.com/streamingfast/substreams-sink-pubsub) binary remains for a module that emits [sf.substreams.sink.pubsub.v1.Publish](https://github.com/streamingfast/substreams-sink-pubsub/blob/develop/proto/sf/substreams/sink/pubsub/v1/pubsub.proto). That message chooses the bytes and attributes of each Pub/Sub message itself.
-
-- Clone the [substreams-sink-pubsub](https://github.com/streamingfast/substreams-sink-pubsub) repository.
-- From that checkout, install the CLI:
+A module whose output is [`sf.substreams.sink.pubsub.v1.Publish`](https://github.com/streamingfast/substreams-sink-pubsub/blob/develop/proto/sf/substreams/sink/pubsub/v1/pubsub.proto) is published by `substreams sink pubsub` in the [substreams-sink-pubsub](https://github.com/streamingfast/substreams-sink-pubsub) format. Run it with the same command as any other module:
 
 ```bash
-go install ./cmd/substreams-sink-pubsub
+substreams sink pubsub --project <project_id> <topic_name> <substreams_manifest> <substreams_module_name> -e <endpoint>
 ```
 
-- Create a topic in Google Cloud Pub/Sub.
-- Run the sink. The module must emit `sf.substreams.sink.pubsub.v1.Publish`:
+Each `Publish.Message` becomes one Pub/Sub message. The bytes and attributes are kept, attribute `Cursor` is the sink cursor, and the ordering key is the zero-padded block number and the message index (`000000012_00000`). A reorg is a message with attributes `LastValidBlock`, `Step=Undo`, and `Cursor`, and no body. That reorg message is published whether or not `--pubsub-undo` is set. `--pubsub-batch-max-blocks` does not apply to this module.
 
-```bash
-substreams-sink-pubsub sink -e <endpoint> --project <project_id> <substreams_manifest> <substreams_module_name> <topic_name>
-```
-
-Examples of modules that emit `Publish` are in the `examples` directory of that repository.
+The standalone `substreams-sink-pubsub` binary publishes that same format. Examples of modules that emit `Publish` are in the `examples` directory of that repository.

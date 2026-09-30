@@ -36,6 +36,12 @@ type pendingDelivery struct {
 	// file was created. A different fingerprint on restart means the
 	// configuration changed, which resets FirstAttemptAt.
 	Fingerprint string `json:"fingerprint"`
+	// Legacy publishes Messages in the substreams-sink-pubsub wire format.
+	// An empty list publishes nothing and still commits the cursor. Both
+	// fields are omitted for the webhook JSON, so an older pending file
+	// still loads.
+	Legacy   bool      `json:"legacy,omitempty"`
+	Messages []Message `json:"messages,omitempty"`
 }
 
 // DeliveryKind tells a block payload from a reorg notification.

@@ -14,6 +14,7 @@ import (
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/pipeline/exec"
+	"github.com/streamingfast/substreams/reqctx"
 )
 
 func TestNewStages(t *testing.T) {
@@ -773,4 +774,37 @@ func TestReprocessMapSegment(t *testing.T) {
 	assert.False(t, stages.ReprocessMapSegment(3), "already pending")
 	stages.forceTransition(3, 2, UnitScheduled)
 	assert.False(t, stages.ReprocessMapSegment(3), "job running")
+}
+
+func TestBlocksToProcessEmptyBackprocessRange(t *testing.T) {
+	// The chain's final block sits in the store's first segment, so the linear handoff lands
+	// exactly on the store's initial block: the stores are scheduled over the empty range
+	// [100, 100) and the global segmenter has no last index.
+	reqPlan, err := plan.BuildTier1RequestPlan(true,
+		100, // segmentInterval
+		100, // lowestInitialBlock
+		100, // lowestStoreInitialBlock
+		330, // resolvedStartBlock
+		100, // linearHandoffBlock
+		360, // exclusiveEndBlock
+		true)
+	require.NoError(t, err)
+	require.True(t, reqPlan.RequiresParallelProcessing())
+
+	ctx := reqctx.WithRequest(context.Background(), &reqctx.RequestDetails{
+		ResolvedStartBlockNum: 330,
+		LinearHandoffBlockNum: 100,
+		StopBlockNum:          360,
+	})
+	stages := NewStages(ctx, exec.TestGraphStagedModules(100, 100, 100, 100, 100), reqPlan, nil, nil)
+	require.Equal(t, -1, stages.globalSegmenter.LastIndex())
+
+	before, effectiveBefore, after, effectiveAfter := stages.BlocksToProcess(250)
+	// Pins current accounting: each store stage is counted up to the start segment (2 segments x 2
+	// store stages) even though the stores range is empty and [100, 330) is processed linearly, so
+	// those blocks also show up in `after`.
+	assert.Equal(t, uint64(400), before)
+	assert.Equal(t, uint64(400), effectiveBefore)
+	assert.Equal(t, uint64(260), after, "every block from the handoff to the stop block is processed linearly")
+	assert.Equal(t, uint64(260), effectiveAfter)
 }

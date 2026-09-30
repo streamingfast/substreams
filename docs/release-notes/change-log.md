@@ -25,6 +25,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   source of Cloud Logging volume on `substreams-workers`, logged on every backpressure refusal alongside
   the line above.
 
+- Fixed a tier1 panic (`INTERNAL: runtime error: invalid memory address or nil pointer dereference`) on a
+  production-mode request starting past the chain's final block, when that final block falls within the
+  first segment of the request's stores. The linear handoff then lands exactly on the stores' initial
+  block, leaving no segment to backprocess.
+
 ### Dependencies
 
 - Bumped `github.com/streamingfast/firehose-networks` to v0.3.0.

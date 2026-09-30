@@ -25,10 +25,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   source of Cloud Logging volume on `substreams-workers`, logged on every backpressure refusal alongside
   the line above.
 
+- Fixed a tier1 panic (`INTERNAL: runtime error: invalid memory address or nil pointer dereference`) on a
+  production-mode request starting past the chain's final block, when that final block falls within the
+  first segment of the request's stores. The linear handoff then lands exactly on the stores' initial
+  block, leaving no segment to backprocess.
+
+### Tools
+
+- `substreams tools devenv` now waits for the dummy chain to finish its genesis burst before starting tier1.
+  The relayer can start serving mid-burst, and tier1 then planned requests against a chain a few blocks high.
+
 ### Dependencies
 
 - Bumped `github.com/streamingfast/firehose-networks` to v0.3.0.
 - Bumped `github.com/streamingfast/dgrpc` to pick up `server.WithCodeLevelFunc`.
+- Bumped `github.com/streamingfast/dummy-blockchain` to v1.7.8, and `substreams tools devenv` now defaults to the
+  `ghcr.io/streamingfast/dummy-blockchain:v1.7.8` image. Its relayer no longer sometimes drops a block around
+  the chain's forks, which could make tier1 exit with `received 5 consecutive unlinkable blocks`.
+- Bumped `github.com/streamingfast/bstream` to pick up the forkable hub fixes: tier1 no longer exits with
+  `received 5 consecutive unlinkable blocks` or `cannot link block after reconnection` when it starts while
+  the merger is deleting the one-block files of a bundle it just merged.
 
 ## v1.23.0
 

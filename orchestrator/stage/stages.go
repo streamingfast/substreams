@@ -1039,7 +1039,11 @@ func (s *Stages) BlocksToProcess(headBlockNum uint64) (beforeStartBlock, effecti
 	}
 
 	var extraBlocks uint64
-	rangeEndBlock := (s.globalSegmenter.Range(s.globalSegmenter.LastIndex()).ExclusiveEndBlock)
+	// An empty segmenter (e.g. stores starting right at the linear handoff) has no last range.
+	rangeEndBlock := s.globalSegmenter.ExclusiveEndBlock()
+	if lastIndex := s.globalSegmenter.LastIndex(); lastIndex >= 0 {
+		rangeEndBlock = s.globalSegmenter.Range(lastIndex).ExclusiveEndBlock
+	}
 	if stopBlock > rangeEndBlock {
 		extraBlocks = stopBlock - rangeEndBlock // blocks processed in linear mode...
 	}

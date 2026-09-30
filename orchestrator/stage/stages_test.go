@@ -799,7 +799,12 @@ func TestBlocksToProcessEmptyBackprocessRange(t *testing.T) {
 	stages := NewStages(ctx, exec.TestGraphStagedModules(100, 100, 100, 100, 100), reqPlan, nil, nil)
 	require.Equal(t, -1, stages.globalSegmenter.LastIndex())
 
-	_, _, after, effectiveAfter := stages.BlocksToProcess(250)
+	before, effectiveBefore, after, effectiveAfter := stages.BlocksToProcess(250)
+	// Pins current accounting: each store stage is counted up to the start segment (2 segments x 2
+	// store stages) even though the stores range is empty and [100, 330) is processed linearly, so
+	// those blocks also show up in `after`.
+	assert.Equal(t, uint64(400), before)
+	assert.Equal(t, uint64(400), effectiveBefore)
 	assert.Equal(t, uint64(260), after, "every block from the handoff to the stop block is processed linearly")
 	assert.Equal(t, uint64(260), effectiveAfter)
 }

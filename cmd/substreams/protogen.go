@@ -107,6 +107,10 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 
 	generator := codegen.NewProtoGenerator(outputPath, excludePaths, generateMod)
 	generator.SetProjectPath(projectPath)
+	// Without the flag the output directory comes from an existing `buf.gen.yaml`.
+	if cmd.Flags().Changed("output-path") {
+		generator.SetOutputPathExplicit()
+	}
 
 	// Check for non-deterministic descriptor sets and warn the user
 	if pkgBundle != nil && pkgBundle.Manifest != nil {

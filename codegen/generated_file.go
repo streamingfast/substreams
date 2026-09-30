@@ -8,39 +8,69 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// bufPlugin is one entry of a buf configuration's plugin list.
+type bufPlugin struct {
+	Plugin string `yaml:"plugin"`
+	Remote string `yaml:"remote"`
+	Local  any    `yaml:"local"`
+	Name   string `yaml:"name"`
+	Out    string `yaml:"out"`
+}
+
+// isBuffa reports whether this entry names the buffa plugin. Only the plugin reference
+// decides it, so a comment mentioning buffa, or a path in some unrelated field, does not count.
+func (p bufPlugin) isBuffa() bool {
+	for _, ref := range []string{p.Plugin, p.Remote, p.Name, fmt.Sprint(p.Local)} {
+		if strings.Contains(ref, "buffa") {
+			return true
+		}
+	}
+	return false
+}
+
+// readBufPlugins parses the plugin list out of the buf configuration at path. A configuration
+// that cannot be read or parsed has no plugins, which callers read as "not ours to touch".
+func readBufPlugins(path string) []bufPlugin {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+
+	var config struct {
+		Plugins []bufPlugin `yaml:"plugins"`
+	}
+	if err := yaml.Unmarshal(content, &config); err != nil {
+		return nil
+	}
+	return config.Plugins
+}
+
 // generatesBuffaOutput reports whether the buf configuration at path runs the buffa plugin.
 //
 // Only buffa's output needs a `mod.rs` written for it. prost's `prost-crate` plugin writes its
 // own, so a project configured for prost gets none from us, and neither does one whose
 // configuration cannot be read.
 func generatesBuffaOutput(path string) bool {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return false
-	}
-
-	// Only the plugin entries decide this. A comment mentioning buffa, or a path in some
-	// unrelated field, must not count.
-	var config struct {
-		Plugins []struct {
-			Plugin string `yaml:"plugin"`
-			Remote string `yaml:"remote"`
-			Local  any    `yaml:"local"`
-			Name   string `yaml:"name"`
-		} `yaml:"plugins"`
-	}
-	if err := yaml.Unmarshal(content, &config); err != nil {
-		return false
-	}
-
-	for _, plugin := range config.Plugins {
-		for _, ref := range []string{plugin.Plugin, plugin.Remote, plugin.Name, fmt.Sprint(plugin.Local)} {
-			if strings.Contains(ref, "buffa") {
-				return true
-			}
+	for _, plugin := range readBufPlugins(path) {
+		if plugin.isBuffa() {
+			return true
 		}
 	}
 	return false
+}
+
+// buffaOutputPath returns the directory buffa is configured to generate into, empty if the
+// configuration does not run buffa or does not say where its output goes.
+//
+// `buf` writes where the configuration tells it to, so that is where `mod.rs` belongs. Reading
+// it keeps the two in step for a project whose generated code does not sit in `src/pb`.
+func buffaOutputPath(path string) string {
+	for _, plugin := range readBufPlugins(path) {
+		if plugin.isBuffa() {
+			return plugin.Out
+		}
+	}
+	return ""
 }
 
 // generatedFile is a file this tool owns and may rewrite, identified by a marker on

@@ -24,6 +24,9 @@ type ProtoGenerator struct {
 	projectPath                    string
 	generateMod                    bool
 	hasNonDeterministicDescriptors bool
+	// outputPathWasSet records that the caller chose the output directory, so an existing
+	// `buf.gen.yaml` does not override it.
+	outputPathWasSet bool
 }
 
 func NewProtoGenerator(outputPath string, excludedPaths []string, generateMod bool) *ProtoGenerator {
@@ -57,6 +60,12 @@ func (g *ProtoGenerator) SetProjectPath(path string) {
 	if rel, err := filepath.Rel(abs, g.outputPath); err == nil {
 		g.outputPath = rel
 	}
+}
+
+// SetOutputPathExplicit marks the output directory as the caller's choice, so an existing
+// `buf.gen.yaml` does not override it.
+func (g *ProtoGenerator) SetOutputPathExplicit() {
+	g.outputPathWasSet = true
 }
 
 // projectFile resolves name against the project directory.
@@ -98,6 +107,40 @@ func (g *ProtoGenerator) bufConfigFile() string {
 // relative to the project because it is written into `buf.gen.yaml`, where `buf` resolves it.
 func (g *ProtoGenerator) outputDir() string {
 	return g.projectFile(g.outputPath)
+}
+
+// adoptConfiguredOutputPath points the generator at the directory an existing `buf.gen.yaml`
+// generates into, so `mod.rs` lands beside the files it includes.
+//
+// `buf` writes where the configuration says, which is not always `src/pb`. Looking only in the
+// default would leave a project that generates elsewhere with its per-package files written and
+// no `mod.rs` tying them together, and nothing said about it. A path given explicitly is the
+// caller's choice and is left alone.
+func (g *ProtoGenerator) adoptConfiguredOutputPath() {
+	if g.outputPathWasSet {
+		return
+	}
+
+	configured := buffaOutputPath(g.bufConfigFile())
+	if configured == "" {
+		return
+	}
+
+	// `out:` is relative to the directory `buf` runs in, while `outputPath` is relative to the
+	// project. They are the same directory only when the configuration sits beside the manifest.
+	dir, err := filepath.Abs(g.bufConfigDir())
+	if err != nil {
+		return
+	}
+	project, err := filepath.Abs(g.projectPath)
+	if err != nil {
+		return
+	}
+	rel, err := filepath.Rel(project, filepath.Join(dir, configured))
+	if err != nil {
+		return
+	}
+	g.outputPath = rel
 }
 
 // bufOutputPath is the generated-code directory as `buf` must see it: relative to the directory
@@ -278,6 +321,8 @@ func (g *ProtoGenerator) warnOnStackMismatch() {
 }
 
 func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
+	g.adoptConfiguredOutputPath()
+
 	// Calculate current hash of inputs
 	currentHash, err := g.calculateHash(pkg)
 	if err != nil {

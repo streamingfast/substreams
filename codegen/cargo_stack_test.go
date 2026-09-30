@@ -208,3 +208,79 @@ func TestFindCargoManifestWithoutAnyManifest(t *testing.T) {
 		t.Error("a missing manifest should not name a stack")
 	}
 }
+
+// `buf` writes where its configuration says, so a project generating outside `src/pb` must
+// still get its `mod.rs` beside the files it includes.
+func TestOutputPathComesFromTheConfiguration(t *testing.T) {
+	dir := t.TempDir()
+	config := "version: v1\nplugins:\n- plugin: buf.build/anthropics/buffa:v0.9.2\n  out: core/src/pb\n"
+	if err := os.WriteFile(filepath.Join(dir, "buf.gen.yaml"), []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	generator := NewProtoGenerator("src/pb", nil, true)
+	generator.SetProjectPath(dir)
+	generator.adoptConfiguredOutputPath()
+
+	if want := filepath.Join(dir, "core", "src", "pb"); generator.outputDir() != want {
+		t.Errorf("outputDir() = %q, want %q", generator.outputDir(), want)
+	}
+}
+
+// A directory named on the command line is the caller's choice, not the configuration's.
+func TestExplicitOutputPathWinsOverTheConfiguration(t *testing.T) {
+	dir := t.TempDir()
+	config := "version: v1\nplugins:\n- plugin: buf.build/anthropics/buffa:v0.9.2\n  out: core/src/pb\n"
+	if err := os.WriteFile(filepath.Join(dir, "buf.gen.yaml"), []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	generator := NewProtoGenerator("elsewhere", nil, true)
+	generator.SetProjectPath(dir)
+	generator.SetOutputPathExplicit()
+	generator.adoptConfiguredOutputPath()
+
+	if want := filepath.Join(dir, "elsewhere"); generator.outputDir() != want {
+		t.Errorf("outputDir() = %q, want %q", generator.outputDir(), want)
+	}
+}
+
+// A prost configuration keeps its own layout, and `prost-crate` writes the `mod.rs`.
+func TestOutputPathIgnoresANonBuffaConfiguration(t *testing.T) {
+	dir := t.TempDir()
+	config := "version: v1\nplugins:\n- plugin: buf.build/community/neoeinstein-prost:v0.4.0\n  out: somewhere/else\n"
+	if err := os.WriteFile(filepath.Join(dir, "buf.gen.yaml"), []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	generator := NewProtoGenerator("src/pb", nil, true)
+	generator.SetProjectPath(dir)
+	generator.adoptConfiguredOutputPath()
+
+	if want := filepath.Join(dir, "src", "pb"); generator.outputDir() != want {
+		t.Errorf("outputDir() = %q, want %q", generator.outputDir(), want)
+	}
+}
+
+// A configuration one directory above the project is resolved against ITS directory, not the
+// project's, matching where `buf` writes when it runs there.
+func TestConfiguredOutputPathResolvesAgainstTheConfigurationDirectory(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "crates", "my-project")
+	if err := os.MkdirAll(project, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	config := "version: v1\nplugins:\n- plugin: buf.build/anthropics/buffa:v0.9.2\n  out: gen/rust\n"
+	if err := os.WriteFile(filepath.Join(root, "buf.gen.yaml"), []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	generator := NewProtoGenerator("src/pb", nil, true)
+	generator.SetProjectPath(project)
+	generator.adoptConfiguredOutputPath()
+
+	if want := filepath.Join(root, "gen", "rust"); generator.outputDir() != want {
+		t.Errorf("outputDir() = %q, want %q", generator.outputDir(), want)
+	}
+}

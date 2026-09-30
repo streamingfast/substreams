@@ -7,7 +7,7 @@ require (
 	github.com/jhump/protoreflect v1.14.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
-	github.com/streamingfast/bstream v0.0.2-0.20260921191230-ea57fcbd4fbb
+	github.com/streamingfast/bstream v0.0.2-0.20260930141647-3dd2b9bd72d7
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
 	github.com/streamingfast/dauth v0.0.0-20260304175046-02898e30442d
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
@@ -79,7 +79,7 @@ require (
 	github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62
 	github.com/streamingfast/dregistry v0.0.0-20260818204944-2fed3956d4e1
 	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
-	github.com/streamingfast/dummy-blockchain v1.7.7
+	github.com/streamingfast/dummy-blockchain v1.7.8
 	github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a
 	github.com/streamingfast/firehose-networks v0.3.0
 	github.com/streamingfast/sf-tracing v0.0.0-20251218140752-bafd5572499f

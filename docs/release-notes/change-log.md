@@ -30,6 +30,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   first segment of the request's stores. The linear handoff then lands exactly on the stores' initial
   block, leaving no segment to backprocess.
 
+- Tier1 now handles Ethereum partial blocks about 20x faster, with almost no allocations. It reads the
+  transaction traces straight from the encoded block and drops the ones already sent by copying bytes,
+  instead of decoding and re-encoding the whole block for every partial.
+
 ### Tools
 
 - `substreams tools devenv` now waits for the dummy chain to finish its genesis burst before starting tier1.

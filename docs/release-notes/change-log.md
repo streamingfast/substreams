@@ -30,6 +30,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   first segment of the request's stores. The linear handoff then lands exactly on the stores' initial
   block, leaving no segment to backprocess.
 
+### Tools
+
+- `substreams tools devenv` now waits for the dummy chain to finish its genesis burst before starting tier1.
+  The relayer can start serving mid-burst, and tier1 then planned requests against a chain a few blocks high.
+
 ### Dependencies
 
 - Bumped `github.com/streamingfast/firehose-networks` to v0.3.0.

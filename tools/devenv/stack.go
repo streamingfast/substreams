@@ -226,7 +226,51 @@ func startDummyBlockchainOnce(ctx context.Context, config ChainConfig) (testcont
 		return container, fmt.Errorf("relayer never accepted a connection on %s: %w", endpoint, err)
 	}
 
+	// The relayer can serve before the burst is over, and a tier1 started then sees a chain a
+	// few blocks high that jumps hundreds of blocks at once: its hub, its linear handoff and
+	// every request planned against it are off. Blocks carry the wall clock as their
+	// timestamp, so nothing downstream can tell a burst block from a live one either.
+	if err := waitBurstProduced(ctx, config.TmpDir, uint64(config.Burst), config.startupTimeout()); err != nil {
+		return container, fmt.Errorf("chain never produced its genesis burst of %d blocks: %w", config.Burst, err)
+	}
+
 	return container, nil
+}
+
+// waitBurstProduced waits for a one-block file at or above burst in the bind-mounted storage.
+// Once the burst is over the reader keeps writing live blocks above it faster than the merger
+// removes them, so there always is one to find.
+func waitBurstProduced(ctx context.Context, tmpDir string, burst uint64, timeout time.Duration) error {
+	if burst == 0 {
+		return nil
+	}
+
+	oneBlocksDir := filepath.Join(tmpDir, "one-blocks")
+	deadline := time.After(timeout)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	var highest uint64
+	for {
+		entries, _ := os.ReadDir(oneBlocksDir) // does not exist until the reader writes its first block
+		for _, entry := range entries {
+			num, _, _ := strings.Cut(entry.Name(), "-")
+			if blockNum, err := strconv.ParseUint(num, 10, 64); err == nil && blockNum > highest {
+				highest = blockNum
+			}
+		}
+		if highest >= burst {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline:
+			return fmt.Errorf("timeout after %s, highest one-block file is #%d", timeout, highest)
+		case <-ticker.C:
+		}
+	}
 }
 
 // TerminateDummyBlockchain stops the container, first making everything it wrote into

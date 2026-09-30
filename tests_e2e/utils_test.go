@@ -187,17 +187,33 @@ func startTier1AppWithSecret(t *testing.T, ctx context.Context, tmpDir string, c
 }
 
 func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image string, additionalReaderArgs string, burst int) (testcontainers.Container, error) {
-	return newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, additionalReaderArgs, burst, 120)
+	return newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, additionalReaderArgs, burst, 120, true)
 }
 
-func newDummyBlockchainContainerWithBlockRate(ctx context.Context, tmpDir string, image string, additionalReaderArgs string, burst int, blockRate int) (testcontainers.Container, error) {
-	return devenv.StartDummyBlockchain(ctx, devenv.ChainConfig{
+// newDummyBlockchainContainerWithBlockRate starts the dummy chain and, unless waitMerger is
+// false, blocks until the merger has bundled the genesis burst before returning. Tier1 started
+// before that can race the merger's one-block deletions and fatally restart its hub (see
+// devenv.WaitMergedBlocks). Partial-block tests pass waitMerger=false: they need to start while
+// the burst is still recent.
+func newDummyBlockchainContainerWithBlockRate(ctx context.Context, tmpDir string, image string, additionalReaderArgs string, burst int, blockRate int, waitMerger bool) (testcontainers.Container, error) {
+	container, err := devenv.StartDummyBlockchain(ctx, devenv.ChainConfig{
 		Image:           image,
 		TmpDir:          tmpDir,
 		Burst:           burst,
 		BlockRate:       blockRate,
 		ExtraReaderArgs: additionalReaderArgs,
 	})
+	if err != nil {
+		return container, err
+	}
+
+	if waitMerger {
+		if err := devenv.WaitMergedBlocks(ctx, tmpDir, uint64(burst), time.Minute+time.Duration(burst/50)*time.Second); err != nil {
+			return container, fmt.Errorf("merger never caught up with the burst: %w", err)
+		}
+	}
+
+	return container, nil
 }
 
 type responses []interface{}
@@ -372,13 +388,4 @@ func findFreePort(t *testing.T) int {
 	require.NoError(t, err)
 
 	return port
-}
-
-// waitMergerCaughtUp waits until the merger has bundled the genesis burst. Tier1 started
-// before that cannot link live blocks and restarts, see devenv.WaitMergedBlocks. Tests that
-// need to start while the burst is still recent, like the partial blocks ones, skip it.
-func waitMergerCaughtUp(t *testing.T, ctx context.Context, tmpDir string, burst int) {
-	t.Helper()
-	err := devenv.WaitMergedBlocks(ctx, tmpDir, uint64(burst), time.Minute+time.Duration(burst/50)*time.Second)
-	require.NoError(t, err, "merger never caught up with the burst")
 }

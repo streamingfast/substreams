@@ -1,6 +1,6 @@
 # Substreams Pub/Sub sink
 
-`substreams sink pubsub` publishes the output of any module to a Google Cloud Pub/Sub topic. The message body is the [webhook sink](../webhook)'s JSON, the same body `substreams sink webhook` sends.
+`substreams sink pubsub` publishes the output of any module to a Google Cloud Pub/Sub topic. A block message is the [webhook sink](../webhook)'s batch JSON.
 
 ## Usage
 
@@ -14,22 +14,16 @@ substreams sink pubsub projects/my-gcp-project/topics/events ./substreams.yaml m
 
 Set `PUBSUB_EMULATOR_HOST` (for example `localhost:8888`) to publish to a Pub/Sub emulator instead.
 
-One message per block carries attribute `type=block`:
-
-```json
-{"clock": {"number": 12000000, "id": "0xabc", "timestamp": "2024-01-01T00:00:00Z"},
- "manifest": {"moduleName": "map_events", "type": "sf.example.v1.Events"},
- "data": {}}
-```
-
-`--pubsub-batch-max-blocks=N` publishes up to N blocks per message, attribute `type=batch`:
+Every block message has attribute `type=batch`:
 
 ```json
 {"manifest": {"moduleName": "map_events", "type": "sf.example.v1.Events"},
  "blocks": [{"clock": {"number": 12000000, "id": "0xabc", "timestamp": "2024-01-01T00:00:00Z"}, "data": {}}]}
 ```
 
-Message ordering is on. For the webhook JSON, every message uses the output module name as its ordering key. A subscription created with message ordering enabled receives that module's messages in publish order.
+`data` is that block's module output as JSON. While Substreams is not live, `--pubsub-batch-max-blocks=N` puts up to N blocks in `blocks`. A live block is published in the same JSON with only that block. `0` publishes one block per message. `--pubsub-batch-max-bytes` caps the body, and `--pubsub-batch-max-wait` bounds how long a batch waits.
+
+Message ordering is on. Every message uses the output module name as its ordering key. A subscription created with message ordering enabled receives that module's messages in publish order.
 
 `--pubsub-undo` also publishes a reorg notification on the same topic, attribute `type=undo`:
 
@@ -43,7 +37,7 @@ Without `--pubsub-undo` the cursor still moves back, and the blocks that replace
 
 A module whose output type is `sf.substreams.sink.pubsub.v1.Publish` is published in the [substreams-sink-pubsub](https://github.com/streamingfast/substreams-sink-pubsub) format. Each `Publish.Message` is one Pub/Sub message. Its bytes and attributes are kept, attribute `Cursor` is set to the sink cursor, and the ordering key is the zero-padded block number and the message index (`000000012_00000`). A reorg is one message with attributes `LastValidBlock`, `Step=Undo`, and `Cursor`, and no body. That reorg message is published whether or not `--pubsub-undo` is set. `--pubsub-batch-max-blocks` does not apply to this module.
 
-Any other module is published as the webhook JSON.
+Any other module is published as that batch JSON.
 
 ## Failure handling
 

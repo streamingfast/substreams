@@ -65,10 +65,10 @@ type BlockEntry struct {
 	Data  json.RawMessage `json:"data"`
 }
 
-// BatchPayload is sent instead of WebhookPayload when batching is on. The
-// manifest is the same for every block so it is carried once; blocks are in
-// ascending order. Every batch uses this shape, a batch of one included, so a
-// subscriber only ever parses one format.
+// BatchPayload is every block message. The manifest is the same for every
+// block so it is carried once; blocks are in ascending order. While the chain
+// is not live, one message holds several blocks. A live message uses this
+// same JSON and holds the current block.
 type BatchPayload struct {
 	Manifest Manifest     `json:"manifest"`
 	Blocks   []BlockEntry `json:"blocks"`

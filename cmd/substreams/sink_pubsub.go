@@ -35,7 +35,7 @@ func init() {
 	sinkPubsubCmd.Flags().Duration("pubsub-timeout", 30*time.Second, "Timeout for one publish attempt")
 	sinkPubsubCmd.Flags().Duration("pubsub-max-retry-interval", 30*time.Second, "Maximum interval between publish retries (exponential backoff cap)")
 	sinkPubsubCmd.Flags().String("pubsub-on-failure", string(pubsub.OnFailureExit), fmt.Sprintf("What to do once every retry for a block has failed: %q (the default) keeps the block on disk, writes the reason to the termination log and exits with status %d; the next start publishes that block before it connects to Substreams. %q drops the block and continues (an undo notification is instead retried until it goes through)", pubsub.OnFailureExit, pubsub.ExitCodeDeliveryFailed, pubsub.OnFailureSkip))
-	sinkPubsubCmd.Flags().Int("pubsub-batch-max-blocks", 0, "Publish up to this many blocks per message, in the webhook sink's batch payload (see below). 0 publishes one block per message in the single-block shape. Does not apply to a module that emits sf.substreams.sink.pubsub.v1.Publish")
+	sinkPubsubCmd.Flags().Int("pubsub-batch-max-blocks", 0, "While Substreams is not live, publish up to this many blocks in one message. 0 publishes one block per message. A live block is always published alone, in the same JSON. Does not apply to a module that emits sf.substreams.sink.pubsub.v1.Publish")
 	sinkPubsubCmd.Flags().Int("pubsub-batch-max-bytes", 0, "With --pubsub-batch-max-blocks, publish a batch before the next block would take its body past this many bytes. A block larger than this on its own is published alone. 0 means no limit")
 	sinkPubsubCmd.Flags().Duration("pubsub-batch-max-wait", time.Second, "Longest a batch waits for more blocks before it is published, checked when the next block arrives. A batch is also published when the chain is live, before an undo notification, and when the stream ends")
 	sinkPubsubCmd.Flags().Bool("pubsub-undo", false, "Publish a reorg notification on the same topic for each chain reorganization, with attribute type=undo and the webhook sink's undo body {\"lastValidBlock\": {\"number\": ..., \"id\": \"...\"}, \"manifest\": {\"moduleName\": \"...\"}}. Without it the cursor still moves back and the replacement blocks are published as usual. A module that emits sf.substreams.sink.pubsub.v1.Publish always publishes that format's reorg message, with or without this flag")
@@ -48,31 +48,27 @@ var sinkPubsubCmd = &cobra.Command{
 	Use:   "pubsub <topic> [<manifest> [<module_name>]]",
 	Short: "Publish the output of a substreams module to a Google Cloud Pub/Sub topic",
 	Long: cli.Dedent(`
-		Publish the output of a substreams module to a Google Cloud Pub/Sub topic. The block,
-		batch, and undo bodies are the webhook sink's JSON ('substreams sink webhook').
-		A module that emits sf.substreams.sink.pubsub.v1.Publish uses the
-		substreams-sink-pubsub format described below.
+		Publish the output of a substreams module to a Google Cloud Pub/Sub topic. Block
+		messages use the webhook sink's batch JSON ('substreams sink webhook'). A module
+		that emits sf.substreams.sink.pubsub.v1.Publish uses the substreams-sink-pubsub
+		format described below.
 
 		<topic> is a topic id, together with --project, or a full projects/<project>/topics/<topic>
 		path. Credentials are application default credentials. When PUBSUB_EMULATOR_HOST is set,
 		the sink publishes to that emulator.
 
-		One message per block, attribute type=block:
-
-		  {"clock": {"number": ..., "id": "...", "timestamp": "..."},
-		   "manifest": {"moduleName": "...", "type": "..."},
-		   "data": {...}}
-
-		With --pubsub-batch-max-blocks=N every message carries up to N blocks, a batch of one
-		included, and at most --pubsub-batch-max-bytes bytes when that is set, attribute type=batch:
+		Every block message has attribute type=batch and this JSON. While Substreams is not
+		live, --pubsub-batch-max-blocks=N puts up to N blocks in one message (also bounded by
+		--pubsub-batch-max-bytes). A live block is published alone, in the same JSON. 0
+		publishes one block per message.
 
 		  {"manifest": {"moduleName": "...", "type": "..."},
-		   "blocks": [{"clock": {...}, "data": {...}}, ...]}
+		   "blocks": [{"clock": {"number": ..., "id": "...", "timestamp": "..."}, "data": {...}}, ...]}
 
-		Message ordering is enabled. For the webhook JSON, every message uses the output module
-		name as its ordering key, so a subscription created with message ordering enabled
-		receives that module's messages in publish order. A failed publish resumes the key
-		before the sink stops, so the next start is not stuck behind it.
+		Message ordering is enabled. Every message uses the output module name as its ordering
+		key, so a subscription created with message ordering enabled receives that module's
+		messages in publish order. A failed publish resumes the key before the sink stops, so
+		the next start is not stuck behind it.
 
 		A module whose output is sf.substreams.sink.pubsub.v1.Publish is published in the
 		substreams-sink-pubsub format. Each Publish.Message is one Pub/Sub message: its bytes

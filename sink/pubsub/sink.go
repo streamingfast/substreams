@@ -101,8 +101,10 @@ func (e *DeliveryFailedError) TerminationReason() []byte {
 }
 
 // Sink publishes substreams module output to a Google Cloud Pub/Sub topic.
-// The message body is WebhookPayload, BatchPayload, and UndoPayload in this
-// package. That JSON matches the webhook sink and must stay in sync with
+// Block messages are BatchPayload: a manifest and a list of blocks. While the
+// chain is not live, one message holds several blocks. A live message uses
+// that same JSON and holds the current block. Undo messages are UndoPayload.
+// That JSON matches the webhook sink and must stay in sync with
 // sink/webhook/payload.go. A module that emits
 // sf.substreams.sink.pubsub.v1.Publish is published in the
 // substreams-sink-pubsub wire format.
@@ -194,9 +196,10 @@ type SinkConfig struct {
 	OnFailure    OnFailure
 	SinkerConfig *sink.SinkerConfig
 	Retry        RetryConfig
-	// BatchMaxBlocks above zero switches every message to the batch JSON shape
-	// and sends up to that many blocks per message. Zero sends one block per
-	// message.
+	// BatchMaxBlocks above zero groups up to that many blocks into one message
+	// while the chain is not live. Zero publishes one block per message. A
+	// live block is always its own message. Every block message is a
+	// BatchPayload.
 	BatchMaxBlocks int
 	// BatchMaxBytes above zero bounds the size of a batch payload: a batch is
 	// sent before the next block would take it past this many bytes. A block
@@ -359,12 +362,12 @@ func (s *Sink) recoverPending(ctx context.Context, startCursor *sink.Cursor) (*s
 		s.legacyPublish = true
 	}
 
-	if !pending.Legacy && !pending.isUndo() && pending.Batched != s.batching() {
-		// The user switched batching on or off while the sink was down. The
-		// subscriber expects the new shape, and the cursor was not advanced
-		// past these blocks, so the stream sends them again in that shape.
-		s.logger.Info("pending payload was written in the other batching mode, discarding it; the stream re-sends its blocks",
-			zap.Bool("pending_batched", pending.Batched), zap.Bool("batching", s.batching()), zap.Uint64("block", pending.BlockNumber))
+	if !pending.Legacy && !pending.isUndo() && !pending.Batched {
+		// A pending file from the single-block JSON. The cursor was not
+		// advanced past it, so the stream sends the block again as a
+		// BatchPayload.
+		s.logger.Info("pending payload used the single-block shape, discarding it; the stream re-sends its block",
+			zap.Uint64("block", pending.BlockNumber))
 		return startCursor, removePending(s.pendingFile)
 	}
 
@@ -523,8 +526,6 @@ func writeTerminationReason(path string, msg []byte) error {
 	return os.WriteFile(path, msg, 0o644)
 }
 
-func (s *Sink) batching() bool { return s.batchMaxBlocks > 0 }
-
 // handleBlockScopedData publishes one block, or appends it to the open batch.
 func (s *Sink) handleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *sink.Cursor) error {
 	now := time.Now()
@@ -552,10 +553,7 @@ func (s *Sink) handleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 	dataContent := s.decoder.DecodeDynamicMessage(msgDesc, data.Output.MapOutput)
 
 	live := isLive != nil && *isLive
-	if s.batching() {
-		return s.addToBatch(ctx, data.Output.Name, data.Output.MapOutput.TypeUrl, data.Clock, dataContent, cursor, live, now)
-	}
-	return s.sendBlock(ctx, data.Output.Name, data.Output.MapOutput.TypeUrl, data.Clock, dataContent, cursor, now)
+	return s.addToBatch(ctx, data.Output.Name, data.Output.MapOutput.TypeUrl, data.Clock, dataContent, cursor, live, now)
 }
 
 // sendLegacyBlock publishes one block the way substreams-sink-pubsub does.
@@ -606,34 +604,16 @@ func (s *Sink) sendLegacyUndo(ctx context.Context, undoSignal *pbsubstreamsrpc.B
 	})
 }
 
-// sendBlock publishes one block as a WebhookPayload.
-func (s *Sink) sendBlock(ctx context.Context, moduleName, typeURL string, clock *pbsubstreams.Clock, dataContent json.RawMessage, cursor *sink.Cursor, now time.Time) error {
-	payload, err := NewWebhookPayload(moduleName, clock, typeURL, dataContent)
-	if err != nil {
-		return fmt.Errorf("creating block payload: %w", err)
-	}
-	wrappedOut, err := payload.ToJSON()
-	if err != nil {
-		return fmt.Errorf("serializing block payload: %w", err)
-	}
-
-	pending := &pendingDelivery{
-		Kind:           DeliveryKindBlock,
-		BlockNumber:    clock.Number,
-		Payload:        wrappedOut,
-		FirstAttemptAt: now,
-		Fingerprint:    s.fingerprint,
-	}
-	if cursor != nil {
-		pending.Cursor = cursor.String()
-	}
-	return s.send(ctx, pending)
-}
-
 // addToBatch appends the block to the open batch and flushes it when it is
-// full, when it waited long enough, or when the chain is live and holding the
-// block back would only add latency.
+// full, when it waited long enough, or when the chain is live. A live block
+// is published by itself: an open historical batch goes out first.
 func (s *Sink) addToBatch(ctx context.Context, moduleName, typeURL string, clock *pbsubstreams.Clock, dataContent json.RawMessage, cursor *sink.Cursor, live bool, now time.Time) error {
+	if live && s.batch != nil {
+		if err := s.flushBatch(ctx); err != nil {
+			return err
+		}
+	}
+
 	single, err := NewWebhookPayload(moduleName, clock, typeURL, dataContent)
 	if err != nil {
 		return fmt.Errorf("creating batch entry: %w", err)

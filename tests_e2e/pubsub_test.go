@@ -52,11 +52,16 @@ func TestPubSubSink(t *testing.T) {
 		runPubSubSink(t, ctx, endpoint, topicID, 0)
 
 		got := pullPubSub(t, ctx, admin, topicID, 5)
-		assert.Equal(t, []uint64{100, 101, 102, 103, 104}, clockNumbers(t, got, false))
+		assert.Equal(t, []uint64{100, 101, 102, 103, 104}, clockNumbers(t, got, true))
 		for _, msg := range got {
-			assert.Equal(t, pubsubsink.TypeBlock, msg.attrs[pubsubsink.AttributeType])
+			assert.Equal(t, pubsubsink.TypeBatch, msg.attrs[pubsubsink.AttributeType])
 			assert.Equal(t, "map_events", msg.key)
 			assert.Equal(t, "map_events", msg.module)
+			var body struct {
+				Blocks []json.RawMessage `json:"blocks"`
+			}
+			require.NoError(t, json.Unmarshal(msg.data, &body))
+			assert.Len(t, body.Blocks, 1)
 		}
 	})
 

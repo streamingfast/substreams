@@ -15,9 +15,11 @@ import (
 const AttributeType = "type"
 
 const (
-	// TypeBlock is one WebhookPayload. The JSON matches the webhook sink.
+	// TypeBlock is the attribute used by a single-block payload kept from an
+	// older pending file. Block messages are published as TypeBatch.
 	TypeBlock = "block"
-	// TypeBatch is one BatchPayload. The JSON matches the webhook sink.
+	// TypeBatch is one BatchPayload. The JSON matches the webhook sink's batch
+	// body, including a message that holds one block.
 	TypeBatch = "batch"
 	// TypeUndo is one UndoPayload. The JSON matches the webhook sink.
 	TypeUndo = "undo"

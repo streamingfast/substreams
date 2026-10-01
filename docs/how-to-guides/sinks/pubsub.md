@@ -1,6 +1,6 @@
 ## PubSub
 
-`substreams sink pubsub` publishes the output of any module to a [Google Cloud Pub/Sub](https://cloud.google.com/pubsub) topic. The message body is the [webhook sink](https://github.com/streamingfast/substreams/tree/develop/sink/webhook)'s JSON, the same body `substreams sink webhook` sends. A module that emits `sf.substreams.sink.pubsub.v1.Publish` is published in the [substreams-sink-pubsub](https://github.com/streamingfast/substreams-sink-pubsub) format described under [Modules that emit Publish](#modules-that-emit-publish).
+`substreams sink pubsub` publishes the output of any module to a [Google Cloud Pub/Sub](https://cloud.google.com/pubsub) topic. A block message is the [webhook sink](https://github.com/streamingfast/substreams/tree/develop/sink/webhook)'s batch JSON. A module that emits `sf.substreams.sink.pubsub.v1.Publish` is published in the [substreams-sink-pubsub](https://github.com/streamingfast/substreams-sink-pubsub) format described under [Modules that emit Publish](#modules-that-emit-publish).
 
 ```bash
 substreams sink pubsub --project my-gcp-project my-topic ./my-substreams.spkg map_events -e <endpoint>
@@ -8,19 +8,20 @@ substreams sink pubsub --project my-gcp-project my-topic ./my-substreams.spkg ma
 
 `<topic>` is a topic id, used with `--project`, or a full `projects/<project>/topics/<topic>` path. Credentials are [application default credentials](https://cloud.google.com/docs/authentication/application-default-credentials). When `PUBSUB_EMULATOR_HOST` is set, the sink publishes to that emulator.
 
-Each block is one message with attribute `type=block`:
+Every block message has attribute `type=batch`:
 
 ```json
 {
-  "clock": {"number": 12000000, "id": "0xabc", "timestamp": "2024-01-01T00:00:00Z"},
   "manifest": {"moduleName": "map_events", "type": "sf.example.v1.Events"},
-  "data": {}
+  "blocks": [
+    {"clock": {"number": 12000000, "id": "0xabc", "timestamp": "2024-01-01T00:00:00Z"}, "data": {}}
+  ]
 }
 ```
 
-`--pubsub-batch-max-blocks=N` puts up to N blocks in one message (`type=batch`). `--pubsub-batch-max-bytes` caps that body, and `--pubsub-batch-max-wait` bounds how long a batch waits.
+`data` is that block's module output as JSON. While Substreams is not live, `--pubsub-batch-max-blocks=N` puts up to N blocks in `blocks`. A live block is published in the same JSON with only that block. `0` publishes one block per message. `--pubsub-batch-max-bytes` caps the body, and `--pubsub-batch-max-wait` bounds how long a batch waits.
 
-Message ordering is enabled. For the webhook JSON, every message uses the output module's name as its ordering key, so a subscription created with message ordering enabled receives that module's messages in publish order.
+Message ordering is enabled. Every message uses the output module's name as its ordering key, so a subscription created with message ordering enabled receives that module's messages in publish order.
 
 `--pubsub-undo` publishes a reorg notification on the same topic (`type=undo`) naming the last valid block. Without it, the cursor still moves back and the blocks that replace the undone ones are published as usual.
 
@@ -39,7 +40,7 @@ substreams sink pubsub --project <project_id> <topic_name> <substreams_manifest>
 - `endpoint`: the Substreams endpoint. [Chains & Endpoints](../../references/chains-and-endpoints.md) lists them.
 - `project_id`: the Google Cloud project ID. Omit `--project` when `<topic_name>` is a full `projects/<project>/topics/<topic>` path.
 - `substreams_manifest`: path to the Substreams manifest or package.
-- `substreams_module_name`: the output module. Any module works. Its output is published as the webhook sink's JSON, the same body `substreams sink webhook` sends. A module that emits `sf.substreams.sink.pubsub.v1.Publish` is published in the substreams-sink-pubsub format. See [Modules that emit Publish](#modules-that-emit-publish).
+- `substreams_module_name`: the output module. Any module works. Its output is published as the webhook sink's batch JSON. A module that emits `sf.substreams.sink.pubsub.v1.Publish` is published in the substreams-sink-pubsub format. See [Modules that emit Publish](#modules-that-emit-publish).
 - `topic_name`: the Pub/Sub topic ID.
 
 ### Modules that emit Publish

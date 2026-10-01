@@ -105,9 +105,10 @@ func (s *Sink) enableUndo() {
 
 func newPending(num uint64) *pendingDelivery {
 	return &pendingDelivery{
+		Batched:        true,
 		Cursor:         opaqueCursor(num),
 		BlockNumber:    num,
-		Payload:        json.RawMessage(`{"clock":{"number":` + jsonNumber(num) + `}}`),
+		Payload:        json.RawMessage(`{"manifest":{"moduleName":"map_events"},"blocks":[{"clock":{"number":` + jsonNumber(num) + `}}]}`),
 		FirstAttemptAt: time.Now().Add(-time.Hour),
 	}
 }
@@ -146,24 +147,26 @@ func TestPendingFile_RoundTrip(t *testing.T) {
 	assert.Empty(t, pendingFilePath(""))
 }
 
-func TestSendBlock_PublishesWebhookJSONOnOneOrderingKey(t *testing.T) {
+func TestSendBlock_PublishesOneBlockInTheBatchJSON(t *testing.T) {
 	pub := &fakePublisher{}
 	s := newTestSink(t, pub, OnFailureExit)
 	clock := protoClock(10)
 	data := json.RawMessage(`{"n":1}`)
 
-	require.NoError(t, s.sendBlock(context.Background(), "map_events", "type.googleapis.com/sf.test.v1.Out", clock, data, sink.MustNewCursor(opaqueCursor(10)), time.Now()))
+	require.NoError(t, s.addToBatch(context.Background(), "map_events", "type.googleapis.com/sf.test.v1.Out", clock, data, sink.MustNewCursor(opaqueCursor(10)), false, time.Now()))
 
 	msgs := pub.messages()
 	require.Len(t, msgs, 1)
 	assert.Equal(t, "map_events", msgs[0].OrderingKey)
-	assert.Equal(t, TypeBlock, msgs[0].Attributes[AttributeType])
+	assert.Equal(t, TypeBatch, msgs[0].Attributes[AttributeType])
 
-	want, err := NewWebhookPayload("map_events", clock, "type.googleapis.com/sf.test.v1.Out", data)
-	require.NoError(t, err)
-	wantJSON, err := want.ToJSON()
-	require.NoError(t, err)
-	assert.JSONEq(t, string(wantJSON), string(msgs[0].Data))
+	var got BatchPayload
+	require.NoError(t, json.Unmarshal(msgs[0].Data, &got))
+	assert.Equal(t, "map_events", got.Manifest.ModuleName)
+	assert.Equal(t, "sf.test.v1.Out", got.Manifest.Type)
+	require.Len(t, got.Blocks, 1)
+	assert.Equal(t, uint64(10), got.Blocks[0].Clock.Number)
+	assert.JSONEq(t, string(data), string(got.Blocks[0].Data))
 	assert.Equal(t, opaqueCursor(10), readStateCursor(t, s))
 	assert.NoFileExists(t, s.pendingFile)
 }
@@ -269,7 +272,7 @@ func TestRecoverPending_DeliversBeforeStreaming(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, opaqueCursor(10), got.String())
 	assert.Equal(t, 1, pub.callCount())
-	assert.Equal(t, TypeBlock, pub.messages()[0].Attributes[AttributeType])
+	assert.Equal(t, TypeBatch, pub.messages()[0].Attributes[AttributeType])
 	assert.Equal(t, "map_events", pub.messages()[0].OrderingKey)
 	assert.NoFileExists(t, s.pendingFile)
 }
@@ -371,12 +374,12 @@ func TestUndo_SkipModeRetriesUntilPublished(t *testing.T) {
 	require.NoError(t, s.handleBlockUndoSignal(context.Background(), undo, sink.MustNewCursor(opaqueCursor(9))))
 	assert.Equal(t, opaqueCursor(9), readStateCursor(t, s))
 
-	require.NoError(t, s.sendBlock(context.Background(), "map_events", "t", protoClock(10), json.RawMessage(`{}`), sink.MustNewCursor(opaqueCursor(10)), time.Now()))
+	require.NoError(t, s.addToBatch(context.Background(), "map_events", "t", protoClock(10), json.RawMessage(`{}`), sink.MustNewCursor(opaqueCursor(10)), true, time.Now()))
 
 	msgs := pub.messages()
 	require.Len(t, msgs, 2, "the replacement block is published only after the undo notification")
 	assert.Equal(t, TypeUndo, msgs[0].Attributes[AttributeType])
-	assert.Equal(t, TypeBlock, msgs[1].Attributes[AttributeType])
+	assert.Equal(t, TypeBatch, msgs[1].Attributes[AttributeType])
 	assert.Equal(t, "map_events", msgs[0].OrderingKey)
 	assert.Equal(t, "map_events", msgs[1].OrderingKey)
 }
@@ -473,12 +476,21 @@ func TestBatch_FlushesWhenLiveOrWaited(t *testing.T) {
 	now := time.Now()
 	addBlock(t, s, 10, true, now)
 	require.Len(t, pub.messages(), 1, "a live block goes out on its own")
+	assert.Equal(t, []uint64{10}, batchBlockNumbers(t, pub.messages()[0].Data))
 
 	addBlock(t, s, 11, false, now)
-	addBlock(t, s, 12, false, now.Add(2*time.Second))
+	addBlock(t, s, 12, false, now)
+	addBlock(t, s, 13, true, now)
 	msgs := pub.messages()
-	require.Len(t, msgs, 2)
+	require.Len(t, msgs, 3)
 	assert.Equal(t, []uint64{11, 12}, batchBlockNumbers(t, msgs[1].Data))
+	assert.Equal(t, []uint64{13}, batchBlockNumbers(t, msgs[2].Data), "a live block is not appended to the historical batch")
+
+	addBlock(t, s, 14, false, now)
+	addBlock(t, s, 15, false, now.Add(2*time.Second))
+	msgs = pub.messages()
+	require.Len(t, msgs, 4)
+	assert.Equal(t, []uint64{14, 15}, batchBlockNumbers(t, msgs[3].Data))
 }
 
 func TestHandleBlockScopedData_NilOutputDoesNotPanic(t *testing.T) {
@@ -551,13 +563,12 @@ func TestBatch_UndoWithoutUndoDropsBlocksAboveLastValid(t *testing.T) {
 	assert.Equal(t, opaqueCursor(9), readStateCursor(t, s))
 }
 
-func TestRecoverPending_DiscardsOtherBatchingMode(t *testing.T) {
+func TestRecoverPending_DiscardsSingleBlockShape(t *testing.T) {
 	pub := &fakePublisher{}
 	s := newTestSink(t, pub, OnFailureExit)
-	s.batchMaxBlocks = 0
 
 	p := newPending(10)
-	p.Batched = true
+	p.Batched = false
 	p.Fingerprint = s.fingerprint
 	require.NoError(t, writePending(s.pendingFile, p))
 

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // referenceSplitEthereumPartialBlock decodes the whole block and hashes it
@@ -166,4 +167,48 @@ func TestSplitEthereumPartialBlock_EdgeCases(t *testing.T) {
 		_, _, _, err := splitEthereumPartialBlock(data[:len(data)-1], 0, nil)
 		assert.Error(t, err)
 	})
+}
+
+func TestEthereumFieldNumbersMatchSchema(t *testing.T) {
+	block := (&pbeth.Block{}).ProtoReflect().Descriptor()
+	trace := (&pbeth.TransactionTrace{}).ProtoReflect().Descriptor()
+	receipt := (&pbeth.TransactionReceipt{}).ProtoReflect().Descriptor()
+	log := (&pbeth.Log{}).ProtoReflect().Descriptor()
+	bigInt := (&pbeth.BigInt{}).ProtoReflect().Descriptor()
+
+	tests := []struct {
+		message  protoreflect.MessageDescriptor
+		name     protoreflect.Name
+		number   protowire.Number
+		kind     protoreflect.Kind
+		repeated bool
+		// element is the message type of a MessageKind field
+		element protoreflect.MessageDescriptor
+	}{
+		{block, "transaction_traces", ethBlockTransactionTracesField, protoreflect.MessageKind, true, trace},
+		{trace, "hash", ethTraceHashField, protoreflect.BytesKind, false, nil},
+		{trace, "receipt", ethTraceReceiptField, protoreflect.MessageKind, false, receipt},
+		{receipt, "state_root", ethReceiptStateRootField, protoreflect.BytesKind, false, nil},
+		{receipt, "cumulative_gas_used", ethReceiptCumulativeGasUsedField, protoreflect.Uint64Kind, false, nil},
+		{receipt, "logs", ethReceiptLogsField, protoreflect.MessageKind, true, log},
+		{receipt, "blob_gas_used", ethReceiptBlobGasUsedField, protoreflect.Uint64Kind, false, nil},
+		{receipt, "blob_gas_price", ethReceiptBlobGasPriceField, protoreflect.MessageKind, false, bigInt},
+		{log, "address", ethLogAddressField, protoreflect.BytesKind, false, nil},
+		{log, "topics", ethLogTopicsField, protoreflect.BytesKind, true, nil},
+		{log, "data", ethLogDataField, protoreflect.BytesKind, false, nil},
+		{bigInt, "bytes", ethBigIntBytesField, protoreflect.BytesKind, false, nil},
+	}
+
+	for _, test := range tests {
+		t.Run(string(test.message.Name())+"."+string(test.name), func(t *testing.T) {
+			field := test.message.Fields().ByName(test.name)
+			require.NotNil(t, field, "field not found in schema")
+			assert.Equal(t, test.number, field.Number())
+			assert.Equal(t, test.kind, field.Kind())
+			assert.Equal(t, test.repeated, field.IsList())
+			if test.element != nil {
+				assert.Equal(t, test.element.FullName(), field.Message().FullName())
+			}
+		})
+	}
 }

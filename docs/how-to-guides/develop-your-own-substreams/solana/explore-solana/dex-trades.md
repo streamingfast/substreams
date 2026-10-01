@@ -2,6 +2,10 @@ The DEX Trades Substreams, developed by TopLedger, extracts trades from differen
 
 ## About TopLedger
 
+{% hint style="info" %}
+**Compatibility**: the Rust on this page targets `substreams` 0.8.0 and above, where an optional `message` field is a `MessageField<T>` that dereferences to a default. On 0.7 and below the same field is an `Option<T>` and every nested access needs an `.unwrap()` or a `match`. See [Migrating from prost to buffa](../../../../references/migrating-to-buffa.md).
+{% endhint %}
+
 [TopLedger](https://topledger.xyz/) is SQL-based data discovery and analytics platform focused on Solana. By using Substreams, TopLedger has been able to extract data from the main Solana dapps, thus providing rich analytics products.
 
 TopLedger is an active contributor to the Substreams community and has developed several useful ready-to-use Substreams.

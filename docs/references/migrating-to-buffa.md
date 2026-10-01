@@ -1,0 +1,86 @@
+# Migrating from prost to buffa
+
+`substreams` 0.8.0 generates its Rust protobuf bindings with [buffa](https://github.com/anthropics/buffa) instead of [prost](https://github.com/tokio-rs/prost).
+
+**Upgrading is optional.** A module pinned to `substreams` 0.7 keeps building and streaming, and `cargo update` does not move it to 0.8.0. The protobuf wire format is the same under both, so existing packages keep streaming, cached module outputs stay valid, sinks read the same bytes, and a Go or JavaScript consumer needs no change. A project created with `substreams init` already uses buffa.
+
+Read on if you are moving an existing module to 0.8.0, or if a build fails because your crates disagree about which implementation to use.
+
+## Choose a matched set of crates
+
+A crate generates types for one protobuf implementation, so every crate in a module must come from the same row. Mixing rows puts two incompatible copies of `substreams` in the dependency tree.
+
+| `substreams` | `substreams-ethereum` | `substreams-solana` | `substreams-near` | `substreams-database-change` | Protobuf |
+| --- | --- | --- | --- | --- | --- |
+| 0.8.0 | 0.12.0 | 0.16.0 | 0.11.0 | 5.0.0 | buffa |
+| 0.7.x | 0.11.x | 0.15.x | — | 3.x, 4.x | prost |
+| 0.6.x | 0.10.x | 0.14.x | 0.10.x | 2.x | prost |
+
+## Update your dependencies
+
+```diff
+ [dependencies]
+-prost = "0.13"
+-prost-types = "0.13"
+-substreams = "0.7"
+-substreams-ethereum = "0.11"
++buffa = "0.9.2"
++buffa-types = "0.9.2"
++substreams = "0.8.0"
++substreams-ethereum = "0.12.0"
+```
+
+Then delete `buf.gen.yaml` and `src/pb`, and run `substreams build` to regenerate.
+
+`substreams` re-exports both crates, so `substreams::buffa::MessageField` resolves without naming them in `Cargo.toml`.
+
+## How the CLI picks the protobuf plugin
+
+`substreams build` and `substreams protogen` read your `Cargo.toml`: a project that depends on `buffa` gets `buf.build/anthropics/buffa`, and a project that depends on `prost` — or that names neither — gets `buf.build/community/neoeinstein-prost`. Generating buffa bindings for code written against prost does not compile, so buffa is used only where the manifest asks for it.
+
+**Add `buffa` to `[dependencies]` before you build.** Without it you get prost bindings, which do not compile against `substreams` 0.8.0.
+
+The CLI writes `buf.gen.yaml` only when the file is absent, so an existing one stays as you wrote it. When it disagrees with `Cargo.toml`, the CLI warns:
+
+```
+⚠️  Cargo.toml depends on buffa but buf.gen.yaml generates prost bindings
+   Point buf.gen.yaml at buf.build/anthropics/buffa, or delete it to have one generated
+```
+
+## What changes in your handler code
+
+Optional `message` fields become `MessageField<T>`, which dereferences to a default instance when unset, so most nested accesses no longer need unwrapping. Enum fields become `EnumValue<E>` instead of a bare `i32`.
+
+| prost | buffa |
+| --- | --- |
+| `blk.header.as_ref().unwrap().number` | `blk.header.number` |
+| `msg.field.is_some()` | `msg.field.is_set()` |
+| `msg.field.as_ref()` | `msg.field.as_option()` |
+| `msg.field = Some(value)` | `msg.field = MessageField::some(value)` |
+| `Status::try_from(msg.status)? == Status::Active` | `msg.status == Status::Active` |
+| `use prost::Message;` | `use buffa::Message;` |
+| `use prost_types::Timestamp;` | `use buffa_types::google::protobuf::Timestamp;` |
+| `MyMessage::decode(&*bytes)?` | `MyMessage::decode_from_slice(&bytes)?` |
+
+For the rest of the API — unknown enum values, wrapper types, `DecodeError` variants, verbatim type names — see buffa's own [migration guide](https://github.com/anthropics/buffa/blob/main/docs/migration-from-prost.md).
+
+## Crates that have not migrated
+
+These generate prost types and do not compile against `substreams` 0.8.0:
+
+| Crate | Requires | What to do |
+| --- | --- | --- |
+| `substreams-entity-change` 2.0.0 | `substreams ^0.6` | Define the `EntityChanges` protobuf in your own `proto` directory and let `substreams build` generate it, rather than depending on the crate |
+| `substreams-bitcoin` 2.0.0 | `substreams ^0.6.0` | Stay on the 0.6 row |
+| `substreams-antelope` 0.6.0 | `substreams ^0.6.0` | Stay on the 0.6 row |
+| `substreams-abis` 1.6.0 | `substreams ^0.7.6` | Stay on the 0.7 row |
+
+A Rust sink is a separate case: `tonic` generates prost clients, so a program that consumes a Substreams stream keeps using prost. This page applies to modules compiled to WebAssembly.
+
+## Troubleshooting
+
+**`the trait bound 'MyMessage: Message' is not satisfied`** on a handler signature means the type came from prost codegen. Check that `Cargo.toml` names `buffa`, delete `buf.gen.yaml` and `src/pb`, and rebuild.
+
+**Two versions of `substreams` in `Cargo.lock`** mean one crate pins a pre-0.8 row. Run `cargo tree -i substreams` to find it.
+
+**Unresolved modules under `src/pb`** mean `mod.rs` is stale. Delete it and rebuild. One missing module file produces a cascade of unrelated-looking type errors, so fix this before reading the rest of the output.

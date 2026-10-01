@@ -89,13 +89,13 @@ The `src/lib.rs` file contains the declaration of the Substreams module, `map_bl
 fn map_block(block: Block) -> Result<Output, substreams::errors::Error> {
     let slot = block.slot;
     let parent_slot = block.parent_slot;
-    let timestamp = block.block_time.as_ref().unwrap().timestamp;
+    let timestamp = block.block_time.timestamp;
 
     let mut data: Vec<TradeData> = vec![]; // 1.
 
     for trx in block.transactions_owned() { // 2. 
         let accounts = trx.resolved_accounts_as_strings(); // 3.
-        if let Some(transaction) = trx.transaction { // 4.
+        if let Some(transaction) = trx.transaction.into_option() { // 4.
             let meta = trx.meta.unwrap();
             let pre_balances = meta.pre_balances;
             let post_balances = meta.post_balances;

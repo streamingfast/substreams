@@ -79,13 +79,12 @@ substreams gui -e mainnet.sol.streamingfast.io:443 \
 fn process_block(block: Block) -> Result<Output, substreams::errors::Error> {
     let slot = block.slot;
     let parent_slot = block.parent_slot;
-    let timestamp = block.block_time.as_ref();
     let mut data: Vec<TradeData> = vec![]; // 1.
-    if timestamp.is_some() {
-        let timestamp = timestamp.unwrap().timestamp;
+    if block.block_time.is_set() {
+        let timestamp = block.block_time.timestamp;
         for trx in block.transactions_owned() { // 2.
             let accounts = trx.resolved_accounts_as_strings(); // 3.
-            if let Some(transaction) = trx.transaction {
+            if let Some(transaction) = trx.transaction.into_option() {
                 let meta = trx.meta.unwrap();
                 let pre_balances = meta.pre_balances;
                 let post_balances = meta.post_balances;

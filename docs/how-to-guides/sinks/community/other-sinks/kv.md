@@ -59,6 +59,10 @@ message BlockMeta {
 
 ### Import the Cargo module
 
+{% hint style="warning" %}
+**Compatibility**: The `substreams-sink-kv` crate generates its protobuf types with prost, which does not compile against `substreams` 0.8.0 and above. Pin a pre-0.8 row for a module that uses it. See [Migrating from prost to buffa](../../../../references/migrating-to-buffa.md).
+{% endhint %}
+
 1. Add the `substreams-sink-kv` crate to your `Cargo.toml`:
 
 ```toml

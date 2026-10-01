@@ -31,11 +31,12 @@ crate-type = ["cdylib"]
 [dependencies]
 ethabi = "17"
 hex-literal = "0.3.4"
-prost = "0.11"
+buffa = "0.9.2"
+buffa-types = "0.9.2"
 # Use latest from https://crates.io/crates/substreams
-substreams = "0.5"
+substreams = "0.8.0"
 # Use latest from https://crates.io/crates/substreams-ethereum
-substreams-ethereum = "0.9"
+substreams-ethereum = "0.12.0"
 
 # Required so ethabi > ethereum-types build correctly under wasm32-unknown-unknown
 [target.wasm32-unknown-unknown.dependencies]
@@ -43,7 +44,7 @@ getrandom = { version = "0.2", features = ["custom"] }
 
 [build-dependencies]
 anyhow = "1"
-substreams-ethereum = "0.8"
+substreams-ethereum = "0.12.0"
 
 [profile.release]
 lto = true
@@ -82,6 +83,10 @@ The [`ethabi` crate ](https://crates.io/crates/ethabi)is used to decode events f
 #### `hex-literal`
 
 The [`hex-literal` crate ](https://crates.io/crates/hex-literal)is used to define bytes from hexadecimal string literals at compile time.
+
+#### `buffa`
+
+The [`buffa` crate](https://crates.io/crates/buffa) is the protobuf implementation your generated types are built on, and `buffa-types` provides the well-known types such as `Timestamp` and `Any`. Naming `buffa` in `[dependencies]` is also what tells `substreams build` to generate buffa bindings rather than prost ones. Projects on `substreams` 0.7 and below use `prost` instead; see [Migrating from prost to buffa](../../migrating-to-buffa.md).
 
 #### `substreams`
 

@@ -71,15 +71,15 @@ pub fn map_solana_token_events(params: String, block: Block) -> Result<Output, E
     let parameters = parse_parameters(params)?;
 
     let mut output = Output::default(); // 1.
-    let timestamp = block.block_time.as_ref().unwrap().timestamp;
+    let timestamp = block.block_time.timestamp;
 
     for confirmed_trx in block.transactions_owned() { // 2.
         let accounts = confirmed_trx.resolved_accounts_as_strings(); // 3.
 
-        if let Some(trx) = confirmed_trx.transaction { // 4.
+        if let Some(trx) = confirmed_trx.transaction.into_option() { // 4.
             let trx_hash = bs58::encode(&trx.signatures[0]).into_string();
-            let msg = trx.message.unwrap(); // 5.
-            let meta = confirmed_trx.meta.as_ref().unwrap(); // 6.
+            let msg = &trx.message; // 5.
+            let meta = &confirmed_trx.meta; // 6.
 
             for (i, compiled_instruction) in msg.instructions.iter().enumerate() { // 7.
                 utils::process_compiled_instruction( // 8.

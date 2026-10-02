@@ -986,3 +986,111 @@ func TestCanSkipGenerationIgnoresModuleTreeForProstProjects(t *testing.T) {
 		t.Error("regenerated a prost project whose inputs had not changed")
 	}
 }
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("creating %s: %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("writing %s: %v", path, err)
+	}
+}
+
+// A project whose `buf.gen.yaml` was deleted, which is what the stack-mismatch warning tells the
+// reader to do, generates again. Skipping would leave the previous output in place and write no
+// configuration, so the project would stay on the old bindings with nothing said.
+func TestCanSkipGenerationWithoutBufConfig(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "src", "pb", "myproject.v1.rs"), "// @generated\n")
+	writeFile(t, filepath.Join(dir, "Cargo.toml"), "[dependencies]\nbuffa = \"0.9\"\n")
+
+	const hash = "cafebabe"
+	writeFile(t, filepath.Join(dir, "src", "pb", ".last_generated_hash"), hash)
+
+	g := NewProtoGenerator("src/pb", nil, true)
+	g.SetProjectPath(dir)
+
+	skip, err := g.canSkipGeneration(nil, hash)
+	if err != nil {
+		t.Fatalf("canSkipGeneration: %v", err)
+	}
+	if skip {
+		t.Error("generation was skipped with no buf.gen.yaml present, leaving the project on the old bindings")
+	}
+}
+
+// Repointing `buf.gen.yaml` at another plugin changes the hash, so output generated for the
+// previous plugin is not mistaken for current.
+func TestCalculateHashCoversTheConfiguredPlugins(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "src", "pb"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	config := filepath.Join(dir, "buf.gen.yaml")
+
+	g := NewProtoGenerator("src/pb", nil, true)
+	g.SetProjectPath(dir)
+	pkg := &pbsubstreams.Package{}
+
+	writeFile(t, config, "version: v1\nplugins:\n  - plugin: buf.build/community/neoeinstein-prost:v0.4.0\n    out: src/pb\n")
+	prostHash, err := g.calculateHash(pkg)
+	if err != nil {
+		t.Fatalf("hashing the prost configuration: %v", err)
+	}
+
+	writeFile(t, config, "version: v1\nplugins:\n  - plugin: buf.build/anthropics/buffa:v0.9.2\n    out: src/pb\n")
+	buffaHash, err := g.calculateHash(pkg)
+	if err != nil {
+		t.Fatalf("hashing the buffa configuration: %v", err)
+	}
+
+	if prostHash == buffaHash {
+		t.Error("switching the configured plugin left the hash unchanged, so the stale output counts as current")
+	}
+}
+
+// The search does not climb out of the repository, so a `buf.gen.yaml` sitting outside it, in a
+// home directory or an unrelated checkout one level up, does not generate this project.
+func TestBufConfigDirDoesNotEscapeTheRepository(t *testing.T) {
+	outside := t.TempDir()
+	writeFile(t, filepath.Join(outside, "buf.gen.yaml"), "version: v1\nplugins:\n  - plugin: buf.build/protocolbuffers/go\n    out: gen/go\n")
+
+	repo := filepath.Join(outside, "my-repo")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	project := filepath.Join(repo, "modules", "one")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	g := NewProtoGenerator("src/pb", nil, true)
+	g.SetProjectPath(project)
+
+	if got := g.bufConfigDir(); got != project {
+		t.Errorf("bufConfigDir() = %q, want %q: a configuration outside the repository is not this project's", got, project)
+	}
+}
+
+// A configuration above the manifest but inside the same repository is still used: that is what
+// lets one repository hold a single configuration for several manifests.
+func TestBufConfigDirFindsAConfigAboveTheProject(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(root, "buf.gen.yaml"), "version: v1\nplugins:\n  - plugin: buf.build/anthropics/buffa:v0.9.2\n    out: src/pb\n")
+
+	project := filepath.Join(root, "modules", "one")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	g := NewProtoGenerator("src/pb", nil, true)
+	g.SetProjectPath(project)
+
+	if got := g.bufConfigDir(); got != root {
+		t.Errorf("bufConfigDir() = %q, want %q: a config inside the same repository is shared", got, root)
+	}
+}

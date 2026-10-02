@@ -79,6 +79,11 @@ func (g *ProtoGenerator) projectFile(name string) string {
 // A repository can keep one configuration above several manifests. `buf` resolves both the
 // configuration and the `out:` paths inside it against its own working directory, so running
 // anywhere else would ignore that configuration and write a second one beside the manifest.
+//
+// The search stops at the repository root, so a project inside a repository that configures `buf`
+// for something else at its root, generating Go say, is not generated with that configuration
+// and into its `out:` paths. A stray `buf.gen.yaml` in a home directory is out of reach for the
+// same reason.
 func (g *ProtoGenerator) bufConfigDir() string {
 	current, err := filepath.Abs(g.projectPath)
 	if err != nil {
@@ -90,12 +95,27 @@ func (g *ProtoGenerator) bufConfigDir() string {
 			return current
 		}
 
+		if isRepositoryRoot(current) {
+			return g.projectPath
+		}
+
 		parent := filepath.Dir(current)
 		if parent == current {
 			return g.projectPath
 		}
 		current = parent
 	}
+}
+
+// isRepositoryRoot reports whether dir holds the marker of a version-control root, which is as
+// far up as a configuration can belong to the same project.
+func isRepositoryRoot(dir string) bool {
+	for _, marker := range []string{".git", ".hg", ".svn"} {
+		if _, err := os.Stat(filepath.Join(dir, marker)); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // bufConfigFile is the `buf.gen.yaml` this project generates with, whether or not it exists yet.
@@ -205,6 +225,13 @@ func (g *ProtoGenerator) calculateHash(pkg *pbsubstreams.Package) (string, error
 		hasher.Write([]byte("generateMod:false"))
 	}
 
+	// Hash what the output was generated for, not only what it was generated from. Repointing
+	// `buf.gen.yaml` at another plugin, or changing where it writes, leaves the protos untouched
+	// but makes the code on disk wrong for the project.
+	for _, plugin := range readBufPlugins(g.bufConfigFile()) {
+		hasher.Write([]byte("plugin:" + plugin.Plugin + "|" + plugin.Remote + "|" + plugin.Name + "|" + plugin.Out))
+	}
+
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
@@ -291,6 +318,14 @@ func (g *ProtoGenerator) canSkipGeneration(pkg *pbsubstreams.Package, currentHas
 	}
 
 	if lastHash == "" || lastHash != currentHash || !g.hasGeneratedFiles() {
+		return false, nil
+	}
+
+	// Without a configuration there is nothing on disk saying what the output on disk was
+	// generated for, and the next run writes a new one. Generating is what makes the two agree,
+	// so a project whose `buf.gen.yaml` was deleted, which is what the stack-mismatch warning
+	// tells the reader to do, must not be skipped as already up to date.
+	if _, err := os.Stat(g.bufConfigFile()); err != nil {
 		return false, nil
 	}
 

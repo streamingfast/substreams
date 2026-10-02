@@ -43,6 +43,10 @@ func findCargoManifest(dir string) string {
 			return candidate
 		}
 
+		if isRepositoryRoot(current) {
+			return filepath.Join(dir, "Cargo.toml")
+		}
+
 		parent := filepath.Dir(current)
 		if parent == current {
 			return filepath.Join(dir, "Cargo.toml")

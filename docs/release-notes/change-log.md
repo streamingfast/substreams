@@ -9,6 +9,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Server
+
+- Tier1 now handles Ethereum partial blocks about 20x faster, with almost no allocations. It reads the
+  transaction traces straight from the encoded block and drops the ones already sent by copying bytes,
+  instead of decoding and re-encoding the whole block for every partial.
+
 ## v1.24.0
 
 ### Sink

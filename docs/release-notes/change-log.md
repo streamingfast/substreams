@@ -13,52 +13,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-- Fix tier1 requests rejected before their body is read (authentication, compression enforcement) sometimes
-  failing at a load balancer with HTTP 502 or `INTERNAL` instead of returning their error.
+- Tier1 now handles Ethereum partial blocks about 20x faster, with almost no allocations. It reads the
+  transaction traces straight from the encoded block and drops the ones already sent by copying bytes,
+  instead of decoding and re-encoding the whole block for every partial.
 
-- Demoted the tier2 "refusing Substreams ProcessRange request" log from `Info` to `Debug`. It was the
-  single largest source of Cloud Logging volume on `substreams-workers` under backpressure; the
-  `substreams_tier2_rejected_request_counter` metric (by reason) already tracks refusal rate without it.
-
-- Demoted tier2's gRPC "finished streaming call with code ResourceExhausted" completion log from `Info`
-  to `Debug`, using the newly added `dgrpc` `server.WithCodeLevelFunc` override. It was the second largest
-  source of Cloud Logging volume on `substreams-workers`, logged on every backpressure refusal alongside
-  the line above.
-
-- Fixed a tier1 panic (`INTERNAL: runtime error: invalid memory address or nil pointer dereference`) on a
-  production-mode request starting past the chain's final block, when that final block falls within the
-  first segment of the request's stores. The linear handoff then lands exactly on the stores' initial
-  block, leaving no segment to backprocess.
-
-### Tools
-
-- `substreams tools devenv` now waits for the dummy chain to finish its genesis burst before starting tier1.
-  The relayer can start serving mid-burst, and tier1 then planned requests against a chain a few blocks high.
-
-### Dependencies
-
-- Bumped `github.com/streamingfast/firehose-networks` to v0.3.0.
-- Bumped `github.com/streamingfast/dgrpc` to pick up `server.WithCodeLevelFunc`.
-- Bumped `github.com/streamingfast/dummy-blockchain` to v1.7.8, and `substreams tools devenv` now defaults to the
-  `ghcr.io/streamingfast/dummy-blockchain:v1.7.8` image. Its relayer no longer sometimes drops a block around
-  the chain's forks, which could make tier1 exit with `received 5 consecutive unlinkable blocks`.
-- Bumped `github.com/streamingfast/bstream` to pick up the forkable hub fixes: tier1 no longer exits with
-  `received 5 consecutive unlinkable blocks` or `cannot link block after reconnection` when it starts while
-  the merger is deleting the one-block files of a bundle it just merged.
-
-## v1.23.0
-
-### CLI
-
-- Fixed: `substreams registry login` failed with `no such file or directory` when `~/.config/substreams`
-  did not exist yet. The directory is now created before the token is written, and the token file is
-  written with mode `0600` instead of `0644` (an existing file is tightened on re-login).
-
-- A manifest can now import `sf/substreams/sink/sql/schema/v1/schema.proto` without
-  vendoring a copy of it. The file is a system protobuf, but `protoparse` needs the
-  source on disk to honour its extensions, so an import previously failed with
-  `no such file`. It is now served from an embedded copy, the same way
-  `sf/substreams/options.proto` already was.
+## v1.24.0
 
 ### Sink
 
@@ -110,6 +69,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   by default); a block larger than the cap is sent alone. A failed batch is kept and resumed as one payload.
   Switching batching on or off while the sink is stopped discards a pending payload of the other shape; its blocks
   come back through the stream. Default is off, one block per call as before.
+
+### Server
+
+- Fix tier1 requests rejected before their body is read (authentication, compression enforcement) sometimes
+  failing at a load balancer with HTTP 502 or `INTERNAL` instead of returning their error.
+
+- Demoted the tier2 "refusing Substreams ProcessRange request" log from `Info` to `Debug`. It was the
+  single largest source of Cloud Logging volume on `substreams-workers` under backpressure; the
+  `substreams_tier2_rejected_request_counter` metric (by reason) already tracks refusal rate without it.
+
+- Demoted tier2's gRPC "finished streaming call with code ResourceExhausted" completion log from `Info`
+  to `Debug`, using the newly added `dgrpc` `server.WithCodeLevelFunc` override. It was the second largest
+  source of Cloud Logging volume on `substreams-workers`, logged on every backpressure refusal alongside
+  the line above.
+
+- Fixed a tier1 panic (`INTERNAL: runtime error: invalid memory address or nil pointer dereference`) on a
+  production-mode request starting past the chain's final block, when that final block falls within the
+  first segment of the request's stores. The linear handoff then lands exactly on the stores' initial
+  block, leaving no segment to backprocess.
+
+### Tools
+
+- `substreams tools devenv` now waits for the dummy chain to finish its genesis burst before starting tier1.
+  The relayer can start serving mid-burst, and tier1 then planned requests against a chain a few blocks high.
+
+### Dependencies
+
+- Bumped `github.com/streamingfast/firehose-networks` to v0.3.0.
+- Bumped `github.com/streamingfast/dgrpc` to pick up `server.WithCodeLevelFunc`.
+- Bumped `github.com/streamingfast/dummy-blockchain` to v1.7.8, and `substreams tools devenv` now defaults to the
+  `ghcr.io/streamingfast/dummy-blockchain:v1.7.8` image. Its relayer no longer sometimes drops a block around
+  the chain's forks, which could make tier1 exit with `received 5 consecutive unlinkable blocks`.
+- Bumped `github.com/streamingfast/bstream` to pick up the forkable hub fixes: tier1 no longer exits with
+  `received 5 consecutive unlinkable blocks` or `cannot link block after reconnection` when it starts while
+  the merger is deleting the one-block files of a bundle it just merged.
+
+## v1.23.0
+
+### CLI
+
+- Fixed: `substreams registry login` failed with `no such file or directory` when `~/.config/substreams`
+  did not exist yet. The directory is now created before the token is written, and the token file is
+  written with mode `0600` instead of `0644` (an existing file is tightened on re-login).
+
+- A manifest can now import `sf/substreams/sink/sql/schema/v1/schema.proto` without
+  vendoring a copy of it. The file is a system protobuf, but `protoparse` needs the
+  source on disk to honour its extensions, so an import previously failed with
+  `no such file`. It is now served from an embedded copy, the same way
+  `sf/substreams/options.proto` already was.
 
 ### Docs
 

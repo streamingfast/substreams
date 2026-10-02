@@ -173,6 +173,7 @@ fn test_with_real_block() {
 For controlled testing scenarios, construct blocks programmatically:
 
 ```rust
+use buffa::MessageField;
 use substreams_ethereum::pb::eth::v2::{Block, TransactionTrace, TransactionReceipt, Log};
 
 fn create_block_with_transfer() -> Block {
@@ -182,7 +183,7 @@ fn create_block_with_transfer() -> Block {
         transaction_traces: vec![
             TransactionTrace {
                 hash: hex::decode("def456...").unwrap(),
-                receipt: Some(TransactionReceipt {
+                receipt: MessageField::some(TransactionReceipt {
                     logs: vec![
                         Log {
                             address: hex::decode("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap(),

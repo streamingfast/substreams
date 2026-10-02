@@ -11,6 +11,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Docs
+
+- Document the per-store size limit on StreamingFast-hosted endpoints is now 3.5GiB (up from 1GiB), following
+  the move to the mmap stores backend. The binary default remains 1GiB, overridable with the tier1
+  `--substreams-tier1-store-size-limit` flag.
+
 ### Server
 
 - Tier1 now handles Ethereum partial blocks about 20x faster, with almost no allocations. It reads the

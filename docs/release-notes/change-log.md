@@ -17,6 +17,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   transaction traces straight from the encoded block and drops the ones already sent by copying bytes,
   instead of decoding and re-encoding the whole block for every partial.
 
+- Add the `external_calls_<kind>` metering metrics (for example `external_calls_eth_call`), counting the calls
+  made by WASM extensions. A batch counts for as many calls as it contains. Extensions report them with
+  `metering.AddExternalCalls`.
+
 ## v1.24.0
 
 ### Sink

@@ -362,6 +362,27 @@ func TestAddWasmInputBytes(t *testing.T) {
 	assert.Equal(t, 10, meter.GetCount(MeterWasmInputBytes))
 }
 
+func TestSend_externalCalls(t *testing.T) {
+	ctx := dmetering.WithBytesMeter(context.Background())
+	emitter := &mockEmitter{}
+	ctx = reqctx.WithEmitter(ctx, emitter)
+
+	AddExternalCalls(ctx, "eth_call", 3)
+	AddExternalCalls(ctx, "eth_call", 2)
+	AddExternalCalls(ctx, "eth_getBalance", 4)
+
+	sender := NewMetricsSender()
+	sender.Send(ctx, "org1", "apiKey1", "127.0.0.1", "meta", "outputModuleHash", "endpoint")
+	sender.Send(ctx, "org1", "apiKey1", "127.0.0.1", "meta", "outputModuleHash", "endpoint")
+
+	assert.Len(t, emitter.events, 2)
+	assert.Equal(t, float64(5), emitter.events[0].Metrics["external_calls_eth_call"])
+	assert.Equal(t, float64(4), emitter.events[0].Metrics["external_calls_eth_getBalance"])
+
+	assert.NotContains(t, emitter.events[1].Metrics, "external_calls_eth_call")
+	assert.NotContains(t, emitter.events[1].Metrics, "external_calls_eth_getBalance")
+}
+
 func TestSend(t *testing.T) {
 	ctx := dmetering.WithBytesMeter(context.Background())
 	meter := dmetering.GetBytesMeter(ctx)

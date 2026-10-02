@@ -67,8 +67,8 @@ message Entry {
 ### Producer module
 
 ```rust
-use prost::Message;
-use prost_types::Any;
+use buffa::{Message, MessageField};
+use buffa_types::google::protobuf::Any;
 use substreams::errors::Error;
 use substreams::pb::sf::substreams::foundational_store::model::v2::{Entry, Key, SinkEntries};
 
@@ -85,16 +85,16 @@ fn map_to_store(events: pb::acme::Events) -> Result<SinkEntries, Error> {
             name: event.name,
             symbol: event.symbol,
         };
-        let mut buf = Vec::new();
-        Message::encode(&value, &mut buf)?;
+        let buf = value.encode_to_vec();
 
         entries.push(Entry {
-            key: Some(Key {
+            key: MessageField::some(Key {
                 bytes: event.address,
             }),
-            value: Some(Any {
+            value: MessageField::some(Any {
                 type_url: "type.googleapis.com/com.acme.example.v1.TokenMetadata".to_string(),
-                value: buf,
+                value: buf.into(),
+                ..Default::default()
             }),
         });
     }
@@ -194,6 +194,10 @@ plugins:
   - remote: buf.build/community/neoeinstein-tonic
     out: gen/rust
 ```
+
+{% hint style="info" %}
+**Note**: These plugins generate a gRPC **client**, which `tonic` builds on prost. A Substreams module is different: it generates its types with buffa through `substreams build`. See [Migrating from prost to buffa](../../references/migrating-to-buffa.md).
+{% endhint %}
 
 ```bash
 buf generate buf.build/streamingfast/substreams-foundational-store

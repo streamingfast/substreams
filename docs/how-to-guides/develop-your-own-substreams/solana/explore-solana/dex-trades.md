@@ -2,6 +2,10 @@ The DEX Trades Substreams, developed by TopLedger, extracts trades from differen
 
 ## About TopLedger
 
+{% hint style="info" %}
+**Compatibility**: the Rust on this page targets `substreams` 0.8.0 and above, where an optional `message` field is a `MessageField<T>` that dereferences to a default. On 0.7 and below the same field is an `Option<T>` and every nested access needs an `.unwrap()` or a `match`. See [Migrating from prost to buffa](../../../../references/migrating-to-buffa.md).
+{% endhint %}
+
 [TopLedger](https://topledger.xyz/) is SQL-based data discovery and analytics platform focused on Solana. By using Substreams, TopLedger has been able to extract data from the main Solana dapps, thus providing rich analytics products.
 
 TopLedger is an active contributor to the Substreams community and has developed several useful ready-to-use Substreams.
@@ -79,13 +83,12 @@ substreams gui -e mainnet.sol.streamingfast.io:443 \
 fn process_block(block: Block) -> Result<Output, substreams::errors::Error> {
     let slot = block.slot;
     let parent_slot = block.parent_slot;
-    let timestamp = block.block_time.as_ref();
     let mut data: Vec<TradeData> = vec![]; // 1.
-    if timestamp.is_some() {
-        let timestamp = timestamp.unwrap().timestamp;
+    if block.block_time.is_set() {
+        let timestamp = block.block_time.timestamp;
         for trx in block.transactions_owned() { // 2.
             let accounts = trx.resolved_accounts_as_strings(); // 3.
-            if let Some(transaction) = trx.transaction {
+            if let Some(transaction) = trx.transaction.into_option() {
                 let meta = trx.meta.unwrap();
                 let pre_balances = meta.pre_balances;
                 let post_balances = meta.post_balances;

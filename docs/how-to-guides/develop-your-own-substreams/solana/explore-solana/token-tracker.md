@@ -2,6 +2,10 @@ The Solana Token Tracker Substreams allows you to extract transfers from Solana 
 
 ## Before You Begin
 
+{% hint style="info" %}
+**Compatibility**: the Rust on this page targets `substreams` 0.8.0 and above, where an optional `message` field is a `MessageField<T>` that dereferences to a default. On 0.7 and below the same field is an `Option<T>` and every nested access needs an `.unwrap()` or a `match`. See [Migrating from prost to buffa](../../../../references/migrating-to-buffa.md).
+{% endhint %}
+
 The Solana Token Tracker Substreams requires medium to advanced Substreams knowledge. If this is the first time you are using Substreams, make sure you:
 
 - Read the [Develop Substreams](../../../../tutorials/intro-to-tutorials.md) section, which will teach you the basics of the developing Substreams modules.
@@ -71,15 +75,15 @@ pub fn map_solana_token_events(params: String, block: Block) -> Result<Output, E
     let parameters = parse_parameters(params)?;
 
     let mut output = Output::default(); // 1.
-    let timestamp = block.block_time.as_ref().unwrap().timestamp;
+    let timestamp = block.block_time.timestamp;
 
     for confirmed_trx in block.transactions_owned() { // 2.
         let accounts = confirmed_trx.resolved_accounts_as_strings(); // 3.
 
-        if let Some(trx) = confirmed_trx.transaction { // 4.
+        if let Some(trx) = confirmed_trx.transaction.into_option() { // 4.
             let trx_hash = bs58::encode(&trx.signatures[0]).into_string();
-            let msg = trx.message.unwrap(); // 5.
-            let meta = confirmed_trx.meta.as_ref().unwrap(); // 6.
+            let msg = &trx.message; // 5.
+            let meta = &confirmed_trx.meta; // 6.
 
             for (i, compiled_instruction) in msg.instructions.iter().enumerate() { // 7.
                 utils::process_compiled_instruction( // 8.

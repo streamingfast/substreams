@@ -4,6 +4,10 @@ description: SPL Initialized Account Foundational Store
 
 # SPL Initialized Account Foundational Store
 
+{% hint style="info" %}
+**Compatibility**: the Rust on this page targets `substreams` 0.8.0 and above, where an optional `message` field is a `MessageField<T>` that dereferences to a default. On 0.7 and below the same field is an `Option<T>` and every nested access needs an `.unwrap()` or a `match`. See [Migrating from prost to buffa](../../../../references/migrating-to-buffa.md).
+{% endhint %}
+
 A specialized foundational store for tracking SPL token account initializations on Solana. This store provides the essential account-to-owner mappings needed to resolve SPL token transfers, since transfer instructions only contain account addresses without owner information.
 
 ## Overview
@@ -134,7 +138,8 @@ Each SPL token account address becomes a key, with the corresponding `AccountOwn
 ### Creating Foundational Store Entries
 
 ```rust
-use prost::Message;
+use buffa::{Message, MessageField};
+use buffa_types::google::protobuf::Any;
 
 #[substreams::handlers::map]
 pub fn map_spl_initialized_account(
@@ -158,16 +163,16 @@ pub fn map_spl_initialized_account(
                         owner: instruction.accounts()[2].clone(),
                     };
 
-                    let mut buf = Vec::new();
-                    prost::Message::encode(&account_owner, &mut buf).unwrap();
+                    let buf = account_owner.encode_to_vec();
 
                     entries.push(Entry {
-                        key: Some(Key {
+                        key: MessageField::some(Key {
                             bytes: instruction.accounts()[0].to_vec(),
                         }),
-                        value: Some(Any {
+                        value: MessageField::some(Any {
                             type_url: "type.googleapis.com/sf.substreams.solana.spl.v1.AccountOwner".to_string(),
-                            value: buf,
+                            value: buf.into(),
+                            ..Default::default()
                         }),
                     });
                 }

@@ -4,6 +4,10 @@ description: ERC20 Token Metadata Foundational Store
 
 # ERC20 Token Metadata Foundational Store
 
+{% hint style="info" %}
+**Compatibility**: the Rust on this page targets `substreams` 0.8.0 and above, where an optional `message` field is a `MessageField<T>` that dereferences to a default. On 0.7 and below the same field is an `Option<T>` and every nested access needs an `.unwrap()` or a `match`. See [Migrating from prost to buffa](../../../../references/migrating-to-buffa.md).
+{% endhint %}
+
 A specialized foundational store for tracking ERC20 token metadata on Ethereum and EVM-compatible chains. This store focuses specifically on metadata extraction and serving, working in conjunction with separate modules for transfer tracking.
 
 ## Overview
@@ -36,12 +40,11 @@ fn map_tokens_transfers(
     // Process responses and decode metadata
     let mut metadata_map = std::collections::HashMap::new();
     for entry in resp.entries {
-        let code = ResponseCode::try_from(entry.response.as_ref().unwrap().response)?;
-        if code != ResponseCode::Found {
+        if entry.response.code != ResponseCode::Found {
             continue;
         }
 
-        if let Ok(token_metadata) = TokenMetadata::decode(entry.response.unwrap().value.unwrap().value.as_slice()) {
+        if let Ok(token_metadata) = TokenMetadata::decode_from_slice(&entry.response.value.value) {
             metadata_map.insert(entry.key, token_metadata);
         }
     }
@@ -111,8 +114,8 @@ Each token address becomes a key, with the corresponding `TokenMetadata` protobu
 ### Creating Foundational Store Entries
 
 ```rust
-use prost::Message;
-use prost_types::Any;
+use buffa::{Message, MessageField};
+use buffa_types::google::protobuf::Any;
 
 #[substreams::handlers::map]
 fn metadata_to_foundational_store(
@@ -129,16 +132,16 @@ fn metadata_to_foundational_store(
             decimals: init.decimals,
         };
 
-        let mut buf = Vec::new();
-        Message::encode(&token_metadata, &mut buf).unwrap();
+        let buf = token_metadata.encode_to_vec();
 
         entries.push(Entry {
-            key: Some(Key {
+            key: MessageField::some(Key {
                 bytes: init.address
             }),
-            value: Some(Any {
+            value: MessageField::some(Any {
                 type_url: "type.googleapis.com/sf.substreams.ethereum.erc20.v1.TokenMetadata".to_string(),
-                value: buf,
+                value: buf.into(),
+                ..Default::default()
             }),
         });
     }

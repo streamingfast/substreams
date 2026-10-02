@@ -97,6 +97,10 @@ plugins:
     out: gen/rust
 ```
 
+{% hint style="info" %}
+**Note**: These plugins generate a gRPC **client**, which `tonic` builds on prost. A Substreams module is different: it generates its types with buffa through `substreams build`. See [Migrating from prost to buffa](../../references/migrating-to-buffa.md).
+{% endhint %}
+
 ```bash
 buf generate buf.build/streamingfast/substreams-foundational-store
 ```
@@ -315,13 +319,9 @@ fn map_query_test_store(
     let response = store.get(&[key]);
 
     let value = if let Some(entry) = response.entries.first() {
-        let bytes = entry
-            .entry
-            .as_ref()
-            .and_then(|e| e.value.as_ref().map(|v| v.value.clone()))
-            .unwrap_or_default();
+        let bytes = entry.entry.value.value.clone();
 
-        if entry.code == ResponseCode::Found as i32 {
+        if entry.code == ResponseCode::Found {
             String::from_utf8_lossy(&bytes).into_owned()
         } else {
             format!("code={}", entry.code)

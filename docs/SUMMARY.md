@@ -128,6 +128,7 @@
   * [Logging & Debugging](references/log-and-debug.md)
   * [Testing](references/testing.md)
   * [Dev Container Reference](references/devcontainer-ref.md)
+* [Migrating from prost to buffa](references/migrating-to-buffa.md)
 * [Change log](release-notes/change-log.md)
 
 ## Decentralized Indexing

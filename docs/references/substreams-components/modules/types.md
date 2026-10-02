@@ -26,7 +26,11 @@ Stores declaring their own data types expose methods capable of mutating keys wi
 * Do not save keys in stores **unless they are going to be read by a downstream module**. Substreams stores are a way to aggregate data, but they are **not meant to be a storage layer**.
 * Do not save all transfers of a chain in a `store` module, rather, output them in a `map` and have a downstream system store them for querying.
 
-There are limitations imposed on store usage. Specifically, each key/value entry must be smaller than 10MiB while a store cannot exceed 1GiB total. Keys being strings, each character in the key accounts for 1 byte of storage space.
+There are limitations imposed on store usage. Specifically, each key/value entry must be smaller than 10MiB, while a store cannot exceed 3.5GiB total on StreamingFast-hosted endpoints. Keys being strings, each character in the key accounts for 1 byte of storage space.
+
+{% hint style="info" %}
+**Note**: The store size limit is a server-side setting. Self-hosted Substreams nodes default to 1GiB and can override it with the tier1 `--substreams-tier1-store-size-limit` flag.
+{% endhint %}
 
 ### Important store properties
 

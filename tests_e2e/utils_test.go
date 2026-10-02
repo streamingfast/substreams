@@ -7,7 +7,6 @@ import (
 	"io"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dmetering/logger"
@@ -208,8 +207,9 @@ func newDummyBlockchainContainerWithBlockRate(ctx context.Context, tmpDir string
 	}
 
 	if waitMerger {
-		if err := devenv.WaitMergedBlocks(ctx, tmpDir, uint64(burst), time.Minute+time.Duration(burst/50)*time.Second); err != nil {
-			return container, fmt.Errorf("merger never caught up with the burst: %w", err)
+		if err := devenv.WaitMergedBlocks(ctx, tmpDir, uint64(burst), devenv.MergeTimeoutFor(burst)); err != nil {
+			_ = devenv.TerminateDummyBlockchain(ctx, container)
+			return nil, fmt.Errorf("merger never caught up with the burst: %w", err)
 		}
 	}
 

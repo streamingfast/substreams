@@ -32,7 +32,6 @@ func TestFoundationalStoreJSONResolution(t *testing.T) {
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 200)
 	require.NoError(t, err)
 	defer devenv.TerminateDummyBlockchain(ctx, container)
-	waitMergerCaughtUp(t, ctx, tmpDir, 200)
 
 	configPath := filepath.Join(tmpDir, "foundational-stores.json")
 	require.NoError(t, os.WriteFile(configPath, []byte(`{"e2e-store":"127.0.0.1:1"}`), 0o644))
@@ -61,7 +60,6 @@ func TestFoundationalStoreControlPlaneResolution(t *testing.T) {
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 200)
 	require.NoError(t, err)
 	defer devenv.TerminateDummyBlockchain(ctx, container)
-	waitMergerCaughtUp(t, ctx, tmpDir, 200)
 
 	registryAddr := startFakeRegistry(t, map[string]*pbregistry.FoundationStoreEntry{
 		"e2e-store": {
@@ -94,7 +92,6 @@ func TestFoundationalStoreControlPlaneUnreachable(t *testing.T) {
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 200)
 	require.NoError(t, err)
 	defer devenv.TerminateDummyBlockchain(ctx, container)
-	waitMergerCaughtUp(t, ctx, tmpDir, 200)
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
 	app, endpoint := startTier1(t, ctx, devenv.Tier1Config{

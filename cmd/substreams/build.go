@@ -190,9 +190,6 @@ func (p *ProtoBuilder) Build(ctx context.Context) error {
 
 	// Determine output path relative to manifest
 	outputPath := "src/pb"
-	if manifestReader.IsLocalManifest() && !filepath.IsAbs(outputPath) {
-		outputPath = filepath.Join(filepath.Dir(p.manifInfo.Path), outputPath)
-	}
 
 	pkgBundle, err := manifestReader.Read()
 	if err != nil {
@@ -205,6 +202,9 @@ func (p *ProtoBuilder) Build(ctx context.Context) error {
 	}
 
 	generator := codegen.NewProtoGenerator(outputPath, pkgBundle.Manifest.Protobuf.ExcludePaths, true)
+	if manifestReader.IsLocalManifest() {
+		generator.SetProjectPath(filepath.Dir(p.manifInfo.Path))
+	}
 
 	// Check for non-deterministic descriptor sets and warn the user
 	nonDeterministicEntries := pkgBundle.Manifest.GetNonDeterministicDescriptorSets()

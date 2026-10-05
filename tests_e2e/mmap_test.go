@@ -107,7 +107,6 @@ func TestMmapBackendE2E(t *testing.T) {
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 	require.NoError(t, err)
 	defer devenv.TerminateDummyBlockchain(ctx, container)
-	waitMergerCaughtUp(t, ctx, tmpDir, 1000)
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog, mmapDir)
 	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
@@ -222,7 +221,6 @@ func TestMemoryBackendE2E(t *testing.T) {
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 	require.NoError(t, err)
 	defer devenv.TerminateDummyBlockchain(ctx, container)
-	waitMergerCaughtUp(t, ctx, tmpDir, 1000)
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
 	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
@@ -302,7 +300,6 @@ func TestMmapVsMemoryComparison(t *testing.T) {
 			container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 			require.NoError(t, err)
 			defer devenv.TerminateDummyBlockchain(ctx, container)
-			waitMergerCaughtUp(t, ctx, tmpDir, 1000)
 
 			app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog, t2ScratchSpace)
 			app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)

@@ -107,8 +107,12 @@ func (c *DescriptorCache) save(cacheKey string, fds *descriptorpb.FileDescriptor
 func loadLocalProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
 
 	seen := map[string]bool{}
+	declared := map[string]bool{}
 	for _, file := range pkg.ProtoFiles {
 		seen[*file.Name] = true
+		for _, name := range declaredTypeNames(file) {
+			declared[name] = true
+		}
 	}
 
 	// System protos
@@ -122,8 +126,20 @@ func loadLocalProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 			continue
 		}
 
+		// A package can carry its own copy of a protobuf that later became a system one, under
+		// the name it had then: `substreams-sink-sql`'s `services.proto` holds the messages this
+		// project now ships as `deprecated.proto`. The file names differ, so adding ours would
+		// put two definitions of the same type in the image and the generator rejects it. The
+		// package's copy is the one its modules were built against, so it is the one that stays.
+		if isSupersededBy(file, declared) {
+			continue
+		}
+
 		pkg.ProtoFiles = append(pkg.ProtoFiles, file)
 		seen[*file.Name] = true
+		for _, name := range declaredTypeNames(file) {
+			declared[name] = true
+		}
 	}
 
 	var importPaths []string
@@ -286,6 +302,60 @@ func loadDescriptorSets(ctx context.Context, pkg *pbsubstreams.Package, manif *M
 	pkg.ProtoFiles = append(pkg.ProtoFiles, outProto...)
 
 	return out, nil
+}
+
+// declaredTypeNames are the fully qualified names of the messages and enums a file declares,
+// nested ones included. Two files sharing any one of them cannot both be in the same image.
+//
+// The names are read off the descriptor rather than through `desc.CreateFileDescriptor`, which
+// resolves a file's imports and so cannot run here: this is what decides which files go into the
+// image, and the imports are not all present until it has.
+func declaredTypeNames(file *descriptorpb.FileDescriptorProto) []string {
+	prefix := ""
+	if file.GetPackage() != "" {
+		prefix = file.GetPackage() + "."
+	}
+
+	var names []string
+	var walk func(string, []*descriptorpb.DescriptorProto)
+	walk = func(scope string, messages []*descriptorpb.DescriptorProto) {
+		for _, message := range messages {
+			name := scope + message.GetName()
+			names = append(names, name)
+			for _, enum := range message.EnumType {
+				names = append(names, name+"."+enum.GetName())
+			}
+			walk(name+".", message.NestedType)
+		}
+	}
+
+	walk(prefix, file.MessageType)
+	for _, enum := range file.EnumType {
+		names = append(names, prefix+enum.GetName())
+	}
+
+	return names
+}
+
+// isSupersededBy reports whether every type file declares is already in the image, which is what
+// a package carrying its own copy of this protobuf under an older name looks like.
+//
+// Every type, not any: a file sharing only some of its types with the image is not a copy of it,
+// and skipping it would drop the rest. `google/protobuf/descriptor.proto` declares 54 types, so a
+// package naming one of them must not cost the image the other 53.
+func isSupersededBy(file *descriptorpb.FileDescriptorProto, declared map[string]bool) bool {
+	names := declaredTypeNames(file)
+	if len(names) == 0 {
+		return false
+	}
+
+	for _, name := range names {
+		if !declared[name] {
+			return false
+		}
+	}
+
+	return true
 }
 
 func readSystemProtobufs() (*descriptorpb.FileDescriptorSet, error) {

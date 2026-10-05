@@ -4,10 +4,6 @@ description: SPL Initialized Account Foundational Store
 
 # SPL Initialized Account Foundational Store
 
-{% hint style="info" %}
-**Compatibility**: the Rust on this page targets `substreams` 0.8.0 and above, where an optional `message` field is a `MessageField<T>` that dereferences to a default. On 0.7 and below the same field is an `Option<T>` and every nested access needs an `.unwrap()` or a `match`. See [Migrating from prost to buffa](../../../../references/migrating-to-buffa.md).
-{% endhint %}
-
 A specialized foundational store for tracking SPL token account initializations on Solana. This store provides the essential account-to-owner mappings needed to resolve SPL token transfers, since transfer instructions only contain account addresses without owner information.
 
 ## Overview

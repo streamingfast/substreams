@@ -8,10 +8,6 @@ Remember that you can auto-generate your Substreams module by using the [code-ge
 
 ## Before You Begin
 
-{% hint style="info" %}
-**Compatibility**: the Rust on this page targets `substreams` 0.8.0 and above, where an optional `message` field is a `MessageField<T>` that dereferences to a default. On 0.7 and below the same field is an `Option<T>` and every nested access needs an `.unwrap()` or a `match`. See [Migrating from prost to buffa](../../../../references/migrating-to-buffa.md).
-{% endhint %}
-
 - [Install the Substreams CLI](../../../cli/installing-the-cli.md)
 - [Get an authentication token](../../../cli/authentication.md)
 - [Learn about the basics of the Substreams](../../../../references/substreams-components/manifests.md)

@@ -2,10 +2,6 @@ The Solana Token Tracker Substreams allows you to extract transfers from Solana 
 
 ## Before You Begin
 
-{% hint style="info" %}
-**Compatibility**: the Rust on this page targets `substreams` 0.8.0 and above, where an optional `message` field is a `MessageField<T>` that dereferences to a default. On 0.7 and below the same field is an `Option<T>` and every nested access needs an `.unwrap()` or a `match`. See [Migrating from prost to buffa](../../../../references/migrating-to-buffa.md).
-{% endhint %}
-
 The Solana Token Tracker Substreams requires medium to advanced Substreams knowledge. If this is the first time you are using Substreams, make sure you:
 
 - Read the [Develop Substreams](../../../../tutorials/intro-to-tutorials.md) section, which will teach you the basics of the developing Substreams modules.

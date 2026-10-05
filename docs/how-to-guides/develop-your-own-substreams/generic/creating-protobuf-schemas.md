@@ -150,8 +150,4 @@ match person.location.as_option() {
 
 Construct the field with `MessageField::some(value)`, and clear it with `MessageField::none()`.
 
-{% hint style="info" %}
-**Note**: Projects on `substreams` 0.7 and below generate `Option<T>` rather than `MessageField<T>`, and need an [`.unwrap()`](https://doc.rust-lang.org/rust-by-example/error/option_unwrap.html) or a `match` on every nested access. See [Migrating from prost to buffa](../../../references/migrating-to-buffa.md).
-{% endhint %}
-
 [buffa](https://github.com/anthropics/buffa) is the tool that generates this Rust code from your protobuf definitions. `substreams build` runs it for you.

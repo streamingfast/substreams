@@ -2,7 +2,7 @@
 
 `substreams` 0.8.0 generates its Rust protobuf bindings with [buffa](https://github.com/anthropics/buffa) instead of [prost](https://github.com/tokio-rs/prost).
 
-**Upgrading is optional.** A module pinned to `substreams` 0.7 keeps building and streaming, and `cargo update` does not move it to 0.8.0. The protobuf wire format is the same under both, so existing packages keep streaming, cached module outputs stay valid, sinks read the same bytes, and a Go or JavaScript consumer needs no change. A project created with `substreams init` already uses buffa.
+**Upgrading is optional.** A module pinned to `substreams` 0.7 keeps building and streaming, and `cargo update` does not move it to 0.8.0. The protobuf wire format is the same under both, so existing packages keep streaming, cached module outputs stay valid, sinks read the same bytes, and a Go or JavaScript consumer needs no change. A project created with `substreams init` already uses buffa, from CLI v1.25.0 onwards.
 
 Read on if you are moving an existing module to 0.8.0, or if a build fails because your crates disagree about which implementation to use.
 
@@ -10,11 +10,11 @@ Read on if you are moving an existing module to 0.8.0, or if a build fails becau
 
 A crate generates types for one protobuf implementation, so every crate in a module must come from the same row. Mixing rows puts two incompatible copies of `substreams` in the dependency tree.
 
-| `substreams` | `substreams-ethereum` | `substreams-solana` | `substreams-near` | `substreams-database-change` | Protobuf |
-| --- | --- | --- | --- | --- | --- |
-| 0.8.0 | 0.12.0 | 0.16.0 | 0.11.0 | 5.0.0 | buffa |
-| 0.7.x | 0.11.x | 0.15.x | — | 3.x, 4.x | prost |
-| 0.6.x | 0.10.x | 0.14.x | 0.10.x | 2.x | prost |
+| `substreams` | `substreams-ethereum` | `substreams-solana` | `substreams-database-change` | Protobuf |
+| --- | --- | --- | --- | --- |
+| 0.8.0 | 0.12.0 | 0.16.0 | 5.0.0 | buffa |
+| 0.7.x | 0.11.x | 0.15.x | 3.x, 4.x | prost |
+| 0.6.x | 0.10.x | 0.14.x | 2.x | prost |
 
 ## Update your dependencies
 
@@ -31,8 +31,6 @@ A crate generates types for one protobuf implementation, so every crate in a mod
 ```
 
 Then delete `buf.gen.yaml` and `src/pb`, and run `substreams build` to regenerate.
-
-`substreams` re-exports both crates, so `substreams::buffa::MessageField` resolves without naming them in `Cargo.toml`.
 
 ## How the CLI picks the protobuf plugin
 
@@ -73,9 +71,9 @@ These generate prost types and do not compile against `substreams` 0.8.0:
 | Crate | Requires | What to do |
 | --- | --- | --- |
 | `substreams-entity-change` 2.0.0 | `substreams ^0.6` | Define the `EntityChanges` protobuf in your own `proto` directory and let `substreams build` generate it, rather than depending on the crate |
-| `substreams-bitcoin` 2.0.0 | `substreams ^0.6.0` | Stay on the 0.6 row |
-| `substreams-antelope` 0.6.0 | `substreams ^0.6.0` | Stay on the 0.6 row |
-| `substreams-abis` 1.6.0 | `substreams ^0.7.6` | Stay on the 0.7 row, or copy the ABI definitions you use into your own crate. It is maintained outside this project, so a buffa release is not ours to schedule |
+| `substreams-bitcoin` 2.0.0 | `substreams ^0.6.0` | Stay on the 0.6 row until a buffa release lands |
+| `substreams-antelope` 0.6.0 | `substreams ^0.6.0` | Stay on the 0.6 row until a buffa release lands |
+| `substreams-abis` 1.6.0 | `substreams ^0.7.6` | Stay on the 0.7 row, or copy the ABI definitions you use into your own crate |
 
 A Rust sink is a separate case: `tonic` generates prost clients, so a program that consumes a Substreams stream keeps using prost. This page applies to modules compiled to WebAssembly.
 

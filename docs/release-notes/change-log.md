@@ -27,6 +27,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   made by WASM extensions. A batch counts for as many calls as it contains. Extensions report them with
   `metering.AddExternalCalls`.
 
+### CLI
+
+- **Breaking for Rust modules**: `substreams build` and `substreams protogen` generate buffa bindings for a
+  project whose `Cargo.toml` depends on `buffa`, using `buf.build/anthropics/buffa:v0.9.2`. This pairs with
+  `substreams` 0.8.0, which replaced [prost](https://github.com/tokio-rs/prost) with
+  [buffa](https://github.com/anthropics/buffa) as its protobuf implementation. See
+  [Migrating from prost to buffa](../references/migrating-to-buffa.md).
+
+  A project that depends on `prost`, or that names neither implementation, gets
+  `buf.build/community/neoeinstein-prost` output. Generating buffa bindings for code written against prost
+  does not compile, so buffa is used only where the manifest asks for it. Add `buffa` to `[dependencies]`
+  before building against `substreams` 0.8.0.
+
+  The on-the-wire protobuf encoding is unchanged. Existing packages keep streaming, cached module outputs
+  stay valid, and sinks read the same bytes.
+
+- `substreams build` and `substreams protogen` warn when an existing `buf.gen.yaml` generates for a different
+  protobuf implementation than `Cargo.toml` depends on, a combination that does not compile.
+
 ## v1.24.0
 
 ### Sink

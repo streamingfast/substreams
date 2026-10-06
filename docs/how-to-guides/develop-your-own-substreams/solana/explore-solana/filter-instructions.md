@@ -65,7 +65,7 @@ fn map_filter_instructions(params: String, blk: Block) -> Result<Instructions, s
     let filters = parse_filters_from_params(params)?; // 1.
 
     let instructions : Vec<Instruction> = blk.transactions().flat_map(|tx| { // 2.
-        let msg = tx.transaction.as_ref().unwrap().message.as_ref().unwrap(); // 3.
+        let msg = &tx.transaction.message; // 3.
         let acct_keys = tx.resolved_accounts(); // 4.
 
         msg.instructions.iter() // 5.
@@ -85,7 +85,7 @@ fn map_filter_instructions(params: String, blk: Block) -> Result<Instructions, s
 1. The `parse_filters_from_params` function parses the parameters passed to the module.
 In this example, the parameter passed is defined in the `substreams.yaml` file as `program_id=Stake11111111111111111111111111111111111111`.
 2. Iterate over the transactions of the blocks.
-3. Extract the [Message](https://github.com/streamingfast/firehose-solana/blob/develop/proto/sf/solana/type/v1/type.proto#L32) object, which contains relevant information, such as the instructions of the transaction.
+3. Extract the [Message](https://github.com/streamingfast/firehose-solana/blob/develop/proto/sf/solana/type/v1/type.proto#L32) object, which contains relevant information, such as the instructions of the transaction. Optional `message` fields read through directly, because the generated type is a `MessageField<T>` that dereferences to a default instance when unset.
 4. Get accounts of the transaction (the `resolved_accounts()` method contains also accounts stored in the [Address Lookup Tables](https://docs.solana.com/developing/lookup-tables)).
 5. Iterate over the instructions.
 6. Use the `apply_filter` function to only keep instruction where `program_id=Stake11111111111111111111111111111111111111`.

@@ -10,7 +10,7 @@ Consider this store module that aggregates hourly trade counter for each token:
 ```rust
 #[substreams::handlers::store]
 pub fn store_total_tx_counts(clock: Clock, events: Events, output: StoreAddBigInt) {
-    let timestamp_seconds = clock.timestamp.unwrap().seconds;
+    let timestamp_seconds = clock.timestamp.seconds;
     let hour_id = timestamp_seconds / 3600;
     let prev_hour_id = hour_id - 1;
 

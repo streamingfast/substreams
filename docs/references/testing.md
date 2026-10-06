@@ -147,14 +147,14 @@ firecore tools firehose-single-block-client mainnet.eth.streamingfast.io:443 170
 Load the block in your tests:
 
 ```rust
-use prost::Message;
+use buffa::Message;
 use std::fs;
 use substreams_ethereum::pb::eth::v2::Block;
 
 fn load_test_block(path: &str) -> Block {
     let base64_data = fs::read_to_string(path).expect("Failed to read test file");
     let bytes = base64::decode(base64_data.trim()).expect("Failed to decode base64");
-    Block::decode(bytes.as_slice()).expect("Failed to decode protobuf")
+    Block::decode_from_slice(&bytes).expect("Failed to decode protobuf")
 }
 
 #[test]
@@ -173,6 +173,7 @@ fn test_with_real_block() {
 For controlled testing scenarios, construct blocks programmatically:
 
 ```rust
+use buffa::MessageField;
 use substreams_ethereum::pb::eth::v2::{Block, TransactionTrace, TransactionReceipt, Log};
 
 fn create_block_with_transfer() -> Block {
@@ -182,7 +183,7 @@ fn create_block_with_transfer() -> Block {
         transaction_traces: vec![
             TransactionTrace {
                 hash: hex::decode("def456...").unwrap(),
-                receipt: Some(TransactionReceipt {
+                receipt: MessageField::some(TransactionReceipt {
                     logs: vec![
                         Log {
                             address: hex::decode("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap(),
@@ -477,13 +478,13 @@ Start with comprehensive unit tests, add integration tests with real data, and v
 
 ```toml
 [dependencies]
-substreams = "0.7.4"
-substreams-ethereum = "0.9"  # Or appropriate chain package
+buffa = "0.9.2"
+substreams = "0.8.0"
+substreams-ethereum = "0.12.0"  # Or appropriate chain package
 
 [dev-dependencies]
 hex = "0.4"
 base64 = "0.21"
-prost = "0.11"
 
 # For benchmarks
 [dev-dependencies.criterion]

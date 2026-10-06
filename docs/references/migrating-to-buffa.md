@@ -2,7 +2,7 @@
 
 `substreams` 0.8.0 generates its Rust protobuf bindings with [buffa](https://github.com/anthropics/buffa) instead of [prost](https://github.com/tokio-rs/prost).
 
-**Upgrading is optional.** A module pinned to `substreams` 0.7 keeps building and streaming, and `cargo update` does not move it to 0.8.0. The protobuf wire format is the same under both, so existing packages keep streaming, cached module outputs stay valid, sinks read the same bytes, and a Go or JavaScript consumer needs no change. A project created with `substreams init` already uses buffa, from CLI v1.25.0 onwards.
+**Upgrading is optional.** A module pinned to `substreams` 0.7 keeps building and streaming, and `cargo update` does not move it to 0.8.0. The protobuf wire format is the same under both, so existing packages keep streaming, cached module outputs stay valid, sinks read the same bytes, and a Go or JavaScript consumer needs no change. A project created with `substreams init` already uses buffa, from the first CLI release that includes [#964](https://github.com/streamingfast/substreams/pull/964).
 
 Read on if you are moving an existing module to 0.8.0, or if a build fails because your crates disagree about which implementation to use.
 
@@ -56,7 +56,7 @@ Optional `message` fields become `MessageField<T>`, which dereferences to a defa
 | `blk.header.as_ref().unwrap().number` | `blk.header.number` |
 | `msg.field.is_some()` | `msg.field.is_set()` |
 | `msg.field.as_ref()` | `msg.field.as_option()` |
-| `msg.field = Some(value)` | `msg.field = MessageField::some(value)` |
+| `msg.field = Some(value)` | `msg.field = value.into()` |
 | `Status::try_from(msg.status)? == Status::Active` | `msg.status == Status::Active` |
 | `use prost::Message;` | `use buffa::Message;` |
 | `use prost_types::Timestamp;` | `use buffa_types::google::protobuf::Timestamp;` |
@@ -73,13 +73,14 @@ These generate prost types and do not compile against `substreams` 0.8.0:
 | `substreams-entity-change` 2.0.0 | `substreams ^0.6` | Define the `EntityChanges` protobuf in your own `proto` directory and let `substreams build` generate it, rather than depending on the crate |
 | `substreams-bitcoin` 2.0.0 | `substreams ^0.6.0` | Stay on the 0.6 row until a buffa release lands |
 | `substreams-antelope` 0.6.0 | `substreams ^0.6.0` | Stay on the 0.6 row until a buffa release lands |
-| `substreams-abis` 1.6.0 | `substreams ^0.7.6` | Stay on the 0.7 row, or copy the ABI definitions you use into your own crate |
 
 A Rust sink is a separate case: `tonic` generates prost clients, so a program that consumes a Substreams stream keeps using prost. This page applies to modules compiled to WebAssembly.
 
 ## Troubleshooting
 
 **`the trait bound 'MyMessage: Message' is not satisfied`** on a handler signature means the type came from prost codegen. Check that `Cargo.toml` names `buffa`, delete `buf.gen.yaml` and `src/pb`, and rebuild.
+
+**`rust-lld: error: duplicate symbol: alloc`** (and `dealloc`) means two versions of `substreams` are linked, each exporting the allocator. Run `cargo tree -i substreams` to find the crate pinning the pre-0.8 row. `substreams-entity-change` 2.0.0 is the common cause.
 
 **Two versions of `substreams` in `Cargo.lock`** mean one crate pins a pre-0.8 row. Run `cargo tree -i substreams` to find it.
 

@@ -95,31 +95,27 @@ fn map_block(block: Block) -> Result<Output, substreams::errors::Error> {
 
     for trx in block.transactions_owned() { // 2. 
         let accounts = trx.resolved_accounts_as_strings(); // 3.
-        if let Some(transaction) = trx.transaction.into_option() { // 4.
-            let meta = trx.meta.unwrap();
-            let pre_balances = meta.pre_balances;
-            let post_balances = meta.post_balances;
-            let pre_token_balances = meta.pre_token_balances;
-            let post_token_balances = meta.post_token_balances;
+        let meta = trx.meta;
+        let pre_balances = meta.pre_balances;
+        let post_balances = meta.post_balances;
+        let post_token_balances = meta.post_token_balances;
+        let msg = trx.transaction.message;
 
-            let msg = transaction.message.unwrap();
+        for (idx, inst) in msg.instructions.into_iter().enumerate() { // 4.
+            let program = &accounts[inst.program_id_index as usize]; // 5.
 
-            for (idx, inst) in msg.instructions.into_iter().enumerate() { // 5.
-                let program = &accounts[inst.program_id_index as usize]; // 6.
+            let trade_data = get_trade_data( // 6.
+                program,
+                inst.data,
+                &inst.accounts,
+                &accounts,
+                &pre_balances,
+                &post_balances,
+                &meta.log_messages,
+                &post_token_balances,
+            );
 
-                let trade_data = get_trade_data( // 7.
-                    program,
-                    inst.data,
-                    &inst.accounts,
-                    &accounts,
-                    &pre_balances,
-                    &post_balances,
-                    &meta.log_messages,
-                    &post_token_balances,
-                );
-            
-                // ...code omitted...
-            }
+            // ...code omitted...
         }
     }
 }
@@ -127,10 +123,9 @@ fn map_block(block: Block) -> Result<Output, substreams::errors::Error> {
 1. Create an _array_ of `TradeData` objects, where the trading data will be stored.
 2. Iterate over the transactions of the block.
 3. Get accounts of the transaction (the `resolved_accounts()` method contains also accounts stored in the [Address Lookup Tables](https://docs.solana.com/developing/lookup-tables)).
-4. _Unwrap transaction_
-5. Iterate over the instructions of the transaction.
-6. Get the program account. The `instruction.program_id_index` indicates the position of the program account in the accounts array.
-7. Pass the data to the `get_trade_data` function. This function verifies if the instruction executed is from one of the NFT exchanges that you want to track. The return type is `Option<TradeData>`. The `Option` will only be populated if the instruction belongs to one of the NFT exchanges.
+4. Iterate over the instructions of the transaction.
+5. Get the program account. The `instruction.program_id_index` indicates the position of the program account in the accounts array.
+6. Pass the data to the `get_trade_data` function. This function verifies if the instruction executed is from one of the NFT exchanges that you want to track. The return type is `Option<TradeData>`. The `Option` will only be populated if the instruction belongs to one of the NFT exchanges.
 
 Because every exchange handles the NFT data differently, there must be a custom decoding function for every exchange. The `dapps` folder of the project contains a file for every exchange, declaring the `parse_trade_instruction` function.
 

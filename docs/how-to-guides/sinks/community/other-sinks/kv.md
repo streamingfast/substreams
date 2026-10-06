@@ -59,8 +59,8 @@ message BlockMeta {
 
 ### Import the Cargo module
 
-{% hint style="warning" %}
-**Compatibility**: The `substreams-sink-kv` crate generates its protobuf types with prost, which does not compile against `substreams` 0.8.0 and above. Pin a pre-0.8 row for a module that uses it. See [Migrating from prost to buffa](../../../../references/migrating-to-buffa.md).
+{% hint style="info" %}
+**Compatibility**: `substreams-sink-kv` 0.2.0 generates its protobuf types with buffa and requires `substreams` 0.8.0 or above. For `substreams` 0.5 to 0.7, pin `substreams-sink-kv = "0.1.3"`, which generates its types with prost. See [Migrating from prost to buffa](../../../../references/migrating-to-buffa.md).
 {% endhint %}
 
 1. Add the `substreams-sink-kv` crate to your `Cargo.toml`:
@@ -69,7 +69,7 @@ message BlockMeta {
 # Cargo.toml
 
 [dependencies]
-substreams-sink-kv = "0.1.1"
+substreams-sink-kv = "0.2"
 # ...
 
 ```
@@ -95,15 +95,15 @@ substreams-sink-kv = "0.1.1"
 
 #[path = "kv_out.rs"]
 mod kv;
-use substreams_sink_kv::pb::kv::KvOperations;
+use substreams_sink_kv::pb::sf::substreams::sink::kv::v1::KVOperations;
 
 #[substreams::handlers::map]
 pub fn kv_out(
     deltas: store::Deltas<DeltaProto<BlockMeta>>,
-) -> Result<KvOperations, Error> {
+) -> Result<KVOperations, Error> {
 
-    // Create an empty 'KvOperations' structure
-    let mut kv_ops: KvOperations = Default::default();
+    // Create an empty 'KVOperations' structure
+    let mut kv_ops: KVOperations = Default::default();
 
     // Call a function that will push key-value operations from the deltas
     kv::process_deltas(&mut kv_ops, deltas);
@@ -122,18 +122,18 @@ pub fn kv_out(
 
 use substreams::proto;
 use substreams::store::{self, DeltaProto};
-use substreams_sink_kv::pb::kv::KvOperations;
+use substreams_sink_kv::pb::sf::substreams::sink::kv::v1::KVOperations;
 
 use crate::pb::block_meta::BlockMeta;
 
-pub fn process_deltas(ops: &mut KvOperations, deltas: store::Deltas<DeltaProto<BlockMeta>>) {
+pub fn process_deltas(ops: &mut KVOperations, deltas: store::Deltas<DeltaProto<BlockMeta>>) {
     use substreams::pb::substreams::store_delta::Operation;
 
     for delta in deltas.deltas {
         match delta.operation {
             // KV Operations do not distinguish between Create and Update.
             Operation::Create | Operation::Update => {
-                let val = proto::encode(&delta.new_value).unwrap();
+                let val = proto::encode(&delta.new_value);
                 ops.push_new(delta.key, val, delta.ordinal);
             }
             Operation::Delete => ops.push_delete(&delta.key, delta.ordinal),
@@ -148,7 +148,7 @@ pub fn process_deltas(ops: &mut KvOperations, deltas: store::Deltas<DeltaProto<B
 1. Compile your changes in your rust code:
 
 ```
-cargo build --release --target=wasm32-unknown-unknown
+substreams build
 ```
 
 1. Run with `substreams` command directly:

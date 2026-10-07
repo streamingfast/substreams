@@ -1284,12 +1284,6 @@ func tier1ResponseHandler(
 	debugOutputForModules []string,
 	supportBuffering bool,
 ) substreams.ResponseFunc {
-	auth := dauth.FromContext(ctx)
-	organizationID := auth.OrganizationID()
-	apiKeyID := auth.APIKeyID()
-	userMeta := auth.Meta()
-	ip := auth.RealIP()
-
 	outputModuleHash := reqctx.OutputModuleHash(ctx)
 
 	endpoint := "sf.substreams.rpc.v2/Blocks"
@@ -1347,10 +1341,12 @@ func tier1ResponseHandler(
 			}
 		}
 
+		auth := dauth.FromContext(ctx) // per response, continuous auth can refresh it mid-stream
+
 		egressBytes := proto.Size(respAny.(proto.Message))
 		begin := time.Now()
 		if err := streamSrv.SendMsg(respAny); err != nil {
-			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", organizationID), zap.String("api_key_id", apiKeyID), zap.Error(err))
+			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", auth.OrganizationID()), zap.String("api_key_id", auth.APIKeyID()), zap.Error(err))
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 		stats.RecordReadTime(begin)
@@ -1366,7 +1362,7 @@ func tier1ResponseHandler(
 		stats.RecordEgress(egressBytes)
 		metering.AddEgressBytes(ctx, egressBytes)
 
-		metericsSender.Send(ctx, organizationID, apiKeyID, ip, userMeta, outputModuleHash, endpoint)
+		metericsSender.Send(ctx, auth.OrganizationID(), auth.APIKeyID(), auth.RealIP(), auth.Meta(), outputModuleHash, endpoint)
 		return nil
 	}
 }

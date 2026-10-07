@@ -12,6 +12,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
@@ -390,8 +391,8 @@ func TestSend_externalCalls(t *testing.T) {
 	AddExternalCalls(ctx, "eth_getBalance", 4)
 
 	sender := NewMetricsSender()
-	sender.Send(ctx, "org1", "apiKey1", "127.0.0.1", "meta", "outputModuleHash", "endpoint")
-	sender.Send(ctx, "org1", "apiKey1", "127.0.0.1", "meta", "outputModuleHash", "endpoint")
+	sender.Send(ctx, "outputModuleHash", "endpoint")
+	sender.Send(ctx, "outputModuleHash", "endpoint")
 
 	assert.Len(t, emitter.events, 2)
 	assert.Equal(t, float64(5), emitter.events[0].Metrics["external_calls_eth_call"])
@@ -428,7 +429,7 @@ func TestSend(t *testing.T) {
 	outputModuleHash := "outputModuleHash"
 
 	AddEgressBytes(ctx, proto.Size(resp))
-	metericsSender.Send(ctx, "org1", "apiKey1", "127.0.0.1", "meta", outputModuleHash, "endpoint")
+	metericsSender.Send(withTestIdentity(ctx), outputModuleHash, "endpoint")
 
 	// Verify the emitted event
 	assert.Len(t, emitter.events, 1)
@@ -491,7 +492,7 @@ func TestSendParallel(t *testing.T) {
 
 			time.Sleep(time.Duration(randomInt()) * time.Nanosecond)
 			AddEgressBytes(ctx, proto.Size(resp))
-			metricsSender.Send(ctx, "org1", "apiKey1", "127.0.0.1", "meta", "outputModuleHash", "endpoint")
+			metricsSender.Send(ctx, "outputModuleHash", "endpoint")
 		}()
 	}
 
@@ -566,4 +567,25 @@ func (m *mockEmitter) Emit(ctx context.Context, event dmetering.Event) {
 
 func (m *mockEmitter) Shutdown(err error) {
 	return
+}
+
+func withTestIdentity(ctx context.Context) context.Context {
+	return dauth.WithTrustedHeaders(ctx, dauth.TrustedHeaders{
+		dauth.HeaderOrganizationID: "org1",
+		dauth.HeaderApiKeyID:       "apiKey1",
+		dauth.HeaderIP:             "127.0.0.1",
+		dauth.HeaderMeta:           "meta",
+	})
+}
+
+func TestSend_noTrustedHeaders(t *testing.T) {
+	ctx := dmetering.WithBytesMeter(context.Background())
+	emitter := &mockEmitter{}
+	ctx = reqctx.WithEmitter(ctx, emitter)
+
+	NewMetricsSender().Send(ctx, "outputModuleHash", "endpoint")
+
+	require.Len(t, emitter.events, 1)
+	assert.Equal(t, "", emitter.events[0].OrganizationID)
+	assert.Equal(t, "", emitter.events[0].Meta)
 }

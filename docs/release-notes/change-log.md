@@ -1065,7 +1065,7 @@ This release introduces significant performance optimizations to the Substreams 
 ## v1.17.8
 
 * Added experimental support for partial blocks (ex: Base's Flash Blocks) -- only supported on https://base-mainnet-flash.streamingfast.io endpoint
-* See [more details in the documentation](https://docs.substreams.dev/reference-material/flash-blocks)
+* See [more details in the documentation](https://docs.substreams.dev/reference-material/chain-support/flashblocks)
 
 ### CLI
 
@@ -1882,7 +1882,7 @@ This allows flexibility and getting anything from "skeleton" of a substreams for
 
 #### How to use `solana_program` or `alloy`/`ether-rs`
 
-Those libraries when used in a `wasm32-unknown-unknown` context creates in a bunch of [wasmbindgen](https://rustwasm.github.io/wasm-bindgen/) imports in the resulting Substreams Rust code, imports that led to runtime errors because Substreams engine didn't know about those special imports until today.
+Those libraries when used in a `wasm32-unknown-unknown` context creates in a bunch of [wasmbindgen](https://wasm-bindgen.github.io/wasm-bindgen/) imports in the resulting Substreams Rust code, imports that led to runtime errors because Substreams engine didn't know about those special imports until today.
 
 The Substreams engine is now able to "shims" those `wasmbindgen` imports enabling you to run code that depends libraries like `solana_program` and `alloy/ether-rs` which are known to pull those `wasmbindgen` imports. This is going to work as long as you do not actually call those special imports. Normal usage of those libraries don't accidentally call those methods normally. If they are called, the WASM module will fail at runtime and stall the Substreams module from going forward.
 

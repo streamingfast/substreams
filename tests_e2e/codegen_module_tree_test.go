@@ -63,8 +63,11 @@ strip = "debuginfo"
 `
 
 // These drive `buf` against the BSR and compile for wasm32, so they need the real
-// toolchain. A missing tool skips rather than fails: that is an environment gap, not
-// a defect in the code under test.
+// toolchain. On a developer machine a missing tool skips, since that is an environment
+// gap rather than a defect in the code under test. Where the environment is supposed to
+// provide the toolchain, `SUBSTREAMS_E2E_REQUIRE_TOOLS=true` turns the same gap into a
+// failure: a skip is invisible in a CI summary, so without it this suite can go green
+// having run none of its tests.
 func requireCodegenE2E(t *testing.T) {
 	t.Helper()
 	if testing.Short() {
@@ -75,24 +78,36 @@ func requireCodegenE2E(t *testing.T) {
 	requireWasmTarget(t)
 }
 
-// A missing wasm32 target should skip rather than fail: it is an environment gap,
-// not a defect in the code under test.
+// toolsAreRequired reports whether a missing tool fails instead of skipping.
+func toolsAreRequired() bool {
+	return os.Getenv("SUBSTREAMS_E2E_REQUIRE_TOOLS") == "true"
+}
+
+// missingTool skips, or fails when the environment promised the toolchain.
+func missingTool(t *testing.T, format string, args ...any) {
+	t.Helper()
+	if toolsAreRequired() {
+		t.Fatalf(format+" (SUBSTREAMS_E2E_REQUIRE_TOOLS=true)", args...)
+	}
+	t.Skipf(format, args...)
+}
+
 func requireWasmTarget(t *testing.T) {
 	t.Helper()
 	out, err := exec.Command("rustup", "target", "list", "--installed").Output()
 	if err != nil {
-		t.Skipf("could not list rustup targets: %v", err)
+		missingTool(t, "could not list rustup targets: %v", err)
+		return
 	}
 	if !strings.Contains(string(out), "wasm32-unknown-unknown") {
-		t.Skip("wasm32-unknown-unknown target not installed")
+		missingTool(t, "wasm32-unknown-unknown target not installed")
 	}
 }
 
 func requireTool(t *testing.T, name string) {
 	t.Helper()
-	_, err := exec.LookPath(name)
-	if err != nil {
-		t.Skipf("%s not found in PATH", name)
+	if _, err := exec.LookPath(name); err != nil {
+		missingTool(t, "%s not found in PATH", name)
 	}
 }
 

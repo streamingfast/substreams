@@ -2,6 +2,7 @@ package metering
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"io"
 	"math/rand"
@@ -16,6 +17,7 @@ import (
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -32,7 +34,8 @@ func TestWithBlockBytesReadMeteringOptions(t *testing.T) {
 	}
 
 	// write some random bytes to the store
-	err = store.WriteObject(nil, "test", bytes.NewReader([]byte("9t47flpnxpr5izkccod2rstoiyd89xdz4o7dvjunk70qvkystzb0v95noggt386dzfuozsz7ufk0xi11e2ndbbrx652yu4qe0u40zaj9oq98d1rga38d2h8f6xcjvp3oovotoczw5f8tb4jar1mfmo7mqc77ee22")))
+	content := []byte("9t47flpnxpr5izkccod2rstoiyd89xdz4o7dvjunk70qvkystzb0v95noggt386dzfuozsz7ufk0xi11e2ndbbrx652yu4qe0u40zaj9oq98d1rga38d2h8f6xcjvp3oovotoczw5f8tb4jar1mfmo7mqc77ee22")
+	err = store.WriteObject(nil, "test", bytes.NewReader(content))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +52,7 @@ func TestWithBlockBytesReadMeteringOptions(t *testing.T) {
 	_ = r.Close()
 
 	// only compressed read bytes are metered because the uncompressed is metered via the bstream live handler middleware
-	assert.Equal(t, 147, meter.GetCount(MeterFileCompressedReadBytes))
+	assert.Equal(t, gzipSize(t, content), meter.GetCount(MeterFileCompressedReadBytes))
 	assert.Equal(t, 0, meter.GetCount(MeterFileUncompressedReadBytes))
 
 	// written bytes are not metered because we do not write block files in substreams
@@ -112,9 +115,10 @@ func TestWithBytesReadMeteringOptionsGzip(t *testing.T) {
 	}
 
 	uncompressedSize := 1024
-	compressedSize := 32
+	content := bytes.Repeat([]byte("1"), uncompressedSize)
+	compressedSize := gzipSize(t, content)
 
-	err = store.WriteObject(nil, "test", bytes.NewReader(bytes.Repeat([]byte("1"), uncompressedSize)))
+	err = store.WriteObject(nil, "test", bytes.NewReader(content))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,6 +145,20 @@ func TestWithBytesReadMeteringOptionsGzip(t *testing.T) {
 	assert.Equal(t, compressedSize, meter.GetCount(MeterFileCompressedWriteBytes))
 
 	assert.Equal(t, 0, meter.GetCount(MeterLiveUncompressedReadBytes))
+}
+
+// gzipSize returns the size of content once gzipped by the standard library, the
+// exact output varies between Go versions so it cannot be hardcoded.
+func gzipSize(t *testing.T, content []byte) int {
+	t.Helper()
+
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	_, err := gw.Write(content)
+	require.NoError(t, err)
+	require.NoError(t, gw.Close())
+
+	return buf.Len()
 }
 
 func TestFileSourceMiddlewareHandlerFactory(t *testing.T) {

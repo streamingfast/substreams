@@ -164,6 +164,11 @@ func runSubstreamsBuild(t *testing.T, bin, dir string) (string, error) {
 	t.Helper()
 	cmd := exec.Command(bin, "build")
 	cmd.Dir = dir
+	// `substreams build` runs its pack step as a child process, looked up as
+	// `substreams` on PATH rather than as the binary doing the build. Putting the one
+	// under test first keeps the whole build inside this checkout, instead of packing
+	// with whichever version happens to be installed, or failing where none is.
+	cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(bin)+string(os.PathListSeparator)+os.Getenv("PATH"))
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }

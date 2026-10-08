@@ -11,7 +11,6 @@ import (
 
 	connectrpc "connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/bstream/hub"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dauth"
@@ -36,24 +35,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// Unlinkable live blocks in a row that mean the hub is wedged for good. Resets on
-// any linkable block and only armed once ready; same value the relayer uses.
-const maxConsecutiveUnlinkableBlocks = 5
-
-// burstFromLIB is the burst the hub's live source asks the relayer for: every block from
-// the hub's LIB onward, forks included, so the gap left by a disconnect is filled from the
-// relayer's memory instead of from the one-block store. When the LIB is older than what
-// the relayer holds, the relayer starts at its lowest block and the hub fills the rest from
-// the one-block store. A hub without a head yet asks for the last 2 blocks.
-func burstFromLIB(h *hub.ForkableHub) int64 {
-	_, _, _, libNum, err := h.HeadInfo()
-	// a burst of -1 means "from the relayer's LIB", -N (N > 1) means "from block N"
-	if err != nil || libNum < 2 {
-		return 2
-	}
-	return -int64(libNum)
-}
-
 type Tier1Modules struct {
 	// Required dependencies
 	Authenticator         dauth.Authenticator
@@ -62,6 +43,12 @@ type Tier1Modules struct {
 	HeadBlockNumberMetric *dmetrics.HeadBlockNum
 	CheckPendingShutDown  func() bool
 	InfoServer            InfoServer
+
+	// Optional dependencies
+
+	// ForkableHub is a hub built with NewLiveHub that another app of the process
+	// owns, runs and feeds metrics from. When nil, tier1 builds and runs its own.
+	ForkableHub *hub.ForkableHub
 }
 
 type InfoServer interface {
@@ -260,42 +247,33 @@ func (a *Tier1App) Run() error {
 		}
 	}
 
-	withLive := a.config.BlockStreamAddr != ""
+	withLive := a.config.BlockStreamAddr != "" || a.modules.ForkableHub != nil
 
 	var forkableHub *hub.ForkableHub
 
 	if withLive {
-		liveSourceFactory := bstream.SourceFactory(func(h bstream.Handler) bstream.Source {
-			return blockstream.NewSource(
-				context.Background(),
-				a.config.BlockStreamAddr,
-				2,
-				bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+		ownHub := a.modules.ForkableHub == nil
+		if ownHub {
+			forkableHub = NewLiveHub(LiveHubConfig{
+				BlockStreamAddr:        a.config.BlockStreamAddr,
+				MergedBlocksBundleSize: mergedBlocksBundleSize,
+				OneBlocksStore:         oneBlocksStore,
+				Requester:              "substreams-tier1",
+				Logger:                 a.logger,
+				OnBlock: func(blk *pbbstream.Block) {
 					a.modules.HeadBlockNumberMetric.SetUint64(blk.Number)
 					a.modules.HeadTimeDriftMetric.SetBlockTime(blk.Time())
-					return h.ProcessBlock(blk, obj)
-				}),
-				blockstream.WithRequester("substreams-tier1"),
-				blockstream.WithPartialBlocks(),
-				blockstream.WithBurstFunc(func() int64 { return burstFromLIB(forkableHub) }),
-			)
-		})
-
-		// the hub must hold at least two merged-blocks files worth of final
-		// blocks so the joining source can hand off from a file boundary
-		keepFinalBlocks := int(max(200, 2*mergedBlocksBundleSize))
-		forkableHub = hub.NewForkableHubWithOptions(
-			liveSourceFactory,
-			keepFinalBlocks,
-			oneBlocksStore,
-			[]hub.Option{
-				hub.WithLogger(a.logger),
-				hub.WithMaxConsecutiveUnlinkableBlocks(maxConsecutiveUnlinkableBlocks),
-			},
-		)
+				},
+			})
+		} else {
+			a.logger.Info("using the forkable hub shared by the process")
+			forkableHub = a.modules.ForkableHub
+		}
 		forkableHub.OnTerminated(a.Shutdown)
 
-		go forkableHub.Run()
+		if ownHub {
+			go forkableHub.Run()
+		}
 	}
 
 	authType := client.None

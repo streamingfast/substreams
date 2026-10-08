@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   window used to write files and, comma separated, how they are read: `lowmem=false` and a named decoder pool
   shared by all requests, for example `?compression_config=lowmem=false,pool=blocks` on merged blocks and
   `?compression_config=better/16,pool=cache` on the state store. Tier2 reads the setting from the URLs tier1 sends.
+  The bump also fixes zstd files keeping their HTTP stream or file open when closed before the end.
 
 - Tier1 now handles Ethereum partial blocks about 20x faster, with almost no allocations. It reads the
   transaction traces straight from the encoded block and drops the ones already sent by copying bytes,

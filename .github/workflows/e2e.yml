@@ -44,5 +44,4 @@ jobs:
         working-directory: tests_e2e
         env:
           SUBSTREAMS_E2E_REQUIRE_TOOLS: "true"
-          SUBSTREAMS_E2E_THINSTORE: "true"
         run: go test -v -count=1 -timeout 25m ./...

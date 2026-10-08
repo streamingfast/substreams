@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.25.0
 
 ### Docs
 
@@ -47,6 +47,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - `substreams build` and `substreams protogen` warn when an existing `buf.gen.yaml` generates for a different
   protobuf implementation than `Cargo.toml` depends on, a combination that does not compile.
+
+- `substreams build` and `substreams protogen` now generate the Rust module tree (`src/pb/mod.rs`) alongside
+  the bindings, so a new project compiles without a hand-written one. The generated file carries a marker on
+  its first line, and a `mod.rs` without that marker is left alone, so a project that predates its generation
+  keeps its own. A `mod.rs` that has gone missing is restored without regenerating the bindings.
+
+- Fixed `substreams build` and `substreams protogen` skipping generation as already up to date when the code on
+  disk was generated for a different target. The cache key now covers the `buf.gen.yaml` plugins and their
+  `out:` paths, so repointing it at another plugin regenerates instead of leaving stale code in place, and a
+  project whose `buf.gen.yaml` was deleted, which is what the stack-mismatch warning above tells the reader to
+  do, always regenerates. The search for a `buf.gen.yaml` now stops at the repository root, so a project nested
+  in a repository that configures `buf` for something else at its root is no longer generated with that
+  configuration.
+
+- Fixed `substreams build` and `substreams protogen` failing with two definitions of the same type when a
+  package carries its own copy of a protobuf that later became a system one. System protobufs are now matched
+  by the fully qualified types they declare rather than by file name, and the package's copy is the one that
+  stays, since it is what its modules were built against. `substreams-sink-sql`'s `services.proto` holds the
+  messages this project now ships as `deprecated.proto`.
+
+### Dependencies
+
+- Bumped `github.com/streamingfast/bstream` to pick up two fixes: a stream can skip the partial blocks of a
+  forkable hub it shares with another app, and `blockstream` detects a dead relayer in about 40s instead of
+  5 minutes.
 
 ## v1.24.0
 

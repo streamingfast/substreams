@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Tier1 accepts a forkable hub from the process through `Tier1Modules.ForkableHub` instead of building its own, so an app running next to tier1 (firehose in `firecore`) can share it and hold live blocks in memory once. `NewLiveHub` builds that hub and `HubKeepFinalBlocks` gives how many final blocks it keeps.
+
 - Tier1 now handles Ethereum partial blocks about 20x faster, with almost no allocations. It reads the
   transaction traces straight from the encoded block and drops the ones already sent by copying bytes,
   instead of decoding and re-encoding the whole block for every partial.

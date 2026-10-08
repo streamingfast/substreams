@@ -492,7 +492,15 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 		hashFilePath := filepath.Join(g.outputDir(), ".last_generated_hash")
 		os.Remove(hashFilePath) // Ignore errors, file may not exist
 	} else {
-		if err := g.writeLastGeneratedHash(currentHash); err != nil {
+		// Recompute rather than storing the hash from the top of this function. A run that
+		// writes `buf.gen.yaml` itself hashed the plugins before the file existed, which no
+		// later run can reproduce, so storing that value would miss the cache every time.
+		generatedHash, err := g.calculateHash(pkg)
+		if err != nil {
+			return fmt.Errorf("calculating hash: %w", err)
+		}
+
+		if err := g.writeLastGeneratedHash(generatedHash); err != nil {
 			return fmt.Errorf("writing hash file: %w", err)
 		}
 	}

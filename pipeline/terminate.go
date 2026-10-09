@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream/stream"
-	"github.com/streamingfast/dauth"
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/metering"
@@ -62,14 +61,9 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 
 	if reqctx.Details(ctx).IsTier2Request {
 		// metrics on tier2 are just sent at the end of the ProcessBlock
-		auth := dauth.FromContext(ctx)
-		organizationID := auth.OrganizationID()
-		apiKeyID := auth.APIKeyID()
-		userMeta := auth.Meta()
-		ip := auth.RealIP()
 		outputModuleHash := reqctx.OutputModuleHash(ctx)
 		metricsSender := metering.GetMetricsSender(ctx)
-		metricsSender.Send(ctx, organizationID, apiKeyID, ip, userMeta, outputModuleHash, "sf.substreams.internal.v2/ProcessRange")
+		metricsSender.Send(ctx, outputModuleHash, "sf.substreams.internal.v2/ProcessRange")
 		err := p.returnInternalModuleProgressOutputs(p.lastFinalClock, true)
 		if err != nil {
 			logger.Error("returning internal module progress outputs", zap.Error(err))

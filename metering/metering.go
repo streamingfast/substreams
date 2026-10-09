@@ -8,6 +8,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/metrics"
@@ -149,7 +150,8 @@ func NewMetricsSender() *MetricsSender {
 	}
 }
 
-func (ms *MetricsSender) Send(ctx context.Context, organizationID, apiKeyID, ip, userMeta, outputModuleHash, endpoint string) {
+// Send reads the identity from ctx on every call, so headers refreshed mid-stream apply.
+func (ms *MetricsSender) Send(ctx context.Context, outputModuleHash, endpoint string) {
 	ms.Lock()
 	defer ms.Unlock()
 
@@ -200,11 +202,12 @@ func (ms *MetricsSender) Send(ctx context.Context, organizationID, apiKeyID, ip,
 		return true
 	})
 
+	auth := dauth.FromContext(ctx)
 	event := dmetering.Event{
-		OrganizationID:   organizationID,
-		ApiKeyID:         apiKeyID,
-		IpAddress:        ip,
-		Meta:             userMeta,
+		OrganizationID:   auth.OrganizationID(),
+		ApiKeyID:         auth.APIKeyID(),
+		IpAddress:        auth.RealIP(),
+		Meta:             auth.Meta(),
 		OutputModuleHash: outputModuleHash,
 
 		Endpoint:  endpoint,

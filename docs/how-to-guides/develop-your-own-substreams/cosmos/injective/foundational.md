@@ -1,4 +1,4 @@
-The [Injective Foundational Substreams](https://github.com/streamingfast/substreams-foundational-modules/injective-common) contains Substreams modules, which retrieve fundamental data on the Injective blockchain.
+The [Injective Foundational Substreams](https://github.com/streamingfast/substreams-foundational-modules/tree/develop/injective-common) contains Substreams modules, which retrieve fundamental data on the Injective blockchain.
 
 You can use the Injective Foundational Modules as the input for your Substreams.
 

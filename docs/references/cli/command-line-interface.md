@@ -262,7 +262,7 @@ Hash: 11fd70768029bebce3741b051c15191d099d2436
 
 ### `graph`
 
-The `graph` command prints out a visual graph of the package in the [mermaid-js format](https://mermaid.js.org/intro/n00b-syntaxReference.html). It supports reading manifest from stdin using `"-"`.
+The `graph` command prints out a visual graph of the package in the [mermaid-js format](https://mermaid.js.org/intro/syntax-reference.html). It supports reading manifest from stdin using `"-"`.
 
 {% hint style="success" %}
 **Tip**: [Mermaid Live Editor](https://mermaid.live/) is the visual editor used by Substreams.

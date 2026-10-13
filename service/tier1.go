@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -1140,7 +1141,7 @@ func (s *Tier1Service) blocks(
 		}
 
 		if requestDetails.FromQuickload {
-			if err := configureLiveBackFillerFromQuickload(ctx, segmentSize, requestDetails.LinearHandoffBlockNum, execGraph.UsedStoreModules(), storeConfigs, liveBackFiller); err != nil {
+			if err := configureLiveBackFillerFromQuickload(ctx, segmentSize, requestDetails.LinearHandoffBlockNum, chainFirstStreamableBlock, execGraph.UsedStoreModules(), storeConfigs, liveBackFiller); err != nil {
 				return err
 			}
 		}
@@ -1247,11 +1248,14 @@ func (s *Tier1Service) pendingShutdownCheck(deadline time.Time, logger *zap.Logg
 }
 
 // configureLiveBackFillerFromQuickload will ensure that any used store
-func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint64, linearHandoffBlockNum uint64, usedStores []*pbsubstreams.Module, storeConfigs store.ConfigMap, liveBackFiller *LiveBackFiller) error {
+func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint64, linearHandoffBlockNum uint64, firstStreamableBlock uint64, usedStores []*pbsubstreams.Module, storeConfigs store.ConfigMap, liveBackFiller *LiveBackFiller) error {
 	backfillFromIndex := linearHandoffBlockNum / segmentSize
+	// The first segment holding no block below the first streamable block: a job on a lower
+	// one would read blocks that no longer exist, and a failed job stops the back filler.
+	firstStreamableIndex := (firstStreamableBlock + segmentSize - 1) / segmentSize
 
 	for _, mod := range usedStores {
-		lowestIndex := mod.InitialBlock / segmentSize
+		lowestIndex := max(mod.InitialBlock/segmentSize, firstStreamableIndex)
 		for i := 0; backfillFromIndex > lowestIndex; i++ {
 
 			listUpTo := backfillFromIndex * segmentSize
@@ -1268,8 +1272,8 @@ func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint6
 			if err != nil {
 				return err
 			}
-			if files != nil {
-				backfillFromIndex = files[len(files)-1].Range.ExclusiveEndBlock / segmentSize
+			if end, found := lastLoadableSnapshotEnd(files, storeConfigs[mod.Name].ModuleInitialBlock()); found {
+				backfillFromIndex = end / segmentSize
 				break
 			}
 		}
@@ -1277,6 +1281,17 @@ func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint6
 
 	}
 	return nil
+}
+
+// lastLoadableSnapshotEnd returns the end block of the last file in files, skipping full KVs
+// named after another initial block than the store's, which cannot be loaded.
+func lastLoadableSnapshotEnd(files []*store.FileInfo, moduleInitialBlock uint64) (uint64, bool) {
+	for _, file := range slices.Backward(files) {
+		if file.Partial || file.Range.StartBlock == moduleInitialBlock {
+			return file.Range.ExclusiveEndBlock, true
+		}
+	}
+	return 0, false
 }
 
 func tier1ResponseHandler(

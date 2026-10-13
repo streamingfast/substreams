@@ -961,6 +961,7 @@ func (s *Tier1Service) blocks(
 		requestDetails.LinearHandoffBlockNum,
 		requestDetails.StopBlockNum,
 		scheduleStores,
+		execGraph.HasTruncatedStores(),
 	)
 	if err != nil {
 		return stream.NewErrInvalidArg("%s", err.Error())

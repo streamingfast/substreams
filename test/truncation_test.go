@@ -63,6 +63,29 @@ func TestStoreTruncation(t *testing.T) {
 		assert.Contains(t, err.Error(), `store "setup_test_store_add_i64" starts at block 1, before the first streamable block 20`)
 	})
 
+	t.Run("linear handoff at the first streamable block", func(t *testing.T) {
+		for _, productionMode := range []bool{true, false} {
+			for _, withSnapshot := range []bool{true, false} {
+				tempDir := t.TempDir()
+				if withSnapshot {
+					buildSnapshots(t, tempDir)
+				}
+
+				run := truncatedRun(t, 20, true)
+				run.LinearHandoffBlockNum = 20
+				run.ExclusiveEndBlock = 25
+				run.ProductionMode = productionMode
+				err := run.RunWithTempDir(t, "handoff_at_first_streamable_block", tempDir)
+				if withSnapshot {
+					require.NoError(t, err, "production mode: %v", productionMode)
+					continue
+				}
+				require.Error(t, err, "production mode: %v", productionMode)
+				assert.Contains(t, err.Error(), `store "setup_test_store_add_i64" starts at block 1, before the first streamable block 20`)
+			}
+		}
+	})
+
 	t.Run("refuses modules starting before the first streamable block without the flag", func(t *testing.T) {
 		tempDir := t.TempDir()
 		buildSnapshots(t, tempDir)

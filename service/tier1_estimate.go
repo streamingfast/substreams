@@ -245,7 +245,7 @@ func (s *Tier1Service) estimate(
 		}
 	}
 
-	reqPlan, err := plan.BuildTier1RequestPlan(true, segmentSize, execGraph.LowestInitBlock(), lowestStoresInitBlock, details.ResolvedStartBlockNum, stopBlock, stopBlock, scheduleStores)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, segmentSize, execGraph.LowestInitBlock(), lowestStoresInitBlock, details.ResolvedStartBlockNum, stopBlock, stopBlock, scheduleStores, execGraph.HasTruncatedStores())
 	if err != nil {
 		return bsstream.NewErrInvalidArg("%s", err.Error())
 	}

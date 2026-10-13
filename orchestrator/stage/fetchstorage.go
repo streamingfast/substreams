@@ -215,7 +215,7 @@ func (s *Stages) checkTruncatedStores(ctx context.Context, resume int) error {
 			}
 			firstBlock := mod.segmenter.InitialBlock()
 			storeInitialBlock := conf.ModuleInitialBlock()
-			if storeInitialBlock >= firstBlock || mod.segmenter.Count() == 0 || resume >= mod.segmenter.FirstIndex() {
+			if storeInitialBlock >= firstBlock || resume >= mod.segmenter.FirstIndex() {
 				continue
 			}
 

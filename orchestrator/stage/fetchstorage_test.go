@@ -260,7 +260,7 @@ func TestFetchOutputMapperState(t *testing.T) {
 						},
 					}),
 
-					"test_store2": testStoreConfig(t, "test_store2", 0, "hash", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "value", &dstore.MockStore{
+					"test_store2": testStoreConfig(t, "test_store2", 40, "hash", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "value", &dstore.MockStore{
 						WalkFunc:     failWalk(t),
 						WalkFromFunc: failWalkFrom(t),
 						WalkFromToFunc: func(ctx context.Context, prefix, start, end string, f func(string) error) error {
@@ -270,7 +270,7 @@ func TestFetchOutputMapperState(t *testing.T) {
 						},
 					}),
 
-					"test_store3": testStoreConfig(t, "test_store3", 0, "hash", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "value", &dstore.MockStore{
+					"test_store3": testStoreConfig(t, "test_store3", 80, "hash", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "value", &dstore.MockStore{
 						WalkFunc:     failWalk(t),
 						WalkFromFunc: failWalkFrom(t),
 						WalkFromToFunc: func(ctx context.Context, prefix, start, end string, f func(string) error) error {
@@ -326,7 +326,7 @@ func TestFetchOutputMapperState(t *testing.T) {
 						},
 					}),
 
-					"test_store2": testStoreConfig(t, "test_store2", 0, "hash", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "value", &dstore.MockStore{
+					"test_store2": testStoreConfig(t, "test_store2", 40, "hash", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "value", &dstore.MockStore{
 						WalkFunc:     failWalk(t),
 						WalkFromFunc: failWalkFrom(t),
 						WalkFromToFunc: func(ctx context.Context, prefix, start, end string, f func(string) error) error {
@@ -338,7 +338,7 @@ func TestFetchOutputMapperState(t *testing.T) {
 						},
 					}),
 
-					"test_store3": testStoreConfig(t, "test_store3", 0, "hash", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "value", &dstore.MockStore{
+					"test_store3": testStoreConfig(t, "test_store3", 80, "hash", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "value", &dstore.MockStore{
 						WalkFunc:     failWalk(t),
 						WalkFromFunc: failWalkFrom(t),
 						WalkFromToFunc: func(ctx context.Context, prefix, start, end string, f func(string) error) error {

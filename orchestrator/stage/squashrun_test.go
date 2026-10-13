@@ -18,7 +18,7 @@ import (
 // segment 0 of stage 0 already merged.
 func newMergeTestStages(t *testing.T) *Stages {
 	t.Helper()
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true, false)
 	require.NoError(t, err)
 	s := NewStages(context.Background(), exec.TestGraphStagedModules(5, 5, 5, 5, 5), reqPlan, nil, nil)
 	s.allocSegments(4)

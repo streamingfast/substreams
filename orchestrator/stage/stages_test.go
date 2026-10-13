@@ -19,7 +19,7 @@ import (
 
 func TestNewStages(t *testing.T) {
 	//seg := block.NewSegmenter(10, 5, 75)
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 75, 75, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 75, 75, true, false)
 	assert.NoError(t, err)
 
 	stages := NewStages(
@@ -52,7 +52,7 @@ func TestNewStagesDepsInFuture(t *testing.T) {
 		5,    // resolvedStartBlock
 		100,  // linearHandoffBlock
 		200,  // exclusiveEndBlock
-		true)
+		true, false)
 	assert.NoError(t, err)
 
 	stages := NewStages(
@@ -94,7 +94,7 @@ func unit(seg, stage int) Unit {
 }
 
 func TestNewStageNextJobs(t *testing.T) {
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true, false)
 	assert.NoError(t, err)
 	assert.Equal(t, "interval=10, stores=[5, 50), map_write=[5, 50), map_read=[5, 50), linear=[nil)", reqPlan.String())
 	stages := NewStages(
@@ -275,6 +275,7 @@ func TestShadowSimple(t *testing.T) {
 		50,   //linearHandoffBlock
 		50,   //effectiveEndBlock
 		true, // scheduleStores
+		false,
 	)
 	assert.NoError(t, err)
 	assert.Equal(t, "interval=10, stores=[5, 50), map_write=[5, 50), map_read=[5, 50), linear=[nil)", reqPlan.String())
@@ -317,7 +318,7 @@ func TestShadowSimple(t *testing.T) {
 // no job will run for that upper unit, so nothing would ever un-shadow it and the stage
 // would wait forever.
 func TestShadowNotUnderMergeFromDisk(t *testing.T) {
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true, false)
 	assert.NoError(t, err)
 
 	stages := NewStages(
@@ -355,7 +356,7 @@ func TestShadowNotUnderMergeFromDisk(t *testing.T) {
 }
 
 func TestShadowStartAfter(t *testing.T) {
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 30, 90, 90, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 30, 90, 90, true, false)
 	assert.NoError(t, err)
 	assert.Equal(t, "interval=10, stores=[5, 90), map_write=[30, 90), map_read=[30, 90), linear=[nil)", reqPlan.String())
 
@@ -393,7 +394,7 @@ func TestShadowStartAfter(t *testing.T) {
 }
 
 func TestShadowStartAfter2(t *testing.T) {
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 40, 90, 90, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 40, 90, 90, true, false)
 	assert.NoError(t, err)
 	assert.Equal(t, "interval=10, stores=[5, 90), map_write=[40, 90), map_read=[40, 90), linear=[nil)", reqPlan.String())
 
@@ -759,7 +760,7 @@ func TestStages_dependenciesCompleted(t *testing.T) {
 }
 
 func TestReprocessMapSegment(t *testing.T) {
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true, false)
 	assert.NoError(t, err)
 	stages := NewStages(context.Background(), exec.TestGraphStagedModules(5, 5, 5, 5, 5), reqPlan, nil, nil)
 
@@ -787,7 +788,7 @@ func TestBlocksToProcessEmptyBackprocessRange(t *testing.T) {
 		330, // resolvedStartBlock
 		100, // linearHandoffBlock
 		360, // exclusiveEndBlock
-		true)
+		true, false)
 	require.NoError(t, err)
 	require.True(t, reqPlan.RequiresParallelProcessing())
 

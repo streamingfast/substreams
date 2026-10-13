@@ -11,7 +11,7 @@ import (
 )
 
 func TestAllStoresCompletedSentOnce(t *testing.T) {
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 0, 0, 0, 100, 100, false)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 0, 0, 0, 100, 100, false, false)
 	require.NoError(t, err)
 	stages := NewStages(context.Background(), exec.TestGraphMapper(0), reqPlan, nil, nil)
 	require.True(t, stages.AllStoresCompleted())

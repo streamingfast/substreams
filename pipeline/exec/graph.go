@@ -19,6 +19,7 @@ type Graph struct {
 	modulesInitBlocks     map[string]uint64
 	lowestInitBlock       uint64
 	lowestStoresInitBlock *uint64
+	truncatedStores       bool
 	outputModule          *pbsubstreams.Module
 
 	schedulableModules      []*pbsubstreams.Module // stores and output mappers needed to execute to produce output for all `output_modules`.
@@ -79,6 +80,10 @@ func (g *Graph) LowestInitBlock() uint64              { return g.lowestInitBlock
 func (g *Graph) LowestStoresInitBlock() *uint64       { return g.lowestStoresInitBlock }
 func (g *Graph) ModulesInitBlocks() map[string]uint64 { return g.modulesInitBlocks }
 func (g *Graph) OutputModuleStageIndex() int          { return len(g.stagedUsedModules) - 1 }
+
+// HasTruncatedStores reports whether a store has an initial block below the first streamable
+// block: its state at its graph initial block comes from a snapshot, not from an empty store.
+func (g *Graph) HasTruncatedStores() bool { return g.truncatedStores }
 
 // NewOutputModuleGraph builds the execution graph of outputModule. A module with an initial block
 // below firstStreamableBlock is refused, unless allowTruncation is set: it then runs from
@@ -223,8 +228,13 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 	g.modulesInitBlocks = map[string]uint64{}
 	for _, mod := range g.usedModules {
 		initialBlock := mod.InitialBlock
-		if initialBlock == 0 || (allowTruncation && initialBlock < firstStreamableBlock) {
+		if initialBlock == 0 {
 			initialBlock = firstStreamableBlock
+		} else if allowTruncation && initialBlock < firstStreamableBlock {
+			initialBlock = firstStreamableBlock
+			if mod.GetKindStore() != nil {
+				g.truncatedStores = true
+			}
 		} else if initialBlock < firstStreamableBlock {
 			return fmt.Errorf("module %q has initial block %d smaller than first streamable block %d", mod.Name, initialBlock, firstStreamableBlock)
 		}

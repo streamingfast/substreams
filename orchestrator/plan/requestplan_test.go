@@ -16,6 +16,7 @@ func TestBuildConfig(t *testing.T) {
 		storeInterval             int
 		productionMode            bool
 		needsStores               bool
+		truncatedStores           bool
 		graphInitBlock            uint64
 		lowestStoreInitBlock      uint64
 		resolvedStartBlock        uint64
@@ -28,6 +29,38 @@ func TestBuildConfig(t *testing.T) {
 	}
 
 	tests := []testStruct{
+		{
+			name:                      "truncated stores, production mode starting at the first streamable block",
+			storeInterval:             100,
+			productionMode:            true,
+			needsStores:               true,
+			truncatedStores:           true,
+			graphInitBlock:            400,
+			lowestStoreInitBlock:      400,
+			resolvedStartBlock:        400,
+			linearHandoffBlock:        400,
+			exclusiveEndBlock:         450,
+			expectStoresRange:         "400-400",
+			expectWriteExecOutRange:   "nil",
+			expectReadExecOutRange:    "nil",
+			expectLinearPipelineRange: "400-450",
+		},
+		{
+			name:                      "truncated stores, dev mode in the first segment",
+			storeInterval:             100,
+			productionMode:            false,
+			needsStores:               true,
+			truncatedStores:           true,
+			graphInitBlock:            400,
+			lowestStoreInitBlock:      400,
+			resolvedStartBlock:        420,
+			linearHandoffBlock:        400,
+			exclusiveEndBlock:         450,
+			expectStoresRange:         "400-400",
+			expectWriteExecOutRange:   "nil",
+			expectReadExecOutRange:    "nil",
+			expectLinearPipelineRange: "400-450",
+		},
 		{
 			name:                      "g1. dev mode with stop within same segment as start block",
 			storeInterval:             100,
@@ -275,7 +308,7 @@ func TestBuildConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res, err := BuildTier1RequestPlan(tt.productionMode, uint64(tt.storeInterval), tt.graphInitBlock, tt.lowestStoreInitBlock, tt.resolvedStartBlock, tt.linearHandoffBlock, tt.exclusiveEndBlock, tt.needsStores)
+			res, err := BuildTier1RequestPlan(tt.productionMode, uint64(tt.storeInterval), tt.graphInitBlock, tt.lowestStoreInitBlock, tt.resolvedStartBlock, tt.linearHandoffBlock, tt.exclusiveEndBlock, tt.needsStores, tt.truncatedStores)
 			assert.Nil(t, err)
 			assert.Equal(t, tt.expectStoresRange, tostr(res.BuildStores), "buildStores")
 			assert.Equal(t, tt.expectWriteExecOutRange, tostr(res.WriteExecOut), "writeExecOut")

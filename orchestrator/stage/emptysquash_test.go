@@ -125,7 +125,7 @@ func runSquashScenario(t *testing.T, sc squashScenario, copyEmpty bool) squashOu
 		cfgs[st.name] = testStoreConfig(t, st.name, st.initBlock, "hash-"+st.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", counting)
 	}
 
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 0, 0, 0, sc.endBlock, sc.endBlock, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 0, 0, 0, sc.endBlock, sc.endBlock, true, false)
 	require.NoError(t, err)
 	s := NewStages(ctx, exec.TestGraphStores(modules...), reqPlan, nil, cfgs)
 	t.Cleanup(s.Close)

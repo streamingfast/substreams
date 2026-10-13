@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store/state"
@@ -95,6 +96,10 @@ func (s *Stages) FetchCachesState(
 		zap.Int("resume_segment", resume),
 		zap.String("snapshots", cacheState.Summary()),
 	)
+
+	if err := s.checkTruncatedStores(ctx, resume); err != nil {
+		return err
+	}
 
 	completes := make(unitMap)
 	partials := make(unitMap)
@@ -191,6 +196,38 @@ func (s *Stages) FetchCachesState(
 	}
 	// right after we fetch the state on disk, we can determine the shadowable segments
 	s.setShadowableSegment(segmenter.IndexForStartBlock(reqctx.Details(ctx).ResolvedStartBlockNum))
+	return nil
+}
+
+// checkTruncatedStores refuses the request when a store whose files start below the first
+// block its stage can run (the chain was truncated after the store started) has no snapshot to
+// resume from: the blocks needed to rebuild it are gone. Such a store is fine when the resume
+// segment is at or above its first segment, or when a snapshot exists at its first block.
+func (s *Stages) checkTruncatedStores(ctx context.Context, resume int) error {
+	for _, stage := range s.stages {
+		if stage.kind != KindStore {
+			continue
+		}
+		for _, mod := range stage.storeModuleStates {
+			conf := s.storeConfigs[mod.name]
+			if conf == nil {
+				continue
+			}
+			firstBlock := mod.segmenter.InitialBlock()
+			storeInitialBlock := conf.ModuleInitialBlock()
+			if storeInitialBlock >= firstBlock || mod.segmenter.Count() == 0 || resume >= mod.segmenter.FirstIndex() {
+				continue
+			}
+
+			exists, err := conf.ExistsFullKV(ctx, firstBlock)
+			if err != nil {
+				return fmt.Errorf("checking snapshot of store %q at block %d: %w", mod.name, firstBlock, err)
+			}
+			if !exists {
+				return stream.NewErrInvalidArg("store %q starts at block %d, before the first streamable block %d, and has no snapshot between that block and the start of this request to resume from", mod.name, storeInitialBlock, firstBlock)
+			}
+		}
+	}
 	return nil
 }
 

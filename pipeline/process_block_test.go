@@ -478,7 +478,7 @@ func newTestModuleGraph(t *testing.T, outputModule, blockType string) *exec.Grap
 				Content: []byte("some-fake-binary-data"),
 			},
 		},
-	}, 0)
+	}, 0, false)
 	require.NoError(t, err)
 	return eg
 }

@@ -38,8 +38,12 @@ func TestNewService(runtimeConfig config.RuntimeConfig, linearHandoffBlockNum ui
 	}
 }
 
+func (s *Tier1Service) TestAllowStoreTruncation() {
+	s.tier2RequestParameters.AllowStoreTruncation = true
+}
+
 func (s *Tier1Service) TestBlocks(ctx context.Context, isSubRequest bool, request *pbsubstreamsrpc.Request, respFunc substreams.ResponseFunc) error {
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock, s.tier2RequestParameters.AllowStoreTruncation)
 	if err != nil {
 		return stream.NewErrInvalidArg("%s", err.Error())
 	}

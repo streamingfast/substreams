@@ -136,6 +136,11 @@ type Tier1Config struct {
 	// used by tier2 stores. The value is forwarded to tier2 on each request.
 	StoreSizeLimit uint64
 
+	// AllowStoreTruncation lets requests run modules whose initial block is below the first
+	// streamable block. They serve blocks from the first streamable block on, and their stores
+	// resume from snapshots taken before the chain was truncated. Forwarded to tier2 on each request.
+	AllowStoreTruncation bool
+
 	WASMExtensions wasm.WASMExtensioner
 	Tracing        bool
 
@@ -358,6 +363,7 @@ func (a *Tier1App) Run() error {
 		WASMModules:                wasmModules,
 		FoundationalStoreEndpoints: foundationalStoreEndpoints,
 		StoreSizeLimit:             a.config.StoreSizeLimit,
+		AllowStoreTruncation:       a.config.AllowStoreTruncation,
 	}
 
 	tier1Service, err := service.NewTier1(

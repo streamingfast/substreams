@@ -173,7 +173,7 @@ func (s *Tier1Service) estimate(
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(req.OutputModule, true, blocksReq.Modules, bstream.GetProtocolFirstStreamableBlock)
+	execGraph, err := exec.NewOutputModuleGraph(req.OutputModule, true, blocksReq.Modules, bstream.GetProtocolFirstStreamableBlock, s.tier2RequestParameters.AllowStoreTruncation)
 	if err != nil {
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	}

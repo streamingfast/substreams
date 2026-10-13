@@ -514,7 +514,7 @@ func (s *Tier1Service) BlocksAny(
 		return nil, err
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock, s.tier2RequestParameters.AllowStoreTruncation)
 	if err != nil {
 		err := connect.NewError(connect.CodeInvalidArgument, err)
 		fields = append(fields, zap.Error(err))

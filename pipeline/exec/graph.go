@@ -80,11 +80,14 @@ func (g *Graph) LowestStoresInitBlock() *uint64       { return g.lowestStoresIni
 func (g *Graph) ModulesInitBlocks() map[string]uint64 { return g.modulesInitBlocks }
 func (g *Graph) OutputModuleStageIndex() int          { return len(g.stagedUsedModules) - 1 }
 
-func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64) (out *Graph, err error) {
+// NewOutputModuleGraph builds the execution graph of outputModule. A module with an initial block
+// below firstStreamableBlock is refused, unless allowTruncation is set: it then runs from
+// firstStreamableBlock on, and its stores keep the file names they had before the chain was truncated.
+func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64, allowTruncation bool) (out *Graph, err error) {
 	out = &Graph{
 		requestModules: modules,
 	}
-	if err := out.computeGraph(outputModule, productionMode, modules, firstStreamableBlock); err != nil {
+	if err := out.computeGraph(outputModule, productionMode, modules, firstStreamableBlock, allowTruncation); err != nil {
 		return nil, fmt.Errorf("module graph: %w", err)
 	}
 
@@ -177,7 +180,7 @@ func (g *Graph) dedupeModules(mods *pbsubstreams.Modules) (*pbsubstreams.Modules
 	return &pbsubstreams.Modules{Modules: filteredModules}, deduped
 }
 
-func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64) error {
+func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64, allowTruncation bool) error {
 	graph, err := manifest.NewModuleGraph(modules.Modules)
 	if err != nil {
 		return fmt.Errorf("compute graph: %w", err)
@@ -220,7 +223,7 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 	g.modulesInitBlocks = map[string]uint64{}
 	for _, mod := range g.usedModules {
 		initialBlock := mod.InitialBlock
-		if initialBlock == 0 {
+		if initialBlock == 0 || (allowTruncation && initialBlock < firstStreamableBlock) {
 			initialBlock = firstStreamableBlock
 		} else if initialBlock < firstStreamableBlock {
 			return fmt.Errorf("module %q has initial block %d smaller than first streamable block %d", mod.Name, initialBlock, firstStreamableBlock)

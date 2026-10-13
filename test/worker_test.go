@@ -25,6 +25,7 @@ type TestWorker struct {
 	testTempDir            string
 	id                     uint64
 	firstStreamableBlock   uint64
+	allowStoreTruncation   bool
 }
 
 var workerID atomic.Uint64
@@ -45,6 +46,7 @@ func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint6
 		StateStoreURL:        filepath.Join(w.testTempDir, "test.store"),
 		StateStoreDefaultTag: "tag",
 		FirstStreamableBlock: w.firstStreamableBlock,
+		AllowStoreTruncation: w.allowStoreTruncation,
 	})
 	request := work.NewRequest(ctx, reqctx.Details(ctx), unit.Stage, startBlock, streamOutput)
 

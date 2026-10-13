@@ -45,6 +45,7 @@ func (m *ProcessRangeRequest) CloneVT() *ProcessRangeRequest {
 	r.EthCallFallbackToNumberDuration = m.EthCallFallbackToNumberDuration
 	r.StoreSizeLimit = m.StoreSizeLimit
 	r.MergedBlocksBundleSize = m.MergedBlocksBundleSize
+	r.AllowStoreTruncation = m.AllowStoreTruncation
 	if rhs := m.WasmExtensionConfigs; rhs != nil {
 		tmpContainer := make(map[string]string, len(rhs))
 		for k, v := range rhs {
@@ -373,6 +374,9 @@ func (this *ProcessRangeRequest) EqualVT(that *ProcessRangeRequest) bool {
 		return false
 	}
 	if this.MergedBlocksBundleSize != that.MergedBlocksBundleSize {
+		return false
+	}
+	if this.AllowStoreTruncation != that.AllowStoreTruncation {
 		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -792,6 +796,18 @@ func (m *ProcessRangeRequest) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m.unknownFields != nil {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
+	}
+	if m.AllowStoreTruncation {
+		i--
+		if m.AllowStoreTruncation {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xb8
 	}
 	if m.MergedBlocksBundleSize != 0 {
 		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.MergedBlocksBundleSize))
@@ -1597,6 +1613,9 @@ func (m *ProcessRangeRequest) SizeVT() (n int) {
 	}
 	if m.MergedBlocksBundleSize != 0 {
 		n += 2 + protohelpers.SizeOfVarint(uint64(m.MergedBlocksBundleSize))
+	}
+	if m.AllowStoreTruncation {
+		n += 3
 	}
 	n += len(m.unknownFields)
 	return n
@@ -2562,6 +2581,26 @@ func (m *ProcessRangeRequest) UnmarshalVT(dAtA []byte) error {
 					break
 				}
 			}
+		case 23:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AllowStoreTruncation", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.AllowStoreTruncation = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := protohelpers.Skip(dAtA[iNdEx:])

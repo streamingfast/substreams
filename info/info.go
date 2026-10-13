@@ -248,7 +248,7 @@ func ExtendedWithPackage(pkg *pbsubstreams.Package, graph *manifest.ModuleGraph,
 
 	var stages [][][]string
 	if outputModule != "" {
-		execGraph, err := exec.NewOutputModuleGraph(outputModule, true, pkg.Modules, 0)
+		execGraph, err := exec.NewOutputModuleGraph(outputModule, true, pkg.Modules, 0, false)
 		if err != nil {
 			return nil, fmt.Errorf("creating output module graph: %w", err)
 		}

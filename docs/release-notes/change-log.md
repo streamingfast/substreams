@@ -9,6 +9,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Server
+
+- Add store truncation, enabled on tier1 with `Tier1Config.AllowStoreTruncation` and forwarded to tier2. It lets
+  requests keep running Substreams whose modules start before the chain's first streamable block, after that block
+  was raised (the chain was truncated). Those modules run from the first streamable block on, and their stores resume
+  from the snapshots taken before the truncation, which keep their original names (ex: `0400100000-0350000000.kv`).
+  A request is refused when a store has no snapshot at or after the first streamable block to resume from.
+
 ## v1.25.0
 
 ### Docs

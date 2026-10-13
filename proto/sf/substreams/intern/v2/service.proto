@@ -55,6 +55,10 @@ message ProcessRangeRequest {
   uint64 store_size_limit = 21; // if non-zero, overrides the default store size limit (in bytes) for stores loaded during this request
 
   uint64 merged_blocks_bundle_size = 22; // number of blocks per merged-blocks file in merged_blocks_store (0 means the default of 100)
+
+  // Modules may have an initial block below first_streamable_block: they run from first_streamable_block
+  // on, and their stores resume from snapshots taken before the chain was truncated.
+  bool allow_store_truncation = 23;
 }
 
 message ProcessRangeResponse {

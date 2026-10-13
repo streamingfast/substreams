@@ -61,7 +61,7 @@ func TestGetExecutionPlan_CancelledContextNoMapRace(t *testing.T) {
 		Binaries: []*pbsubstreams.Binary{
 			{Type: "test", Content: []byte("some-fake-binary-data")},
 		},
-	}, 0)
+	}, 0, false)
 	require.NoError(t, err)
 
 	const stage = uint32(0)
@@ -137,7 +137,7 @@ func TestGetExecutionPlan_StoreOutputMissingWithFullKV(t *testing.T) {
 		Binaries: []*pbsubstreams.Binary{
 			{Type: "test", Content: []byte("some-fake-binary-data")},
 		},
-	}, 0)
+	}, 0, false)
 	require.NoError(t, err)
 
 	const stage = uint32(1)

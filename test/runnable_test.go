@@ -52,6 +52,7 @@ type testRun struct {
 	LinearHandoffBlockNum  uint64 // defaults to the request's StopBlock, so no linear handoff, only backprocessing
 	FirstStreamableBlock   uint64
 	StoreSizeLimit         uint64 // per-store size limit for tier1's linear pipeline; 0 uses the store default
+	AllowStoreTruncation   bool
 	ProductionMode         bool
 	// PreWork can be done to perform tier2 work in advance, to simulate when
 	// pre-existing data is available in different conditions
@@ -166,6 +167,7 @@ func (f *testRun) run(t *testing.T, testName string) error {
 			testTempDir:            f.TempDir,
 			id:                     workerID.Inc(),
 			firstStreamableBlock:   f.FirstStreamableBlock,
+			allowStoreTruncation:   f.AllowStoreTruncation,
 		}
 	}
 
@@ -178,7 +180,7 @@ func (f *testRun) run(t *testing.T, testName string) error {
 		f.PreWork(t, f, workerPoolFactory)
 	}
 
-	if err := processRequest(t, ctx, request, workerPoolFactory, newBlockGenerator, responseCollector, false, f.BlockProcessedCallback, f.TempDir, f.ParallelSubrequests, f.LinearHandoffBlockNum, f.StoreSizeLimit); err != nil {
+	if err := processRequest(t, ctx, request, workerPoolFactory, newBlockGenerator, responseCollector, false, f.BlockProcessedCallback, f.TempDir, f.ParallelSubrequests, f.LinearHandoffBlockNum, f.StoreSizeLimit, f.AllowStoreTruncation); err != nil {
 		return fmt.Errorf("running test: %w", err)
 	}
 
@@ -339,6 +341,7 @@ func processRequest(
 	parallelSubrequests uint64,
 	linearHandoffBlockNum uint64,
 	storeSizeLimit uint64,
+	allowStoreTruncation bool,
 ) error {
 	t.Helper()
 
@@ -366,6 +369,9 @@ func processRequest(
 	}
 
 	svc := service.TestNewService(runtimeConfig, linearHandoffBlockNum, tr.StreamFactory)
+	if allowStoreTruncation {
+		svc.TestAllowStoreTruncation()
+	}
 	return svc.TestBlocks(ctx, isSubRequest, request, responseCollector.Collect)
 }
 

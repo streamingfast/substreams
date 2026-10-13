@@ -23,6 +23,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   stores without an initial block. Their snapshots written before are named after the previous first streamable block
   and were counted as present, then failed to load. They are now ignored and the store is rebuilt.
 
+- Fix dev-mode requests reading blocks below the first streamable block when that block is not a multiple of the
+  segment size: the linear handoff was rounded down below it. It now stays at or above the first streamable block.
+
+- Fix the live back filler (started after a quickload) stopping for the rest of the request when it rewound below the
+  first streamable block, or to a snapshot named after another initial block: its first job failed. It now starts at
+  or above the first streamable block and skips those snapshots.
+
 ## v1.25.0
 
 ### Docs

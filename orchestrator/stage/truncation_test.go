@@ -13,9 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The chain was truncated at block 30: test_store started at block 5, so its files are named
-// after block 5, but its stage can only run from block 30 on.
+// test_store started at block 5, so its files are named after block 5, but the chain was then
+// truncated at firstStreamableBlock: its stage can only run from that block on.
 func TestFetchCachesState_TruncatedStore(t *testing.T) {
+	const firstStreamableBlock = 30
+
 	tests := []struct {
 		name              string
 		storeInitialBlock uint64
@@ -48,7 +50,7 @@ func TestFetchCachesState_TruncatedStore(t *testing.T) {
 		},
 		{
 			name:              "store starting at the first streamable block builds from scratch",
-			storeInitialBlock: 30,
+			storeInitialBlock: firstStreamableBlock,
 			wantStates:        `S:`,
 		},
 	}
@@ -60,14 +62,16 @@ func TestFetchCachesState_TruncatedStore(t *testing.T) {
 			for _, f := range tt.files {
 				files[f] = nil
 			}
+			// The graph raises the initial block of a truncated store to the first streamable
+			// block, so every segmenter starts there.
 			stages := &Stages{
-				globalSegmenter: segmenter(30, 60),
-				storeSegmenter:  segmenter(30, 60),
+				globalSegmenter: segmenter(firstStreamableBlock, 60),
+				storeSegmenter:  segmenter(firstStreamableBlock, 60),
 				stages: []*Stage{
 					{
-						segmenter: segmenter(30, 60),
+						segmenter: segmenter(firstStreamableBlock, 60),
 						storeModuleStates: []*StoreModuleState{
-							{name: "test_store", segmenter: segmenter(30, 60)},
+							{name: "test_store", segmenter: segmenter(firstStreamableBlock, 60)},
 						},
 						kind: KindStore,
 					},

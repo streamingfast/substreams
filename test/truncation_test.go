@@ -86,6 +86,24 @@ func TestStoreTruncation(t *testing.T) {
 		}
 	})
 
+	t.Run("dev mode with a first streamable block between segment boundaries", func(t *testing.T) {
+		tempDir := t.TempDir()
+		buildSnapshots(t, tempDir)
+
+		bstream.GetProtocolFirstStreamableBlock = 25
+		for _, startBlock := range []uint64{25, 27, 33} {
+			run := newTestRun(t, int64(startBlock), startBlock, startBlock+5, 25, outputModule, spkg)
+			run.AllowStoreTruncation = true
+			err := run.RunWithTempDir(t, "first_streamable_block_between_boundaries", tempDir)
+			if startBlock >= 30 {
+				require.NoError(t, err, "start block %d resumes from the snapshot at block 30", startBlock)
+				continue
+			}
+			require.Error(t, err, "start block %d needs the store at block 25, where it has no snapshot", startBlock)
+			assert.Contains(t, err.Error(), `store "setup_test_store_add_i64" starts at block 1, before the first streamable block 25`)
+		}
+	})
+
 	t.Run("refuses modules starting before the first streamable block without the flag", func(t *testing.T) {
 		tempDir := t.TempDir()
 		buildSnapshots(t, tempDir)

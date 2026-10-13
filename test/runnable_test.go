@@ -372,6 +372,8 @@ func processRequest(
 	if allowStoreTruncation {
 		svc.TestAllowStoreTruncation()
 	}
+	// The test's temp dir is removed when it ends: no write may still be running then.
+	defer svc.TestWaitCacheMarkers()
 	return svc.TestBlocks(ctx, isSubRequest, request, responseCollector.Collect)
 }
 

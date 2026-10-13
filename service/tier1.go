@@ -115,6 +115,8 @@ func init() {
 type Tier1Service struct {
 	*shutter.Shutter
 	activeRequestsWG sync.WaitGroup
+	// cacheMarkerWrites tracks the detached package and last_used writes.
+	cacheMarkerWrites sync.WaitGroup
 
 	blockType             string
 	wasmExtensions        map[string]map[string]wasm.WASMExtension
@@ -846,7 +848,9 @@ func (s *Tier1Service) blocks(
 	// they run detached from the request: neither its start nor its exit waits for
 	// them, and a client that disconnects early still leaves its usage marker
 	// behind. The timeout is the only bound on how long they may run.
+	s.cacheMarkerWrites.Add(1)
 	go func() {
+		defer s.cacheMarkerWrites.Done()
 		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cacheMarkerWriteTimeout)
 		defer cancel()
 		if err := s.writePackage(ctx, request, execGraph, cacheStore); err != nil {

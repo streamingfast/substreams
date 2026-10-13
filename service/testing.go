@@ -38,6 +38,12 @@ func TestNewService(runtimeConfig config.RuntimeConfig, linearHandoffBlockNum ui
 	}
 }
 
+// TestWaitCacheMarkers waits for the cache marker writes of every request served so far, which
+// outlive the request on purpose.
+func (s *Tier1Service) TestWaitCacheMarkers() {
+	s.cacheMarkerWrites.Wait()
+}
+
 func (s *Tier1Service) TestAllowStoreTruncation() {
 	s.tier2RequestParameters.AllowStoreTruncation = true
 }

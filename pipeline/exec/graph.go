@@ -228,6 +228,12 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 	g.modulesInitBlocks = map[string]uint64{}
 	for _, mod := range g.usedModules {
 		initialBlock := mod.InitialBlock
+		if initialBlock == 0 && allowTruncation && mod.GetKindStore() != nil {
+			// Its snapshots would be named after the current first streamable block, so raising
+			// it would silently rebuild the store from there while cached outputs still reflect
+			// the older state.
+			return fmt.Errorf("store %q has no initial block: this endpoint truncates the chain (first streamable block is currently %d), so every store must set an initial block, at or above %d", mod.Name, firstStreamableBlock, firstStreamableBlock)
+		}
 		if initialBlock == 0 {
 			initialBlock = firstStreamableBlock
 		} else if allowTruncation && initialBlock < firstStreamableBlock {

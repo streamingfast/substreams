@@ -18,6 +18,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   was raised (the chain was truncated). Those modules run from the first streamable block on, and their stores resume
   from the snapshots taken before the truncation, which keep their original names (ex: `0400100000-0350000000.kv`).
   A request is refused when a store has no snapshot at or after the first streamable block to resume from.
+  When it is enabled, a request using a store without an initial block is refused: such a store would be rebuilt from the new
+  first streamable block each time it is raised, while cached outputs still reflect its older state. Every store must
+  set an initial block, at or above the first streamable block.
 
 - Fix requests failing with `snapshot "…" does not exist` after the chain's first streamable block was raised, for
   stores without an initial block. Their snapshots written before are named after the previous first streamable block

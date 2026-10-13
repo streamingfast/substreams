@@ -54,3 +54,20 @@ func TestNewOutputModuleGraph_Truncation(t *testing.T) {
 	assert.Equal(t, uint64(400), *graph.LowestStoresInitBlock())
 	assert.Equal(t, untruncated.ModuleHashes(), graph.ModuleHashes(), "truncation must not change module hashes, or previous snapshots would not be found")
 }
+
+func TestNewOutputModuleGraph_TruncationStoreWithoutInitialBlock(t *testing.T) {
+	modules := truncationTestModules()
+	for _, mod := range modules.Modules {
+		mod.InitialBlock = 0
+	}
+
+	_, err := NewOutputModuleGraph("map_out", true, modules, 400, false)
+	require.NoError(t, err)
+
+	_, err = NewOutputModuleGraph("map_out", true, modules, 400, true)
+	require.ErrorContains(t, err, `store "store_a" has no initial block: this endpoint truncates the chain (first streamable block is currently 400), so every store must set an initial block, at or above 400`)
+
+	modules.Modules[1].InitialBlock = 450
+	_, err = NewOutputModuleGraph("map_out", true, modules, 400, true)
+	require.NoError(t, err, "maps without initial block hold no state")
+}

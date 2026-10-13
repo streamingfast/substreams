@@ -10,6 +10,7 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/manifest"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
@@ -114,7 +115,7 @@ func runPack(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("create output directories: %w", err)
 	}
 
-	cnt, err := proto.Marshal(pkgBundle.Package)
+	cnt, err := marshalPackage(pkgBundle.Package)
 	if err != nil {
 		return fmt.Errorf("marshalling package: %w", err)
 	}
@@ -158,4 +159,11 @@ func resolveOutputFile(input string, bindings map[string]string) string {
 	}
 
 	return input
+}
+
+// marshalPackage encodes a package with map entries in key order, so packing the same inputs twice gives the
+// same bytes. Plain proto.Marshal writes map entries in Go's random iteration order, which changes the .spkg
+// digest of a package with a multi-entry map, such as `networks`, from one pack to the next.
+func marshalPackage(pkg *pbsubstreams.Package) ([]byte, error) {
+	return proto.MarshalOptions{Deterministic: true}.Marshal(pkg)
 }

@@ -31,6 +31,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+- `substreams pack` writes map entries in key order, so packing the same inputs twice gives a byte-identical
+  `.spkg`. Before, a package with a multi-entry map, such as `networks`, got a different digest from one pack to
+  the next.
+
 - **Breaking for Rust modules**: `substreams build` and `substreams protogen` generate buffa bindings for a
   project whose `Cargo.toml` depends on `buffa`, using `buf.build/anthropics/buffa:v0.9.2`. This pairs with
   `substreams` 0.8.0, which replaced [prost](https://github.com/tokio-rs/prost) with

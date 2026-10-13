@@ -107,6 +107,33 @@ func TestStoreTruncation(t *testing.T) {
 	})
 }
 
+// A store without initial block is named after the first streamable block: once that block is
+// raised, the snapshots written before are named after another block and must not be resumed from.
+func TestFirstStreamableBlockRaised_StoreWithoutInitialBlock(t *testing.T) {
+	manifest.TestUseSimpleHash = true
+	defer func() { bstream.GetProtocolFirstStreamableBlock = 0 }()
+
+	spkg := "./testdata/simple_substreams/substreams-test-v0.1.0.spkg"
+	storeHash := hex.EncodeToString([]byte("setup_test_store_add_i64"))
+	outputModule := "assert_test_store_add_i64"
+	newRun := func(t *testing.T, startBlock int64, exclusiveEndBlock, firstStreamableBlock uint64) *testRun {
+		bstream.GetProtocolFirstStreamableBlock = firstStreamableBlock
+		run := newTestRun(t, startBlock, exclusiveEndBlock, exclusiveEndBlock, firstStreamableBlock, outputModule, spkg)
+		run.ProductionMode = true
+		for _, mod := range run.Package.Modules.Modules {
+			mod.InitialBlock = 0
+		}
+		return run
+	}
+
+	tempDir := t.TempDir()
+	require.NoError(t, newRun(t, 25, 30, 0).RunWithTempDir(t, "build_snapshots", tempDir))
+	assertFileProduced(t, tempDir, storeHash+"/states/0000000030-0000000000.kv.zst")
+
+	require.NoError(t, newRun(t, 35, 40, 20).RunWithTempDir(t, "first_streamable_block_raised", tempDir))
+	assertFileProduced(t, tempDir, storeHash+"/states/0000000030-0000000020.kv.zst")
+}
+
 func assertFileProduced(t *testing.T, tempDir string, wanted string) {
 	t.Helper()
 	produced, empty := listFiles(t, tempDir)

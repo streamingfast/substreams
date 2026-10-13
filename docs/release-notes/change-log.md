@@ -19,6 +19,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   from the snapshots taken before the truncation, which keep their original names (ex: `0400100000-0350000000.kv`).
   A request is refused when a store has no snapshot at or after the first streamable block to resume from.
 
+- Fix requests failing with `snapshot "…" does not exist` after the chain's first streamable block was raised, for
+  stores without an initial block. Their snapshots written before are named after the previous first streamable block
+  and were counted as present, then failed to load. They are now ignored and the store is rebuilt.
+
 ## v1.25.0
 
 ### Docs

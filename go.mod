@@ -103,7 +103,7 @@ require (
 	go.uber.org/atomic v1.12.0
 	golang.org/x/exp v0.0.0-20250813145105-42675adae3e6
 	golang.org/x/mod v0.41.0
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 	golang.org/x/oauth2 v0.37.0
 	google.golang.org/grpc v1.86.0-dev
 	gopkg.in/yaml.v2 v2.4.0

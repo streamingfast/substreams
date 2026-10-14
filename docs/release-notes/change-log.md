@@ -33,6 +33,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   first streamable block, or to a snapshot named after another initial block: its first job failed. It now starts at
   or above the first streamable block and skips those snapshots.
 
+### Dependencies
+
+- `golang.org/x/net` is at v0.60.0, which clears CVE-2026-78663 (CRITICAL) and CVE-2026-78669, CVE-2026-78660 and
+  CVE-2026-78659 (HIGH), all HTTP/2 issues reported by Docker Scout against the image.
+
 ## v1.25.0
 
 ### Docs

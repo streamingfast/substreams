@@ -2,12 +2,20 @@ package exec
 
 import (
 	"bytes"
+	"context"
+	"errors"
+	"fmt"
 	"testing"
 
+	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestGetWasmArgumentValues(t *testing.T) {
@@ -202,6 +210,51 @@ func TestCanSkipExecution(t *testing.T) {
 	}
 }
 
+func TestWasmCallErrorClassification(t *testing.T) {
+	testCases := []struct {
+		name                string
+		err                 error
+		expectDeterministic bool
+	}{
+		{
+			name:                "module instantiation failure",
+			err:                 fmt.Errorf("%w: creating new instance: cannot create a memfd: Too many open files (os error 24)", wasm.ErrModuleInstantiation),
+			expectDeterministic: false,
+		},
+		{
+			name:                "store backend failure",
+			err:                 fmt.Errorf("store backend failed to set key %q: %w", "key", store.ErrStoreBackendFailure),
+			expectDeterministic: false,
+		},
+		{
+			name:                "wasm execution failure",
+			err:                 errors.New("calling entrypoint: unreachable"),
+			expectDeterministic: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			stats := metrics.NewReqStats(&metrics.Config{}, nil, nil, zap.NewNop())
+			executor := &BaseExecutor{
+				ctx:           reqctx.WithReqStats(context.Background(), stats),
+				moduleName:    "map_test",
+				wasmModule:    &failingModule{err: tc.err},
+				wasmArguments: []wasm.Argument{wa("arg1")},
+				entrypoint:    "map_test",
+			}
+			outputGetter := clockOutputGetter{
+				mockOutputGetter: mockOutputGetter{"arg1": {1, 2, 3}},
+				clock:            &pbsubstreams.Clock{Id: "block-1", Number: 1},
+			}
+
+			_, err := executor.wasmCall(outputGetter, false, nil, nil)
+			require.ErrorContains(t, err, tc.err.Error())
+			assert.Equal(t, tc.expectDeterministic, errors.Is(err, wasm.ErrWasmDeterministicExec))
+		})
+	}
+}
+
 func wa(in string) *wasm.MapInput {
 	return wasm.NewMapInput(in, 0)
 }
@@ -220,4 +273,13 @@ func (m mockOutputGetter) Get(name string) ([]byte, bool, error) {
 		return val, false, nil
 	}
 	return nil, false, execout.ErrNotFound
+}
+
+type clockOutputGetter struct {
+	mockOutputGetter
+	clock *pbsubstreams.Clock
+}
+
+func (c clockOutputGetter) Clock() *pbsubstreams.Clock {
+	return c.clock
 }

@@ -29,6 +29,11 @@ import (
 var ErrWasmDeterministicExec = errors.New("wasm execution failed deterministically")
 var ErrFoundationalStoreCanceled = errors.New("foundational store request canceled")
 
+// ErrModuleInstantiation marks a failure to create a wasm instance (e.g. out of
+// memory or file descriptors). It is not deterministic: the module has not
+// received any input yet.
+var ErrModuleInstantiation = errors.New("could not instantiate wasm module")
+
 // ErrFoundationalStoreFatal indicates a foundational store call failed in a way
 // that retrying will not fix (authentication failure, organization id mismatch,
 // or the store being unreachable). It is non-deterministic so it bubbles up to

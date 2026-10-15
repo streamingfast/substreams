@@ -63,7 +63,7 @@ func (m *Module) Close(_ context.Context) error {
 func (m *Module) NewInstance(ctx context.Context) (instance wasm.Instance, err error) {
 	inst, err := m.newInstance(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("could not instantiate wasm module: %w", err)
+		return nil, fmt.Errorf("%w: %w", wasm.ErrModuleInstantiation, err)
 	}
 
 	return inst, nil
@@ -79,7 +79,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 	} else {
 		inst, err = m.newInstance(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("could not instantiate wasm module: %w", err)
+			return nil, fmt.Errorf("%w: %w", wasm.ErrModuleInstantiation, err)
 		}
 		defer func() {
 			if e := inst.Close(ctx); e != nil {

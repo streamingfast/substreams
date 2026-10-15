@@ -169,7 +169,8 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 		// infrastructure, not a function of the module's input. It must NOT be
 		// wrapped as ErrWasmDeterministicExec, or callers would cache it as a
 		// deterministic error and serve it to every consumer instead of retrying.
-		if errors.Is(err, store.ErrStoreBackendFailure) {
+		// Same for a module that could not be instantiated.
+		if errors.Is(err, store.ErrStoreBackendFailure) || errors.Is(err, wasm.ErrModuleInstantiation) {
 			return nil, fmt.Errorf("block %d: module %q: %w", clock.Number, e.moduleName, err)
 		}
 		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleName, wasm.ErrWasmDeterministicExec, err)

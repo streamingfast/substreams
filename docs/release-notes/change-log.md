@@ -37,6 +37,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   first streamable block, or to a snapshot named after another initial block: its first job failed. It now starts at
   or above the first streamable block and skips those snapshots.
 
+- Fix wasm instantiation failures (e.g. `Too many open files`) being reported as deterministic errors, which returned
+  `InvalidArgument` and were cached for 1h. They now return `Internal` and are not cached.
+
 ### Dependencies
 
 - `golang.org/x/net` is at v0.60.0, which clears CVE-2026-78663 (CRITICAL) and CVE-2026-78669, CVE-2026-78660 and

@@ -30,6 +30,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Fix dev-mode requests reading blocks below the first streamable block when that block is not a multiple of the
   segment size: the linear handoff was rounded down below it. It now stays at or above the first streamable block.
 
+- Fix requests with a cursor being refused with `invalid start block …, must be >= …` when their start block is below
+  the first streamable block: the cursor replaces the start block, so the block it resolves to is what is checked now.
+
 - Fix the live back filler (started after a quickload) stopping for the rest of the request when it rewound below the
   first streamable block, or to a snapshot named after another initial block: its first job failed. It now starts at
   or above the first streamable block and skips those snapshots.

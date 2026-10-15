@@ -724,14 +724,18 @@ func (s *Tier1Service) blocks(
 	execOutMessageBufferSize int,
 ) (err error) {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
-	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
-		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain, this endpoint has no blocks below it)", request.StartBlockNum, chainFirstStreamableBlock)
-	} else if request.StartBlockNum < 0 && request.StopBlockNum > 0 {
-		if int64(request.StopBlockNum)+int64(request.StartBlockNum) < int64(chainFirstStreamableBlock) {
+	// A cursor replaces the start block, so only a request without one is checked here;
+	// the block a cursor resolves to is checked below.
+	if request.StartCursor == "" {
+		if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
+			return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain, this endpoint has no blocks below it)", request.StartBlockNum, chainFirstStreamableBlock)
+		} else if request.StartBlockNum < 0 && request.StopBlockNum > 0 {
+			if int64(request.StopBlockNum)+int64(request.StartBlockNum) < int64(chainFirstStreamableBlock) {
+				request.StartBlockNum = int64(chainFirstStreamableBlock)
+			}
+		} else if request.StartBlockNum == 0 {
 			request.StartBlockNum = int64(chainFirstStreamableBlock)
 		}
-	} else if request.StartBlockNum == 0 {
-		request.StartBlockNum = int64(chainFirstStreamableBlock)
 	}
 
 	logger := reqctx.Logger(ctx)
@@ -741,6 +745,10 @@ func (s *Tier1Service) blocks(
 		err = fmt.Errorf("build request details: %w", err)
 		logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
 		return err
+	}
+
+	if request.StartCursor != "" && requestDetails.ResolvedStartBlockNum < chainFirstStreamableBlock {
+		return bsstream.NewErrInvalidArg("invalid start cursor: it resolves to block %d, must be >= %d (the first streamable block of the chain, this endpoint has no blocks below it)", requestDetails.ResolvedStartBlockNum, chainFirstStreamableBlock)
 	}
 
 	if request.StopBlockNum != 0 {

@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -123,6 +124,26 @@ func TestTailTruncation(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be >= 20")
 	})
+
+	t.Run("a cursor replaces a start block below the first streamable block", func(t *testing.T) {
+		tempDir := t.TempDir()
+		buildSnapshots(t, tempDir)
+
+		run := truncatedRun(t, 15, true)
+		run.Cursor = cursorAtFinalBlock(34)
+		require.NoError(t, run.RunWithTempDir(t, "cursor_above_first_streamable_block", tempDir))
+	})
+
+	t.Run("refuses a cursor below the first streamable block", func(t *testing.T) {
+		tempDir := t.TempDir()
+		buildSnapshots(t, tempDir)
+
+		run := truncatedRun(t, 35, true)
+		run.Cursor = cursorAtFinalBlock(14)
+		err := run.RunWithTempDir(t, "cursor_below_first_streamable_block", tempDir)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid start cursor: it resolves to block 15, must be >= 20")
+	})
 }
 
 // A store without initial block is named after the first streamable block: once that block is
@@ -161,4 +182,15 @@ func assertFileProduced(t *testing.T, tempDir string, wanted string) {
 		actual = append(actual, filepath.Join(parts[3:]...))
 	}
 	assert.Contains(t, actual, wanted)
+}
+
+// cursorAtFinalBlock returns a cursor on block num, final, so a request using it starts at num+1.
+func cursorAtFinalBlock(num uint64) *bstream.Cursor {
+	ref := bstream.NewBlockRef("block-"+strconv.FormatUint(num, 10), num)
+	return &bstream.Cursor{
+		Step:      bstream.StepNewIrreversible,
+		Block:     ref,
+		LIB:       ref,
+		HeadBlock: ref,
+	}
 }

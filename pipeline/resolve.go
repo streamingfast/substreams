@@ -82,7 +82,9 @@ func BuildRequestDetails(
 		return nil, nil, err
 	}
 
-	req.LinearHandoffBlockNum = linearHandoff
+	// Rounding down to a segment boundary can land below the first streamable block when it is
+	// not a multiple of the segment size: no block can be read there.
+	req.LinearHandoffBlockNum = max(linearHandoff, bstream.GetProtocolFirstStreamableBlock)
 
 	req.LinearGateBlockNum = req.LinearHandoffBlockNum
 	if req.ResolvedStartBlockNum > req.LinearHandoffBlockNum {

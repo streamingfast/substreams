@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -115,6 +116,8 @@ func init() {
 type Tier1Service struct {
 	*shutter.Shutter
 	activeRequestsWG sync.WaitGroup
+	// cacheMarkerWrites tracks the detached package and last_used writes.
+	cacheMarkerWrites sync.WaitGroup
 
 	blockType             string
 	wasmExtensions        map[string]map[string]wasm.WASMExtension
@@ -514,7 +517,7 @@ func (s *Tier1Service) BlocksAny(
 		return nil, err
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock, s.tier2RequestParameters.AllowPrunedChain)
 	if err != nil {
 		err := connect.NewError(connect.CodeInvalidArgument, err)
 		fields = append(fields, zap.Error(err))
@@ -721,14 +724,18 @@ func (s *Tier1Service) blocks(
 	execOutMessageBufferSize int,
 ) (err error) {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
-	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
-		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
-	} else if request.StartBlockNum < 0 && request.StopBlockNum > 0 {
-		if int64(request.StopBlockNum)+int64(request.StartBlockNum) < int64(chainFirstStreamableBlock) {
+	// A cursor replaces the start block, so only a request without one is checked here;
+	// the block a cursor resolves to is checked below.
+	if request.StartCursor == "" {
+		if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
+			return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain, this endpoint has no blocks below it)", request.StartBlockNum, chainFirstStreamableBlock)
+		} else if request.StartBlockNum < 0 && request.StopBlockNum > 0 {
+			if int64(request.StopBlockNum)+int64(request.StartBlockNum) < int64(chainFirstStreamableBlock) {
+				request.StartBlockNum = int64(chainFirstStreamableBlock)
+			}
+		} else if request.StartBlockNum == 0 {
 			request.StartBlockNum = int64(chainFirstStreamableBlock)
 		}
-	} else if request.StartBlockNum == 0 {
-		request.StartBlockNum = int64(chainFirstStreamableBlock)
 	}
 
 	logger := reqctx.Logger(ctx)
@@ -738,6 +745,10 @@ func (s *Tier1Service) blocks(
 		err = fmt.Errorf("build request details: %w", err)
 		logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
 		return err
+	}
+
+	if request.StartCursor != "" && requestDetails.ResolvedStartBlockNum < chainFirstStreamableBlock {
+		return bsstream.NewErrInvalidArg("invalid start cursor: it resolves to block %d, must be >= %d (the first streamable block of the chain, this endpoint has no blocks below it)", requestDetails.ResolvedStartBlockNum, chainFirstStreamableBlock)
 	}
 
 	if request.StopBlockNum != 0 {
@@ -846,7 +857,9 @@ func (s *Tier1Service) blocks(
 	// they run detached from the request: neither its start nor its exit waits for
 	// them, and a client that disconnects early still leaves its usage marker
 	// behind. The timeout is the only bound on how long they may run.
+	s.cacheMarkerWrites.Add(1)
 	go func() {
+		defer s.cacheMarkerWrites.Done()
 		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cacheMarkerWriteTimeout)
 		defer cancel()
 		if err := s.writePackage(ctx, request, execGraph, cacheStore); err != nil {
@@ -961,6 +974,7 @@ func (s *Tier1Service) blocks(
 		requestDetails.LinearHandoffBlockNum,
 		requestDetails.StopBlockNum,
 		scheduleStores,
+		execGraph.HasStoresBelowFirstStreamableBlock(),
 	)
 	if err != nil {
 		return stream.NewErrInvalidArg("%s", err.Error())
@@ -1135,7 +1149,7 @@ func (s *Tier1Service) blocks(
 		}
 
 		if requestDetails.FromQuickload {
-			if err := configureLiveBackFillerFromQuickload(ctx, segmentSize, requestDetails.LinearHandoffBlockNum, execGraph.UsedStoreModules(), storeConfigs, liveBackFiller); err != nil {
+			if err := configureLiveBackFillerFromQuickload(ctx, segmentSize, requestDetails.LinearHandoffBlockNum, chainFirstStreamableBlock, execGraph.UsedStoreModules(), storeConfigs, liveBackFiller); err != nil {
 				return err
 			}
 		}
@@ -1242,11 +1256,14 @@ func (s *Tier1Service) pendingShutdownCheck(deadline time.Time, logger *zap.Logg
 }
 
 // configureLiveBackFillerFromQuickload will ensure that any used store
-func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint64, linearHandoffBlockNum uint64, usedStores []*pbsubstreams.Module, storeConfigs store.ConfigMap, liveBackFiller *LiveBackFiller) error {
+func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint64, linearHandoffBlockNum uint64, firstStreamableBlock uint64, usedStores []*pbsubstreams.Module, storeConfigs store.ConfigMap, liveBackFiller *LiveBackFiller) error {
 	backfillFromIndex := linearHandoffBlockNum / segmentSize
+	// The first segment holding no block below the first streamable block: a job on a lower
+	// one would read blocks that no longer exist, and a failed job stops the back filler.
+	firstStreamableIndex := (firstStreamableBlock + segmentSize - 1) / segmentSize
 
 	for _, mod := range usedStores {
-		lowestIndex := mod.InitialBlock / segmentSize
+		lowestIndex := max(mod.InitialBlock/segmentSize, firstStreamableIndex)
 		for i := 0; backfillFromIndex > lowestIndex; i++ {
 
 			listUpTo := backfillFromIndex * segmentSize
@@ -1263,8 +1280,8 @@ func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint6
 			if err != nil {
 				return err
 			}
-			if files != nil {
-				backfillFromIndex = files[len(files)-1].Range.ExclusiveEndBlock / segmentSize
+			if end, found := lastLoadableSnapshotEnd(files, storeConfigs[mod.Name].ModuleInitialBlock()); found {
+				backfillFromIndex = end / segmentSize
 				break
 			}
 		}
@@ -1272,6 +1289,17 @@ func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint6
 
 	}
 	return nil
+}
+
+// lastLoadableSnapshotEnd returns the end block of the last file in files, skipping full KVs
+// named after another initial block than the store's, which cannot be loaded.
+func lastLoadableSnapshotEnd(files []*store.FileInfo, moduleInitialBlock uint64) (uint64, bool) {
+	for _, file := range slices.Backward(files) {
+		if file.Partial || file.Range.StartBlock == moduleInitialBlock {
+			return file.Range.ExclusiveEndBlock, true
+		}
+	}
+	return 0, false
 }
 
 func tier1ResponseHandler(

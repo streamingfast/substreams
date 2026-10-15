@@ -165,7 +165,7 @@ func newEstimateTestService(t *testing.T, withStore bool, tweaks ...func(modules
 	execGraph, err := exec.NewOutputModuleGraph("map_out", true, &pbsubstreams.Modules{
 		Modules:  modules,
 		Binaries: []*pbsubstreams.Binary{{Type: "test", Content: []byte("some-fake-binary-data")}},
-	}, 0)
+	}, 0, false)
 	require.NoError(t, err)
 
 	svc := &Tier1Service{

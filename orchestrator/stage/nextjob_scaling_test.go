@@ -18,7 +18,7 @@ func scheduleRun(t testing.TB, segments, workers, squashEvery int) (stages *Stag
 	t.Helper()
 	interval := uint64(10)
 	end := uint64(segments) * interval
-	reqPlan, err := plan.BuildTier1RequestPlan(true, interval, 0, 0, 0, end, end, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, interval, 0, 0, 0, end, end, true, false)
 	require.NoError(t, err)
 	stages = NewStages(context.Background(), exec.TestGraphStagedModules(0, 0, 0, 0, 0), reqPlan, nil, nil)
 
@@ -73,7 +73,7 @@ func TestNextJob_CursorFollowsTheJobFrontierNotTheSquasher(t *testing.T) {
 	interval := uint64(10)
 	segments := 200
 	end := uint64(segments) * interval
-	reqPlan, err := plan.BuildTier1RequestPlan(true, interval, 0, 0, 0, end, end, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, interval, 0, 0, 0, end, end, true, false)
 	require.NoError(t, err)
 	stages := NewStages(context.Background(), exec.TestGraphStagedModules(0, 0, 0, 0, 0), reqPlan, nil, nil)
 

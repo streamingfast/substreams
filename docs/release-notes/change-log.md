@@ -9,6 +9,39 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Server
+
+- Add `Tier1Config.AllowPrunedChain`, forwarded to tier2. It lets
+  requests keep running Substreams whose modules (mappers and stores) start before the chain's first streamable block,
+  after that block was raised (the chain was pruned). Those modules run from the first streamable block on,
+  and their stores resume from the snapshots taken before the pruning, which keep their original names
+  (ex: `0400100000-0350000000.kv`). A request is refused when a store has no snapshot at the first streamable block
+  to resume from, and the error says which store and how to fix it.
+  When it is enabled, a request using a store without an initial block is refused: such a store would be rebuilt from the new
+  first streamable block each time it is raised, while cached outputs still reflect its older state. Every store must
+  set an initial block, at or above the first streamable block.
+
+- Fix requests failing with `snapshot "…" does not exist` after the chain's first streamable block was raised, for
+  stores without an initial block. Their snapshots written before are named after the previous first streamable block
+  and were counted as present, then failed to load. They are now ignored and the store is rebuilt.
+
+- Fix dev-mode requests reading blocks below the first streamable block when that block is not a multiple of the
+  segment size: the linear handoff was rounded down below it. It now stays at or above the first streamable block.
+
+- Fix requests with a cursor being refused with `invalid start block …, must be >= …` when their start block is below
+  the first streamable block: the cursor replaces the start block, so the block it resolves to is what is checked now.
+
+- Fix the live back filler (started after a quickload) stopping for the rest of the request when it rewound below the
+  first streamable block, or to a snapshot named after another initial block: its first job failed. It now starts at
+  or above the first streamable block and skips those snapshots.
+
+### Dependencies
+
+- `golang.org/x/net` is at v0.60.0, which clears CVE-2026-78663 (CRITICAL) and CVE-2026-78669, CVE-2026-78660 and
+  CVE-2026-78659 (HIGH), all HTTP/2 issues reported by Docker Scout against the image.
+
 ## v1.25.0
 
 ### Docs

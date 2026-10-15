@@ -270,7 +270,7 @@ func (ui *TUI) HandleSession(ctx context.Context, req *pbsubstreamsrpcv3.Request
 	ui.ResolvedStartBlock = session.ResolvedStartBlock
 	ui.session = session
 
-	execGraph, err := exec.NewOutputModuleGraph(req.OutputModule, req.ProductionMode, req.Package.GetModules(), bstream.GetProtocolFirstStreamableBlock)
+	execGraph, err := exec.NewOutputModuleGraph(req.OutputModule, req.ProductionMode, req.Package.GetModules(), bstream.GetProtocolFirstStreamableBlock, false)
 	if err != nil {
 		return fmt.Errorf("cannot handle module graph: %w", err)
 	}

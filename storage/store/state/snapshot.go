@@ -20,9 +20,15 @@ func listSnapshots(ctx context.Context, storeConfig *store.Config, from, to uint
 	for _, file := range files {
 		if file.Partial {
 			out.Partials = append(out.Partials, file)
-		} else {
-			out.FullKVFiles = append(out.FullKVFiles, file)
+			continue
 		}
+		// A full KV is only loadable under the name built from the store's own initial block:
+		// files written under another one (ex: before the first streamable block was raised)
+		// would be counted as present but fail to load.
+		if file.Range.StartBlock != storeConfig.ModuleInitialBlock() {
+			continue
+		}
+		out.FullKVFiles = append(out.FullKVFiles, file)
 	}
 	out.Sort()
 	return out, nil

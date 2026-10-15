@@ -22,7 +22,7 @@ func stagesForProgress(t *testing.T, firstStreamableBlock uint64) *Stages {
 	bstream.GetProtocolFirstStreamableBlock = firstStreamableBlock
 	t.Cleanup(func() { bstream.GetProtocolFirstStreamableBlock = previous })
 
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true, false)
 	require.NoError(t, err)
 
 	return NewStages(context.Background(), exec.TestGraphStagedModules(5, 5, 5, 5, 5), reqPlan, nil, nil)

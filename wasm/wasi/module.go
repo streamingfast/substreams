@@ -66,7 +66,7 @@ func (m *Module) Close(ctx context.Context) error {
 func (m *Module) NewInstance(ctx context.Context) (out wasm.Instance, err error) {
 	err = m.instantiateModule(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", wasm.ErrModuleInstantiation, err)
+		return nil, fmt.Errorf("could not instantiate wasm module: %w", err)
 	}
 
 	return sfwazero.NewInstance(nil, sfwazero.TinyGoSauce), nil

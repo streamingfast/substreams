@@ -13,11 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-- Add store truncation, enabled on tier1 with `Tier1Config.AllowStoreTruncation` and forwarded to tier2. It lets
-  requests keep running Substreams whose modules start before the chain's first streamable block, after that block
-  was raised (the chain was truncated). Those modules run from the first streamable block on, and their stores resume
-  from the snapshots taken before the truncation, which keep their original names (ex: `0400100000-0350000000.kv`).
-  A request is refused when a store has no snapshot at or after the first streamable block to resume from.
+- Add tail truncation, enabled on tier1 with `Tier1Config.AllowTailTruncation` and forwarded to tier2. It lets
+  requests keep running Substreams whose modules (mappers and stores) start before the chain's first streamable block,
+  after that block was raised (the chain's tail was truncated). Those modules run from the first streamable block on,
+  and their stores resume from the snapshots taken before the truncation, which keep their original names
+  (ex: `0400100000-0350000000.kv`). A request is refused when a store has no snapshot at the first streamable block
+  to resume from, and the error says which store and how to fix it.
   When it is enabled, a request using a store without an initial block is refused: such a store would be rebuilt from the new
   first streamable block each time it is raised, while cached outputs still reflect its older state. Every store must
   set an initial block, at or above the first streamable block.

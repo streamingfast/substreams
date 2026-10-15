@@ -517,7 +517,7 @@ func (s *Tier1Service) BlocksAny(
 		return nil, err
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock, s.tier2RequestParameters.AllowStoreTruncation)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock, s.tier2RequestParameters.AllowTailTruncation)
 	if err != nil {
 		err := connect.NewError(connect.CodeInvalidArgument, err)
 		fields = append(fields, zap.Error(err))
@@ -725,7 +725,7 @@ func (s *Tier1Service) blocks(
 ) (err error) {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
-		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
+		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain, this endpoint has no blocks below it)", request.StartBlockNum, chainFirstStreamableBlock)
 	} else if request.StartBlockNum < 0 && request.StopBlockNum > 0 {
 		if int64(request.StopBlockNum)+int64(request.StartBlockNum) < int64(chainFirstStreamableBlock) {
 			request.StartBlockNum = int64(chainFirstStreamableBlock)
@@ -966,7 +966,7 @@ func (s *Tier1Service) blocks(
 		requestDetails.LinearHandoffBlockNum,
 		requestDetails.StopBlockNum,
 		scheduleStores,
-		execGraph.HasTruncatedStores(),
+		execGraph.HasTailTruncatedStores(),
 	)
 	if err != nil {
 		return stream.NewErrInvalidArg("%s", err.Error())

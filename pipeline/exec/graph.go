@@ -19,7 +19,7 @@ type Graph struct {
 	modulesInitBlocks     map[string]uint64
 	lowestInitBlock       uint64
 	lowestStoresInitBlock *uint64
-	truncatedStores       bool
+	tailTruncatedStores   bool
 	outputModule          *pbsubstreams.Module
 
 	schedulableModules      []*pbsubstreams.Module // stores and output mappers needed to execute to produce output for all `output_modules`.
@@ -81,18 +81,18 @@ func (g *Graph) LowestStoresInitBlock() *uint64       { return g.lowestStoresIni
 func (g *Graph) ModulesInitBlocks() map[string]uint64 { return g.modulesInitBlocks }
 func (g *Graph) OutputModuleStageIndex() int          { return len(g.stagedUsedModules) - 1 }
 
-// HasTruncatedStores reports whether a store has an initial block below the first streamable
+// HasTailTruncatedStores reports whether a store has an initial block below the first streamable
 // block: its state at its graph initial block comes from a snapshot, not from an empty store.
-func (g *Graph) HasTruncatedStores() bool { return g.truncatedStores }
+func (g *Graph) HasTailTruncatedStores() bool { return g.tailTruncatedStores }
 
 // NewOutputModuleGraph builds the execution graph of outputModule. A module with an initial block
-// below firstStreamableBlock is refused, unless allowTruncation is set: it then runs from
+// below firstStreamableBlock is refused, unless allowTailTruncation is set: it then runs from
 // firstStreamableBlock on, and its stores keep the file names they had before the chain was truncated.
-func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64, allowTruncation bool) (out *Graph, err error) {
+func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64, allowTailTruncation bool) (out *Graph, err error) {
 	out = &Graph{
 		requestModules: modules,
 	}
-	if err := out.computeGraph(outputModule, productionMode, modules, firstStreamableBlock, allowTruncation); err != nil {
+	if err := out.computeGraph(outputModule, productionMode, modules, firstStreamableBlock, allowTailTruncation); err != nil {
 		return nil, fmt.Errorf("module graph: %w", err)
 	}
 
@@ -185,7 +185,7 @@ func (g *Graph) dedupeModules(mods *pbsubstreams.Modules) (*pbsubstreams.Modules
 	return &pbsubstreams.Modules{Modules: filteredModules}, deduped
 }
 
-func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64, allowTruncation bool) error {
+func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64, allowTailTruncation bool) error {
 	graph, err := manifest.NewModuleGraph(modules.Modules)
 	if err != nil {
 		return fmt.Errorf("compute graph: %w", err)
@@ -228,18 +228,18 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 	g.modulesInitBlocks = map[string]uint64{}
 	for _, mod := range g.usedModules {
 		initialBlock := mod.InitialBlock
-		if initialBlock == 0 && allowTruncation && mod.GetKindStore() != nil {
+		if initialBlock == 0 && allowTailTruncation && mod.GetKindStore() != nil {
 			// Its snapshots would be named after the current first streamable block, so raising
 			// it would silently rebuild the store from there while cached outputs still reflect
 			// the older state.
-			return fmt.Errorf("store %q has no initial block: this endpoint truncates the chain (first streamable block is currently %d), so every store must set an initial block, at or above %d", mod.Name, firstStreamableBlock, firstStreamableBlock)
+			return fmt.Errorf("store %q has no initial block, which this endpoint refuses because it truncates the chain's tail (blocks below %d are gone, and that block can be raised later): set an initial block at or above %d on the store", mod.Name, firstStreamableBlock, firstStreamableBlock)
 		}
 		if initialBlock == 0 {
 			initialBlock = firstStreamableBlock
-		} else if allowTruncation && initialBlock < firstStreamableBlock {
+		} else if allowTailTruncation && initialBlock < firstStreamableBlock {
 			initialBlock = firstStreamableBlock
 			if mod.GetKindStore() != nil {
-				g.truncatedStores = true
+				g.tailTruncatedStores = true
 			}
 		} else if initialBlock < firstStreamableBlock {
 			return fmt.Errorf("module %q has initial block %d smaller than first streamable block %d", mod.Name, initialBlock, firstStreamableBlock)

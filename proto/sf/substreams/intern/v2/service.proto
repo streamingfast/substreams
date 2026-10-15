@@ -58,7 +58,7 @@ message ProcessRangeRequest {
 
   // Modules may have an initial block below first_streamable_block: they run from first_streamable_block
   // on, and their stores resume from snapshots taken before the chain was truncated.
-  bool allow_store_truncation = 23;
+  bool allow_tail_truncation = 23;
 }
 
 message ProcessRangeResponse {

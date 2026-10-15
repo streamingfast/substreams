@@ -44,12 +44,12 @@ func (s *Tier1Service) TestWaitCacheMarkers() {
 	s.cacheMarkerWrites.Wait()
 }
 
-func (s *Tier1Service) TestAllowStoreTruncation() {
-	s.tier2RequestParameters.AllowStoreTruncation = true
+func (s *Tier1Service) TestAllowTailTruncation() {
+	s.tier2RequestParameters.AllowTailTruncation = true
 }
 
 func (s *Tier1Service) TestBlocks(ctx context.Context, isSubRequest bool, request *pbsubstreamsrpc.Request, respFunc substreams.ResponseFunc) error {
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock, s.tier2RequestParameters.AllowStoreTruncation)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock, s.tier2RequestParameters.AllowTailTruncation)
 	if err != nil {
 		return stream.NewErrInvalidArg("%s", err.Error())
 	}

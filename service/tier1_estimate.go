@@ -173,7 +173,7 @@ func (s *Tier1Service) estimate(
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(req.OutputModule, true, blocksReq.Modules, bstream.GetProtocolFirstStreamableBlock, s.tier2RequestParameters.AllowStoreTruncation)
+	execGraph, err := exec.NewOutputModuleGraph(req.OutputModule, true, blocksReq.Modules, bstream.GetProtocolFirstStreamableBlock, s.tier2RequestParameters.AllowTailTruncation)
 	if err != nil {
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	}
@@ -245,7 +245,7 @@ func (s *Tier1Service) estimate(
 		}
 	}
 
-	reqPlan, err := plan.BuildTier1RequestPlan(true, segmentSize, execGraph.LowestInitBlock(), lowestStoresInitBlock, details.ResolvedStartBlockNum, stopBlock, stopBlock, scheduleStores, execGraph.HasTruncatedStores())
+	reqPlan, err := plan.BuildTier1RequestPlan(true, segmentSize, execGraph.LowestInitBlock(), lowestStoresInitBlock, details.ResolvedStartBlockNum, stopBlock, stopBlock, scheduleStores, execGraph.HasTailTruncatedStores())
 	if err != nil {
 		return bsstream.NewErrInvalidArg("%s", err.Error())
 	}

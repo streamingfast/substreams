@@ -37,6 +37,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   first streamable block, or to a snapshot named after another initial block: its first job failed. It now starts at
   or above the first streamable block and skips those snapshots.
 
+- Fix tier1 leaking a gRPC connection each time a job failed to reach a tier2. The error now also says what failed
+  instead of just `connection refused`.
+
 ### Dependencies
 
 - `golang.org/x/net` is at v0.60.0, which clears CVE-2026-78663 (CRITICAL) and CVE-2026-78669, CVE-2026-78660 and

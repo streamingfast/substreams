@@ -50,7 +50,7 @@ func (p *RequestPlan) RequiresParallelProcessing() bool {
 	return p.WriteExecOut != nil || p.BuildStores != nil
 }
 
-func BuildTier1RequestPlan(productionMode bool, segmentInterval, lowestInitialBlock, lowestStoreInitialBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, scheduleStores, tailTruncatedStores bool) (*RequestPlan, error) {
+func BuildTier1RequestPlan(productionMode bool, segmentInterval, lowestInitialBlock, lowestStoreInitialBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, scheduleStores, storesBelowFirstStreamableBlock bool) (*RequestPlan, error) {
 	if resolvedStartBlock < lowestInitialBlock {
 		return nil, fmt.Errorf("start block cannot be prior to the lowest init block in the requested module graph (%d)", lowestInitialBlock)
 	}
@@ -68,7 +68,7 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval, lowestInitialBl
 
 	// Truncated stores hold state at lowestInitialBlock, so they must still be loaded by the
 	// parallel processor even when there is nothing to backprocess.
-	if resolvedStartBlock == linearHandoffBlock && lowestInitialBlock == resolvedStartBlock && !tailTruncatedStores {
+	if resolvedStartBlock == linearHandoffBlock && lowestInitialBlock == resolvedStartBlock && !storesBelowFirstStreamableBlock {
 		return plan, nil
 	}
 
@@ -97,7 +97,7 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval, lowestInitialBl
 			plan.ReadExecOut = block.NewRange(resolvedStartBlock, readEndBlock)
 		}
 	} else { /* dev mode */
-		if scheduleStores && (linearHandoffBlock > lowestStoreInitialBlock || tailTruncatedStores) {
+		if scheduleStores && (linearHandoffBlock > lowestStoreInitialBlock || storesBelowFirstStreamableBlock) {
 			plan.BuildStores = block.NewRange(lowestStoreInitialBlock, linearHandoffBlock)
 		}
 		plan.WriteExecOut = nil

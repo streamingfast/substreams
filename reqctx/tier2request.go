@@ -21,8 +21,8 @@ type Tier2RequestParameters struct {
 	// for stores loaded on tier2. Set from the tier1 store-size-limit flag.
 	StoreSizeLimit uint64
 
-	// AllowTailTruncation, if true, lets modules have an initial block below FirstStreamableBlock.
-	AllowTailTruncation bool
+	// AllowPrunedChain, if true, lets modules have an initial block below FirstStreamableBlock.
+	AllowPrunedChain bool
 
 	WASMModules                map[string]string
 	FoundationalStoreEndpoints map[string]string

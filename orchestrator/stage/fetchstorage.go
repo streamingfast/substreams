@@ -97,7 +97,7 @@ func (s *Stages) FetchCachesState(
 		zap.String("snapshots", cacheState.Summary()),
 	)
 
-	if err := s.checkTailTruncatedStores(ctx, resume); err != nil {
+	if err := s.checkStoresBelowFirstStreamableBlock(ctx, resume); err != nil {
 		return err
 	}
 
@@ -199,11 +199,11 @@ func (s *Stages) FetchCachesState(
 	return nil
 }
 
-// checkTailTruncatedStores refuses the request when a store whose files start below the first
-// block its stage can run (the chain was truncated after the store started) has no snapshot to
+// checkStoresBelowFirstStreamableBlock refuses the request when a store whose files start below the first
+// block its stage can run (the chain was pruned after the store started) has no snapshot to
 // resume from: the blocks needed to rebuild it are gone. Such a store is fine when the resume
 // segment is at or above its first segment, or when a snapshot exists at its first block.
-func (s *Stages) checkTailTruncatedStores(ctx context.Context, resume int) error {
+func (s *Stages) checkStoresBelowFirstStreamableBlock(ctx context.Context, resume int) error {
 	for _, stage := range s.stages {
 		if stage.kind != KindStore {
 			continue
@@ -224,7 +224,7 @@ func (s *Stages) checkTailTruncatedStores(ctx context.Context, resume int) error
 				return fmt.Errorf("checking snapshot of store %q at block %d: %w", mod.name, firstBlock, err)
 			}
 			if !exists {
-				return stream.NewErrInvalidArg("store %q has initial block %d, but this endpoint truncated the chain's tail at block %d and has no snapshot of the store at that block: it cannot be rebuilt without the missing blocks. Set an initial block at or above %d on the store, or start the request at a block where a later snapshot exists", mod.name, storeInitialBlock, firstBlock, firstBlock)
+				return stream.NewErrInvalidArg("store %q has initial block %d, but this endpoint pruned the chain below block %d and has no snapshot of the store at that block: it cannot be rebuilt without the missing blocks. Set an initial block at or above %d on the store, or start the request at a block where a later snapshot exists", mod.name, storeInitialBlock, firstBlock, firstBlock)
 			}
 		}
 	}

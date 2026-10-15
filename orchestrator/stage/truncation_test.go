@@ -15,7 +15,7 @@ import (
 
 // test_store started at block 5, so its files are named after block 5, but the chain was then
 // truncated at firstStreamableBlock: its stage can only run from that block on.
-func TestFetchCachesState_TailTruncatedStore(t *testing.T) {
+func TestFetchCachesState_StoreBelowFirstStreamableBlock(t *testing.T) {
 	const firstStreamableBlock = 30
 
 	tests := []struct {
@@ -86,7 +86,7 @@ func TestFetchCachesState_TailTruncatedStore(t *testing.T) {
 			if tt.wantErr {
 				var invalidArg *stream.ErrInvalidArg
 				require.ErrorAs(t, err, &invalidArg)
-				assert.Contains(t, err.Error(), `store "test_store" has initial block 5, but this endpoint truncated the chain's tail at block 30`)
+				assert.Contains(t, err.Error(), `store "test_store" has initial block 5, but this endpoint pruned the chain below block 30`)
 				return
 			}
 			require.NoError(t, err)

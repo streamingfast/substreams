@@ -517,7 +517,7 @@ func (s *Tier1Service) BlocksAny(
 		return nil, err
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock, s.tier2RequestParameters.AllowTailTruncation)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock, s.tier2RequestParameters.AllowPrunedChain)
 	if err != nil {
 		err := connect.NewError(connect.CodeInvalidArgument, err)
 		fields = append(fields, zap.Error(err))
@@ -974,7 +974,7 @@ func (s *Tier1Service) blocks(
 		requestDetails.LinearHandoffBlockNum,
 		requestDetails.StopBlockNum,
 		scheduleStores,
-		execGraph.HasTailTruncatedStores(),
+		execGraph.HasStoresBelowFirstStreamableBlock(),
 	)
 	if err != nil {
 		return stream.NewErrInvalidArg("%s", err.Error())

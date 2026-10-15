@@ -45,7 +45,7 @@ func (m *ProcessRangeRequest) CloneVT() *ProcessRangeRequest {
 	r.EthCallFallbackToNumberDuration = m.EthCallFallbackToNumberDuration
 	r.StoreSizeLimit = m.StoreSizeLimit
 	r.MergedBlocksBundleSize = m.MergedBlocksBundleSize
-	r.AllowTailTruncation = m.AllowTailTruncation
+	r.AllowPrunedChain = m.AllowPrunedChain
 	if rhs := m.WasmExtensionConfigs; rhs != nil {
 		tmpContainer := make(map[string]string, len(rhs))
 		for k, v := range rhs {
@@ -376,7 +376,7 @@ func (this *ProcessRangeRequest) EqualVT(that *ProcessRangeRequest) bool {
 	if this.MergedBlocksBundleSize != that.MergedBlocksBundleSize {
 		return false
 	}
-	if this.AllowTailTruncation != that.AllowTailTruncation {
+	if this.AllowPrunedChain != that.AllowPrunedChain {
 		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -797,9 +797,9 @@ func (m *ProcessRangeRequest) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
-	if m.AllowTailTruncation {
+	if m.AllowPrunedChain {
 		i--
-		if m.AllowTailTruncation {
+		if m.AllowPrunedChain {
 			dAtA[i] = 1
 		} else {
 			dAtA[i] = 0
@@ -1614,7 +1614,7 @@ func (m *ProcessRangeRequest) SizeVT() (n int) {
 	if m.MergedBlocksBundleSize != 0 {
 		n += 2 + protohelpers.SizeOfVarint(uint64(m.MergedBlocksBundleSize))
 	}
-	if m.AllowTailTruncation {
+	if m.AllowPrunedChain {
 		n += 3
 	}
 	n += len(m.unknownFields)
@@ -2583,7 +2583,7 @@ func (m *ProcessRangeRequest) UnmarshalVT(dAtA []byte) error {
 			}
 		case 23:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field AllowTailTruncation", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field AllowPrunedChain", wireType)
 			}
 			var v int
 			for shift := uint(0); ; shift += 7 {
@@ -2600,7 +2600,7 @@ func (m *ProcessRangeRequest) UnmarshalVT(dAtA []byte) error {
 					break
 				}
 			}
-			m.AllowTailTruncation = bool(v != 0)
+			m.AllowPrunedChain = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := protohelpers.Skip(dAtA[iNdEx:])

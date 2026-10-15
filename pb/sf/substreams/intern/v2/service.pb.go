@@ -97,10 +97,10 @@ type ProcessRangeRequest struct {
 	StoreSizeLimit                  uint64            `protobuf:"varint,21,opt,name=store_size_limit,json=storeSizeLimit,proto3" json:"store_size_limit,omitempty"`                                                          // if non-zero, overrides the default store size limit (in bytes) for stores loaded during this request
 	MergedBlocksBundleSize          uint64            `protobuf:"varint,22,opt,name=merged_blocks_bundle_size,json=mergedBlocksBundleSize,proto3" json:"merged_blocks_bundle_size,omitempty"`                                // number of blocks per merged-blocks file in merged_blocks_store (0 means the default of 100)
 	// Modules may have an initial block below first_streamable_block: they run from first_streamable_block
-	// on, and their stores resume from snapshots taken before the chain was truncated.
-	AllowTailTruncation bool `protobuf:"varint,23,opt,name=allow_tail_truncation,json=allowTailTruncation,proto3" json:"allow_tail_truncation,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// on, and their stores resume from snapshots taken before the chain was pruned.
+	AllowPrunedChain bool `protobuf:"varint,23,opt,name=allow_pruned_chain,json=allowPrunedChain,proto3" json:"allow_pruned_chain,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ProcessRangeRequest) Reset() {
@@ -274,9 +274,9 @@ func (x *ProcessRangeRequest) GetMergedBlocksBundleSize() uint64 {
 	return 0
 }
 
-func (x *ProcessRangeRequest) GetAllowTailTruncation() bool {
+func (x *ProcessRangeRequest) GetAllowPrunedChain() bool {
 	if x != nil {
-		return x.AllowTailTruncation
+		return x.AllowPrunedChain
 	}
 	return false
 }
@@ -905,7 +905,7 @@ var File_sf_substreams_intern_v2_service_proto protoreflect.FileDescriptor
 
 const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"\n" +
-	"%sf/substreams/intern/v2/service.proto\x12\x19sf.substreams.internal.v2\x1a\x19google/protobuf/any.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\"\xbb\n" +
+	"%sf/substreams/intern/v2/service.proto\x12\x19sf.substreams.internal.v2\x1a\x19google/protobuf/any.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\"\xb5\n" +
 	"\n" +
 	"\x13ProcessRangeRequest\x12(\n" +
 	"\x0estop_block_num\x18\x02 \x01(\x04B\x02\x18\x01R\fstopBlockNum\x12#\n" +
@@ -930,8 +930,8 @@ const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"$eth_call_fallback_to_latest_duration\x18\x13 \x01(\x03R\x1fethCallFallbackToLatestDuration\x12M\n" +
 	"$eth_call_fallback_to_number_duration\x18\x14 \x01(\x03R\x1fethCallFallbackToNumberDuration\x12(\n" +
 	"\x10store_size_limit\x18\x15 \x01(\x04R\x0estoreSizeLimit\x129\n" +
-	"\x19merged_blocks_bundle_size\x18\x16 \x01(\x04R\x16mergedBlocksBundleSize\x122\n" +
-	"\x15allow_tail_truncation\x18\x17 \x01(\bR\x13allowTailTruncation\x1aG\n" +
+	"\x19merged_blocks_bundle_size\x18\x16 \x01(\x04R\x16mergedBlocksBundleSize\x12,\n" +
+	"\x12allow_pruned_chain\x18\x17 \x01(\bR\x10allowPrunedChain\x1aG\n" +
 	"\x19WasmExtensionConfigsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aM\n" +

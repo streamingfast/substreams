@@ -101,7 +101,7 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 		EthCallFallbackToLatestDuration: int64(reqctx.EthCallFallbackToLatestDuration(ctx)),
 		EthCallFallbackToNumberDuration: int64(reqctx.EthCallUseBlockNumberDuration(ctx)),
 		StoreSizeLimit:                  tier2ReqParams.StoreSizeLimit,
-		AllowTailTruncation:             tier2ReqParams.AllowTailTruncation,
+		AllowPrunedChain:                tier2ReqParams.AllowPrunedChain,
 	}
 }
 

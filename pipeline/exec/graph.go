@@ -11,16 +11,16 @@ import (
 )
 
 type Graph struct {
-	requestModules        *pbsubstreams.Modules
-	usedModules           []*pbsubstreams.Module // all modules that need to be processed (requested directly or a required module ancestor)
-	stagedUsedModules     ExecutionStages        // all modules that need to be processed (requested directly or a required module ancestor)
-	moduleHashes          map[string]string
-	stores                []*pbsubstreams.Module // subset of allModules: only the stores
-	modulesInitBlocks     map[string]uint64
-	lowestInitBlock       uint64
-	lowestStoresInitBlock *uint64
-	tailTruncatedStores   bool
-	outputModule          *pbsubstreams.Module
+	requestModules                  *pbsubstreams.Modules
+	usedModules                     []*pbsubstreams.Module // all modules that need to be processed (requested directly or a required module ancestor)
+	stagedUsedModules               ExecutionStages        // all modules that need to be processed (requested directly or a required module ancestor)
+	moduleHashes                    map[string]string
+	stores                          []*pbsubstreams.Module // subset of allModules: only the stores
+	modulesInitBlocks               map[string]uint64
+	lowestInitBlock                 uint64
+	lowestStoresInitBlock           *uint64
+	storesBelowFirstStreamableBlock bool
+	outputModule                    *pbsubstreams.Module
 
 	schedulableModules      []*pbsubstreams.Module // stores and output mappers needed to execute to produce output for all `output_modules`.
 	schedulableAncestorsMap map[string][]string    // modules that are ancestors (therefore dependencies) of a given module
@@ -81,18 +81,18 @@ func (g *Graph) LowestStoresInitBlock() *uint64       { return g.lowestStoresIni
 func (g *Graph) ModulesInitBlocks() map[string]uint64 { return g.modulesInitBlocks }
 func (g *Graph) OutputModuleStageIndex() int          { return len(g.stagedUsedModules) - 1 }
 
-// HasTailTruncatedStores reports whether a store has an initial block below the first streamable
+// HasStoresBelowFirstStreamableBlock reports whether a store has an initial block below the first streamable
 // block: its state at its graph initial block comes from a snapshot, not from an empty store.
-func (g *Graph) HasTailTruncatedStores() bool { return g.tailTruncatedStores }
+func (g *Graph) HasStoresBelowFirstStreamableBlock() bool { return g.storesBelowFirstStreamableBlock }
 
 // NewOutputModuleGraph builds the execution graph of outputModule. A module with an initial block
-// below firstStreamableBlock is refused, unless allowTailTruncation is set: it then runs from
-// firstStreamableBlock on, and its stores keep the file names they had before the chain was truncated.
-func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64, allowTailTruncation bool) (out *Graph, err error) {
+// below firstStreamableBlock is refused, unless allowPrunedChain is set: it then runs from
+// firstStreamableBlock on, and its stores keep the file names they had before the chain was pruned.
+func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64, allowPrunedChain bool) (out *Graph, err error) {
 	out = &Graph{
 		requestModules: modules,
 	}
-	if err := out.computeGraph(outputModule, productionMode, modules, firstStreamableBlock, allowTailTruncation); err != nil {
+	if err := out.computeGraph(outputModule, productionMode, modules, firstStreamableBlock, allowPrunedChain); err != nil {
 		return nil, fmt.Errorf("module graph: %w", err)
 	}
 
@@ -185,7 +185,7 @@ func (g *Graph) dedupeModules(mods *pbsubstreams.Modules) (*pbsubstreams.Modules
 	return &pbsubstreams.Modules{Modules: filteredModules}, deduped
 }
 
-func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64, allowTailTruncation bool) error {
+func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64, allowPrunedChain bool) error {
 	graph, err := manifest.NewModuleGraph(modules.Modules)
 	if err != nil {
 		return fmt.Errorf("compute graph: %w", err)
@@ -228,18 +228,18 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 	g.modulesInitBlocks = map[string]uint64{}
 	for _, mod := range g.usedModules {
 		initialBlock := mod.InitialBlock
-		if initialBlock == 0 && allowTailTruncation && mod.GetKindStore() != nil {
+		if initialBlock == 0 && allowPrunedChain && mod.GetKindStore() != nil {
 			// Its snapshots would be named after the current first streamable block, so raising
 			// it would silently rebuild the store from there while cached outputs still reflect
 			// the older state.
-			return fmt.Errorf("store %q has no initial block, which this endpoint refuses because it truncates the chain's tail (blocks below %d are gone, and that block can be raised later): set an initial block at or above %d on the store", mod.Name, firstStreamableBlock, firstStreamableBlock)
+			return fmt.Errorf("store %q has no initial block, which this endpoint refuses because it prunes the chain (blocks below %d are gone, and that block can be raised later): set an initial block at or above %d on the store", mod.Name, firstStreamableBlock, firstStreamableBlock)
 		}
 		if initialBlock == 0 {
 			initialBlock = firstStreamableBlock
-		} else if allowTailTruncation && initialBlock < firstStreamableBlock {
+		} else if allowPrunedChain && initialBlock < firstStreamableBlock {
 			initialBlock = firstStreamableBlock
 			if mod.GetKindStore() != nil {
-				g.tailTruncatedStores = true
+				g.storesBelowFirstStreamableBlock = true
 			}
 		} else if initialBlock < firstStreamableBlock {
 			return fmt.Errorf("module %q has initial block %d smaller than first streamable block %d", mod.Name, initialBlock, firstStreamableBlock)

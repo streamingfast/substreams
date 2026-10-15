@@ -18,7 +18,7 @@ import (
 
 // The store of this package starts at block 1. Snapshots are built while the chain starts at
 // block 0, then the first streamable block is raised to 20 (chain truncation).
-func TestTailTruncation(t *testing.T) {
+func TestPrunedChain(t *testing.T) {
 	manifest.TestUseSimpleHash = true
 	defer func() { bstream.GetProtocolFirstStreamableBlock = 0 }()
 
@@ -34,11 +34,11 @@ func TestTailTruncation(t *testing.T) {
 		assertFileProduced(t, tempDir, storeHash+"/states/0000000030-0000000001.kv.zst")
 	}
 
-	truncatedRun := func(t *testing.T, startBlock int64, allowTailTruncation bool) *testRun {
+	truncatedRun := func(t *testing.T, startBlock int64, allowPrunedChain bool) *testRun {
 		bstream.GetProtocolFirstStreamableBlock = 20
 		run := newTestRun(t, startBlock, 40, 40, 20, outputModule, spkg)
 		run.ProductionMode = true
-		run.AllowTailTruncation = allowTailTruncation
+		run.AllowPrunedChain = allowPrunedChain
 		return run
 	}
 
@@ -61,7 +61,7 @@ func TestTailTruncation(t *testing.T) {
 		run := truncatedRun(t, 35, true)
 		err := run.Run(t, "truncated_no_snapshot")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), `store "setup_test_store_add_i64" has initial block 1, but this endpoint truncated the chain's tail at block 20 and has no snapshot of the store at that block`)
+		assert.Contains(t, err.Error(), `store "setup_test_store_add_i64" has initial block 1, but this endpoint pruned the chain below block 20 and has no snapshot of the store at that block`)
 	})
 
 	t.Run("linear handoff at the first streamable block", func(t *testing.T) {
@@ -82,7 +82,7 @@ func TestTailTruncation(t *testing.T) {
 					continue
 				}
 				require.Error(t, err, "production mode: %v", productionMode)
-				assert.Contains(t, err.Error(), `store "setup_test_store_add_i64" has initial block 1, but this endpoint truncated the chain's tail at block 20 and has no snapshot of the store at that block`)
+				assert.Contains(t, err.Error(), `store "setup_test_store_add_i64" has initial block 1, but this endpoint pruned the chain below block 20 and has no snapshot of the store at that block`)
 			}
 		}
 	})
@@ -94,14 +94,14 @@ func TestTailTruncation(t *testing.T) {
 		bstream.GetProtocolFirstStreamableBlock = 25
 		for _, startBlock := range []uint64{25, 27, 33} {
 			run := newTestRun(t, int64(startBlock), startBlock, startBlock+5, 25, outputModule, spkg)
-			run.AllowTailTruncation = true
+			run.AllowPrunedChain = true
 			err := run.RunWithTempDir(t, "first_streamable_block_between_boundaries", tempDir)
 			if startBlock >= 30 {
 				require.NoError(t, err, "start block %d resumes from the snapshot at block 30", startBlock)
 				continue
 			}
 			require.Error(t, err, "start block %d needs the store at block 25, where it has no snapshot", startBlock)
-			assert.Contains(t, err.Error(), `store "setup_test_store_add_i64" has initial block 1, but this endpoint truncated the chain's tail at block 25 and has no snapshot of the store at that block`)
+			assert.Contains(t, err.Error(), `store "setup_test_store_add_i64" has initial block 1, but this endpoint pruned the chain below block 25 and has no snapshot of the store at that block`)
 		}
 	})
 

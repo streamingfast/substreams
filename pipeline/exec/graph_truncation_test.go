@@ -65,7 +65,7 @@ func TestNewOutputModuleGraph_TruncationStoreWithoutInitialBlock(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = NewOutputModuleGraph("map_out", true, modules, 400, true)
-	require.ErrorContains(t, err, `store "store_a" has no initial block, which this endpoint refuses because it truncates the chain's tail (blocks below 400 are gone, and that block can be raised later): set an initial block at or above 400 on the store`)
+	require.ErrorContains(t, err, `store "store_a" has no initial block, which this endpoint refuses because it prunes the chain (blocks below 400 are gone, and that block can be raised later): set an initial block at or above 400 on the store`)
 
 	modules.Modules[1].InitialBlock = 450
 	_, err = NewOutputModuleGraph("map_out", true, modules, 400, true)

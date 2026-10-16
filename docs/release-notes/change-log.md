@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Change the tier1 local squasher to upload a segment's full store in the background instead of blocking the next
+  segment's merge on it. Uploads are bounded (a few at a time) and a segment only counts as squashed once its own
+  upload succeeds; an upload failure after retries still fails the request like before.
+
 - Add `Tier1Config.AllowPrunedChain`, forwarded to tier2. It lets
   requests keep running Substreams whose modules (mappers and stores) start before the chain's first streamable block,
   after that block was raised (the chain was pruned). Those modules run from the first streamable block on,

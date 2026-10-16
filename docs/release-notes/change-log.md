@@ -37,9 +37,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   first streamable block, or to a snapshot named after another initial block: its first job failed. It now starts at
   or above the first streamable block and skips those snapshots.
 
+- Fix wasm calls that fail because the host ran out of file descriptors or memory (e.g. `Too many open files` while
+  creating an instance) being reported as deterministic errors, which returned `InvalidArgument` and were cached for 1h.
+  They now return `Internal`, and the shared cache runs the call again instead of handing the same error to every
+  stream on that block. A store backend failure is no longer kept in the shared cache either.
+
 - Fix tier1 leaking a gRPC connection each time a job failed to reach a tier2. The error now also says what failed
   instead of just `connection refused`.
-  
+
 ### Sink
 
 - Add `substreams sink pubsub`, which publishes any module output to a Google Cloud Pub/Sub topic as the
@@ -62,6 +67,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - `golang.org/x/net` is at v0.60.0, which clears CVE-2026-78663 (CRITICAL) and CVE-2026-78669, CVE-2026-78660 and
   CVE-2026-78659 (HIGH), all HTTP/2 issues reported by Docker Scout against the image.
+- Bumped OpenTelemetry to v1.47.0 and `github.com/streamingfast/dhttp` to v0.2.0 to fix known vulnerabilities.
+- Bumped `github.com/yuin/goldmark` to v1.7.17 to fix an XSS (GO-2026-5320) in the CLI's markdown rendering.
+- Go 1.27 or newer is now required to build.
 
 ## v1.25.0
 

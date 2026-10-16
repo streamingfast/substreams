@@ -345,6 +345,11 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	if err != nil {
 		return &Result{Error: fmt.Errorf("unable to create grpc client: %w", err)}
 	}
+	defer func() {
+		if err := closeFunc(); err != nil {
+			logger.Warn("failed to close grpc client on job termination", zap.Error(err))
+		}
+	}()
 
 	ctx = dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx)
 
@@ -357,16 +362,13 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 			return &Result{Error: ctx.Err()}
 		}
 		return &Result{
-			Error: NewRetryableErr(ErrConnectionRefused),
+			Error: NewRetryableErr(fmt.Errorf("%w: %w", ErrConnectionRefused, err)),
 		}
 	}
 
 	defer func() {
 		if err := stream.CloseSend(); err != nil {
 			logger.Warn("failed to close stream on job termination", zap.Error(err))
-		}
-		if err := closeFunc(); err != nil {
-			logger.Warn("failed to close grpc client on job termination", zap.Error(err))
 		}
 	}()
 

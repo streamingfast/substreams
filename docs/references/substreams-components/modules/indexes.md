@@ -26,7 +26,7 @@ In the following diagram, `Block 1` and `Block 2` contain an event where `log.ad
 
 ### Create a Custom Index
 
-Anyone can create an index module. All you need to do is create a Substreams with a module that outputs a list of tags that are contained in each block. For example, let's take a look at the `index_events` module from the [Ethereum Foundational Modules GitHub repository](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/ethereum-common/substreams.yaml#L53).
+Anyone can create an index module. All you need to do is create a Substreams with a module that outputs a list of tags that are contained in each block. For example, let's take a look at the `index_events` module from the [Ethereum Foundational Modules GitHub repository](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/ethereum/common/substreams.yaml#L51).
 
 A possible flow to use an index module to index all the events in a block:
 
@@ -51,7 +51,7 @@ The definition of the `index_events` module looks like any other Substreams modu
       type: proto:sf.substreams.index.v1.Keys
 ```
 
-The `index_events` module is defined by the [following function](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/ethereum-common/src/events.rs#L39):
+The `index_events` module is defined by the [following function](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/ethereum/common/src/events.rs#L36):
 
 ```rust
 #[substreams::handlers::map]

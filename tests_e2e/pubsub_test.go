@@ -34,7 +34,6 @@ func TestPubSubSink(t *testing.T) {
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", burst)
 	require.NoError(t, err)
 	defer devenv.TerminateDummyBlockchain(ctx, container)
-	waitMergerCaughtUp(t, ctx, tmpDir, burst)
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
 	app, endpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)

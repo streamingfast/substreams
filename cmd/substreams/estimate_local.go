@@ -112,7 +112,7 @@ func estimateLocalE(cmd *cobra.Command, args []string) error {
 		zap.Int("parallel_requests", parallelRequests),
 	)
 
-	graph, err := exec.NewOutputModuleGraph(outputModule, true, sinkerConfig.Pkg.Modules, 0)
+	graph, err := exec.NewOutputModuleGraph(outputModule, true, sinkerConfig.Pkg.Modules, 0, false)
 	if err != nil {
 		return fmt.Errorf("creating module graph: %w", err)
 	}

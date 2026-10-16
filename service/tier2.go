@@ -273,7 +273,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	if s.isOverloaded() {
 		err := status.Error(codes.ResourceExhausted, "service currently overloaded")
 		fields = append(fields, zap.Error(err))
-		logger.Info("refusing Substreams ProcessRange request", fields...)
+		logger.Debug("refusing Substreams ProcessRange request", fields...)
 		return err
 	}
 
@@ -297,7 +297,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	if request.Modules == nil {
 		err := status.Error(codes.InvalidArgument, "missing modules in request")
 		fields = append(fields, zap.Error(err))
-		logger.Info("refusing Substreams ProcessRange request", fields...)
+		logger.Debug("refusing Substreams ProcessRange request", fields...)
 		return err
 	}
 	moduleNames := make([]string, len(request.Modules.Modules))
@@ -309,15 +309,15 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	if err := ValidateTier2Request(request); err != nil {
 		err = status.Errorf(codes.InvalidArgument, "validate request: %s", err)
 		fields = append(fields, zap.Error(err))
-		logger.Info("refusing Substreams ProcessRange request", fields...)
+		logger.Debug("refusing Substreams ProcessRange request", fields...)
 		return err
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock) //production-mode flag is irrelevant here because it isn't used to calculate the hashes
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock, request.AllowPrunedChain) //production-mode flag is irrelevant here because it isn't used to calculate the hashes
 	if err != nil {
 		err = bsstream.NewErrInvalidArg("%s", err.Error())
 		fields = append(fields, zap.Error(err))
-		logger.Info("refusing Substreams ProcessRange request", fields...)
+		logger.Debug("refusing Substreams ProcessRange request", fields...)
 		return err
 	}
 	outputModuleHash := execGraph.ModuleHashes()[request.OutputModule]
@@ -394,7 +394,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return err
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock, request.AllowPrunedChain)
 	if err != nil {
 		return stream.NewErrInvalidArg("%s", err.Error())
 	}

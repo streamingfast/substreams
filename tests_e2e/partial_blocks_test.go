@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const latestDummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:1cea671"
+const latestDummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:v1.7.8"
 
 func TestPartialBlocksSimple(t *testing.T) {
 	ctx := context.Background()
@@ -34,7 +34,7 @@ func TestPartialBlocksSimple(t *testing.T) {
 	burst := 120
 
 	t.Logf("Starting container with image: %s and burst %d", image, burst)
-	container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks", burst)
+	container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, "--with-flash-blocks", burst, 120, false)
 	require.NoError(t, err)
 	defer devenv.TerminateDummyBlockchain(ctx, container)
 
@@ -194,7 +194,7 @@ func TestPartialBlocksWithStores(t *testing.T) {
 			burst := partialStoresBurst
 
 			t.Logf("Starting container with image: %s and burst %d", image, burst)
-			container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, "--with-flash-blocks --with-reorgs", burst, 330)
+			container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, "--with-flash-blocks --with-reorgs", burst, 330, false)
 			require.NoError(t, err)
 			defer devenv.TerminateDummyBlockchain(ctx, container)
 
@@ -363,7 +363,7 @@ func TestPartialBlocksReorgs(t *testing.T) {
 			burst := 0
 
 			t.Logf("Starting container with image: %s and burst %d", image, burst)
-			container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks --with-skipped-blocks=false --with-reorgs --block-rate=220", burst)
+			container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, "--with-flash-blocks --with-skipped-blocks=false --with-reorgs --block-rate=220", burst, 120, false)
 			require.NoError(t, err)
 
 			// Log container details for debugging

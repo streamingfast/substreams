@@ -13,8 +13,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-- Fix tier1 requests rejected before their body is read (authentication, compression enforcement) sometimes
-  failing at a load balancer with HTTP 502 or `INTERNAL` instead of returning their error.
+- Add `Tier1Config.AllowPrunedChain`, forwarded to tier2. It lets
+  requests keep running Substreams whose modules (mappers and stores) start before the chain's first streamable block,
+  after that block was raised (the chain was pruned). Those modules run from the first streamable block on,
+  and their stores resume from the snapshots taken before the pruning, which keep their original names
+  (ex: `0400100000-0350000000.kv`). A request is refused when a store has no snapshot at the first streamable block
+  to resume from, and the error says which store and how to fix it.
+  When it is enabled, a request using a store without an initial block is refused: such a store would be rebuilt from the new
+  first streamable block each time it is raised, while cached outputs still reflect its older state. Every store must
+  set an initial block, at or above the first streamable block.
+
+- Fix requests failing with `snapshot "…" does not exist` after the chain's first streamable block was raised, for
+  stores without an initial block. Their snapshots written before are named after the previous first streamable block
+  and were counted as present, then failed to load. They are now ignored and the store is rebuilt.
+
+- Fix dev-mode requests reading blocks below the first streamable block when that block is not a multiple of the
+  segment size: the linear handoff was rounded down below it. It now stays at or above the first streamable block.
+
+- Fix requests with a cursor being refused with `invalid start block …, must be >= …` when their start block is below
+  the first streamable block: the cursor replaces the start block, so the block it resolves to is what is checked now.
+
+- Fix the live back filler (started after a quickload) stopping for the rest of the request when it rewound below the
+  first streamable block, or to a snapshot named after another initial block: its first job failed. It now starts at
+  or above the first streamable block and skips those snapshots.
 
 ### Sink
 
@@ -36,21 +57,86 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Dependencies
 
-- Bumped `github.com/streamingfast/firehose-networks` to v0.3.0.
+- `golang.org/x/net` is at v0.60.0, which clears CVE-2026-78663 (CRITICAL) and CVE-2026-78669, CVE-2026-78660 and
+  CVE-2026-78659 (HIGH), all HTTP/2 issues reported by Docker Scout against the image.
 
-## v1.23.0
+## v1.25.0
+
+### Docs
+
+- Document the per-store size limit on StreamingFast-hosted endpoints is now 3.5GiB (up from 1GiB), following
+  the move to the mmap stores backend. The binary default remains 1GiB, overridable with the tier1
+  `--substreams-tier1-store-size-limit` flag.
+
+### Server
+
+- Tier1 accepts a forkable hub from the process through `Tier1Modules.ForkableHub` instead of building its own, so an app running next to tier1 (firehose in `firecore`) can share it and hold live blocks in memory once. `NewLiveHub` builds that hub and `HubKeepFinalBlocks` gives how many final blocks it keeps.
+
+- Tier1 now handles Ethereum partial blocks about 20x faster, with almost no allocations. It reads the
+  transaction traces straight from the encoded block and drops the ones already sent by copying bytes,
+  instead of decoding and re-encoding the whole block for every partial.
+
+- Add the `external_calls_<kind>` metering metrics (for example `external_calls_eth_call`), counting the calls
+  made by WASM extensions. A batch counts for as many calls as it contains. Extensions report them with
+  `metering.AddExternalCalls`.
 
 ### CLI
 
-- Fixed: `substreams registry login` failed with `no such file or directory` when `~/.config/substreams`
-  did not exist yet. The directory is now created before the token is written, and the token file is
-  written with mode `0600` instead of `0644` (an existing file is tightened on re-login).
+- `substreams pack` writes map entries in key order, so packing the same inputs twice gives a byte-identical
+  `.spkg`. Before, a package with a multi-entry map, such as `networks`, got a different digest from one pack to
+  the next.
 
-- A manifest can now import `sf/substreams/sink/sql/schema/v1/schema.proto` without
-  vendoring a copy of it. The file is a system protobuf, but `protoparse` needs the
-  source on disk to honour its extensions, so an import previously failed with
-  `no such file`. It is now served from an embedded copy, the same way
-  `sf/substreams/options.proto` already was.
+- **Breaking for Rust modules**: `substreams build` and `substreams protogen` generate buffa bindings for a
+  project whose `Cargo.toml` depends on `buffa`, using `buf.build/anthropics/buffa:v0.9.2`. This pairs with
+  `substreams` 0.8.0, which replaced [prost](https://github.com/tokio-rs/prost) with
+  [buffa](https://github.com/anthropics/buffa) as its protobuf implementation. See
+  [Migrating from prost to buffa](../references/migrating-to-buffa.md).
+
+  A project that depends on `prost`, or that names neither implementation, gets
+  `buf.build/community/neoeinstein-prost` output. Generating buffa bindings for code written against prost
+  does not compile, so buffa is used only where the manifest asks for it. Add `buffa` to `[dependencies]`
+  before building against `substreams` 0.8.0.
+
+  The on-the-wire protobuf encoding is unchanged. Existing packages keep streaming, cached module outputs
+  stay valid, and sinks read the same bytes.
+
+- `substreams build` and `substreams protogen` warn when an existing `buf.gen.yaml` generates for a different
+  protobuf implementation than `Cargo.toml` depends on, a combination that does not compile.
+
+- `substreams build` and `substreams protogen` write the `mod.rs` tying buffa's generated files together,
+  which no buffa plugin produces, where `buf.gen.yaml` generates them. A prost project is unaffected: the
+  `prost-crate` plugin writes its own. The file starts with `// @generated by substreams`, and one without
+  that line is left alone, so a hand-written `mod.rs` is never overwritten; a `mod.rs` that has gone missing
+  is written back without regenerating the bindings.
+
+- Fixed `substreams build` and `substreams protogen` skipping generation as already up to date when the code on
+  disk was generated for a different target. The cache key now covers the `buf.gen.yaml` plugins and their
+  `out:` paths, so repointing it at another plugin regenerates instead of leaving stale code in place, and a
+  project whose `buf.gen.yaml` was deleted, which is what the stack-mismatch warning above tells the reader to
+  do, always regenerates. The search for a `buf.gen.yaml` now stops at the repository root, so a project nested
+  in a repository that configures `buf` for something else at its root is no longer generated with that
+  configuration.
+
+- Fixed `substreams build` and `substreams protogen` failing with two definitions of the same type when a
+  package carries its own copy of a protobuf that later became a system one. System protobufs are now matched
+  by the fully qualified types they declare rather than by file name, and the package's copy is the one that
+  stays, since it is what its modules were built against. `substreams-sink-sql`'s `services.proto` holds the
+  messages this project now ships as `deprecated.proto`.
+
+- `substreams protogen --output-path` now overrides the output directory only when it is given on the
+  command line. Without it, an existing `buf.gen.yaml` that generates somewhere other than `src/pb` is
+  followed, so `mod.rs` lands beside the files it includes instead of in a directory those files were
+  never written to. The `out:` path written into a generated `buf.gen.yaml` is now resolved relative to
+  that file rather than to the manifest, which is the same directory in a project whose `buf.gen.yaml`
+  sits beside its manifest.
+
+### Dependencies
+
+- Bumped `github.com/streamingfast/bstream` to pick up two fixes: a stream can skip the partial blocks of a
+  forkable hub it shares with another app, and `blockstream` detects a dead relayer in about 40s instead of
+  5 minutes.
+
+## v1.24.0
 
 ### Sink
 
@@ -102,6 +188,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   by default); a block larger than the cap is sent alone. A failed batch is kept and resumed as one payload.
   Switching batching on or off while the sink is stopped discards a pending payload of the other shape; its blocks
   come back through the stream. Default is off, one block per call as before.
+
+### Server
+
+- Fix tier1 requests rejected before their body is read (authentication, compression enforcement) sometimes
+  failing at a load balancer with HTTP 502 or `INTERNAL` instead of returning their error.
+
+- Demoted the tier2 "refusing Substreams ProcessRange request" log from `Info` to `Debug`. It was the
+  single largest source of Cloud Logging volume on `substreams-workers` under backpressure; the
+  `substreams_tier2_rejected_request_counter` metric (by reason) already tracks refusal rate without it.
+
+- Demoted tier2's gRPC "finished streaming call with code ResourceExhausted" completion log from `Info`
+  to `Debug`, using the newly added `dgrpc` `server.WithCodeLevelFunc` override. It was the second largest
+  source of Cloud Logging volume on `substreams-workers`, logged on every backpressure refusal alongside
+  the line above.
+
+- Fixed a tier1 panic (`INTERNAL: runtime error: invalid memory address or nil pointer dereference`) on a
+  production-mode request starting past the chain's final block, when that final block falls within the
+  first segment of the request's stores. The linear handoff then lands exactly on the stores' initial
+  block, leaving no segment to backprocess.
+
+### Tools
+
+- `substreams tools devenv` now waits for the dummy chain to finish its genesis burst before starting tier1.
+  The relayer can start serving mid-burst, and tier1 then planned requests against a chain a few blocks high.
+
+### Dependencies
+
+- Bumped `github.com/streamingfast/firehose-networks` to v0.3.0.
+- Bumped `github.com/streamingfast/dgrpc` to pick up `server.WithCodeLevelFunc`.
+- Bumped `github.com/streamingfast/dummy-blockchain` to v1.7.8, and `substreams tools devenv` now defaults to the
+  `ghcr.io/streamingfast/dummy-blockchain:v1.7.8` image. Its relayer no longer sometimes drops a block around
+  the chain's forks, which could make tier1 exit with `received 5 consecutive unlinkable blocks`.
+- Bumped `github.com/streamingfast/bstream` to pick up the forkable hub fixes: tier1 no longer exits with
+  `received 5 consecutive unlinkable blocks` or `cannot link block after reconnection` when it starts while
+  the merger is deleting the one-block files of a bundle it just merged.
+
+## v1.23.0
+
+### CLI
+
+- Fixed: `substreams registry login` failed with `no such file or directory` when `~/.config/substreams`
+  did not exist yet. The directory is now created before the token is written, and the token file is
+  written with mode `0600` instead of `0644` (an existing file is tightened on re-login).
+
+- A manifest can now import `sf/substreams/sink/sql/schema/v1/schema.proto` without
+  vendoring a copy of it. The file is a system protobuf, but `protoparse` needs the
+  source on disk to honour its extensions, so an import previously failed with
+  `no such file`. It is now served from an embedded copy, the same way
+  `sf/substreams/options.proto` already was.
 
 ### Docs
 
@@ -1020,7 +1155,7 @@ This release introduces significant performance optimizations to the Substreams 
 ## v1.17.8
 
 * Added experimental support for partial blocks (ex: Base's Flash Blocks) -- only supported on https://base-mainnet-flash.streamingfast.io endpoint
-* See [more details in the documentation](https://docs.substreams.dev/reference-material/flash-blocks)
+* See [more details in the documentation](https://docs.substreams.dev/reference-material/chain-support/flashblocks)
 
 ### CLI
 
@@ -1837,7 +1972,7 @@ This allows flexibility and getting anything from "skeleton" of a substreams for
 
 #### How to use `solana_program` or `alloy`/`ether-rs`
 
-Those libraries when used in a `wasm32-unknown-unknown` context creates in a bunch of [wasmbindgen](https://rustwasm.github.io/wasm-bindgen/) imports in the resulting Substreams Rust code, imports that led to runtime errors because Substreams engine didn't know about those special imports until today.
+Those libraries when used in a `wasm32-unknown-unknown` context creates in a bunch of [wasmbindgen](https://wasm-bindgen.github.io/wasm-bindgen/) imports in the resulting Substreams Rust code, imports that led to runtime errors because Substreams engine didn't know about those special imports until today.
 
 The Substreams engine is now able to "shims" those `wasmbindgen` imports enabling you to run code that depends libraries like `solana_program` and `alloy/ether-rs` which are known to pull those `wasmbindgen` imports. This is going to work as long as you do not actually call those special imports. Normal usage of those libraries don't accidentally call those methods normally. If they are called, the WASM module will fail at runtime and stall the Substreams module from going forward.
 

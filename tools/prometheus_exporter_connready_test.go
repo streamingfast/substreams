@@ -37,6 +37,9 @@ func TestWaitForConnReady_RecoversWithinConnectBudget(t *testing.T) {
 	server := grpc.NewServer()
 	t.Cleanup(server.Stop)
 
+	// Taken before the backend's down window starts so elapsed can never undercount it.
+	begin := time.Now()
+
 	serving := make(chan struct{})
 	go func() {
 		time.Sleep(backendDownFor)
@@ -58,7 +61,6 @@ func TestWaitForConnReady_RecoversWithinConnectBudget(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
 	defer cancel()
 
-	begin := time.Now()
 	err = waitForConnReady(ctx, conn)
 	elapsed := time.Since(begin)
 
@@ -79,10 +81,11 @@ func TestWaitForConnReady_GivesUpAfterConnectBudget(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
 
+	// Taken before the deadline is armed so elapsed can never undercount the budget.
+	begin := time.Now()
 	ctx, cancel := context.WithTimeoutCause(context.Background(), connectTimeout, context.DeadlineExceeded)
 	defer cancel()
 
-	begin := time.Now()
 	err = waitForConnReady(ctx, conn)
 	elapsed := time.Since(begin)
 

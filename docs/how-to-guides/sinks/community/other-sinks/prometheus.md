@@ -79,6 +79,10 @@ $ cargo add substreams-sink-prometheus
 
 ## Quickstart
 
+{% hint style="warning" %}
+**Compatibility**: The `substreams-sink-prometheus` crate generates its protobuf types with prost, which does not compile against `substreams` 0.8.0 and above, and its repository is archived. Pin a pre-0.8 row for a module that uses it. See [Migrating from prost to buffa](../../../../references/migrating-to-buffa.md).
+{% endhint %}
+
 **Cargo.toml**
 
 ```toml

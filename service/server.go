@@ -23,9 +23,11 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/encoding"
 	_ "google.golang.org/grpc/experimental"
 )
@@ -159,6 +161,9 @@ func ListenTier2(
 			regexp.MustCompile(`TLS handshake error.*first record does not look like a TLS handshake`),
 			regexp.MustCompile(`http2: server: error reading preface.*connection reset by peer`),
 		),
+		// ResourceExhausted is routine admission-control backpressure on tier2, not worth Info
+		// on every refusal; everything else keeps dgrpc's normal-verbosity mapping.
+		dgrpcserver.WithCodeLevelFunc(tier2CodeLevel),
 	}
 	if enforceCompression {
 		options = append(options, dgrpcserver.WithEnforceCompression())
@@ -196,4 +201,20 @@ func ListenTier2(
 
 	return
 
+}
+
+// tier2CodeLevel mirrors dgrpc's normal-verbosity gRPC-code-to-zap-level mapping, except
+// codes.ResourceExhausted is demoted to Debug: on tier2 it signals routine admission-control
+// backpressure, not an abnormal condition worth Info on every refusal.
+func tier2CodeLevel(code codes.Code) zapcore.Level {
+	switch code {
+	case codes.ResourceExhausted:
+		return zap.DebugLevel
+	case codes.OK, codes.Canceled, codes.InvalidArgument, codes.NotFound, codes.PermissionDenied, codes.Unauthenticated:
+		return zap.DebugLevel
+	case codes.Unknown, codes.Unimplemented, codes.Internal, codes.DataLoss:
+		return zap.ErrorLevel
+	default:
+		return zap.InfoLevel
+	}
 }

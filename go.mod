@@ -7,12 +7,12 @@ require (
 	github.com/jhump/protoreflect v1.14.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
-	github.com/streamingfast/bstream v0.0.2-0.20260921191230-ea57fcbd4fbb
+	github.com/streamingfast/bstream v0.0.2-0.20261008140057-0873d6f53bd2
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
 	github.com/streamingfast/dauth v0.0.0-20260304175046-02898e30442d
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7
-	github.com/streamingfast/dgrpc v0.0.0-20260801042045-4c4ac6a8e41a
+	github.com/streamingfast/dgrpc v0.0.0-20260929191947-99e20897ecc7
 	github.com/streamingfast/dhttp v0.1.3-0.20251218140957-6d46b8f12eb1
 	github.com/streamingfast/dstore v0.2.4-0.20260825160629-56e87480522c
 	github.com/streamingfast/logging v1.2.3-0.20260810132752-360563ac68a9
@@ -38,11 +38,12 @@ require (
 	github.com/abourget/llerrgroup v0.2.0
 	github.com/alecthomas/chroma v0.10.0
 	github.com/alecthomas/participle v0.7.1
-	github.com/bmatcuk/doublestar/v4 v4.10.0
+	github.com/bmatcuk/doublestar/v4 v4.10.2
 	github.com/bobg/go-generics/v2 v2.2.2
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/bytecodealliance/wasmtime-go/v41 v41.0.0
 	github.com/cenkalti/backoff/v4 v4.3.0
+	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/glamour v1.0.0
@@ -70,6 +71,7 @@ require (
 	github.com/muesli/termenv v0.16.0
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
+	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10
 	github.com/prometheus/client_golang v1.24.1
 	github.com/protocolbuffers/protoscope v0.0.0-20221109213918-8e7a6aafa2c9
@@ -80,7 +82,7 @@ require (
 	github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62
 	github.com/streamingfast/dregistry v0.0.0-20260818204944-2fed3956d4e1
 	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
-	github.com/streamingfast/dummy-blockchain v1.7.7
+	github.com/streamingfast/dummy-blockchain v1.7.8
 	github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a
 	github.com/streamingfast/firehose-networks v0.3.0
 	github.com/streamingfast/sf-tracing v0.0.0-20251218140752-bafd5572499f
@@ -93,7 +95,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/clickhouse v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.44.0
 	github.com/tetratelabs/wazero v1.12.0
-	github.com/tidwall/pretty v1.2.1
+	github.com/tidwall/pretty v1.2.2
 	github.com/wk8/go-ordered-map/v2 v2.1.8
 	go.etcd.io/bbolt v1.5.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.71.0
@@ -102,9 +104,9 @@ require (
 	go.uber.org/atomic v1.12.0
 	golang.org/x/exp v0.0.0-20250813145105-42675adae3e6
 	golang.org/x/mod v0.41.0
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 	golang.org/x/oauth2 v0.37.0
-	google.golang.org/grpc v1.85.0-dev.0.20260825072537-93e31b48545e
+	google.golang.org/grpc v1.86.0-dev
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -169,7 +171,7 @@ require (
 	github.com/docker/go-connections v0.7.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.10.1 // indirect
-	github.com/envoyproxy/go-control-plane/envoy v1.39.0 // indirect
+	github.com/envoyproxy/go-control-plane/envoy v1.39.1-0.20260819172001-e6e3fd93e4be // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/go-faster/city v1.0.1 // indirect
@@ -214,7 +216,6 @@ require (
 	github.com/parquet-go/parquet-go v0.25.1 // indirect
 	github.com/pascaldekloe/name v1.0.1 // indirect
 	github.com/paulmach/orb v0.13.0 // indirect
-	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pierrec/lz4/v4 v4.1.27 // indirect
 	github.com/pinax-network/graph-networks-libs/packages/golang v0.8.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
@@ -265,7 +266,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blendle/zapdriver v1.3.2-0.20200203083823-9200777f8a3d // indirect
 	github.com/bufbuild/protocompile v0.4.0 // indirect
-	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chzyer/readline v1.5.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20260202195803-dba9d589def2 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
@@ -282,7 +282,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/itchyny/timefmt-go v0.1.8 // indirect
-	github.com/klauspost/compress v1.20.0
+	github.com/klauspost/compress v1.20.1
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect

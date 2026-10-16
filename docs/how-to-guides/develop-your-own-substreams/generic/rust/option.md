@@ -1,5 +1,9 @@
 # The Option<T> struct
 
+{% hint style="info" %}
+**Note**: This page covers Rust's own `Option<T>`. Optional `message` fields in your generated protobuf types are `MessageField<T>` rather than `Option<T>`, and read without unwrapping. See [Protobuf and Rust optional fields](../creating-protobuf-schemas.md#protobuf-and-rust-optional-fields).
+{% endhint %}
+
 ## The Problem
 
 Consider that you want to implement a function that returns a username, given the corresponding user identifier. The signature of the function could be as follows:

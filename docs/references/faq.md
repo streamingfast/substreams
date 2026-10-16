@@ -94,7 +94,7 @@ The first unknown is the system you are compiling on, and the second is the syst
 
 “Compile on almost any machine, run on almost any machine.”
 
-Additional information [is available in the Github issue for WASM-bindgen](https://github.com/rustwasm/wasm-bindgen/issues/979).
+Additional information [is available in the Github issue for WASM-bindgen](https://github.com/wasm-bindgen/wasm-bindgen/issues/979).
 
 ### Why does the output show "@unknown" instead of "@type" and the decoding failed only showing "@str" and "@bytes"
 

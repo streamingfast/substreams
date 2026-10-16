@@ -134,7 +134,8 @@ Each SPL token account address becomes a key, with the corresponding `AccountOwn
 ### Creating Foundational Store Entries
 
 ```rust
-use prost::Message;
+use buffa::{Message, MessageField};
+use buffa_types::google::protobuf::Any;
 
 #[substreams::handlers::map]
 pub fn map_spl_initialized_account(
@@ -158,16 +159,16 @@ pub fn map_spl_initialized_account(
                         owner: instruction.accounts()[2].clone(),
                     };
 
-                    let mut buf = Vec::new();
-                    prost::Message::encode(&account_owner, &mut buf).unwrap();
+                    let buf = account_owner.encode_to_vec();
 
                     entries.push(Entry {
-                        key: Some(Key {
+                        key: MessageField::some(Key {
                             bytes: instruction.accounts()[0].to_vec(),
                         }),
-                        value: Some(Any {
+                        value: MessageField::some(Any {
                             type_url: "type.googleapis.com/sf.substreams.solana.spl.v1.AccountOwner".to_string(),
-                            value: buf,
+                            value: buf.into(),
+                            ..Default::default()
                         }),
                     });
                 }

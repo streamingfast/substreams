@@ -18,7 +18,7 @@ In the example of a counter store below, we increment transaction counters for d
 ```rust
 #[substreams::handlers::store]
 pub fn store_total_tx_counts(clock: Clock, events: Events, output: StoreAddBigInt) {
-    let timestamp_seconds = clock.timestamp.unwrap().seconds;
+    let timestamp_seconds = clock.timestamp.seconds;
     let day_id = timestamp_seconds / 86400;
     let hour_id = timestamp_seconds / 3600;
     let prev_day_id = day_id - 1;

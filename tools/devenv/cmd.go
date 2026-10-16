@@ -91,7 +91,7 @@ func runDevenv(cmd *cobra.Command, _ []string) error {
 	// Tier1 cannot become ready until the merger has caught up with the burst, see
 	// WaitMergedBlocks.
 	fmt.Printf("Waiting for the merger to bundle %d blocks…\n", burst)
-	if err := WaitMergedBlocks(ctx, dataDir, uint64(burst), mergeTimeoutFor(burst)); err != nil {
+	if err := WaitMergedBlocks(ctx, dataDir, uint64(burst), MergeTimeoutFor(burst)); err != nil {
 		return fmt.Errorf("merger never caught up: %w", err)
 	}
 
@@ -136,9 +136,9 @@ Ctrl-C to tear everything down.
 	return nil
 }
 
-// mergeTimeoutFor allows well over the observed merge rate of roughly a hundred blocks a
+// MergeTimeoutFor allows well over the observed merge rate of roughly a hundred blocks a
 // second, so that a slow machine reports the real problem rather than a spurious timeout.
-func mergeTimeoutFor(burst int) time.Duration {
+func MergeTimeoutFor(burst int) time.Duration {
 	return time.Minute + time.Duration(burst/50)*time.Second
 }
 

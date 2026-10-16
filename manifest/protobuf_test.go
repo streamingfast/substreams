@@ -583,3 +583,115 @@ func TestCacheIntegration(t *testing.T) {
 		require.Equal(t, testFds, cachedFds, "Cached descriptor should match original")
 	}
 }
+
+func TestDeclaredTypeNames(t *testing.T) {
+	file := &descriptorpb.FileDescriptorProto{
+		Name:    proto.String("a/v1/a.proto"),
+		Package: proto.String("a.v1"),
+		MessageType: []*descriptorpb.DescriptorProto{{
+			Name: proto.String("Outer"),
+			NestedType: []*descriptorpb.DescriptorProto{{
+				Name: proto.String("Inner"),
+			}},
+			EnumType: []*descriptorpb.EnumDescriptorProto{{
+				Name: proto.String("Kind"),
+			}},
+		}},
+		EnumType: []*descriptorpb.EnumDescriptorProto{{
+			Name: proto.String("TopLevel"),
+		}},
+	}
+
+	assert.ElementsMatch(t, []string{
+		"a.v1.Outer",
+		"a.v1.Outer.Kind",
+		"a.v1.Outer.Inner",
+		"a.v1.TopLevel",
+	}, declaredTypeNames(file))
+}
+
+func TestDeclaredTypeNamesWithoutPackage(t *testing.T) {
+	file := &descriptorpb.FileDescriptorProto{
+		Name:        proto.String("a.proto"),
+		MessageType: []*descriptorpb.DescriptorProto{{Name: proto.String("Bare")}},
+	}
+
+	assert.Equal(t, []string{"Bare"}, declaredTypeNames(file))
+}
+
+func TestIsSupersededBy(t *testing.T) {
+	file := &descriptorpb.FileDescriptorProto{
+		Name:        proto.String("sf/substreams/sink/sql/v1/deprecated.proto"),
+		Package:     proto.String("sf.substreams.sink.sql.v1"),
+		MessageType: []*descriptorpb.DescriptorProto{{Name: proto.String("Service")}},
+	}
+
+	assert.True(t, isSupersededBy(file, map[string]bool{"sf.substreams.sink.sql.v1.Service": true}),
+		"the image already has every type this file declares")
+	assert.False(t, isSupersededBy(file, map[string]bool{"sf.substreams.sink.sql.v1.Other": true}),
+		"a different type in the same package supersedes nothing")
+	assert.False(t, isSupersededBy(file, map[string]bool{}),
+		"nothing declared yet, so nothing is superseded")
+
+	// A partial overlap must not skip the file, or the types it alone declares are lost.
+	twoTypes := &descriptorpb.FileDescriptorProto{
+		Name:    proto.String("a/v1/a.proto"),
+		Package: proto.String("a.v1"),
+		MessageType: []*descriptorpb.DescriptorProto{
+			{Name: proto.String("Kept")},
+			{Name: proto.String("Shared")},
+		},
+	}
+	assert.False(t, isSupersededBy(twoTypes, map[string]bool{"a.v1.Shared": true}),
+		"one shared type out of two is not a superseding copy")
+}
+
+// A package carrying its own copy of what is now a system protobuf, under the name it had then,
+// keeps its copy: adding ours would put the same type in the image twice.
+func TestLoadLocalProtobufsKeepsThePackagesOwnCopy(t *testing.T) {
+	systemFiles, err := readSystemProtobufs()
+	require.NoError(t, err)
+
+	var system *descriptorpb.FileDescriptorProto
+	for _, file := range systemFiles.File {
+		if file.GetName() == "sf/substreams/sink/sql/v1/deprecated.proto" {
+			system = file
+			break
+		}
+	}
+	require.NotNil(t, system, "the system protos should hold the renamed sink-sql file")
+
+	// the same messages, under the name the package knew them by
+	vendored := proto.Clone(system).(*descriptorpb.FileDescriptorProto)
+	vendored.Name = proto.String("sf/substreams/sink/sql/v1/services.proto")
+
+	pkg := &pbsubstreams.Package{ProtoFiles: []*descriptorpb.FileDescriptorProto{vendored}}
+	_, err = loadLocalProtobufs(pkg, &Manifest{})
+	require.NoError(t, err)
+
+	var names []string
+	for _, file := range pkg.ProtoFiles {
+		if strings.HasPrefix(file.GetName(), "sf/substreams/sink/sql/v1/") {
+			names = append(names, file.GetName())
+		}
+	}
+
+	assert.Equal(t, []string{"sf/substreams/sink/sql/v1/services.proto"}, names,
+		"the system copy must not be added beside the package's own")
+}
+
+// A package that carries none of the system types still gets all of them.
+func TestLoadLocalProtobufsStillAddsTheSystemProtos(t *testing.T) {
+	pkg := &pbsubstreams.Package{ProtoFiles: []*descriptorpb.FileDescriptorProto{{
+		Name:        proto.String("mine/v1/mine.proto"),
+		Package:     proto.String("mine.v1"),
+		MessageType: []*descriptorpb.DescriptorProto{{Name: proto.String("Thing")}},
+	}}}
+
+	_, err := loadLocalProtobufs(pkg, &Manifest{})
+	require.NoError(t, err)
+
+	systemFiles, err := readSystemProtobufs()
+	require.NoError(t, err)
+	assert.Len(t, pkg.ProtoFiles, len(systemFiles.File)+1, "every system proto is added")
+}

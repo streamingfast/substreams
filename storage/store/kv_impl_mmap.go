@@ -38,6 +38,13 @@ const (
 	snapshotBatchMaxBytes = 8 << 20 // 8MiB
 )
 
+// longLivedSnapshotHeadroomFraction is the maximum fraction of its mmap reservation a
+// store may already occupy for Snapshot to risk the long-lived-read-transaction path.
+// Above this, a concurrent write growing the store could force bbolt to remap while the
+// transaction is open, which corrupts its view (see Snapshot's doc comment) — so instead
+// Snapshot falls back to the exclusive write-gate, which is always safe.
+const longLivedSnapshotHeadroomFraction = 0.6
+
 // mmapKVImpl is a memory-mapped KVImpl backed by bbolt.
 // Data lives on disk and is paged into memory by the OS as needed.
 type mmapKVImpl struct {
@@ -48,15 +55,28 @@ type mmapKVImpl struct {
 	keyCount  atomic.Int64 // tracked in-memory to avoid O(N) bucket.Stats() traversal; atomic because
 	// write paths mutate it while holding only the shared snapMu.RLock() side.
 
-	// snapMu gates writes against open snapshots. Roles are inverted from the
-	// usual RWMutex reading: write operations hold the R side (they may run
-	// concurrently with each other — bbolt serializes them internally), while
-	// an open Snapshot holds the W side exclusively, blocking all writes (and
-	// Close) for its lifetime so its paged reads across separate View
+	// longLivedSnapshot opts Snapshot() into the single-read-transaction path; see
+	// MmapBackendConfig.LongLivedSnapshot.
+	longLivedSnapshot bool
+	// reservedBytes is the mmap address space reserved at open (InitialMmapSize, after
+	// defaulting), used to decide whether a long-lived snapshot is safe; see
+	// longLivedSnapshotHeadroomFraction.
+	reservedBytes int64
+
+	// snapMu gates writes against open snapshots taking the exclusive (fallback) path.
+	// Roles are inverted from the usual RWMutex reading: write operations hold the R
+	// side (they may run concurrently with each other — bbolt serializes them
+	// internally), while an exclusive Snapshot holds the W side, blocking all writes
+	// (and Close) for its lifetime so its paged reads across separate View
 	// transactions observe a stable store.
 	// CAUTION: writing to the store from the goroutine that holds an open
-	// snapshot deadlocks.
+	// exclusive snapshot deadlocks.
 	snapMu sync.RWMutex
+
+	// openLongTxSnapshots tracks long-lived-read-transaction snapshots in flight, since
+	// those don't take snapMu (that's the point: writes proceed concurrently with them).
+	// Close waits on it so the mmap file is never removed out from under one.
+	openLongTxSnapshots sync.WaitGroup
 }
 
 func openMmapDB(path string, noSync bool, initialMmapSize int) (*bbolt.DB, error) {
@@ -162,6 +182,8 @@ func newMmapKVImplWithConfig(storeName, moduleHash string, cfg *MmapBackendConfi
 	if err != nil {
 		return nil, err
 	}
+	impl.longLivedSnapshot = cfg.LongLivedSnapshot
+	impl.reservedBytes = int64(initialMmapSize)
 
 	if metrics.StoreBackendType != nil {
 		metrics.StoreBackendType.SetFloat64(1.0, "mmap", storeName)
@@ -484,19 +506,109 @@ func (b *mmapKVImpl) Save() iter.Seq2[marshaller.StoreDataEntry, error] {
 	}
 }
 
-// Snapshot returns a pull-based iterator over the store in lexicographic key
-// order, reading in bounded batches (short View transaction per batch, resumed
-// via cursor Seek on the last key). It never holds a bbolt read transaction
-// across batches, so it does not pin the mmap or block file growth.
-// Consistency across batches is guaranteed by holding snapMu exclusively:
-// all writes (Set, Delete, BatchSet, Clear, Load) and Close block until the
-// iterator is closed. The caller MUST Close() the returned iterator.
+// Snapshot returns a pull-based iterator over the store in lexicographic key order.
+//
+// When the backend was opened with MmapBackendConfig.LongLivedSnapshot and the store
+// still has enough headroom in its mmap reservation (see longLivedSnapshotHeadroomFraction),
+// it opens a single bbolt read transaction and streams the whole save from it: bbolt's
+// MVCC gives that transaction a stable view while writes (Set, Delete, BatchSet, Clear,
+// Load) proceed concurrently — the point of this mode is letting the next segment merge
+// while this one's save uploads. The tradeoff: pages freed by concurrent writes are not
+// reclaimed until the transaction closes, so the file can grow more than the live data
+// would need; see MmapBackendConfig.LongLivedSnapshot. This is safe only because
+// InitialMmapSize already reserves enough address space that the write path never needs
+// to remap while the read transaction is open — a remap deref's only the current write
+// transaction's pages (see bbolt's db.mmap), so one racing an open read transaction would
+// leave it reading freed/remapped memory. The headroom check below is what keeps that from
+// happening: when it looks thin, Snapshot falls back to the exclusive write-gate instead.
+//
+// Without that opt-in (or when headroom is thin), Snapshot reads in bounded batches
+// (short View transaction per batch, resumed via cursor Seek on the last key), never
+// holding a bbolt read transaction across batches so it never risks the remap race above.
+// Consistency across batches is instead guaranteed by holding snapMu exclusively: all
+// writes and Close block until the iterator is closed.
+//
+// The caller MUST Close() the returned iterator either way.
 func (b *mmapKVImpl) Snapshot() (marshaller.KVSnapshotIter, error) {
 	if metrics.StoreMmapOperationsTotal != nil {
 		metrics.StoreMmapOperationsTotal.Inc("snapshot", b.storeName)
 	}
+	if b.longLivedSnapshot {
+		if it, ok, err := b.longTxSnapshot(); err != nil || ok {
+			return it, err
+		}
+		if metrics.StoreMmapOperationsTotal != nil {
+			metrics.StoreMmapOperationsTotal.Inc("snapshot_fallback_thin_headroom", b.storeName)
+		}
+	}
 	b.snapMu.Lock()
 	return &mmapSnapshotIter{db: b.db, unlock: b.snapMu.Unlock}, nil
+}
+
+// longTxSnapshot opens the long-lived-read-transaction snapshot described on Snapshot.
+// ok is false (with a nil iter and nil error) when headroom is too thin to risk it — the
+// caller falls back to the exclusive path.
+func (b *mmapKVImpl) longTxSnapshot() (marshaller.KVSnapshotIter, bool, error) {
+	tx, err := b.db.Begin(false)
+	if err != nil {
+		return nil, false, fmt.Errorf("beginning long-lived snapshot read transaction: %w", err)
+	}
+	if tx.Size() > int64(float64(b.reservedBytes)*longLivedSnapshotHeadroomFraction) {
+		if err := tx.Rollback(); err != nil {
+			return nil, false, fmt.Errorf("rolling back abandoned long-lived snapshot read transaction: %w", err)
+		}
+		return nil, false, nil
+	}
+	b.openLongTxSnapshots.Add(1)
+	iter := &mmapLongTxSnapshotIter{tx: tx, release: b.openLongTxSnapshots.Done}
+	if bucket := tx.Bucket(defaultBucket); bucket != nil {
+		iter.cursor = bucket.Cursor()
+	}
+	return iter, true, nil
+}
+
+// mmapLongTxSnapshotIter streams a bucket cursor from a single bbolt read transaction
+// held open for the iterator's whole lifetime; see mmapKVImpl.Snapshot.
+type mmapLongTxSnapshotIter struct {
+	tx      *bbolt.Tx
+	cursor  *bbolt.Cursor
+	started bool
+	closed  bool
+	release func()
+}
+
+func (it *mmapLongTxSnapshotIter) Next() (string, []byte, bool, error) {
+	if it.closed {
+		return "", nil, false, fmt.Errorf("mmap long-lived snapshot iterator used after close")
+	}
+	if it.cursor == nil {
+		return "", nil, false, nil
+	}
+	var k, v []byte
+	if !it.started {
+		it.started = true
+		k, v = it.cursor.First()
+	} else {
+		k, v = it.cursor.Next()
+	}
+	if k == nil {
+		return "", nil, false, nil
+	}
+	value := make([]byte, len(v))
+	copy(value, v)
+	return string(k), value, true, nil
+}
+
+func (it *mmapLongTxSnapshotIter) Close() error {
+	if it.closed {
+		return nil
+	}
+	it.closed = true
+	defer it.release()
+	if err := it.tx.Rollback(); err != nil {
+		return fmt.Errorf("rolling back long-lived snapshot read transaction: %w", err)
+	}
+	return nil
 }
 
 type mmapSnapshotIter struct {
@@ -593,9 +705,13 @@ func (b *mmapKVImpl) KeyCount() int {
 func (b *mmapKVImpl) Close() error {
 	// Wait for any open snapshot before closing and removing the db file;
 	// a leaked snapshot iterator makes this hang, loudly surfacing the bug
-	// instead of yanking the file from under an in-flight save.
+	// instead of yanking the file from under an in-flight save. Exclusive
+	// snapshots are covered by snapMu; long-lived-read-transaction ones don't
+	// take it (writes must proceed concurrently with them), so they get their
+	// own wait.
 	b.snapMu.RLock()
 	defer b.snapMu.RUnlock()
+	b.openLongTxSnapshots.Wait()
 
 	var closeErr error
 	if b.db != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -22,9 +23,41 @@ type StoreModuleState struct {
 
 	cachedStore      *store.FullKV
 	lastBlockInStore uint64
+
+	// snapshotMu guards snapshotEnd: the squasher's upload pool advances it from
+	// goroutines that outlive the merge that scheduled them (see singleSquash), so the
+	// merge loop's own reads of it (canCopySnapshots, copyModuleSnapshots) and the
+	// synchronous writes below can run concurrently with an in-flight upload.
+	snapshotMu sync.Mutex
 	// snapshotEnd is the end block of the last full store this module saved to or loaded
 	// from storage. When it equals lastBlockInStore, that file holds cachedStore's content.
 	snapshotEnd uint64
+}
+
+// SnapshotEnd is the end block of the last full store this module saved to or loaded from
+// storage; see snapshotEnd.
+func (s *StoreModuleState) SnapshotEnd() uint64 {
+	s.snapshotMu.Lock()
+	defer s.snapshotMu.Unlock()
+	return s.snapshotEnd
+}
+
+// setSnapshotEnd unconditionally sets snapshotEnd, for callers that already know it to be
+// current (a fresh load, or the empty-partial copy-forward path, which has its own
+// ordering guarantees). Concurrent upload completions use advanceSnapshotEnd instead.
+func (s *StoreModuleState) setSnapshotEnd(end uint64) {
+	s.snapshotMu.Lock()
+	defer s.snapshotMu.Unlock()
+	s.snapshotEnd = end
+}
+
+// advanceSnapshotEnd raises snapshotEnd to end, never lowering it. The squasher's upload
+// pool can complete segments out of order (a later segment's upload may finish before an
+// earlier one's), and only the highest successfully-uploaded end block is meaningful.
+func (s *StoreModuleState) advanceSnapshotEnd(end uint64) {
+	s.snapshotMu.Lock()
+	defer s.snapshotMu.Unlock()
+	s.snapshotEnd = max(s.snapshotEnd, end)
 }
 
 func NewModuleState(logger *zap.Logger, name string, segmenter *block.Segmenter, storeConfig *store.Config) *StoreModuleState {
@@ -68,7 +101,7 @@ func (s *StoreModuleState) getStore(ctx context.Context, exclusiveEndBlock uint6
 	if s.lastBlockInStore == exclusiveEndBlock && s.cachedStore != nil {
 		return s.cachedStore, nil
 	}
-	loadStore := s.storeConfig.NewFullKV(s.logger)
+	loadStore := s.storeConfig.NewSquasherFullKV(s.logger)
 	moduleInitBlock := s.storeConfig.ModuleInitialBlock()
 	if moduleInitBlock < exclusiveEndBlock { // note that 'endBlock' in a fullKV means the last block inserted in this store, from where we can start
 		fullKVFile := store.NewCompleteFileInfo(s.name, moduleInitBlock, exclusiveEndBlock)
@@ -92,7 +125,7 @@ func (s *StoreModuleState) getStore(ctx context.Context, exclusiveEndBlock uint6
 	s.cachedStore = loadStore
 	s.lastBlockInStore = exclusiveEndBlock
 	if moduleInitBlock < exclusiveEndBlock {
-		s.snapshotEnd = exclusiveEndBlock
+		s.setSnapshotEnd(exclusiveEndBlock)
 	}
 	return loadStore, nil
 }
@@ -117,7 +150,7 @@ func (s *StoreModuleState) tryLoadFullKV(ctx context.Context, exclusiveEndBlock 
 	if moduleInitBlock >= exclusiveEndBlock {
 		return nil, nil
 	}
-	kv := s.storeConfig.NewFullKV(s.logger)
+	kv := s.storeConfig.NewSquasherFullKV(s.logger)
 	fullKVFile := store.NewCompleteFileInfo(s.name, moduleInitBlock, exclusiveEndBlock)
 	if err := kv.Load(ctx, fullKVFile); err != nil {
 		// A canceled load also surfaces as ErrInvalidFullKVFile; only delete

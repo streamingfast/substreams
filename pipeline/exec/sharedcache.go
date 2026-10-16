@@ -147,26 +147,33 @@ func (s *SharedCache) Execute(
 		s.Unlock() // This lock is global, it should never wait for an execution!
 
 		if !found {
+			defer result.Unlock()
 			return s.execute(originalContext, result, clock, wasmModule, moduleHash, call, wasmArguments, argValues, undoManager)
 		}
 
-		// the "second" request (and subsequent requests) waits here for the "first requestor" to finish the WASM execution
-		result.RLock()
-		if result.evicted {
-			// the execution failed because of the host, so its error is not replayed: run the call again
-			result.RUnlock()
-			continue
+		if replayed, err := s.replay(originalContext, result, clock, moduleHash, call); replayed {
+			return err
 		}
-
-		if tracer.Enabled() {
-			zlog.Debug("getting wasm call from cache", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
-		}
-		metrics.SkippedCachedWasmModules.Inc()
-		result.metricsGatherer.ApplyToStats(reqctx.ReqStats(originalContext))
-		err := applyResult(result, call)
-		result.RUnlock()
-		return err
+		// the execution failed because of the host, so its error is not replayed: run the call again
 	}
+}
+
+// replay waits for the "first requestor" to finish the WASM execution, then applies its result to 'call'.
+// It returns replayed=false when that execution was evicted, in which case the call must run again.
+func (s *SharedCache) replay(originalContext context.Context, result *callEntry, clock cacheClock, moduleHash string, call *wasm.Call) (replayed bool, err error) {
+	result.RLock()
+	defer result.RUnlock()
+
+	if result.evicted {
+		return false, nil
+	}
+
+	if tracer.Enabled() {
+		zlog.Debug("getting wasm call from cache", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
+	}
+	metrics.SkippedCachedWasmModules.Inc()
+	result.metricsGatherer.ApplyToStats(reqctx.ReqStats(originalContext))
+	return true, applyResult(result, call)
 }
 
 // execute runs the WASM call and populates 'result', which must be write-locked by the caller.
@@ -181,8 +188,6 @@ func (s *SharedCache) execute(
 	argValues map[string][]byte,
 	undoManager *UndoManager,
 ) error {
-	defer result.Unlock()
-
 	if tracer.Enabled() {
 		zlog.Debug("executing wasm call", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
 	}

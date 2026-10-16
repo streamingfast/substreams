@@ -57,7 +57,7 @@ func SinkerFactory(
 		if err := dbLoader.LoadTables(dsn.Schema(), options.CursorTableName, options.HistoryTableName); err != nil {
 			var e *db.SystemTableError
 			if errors.As(err, &e) {
-				return nil, fmt.Errorf("error validating the system table: %w. Did you run setup?", e)
+				return nil, fmt.Errorf("error validating the system table: %w. Did you run setup?", err)
 			}
 			return nil, fmt.Errorf("load tables: %w", err)
 		}

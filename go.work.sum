@@ -1107,6 +1107,7 @@ github.com/googleinterns/cloud-operations-api-mock v0.0.0-20200709193332-a1e58c2
 github.com/gordonklaus/ineffassign v0.0.0-20180909121442-1003c8bd00dc h1:cJlkeAx1QYgO5N80aF5xRGstVsRQwgLR7uA2FnP1ZjY=
 github.com/gorilla/handlers v0.0.0-20181012153334-350d97a79266 h1:mQtDGATRCnuJe8ZPx1AgBT5ILOSUQG9oIAeZGJMN0yQ=
 github.com/gorilla/handlers v0.0.0-20181012153334-350d97a79266/go.mod h1:Qkdc/uu4tH4g6mTK6auzZ766c4CA0Ng8+o/OAirnOIQ=
+github.com/gorilla/handlers v1.5.2/go.mod h1:dX+xVpaxdSw+q0Qek8SSsl3dfMk3jNddUkMzo0GtH0w=
 github.com/gorilla/mux v1.8.0/go.mod h1:DVbg23sWSpFRCP0SfiEN6jmj59UnW/n46BH5rLB71So=
 github.com/gorilla/securecookie v1.1.1 h1:miw7JPhV+b/lAHSXz4qd/nN9jRiAFV5FwjeKyCS8BvQ=
 github.com/gorilla/securecookie v1.1.1/go.mod h1:ra0sb63/xPlUeL+yeDciTfxMRAA+MP+HVt/4epWDjd4=
@@ -1505,6 +1506,8 @@ github.com/streamingfast/dgrpc v0.0.0-20260218164858-719a69f1b7b4/go.mod h1:S6lJ
 github.com/streamingfast/dgrpc v0.0.0-20260224192836-e5cd6cffceff/go.mod h1:S6lJ9Dd6M3myzWbxspuhGggHtld9uYVN0xQ/7EGXmX8=
 github.com/streamingfast/dgrpc v0.0.0-20260420180129-8b81f2664993/go.mod h1:S6lJ9Dd6M3myzWbxspuhGggHtld9uYVN0xQ/7EGXmX8=
 github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4/go.mod h1:ehPytv7E4rI65iLcrwTes4rNGGqPPiugnH+20nDQyp4=
+github.com/streamingfast/dhttp v0.1.3-0.20251218140957-6d46b8f12eb1 h1:V9oSpY69/OZKTptZEPzJFaC8RS0Y8kffknNTDSZwpME=
+github.com/streamingfast/dhttp v0.1.3-0.20251218140957-6d46b8f12eb1/go.mod h1:W/eu9YKARF3YVkJwoMH1vu5DQ0BGf9JFD5h9HrlCvHA=
 github.com/streamingfast/dmetrics v0.0.0-20210811180524-8494aeb34447/go.mod h1:VLdQY/FwczmC/flqWkcsBbqXO4BhU4zQDSK7GMrpcjY=
 github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed/go.mod h1:JbxEDbzWRG1dHdNIPrYfuPllEkktZMgm40AwVIBENcw=
 github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175/go.mod h1:JbxEDbzWRG1dHdNIPrYfuPllEkktZMgm40AwVIBENcw=

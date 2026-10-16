@@ -151,21 +151,23 @@ func (s *SharedCache) Execute(
 			return s.execute(originalContext, result, clock, wasmModule, moduleHash, call, wasmArguments, argValues, undoManager)
 		}
 
-		if replayed, err := s.replay(originalContext, result, clock, moduleHash, call); replayed {
-			return err
+		evicted, err := s.replay(originalContext, result, clock, moduleHash, call)
+		if evicted {
+			// the execution failed because of the host, so its error is not replayed: run the call again
+			continue
 		}
-		// the execution failed because of the host, so its error is not replayed: run the call again
+		return err
 	}
 }
 
 // replay waits for the "first requestor" to finish the WASM execution, then applies its result to 'call'.
-// It returns replayed=false when that execution was evicted, in which case the call must run again.
-func (s *SharedCache) replay(originalContext context.Context, result *callEntry, clock cacheClock, moduleHash string, call *wasm.Call) (replayed bool, err error) {
+// It returns evicted=true, without touching 'call', when that execution was evicted, in which case the call must run again.
+func (s *SharedCache) replay(originalContext context.Context, result *callEntry, clock cacheClock, moduleHash string, call *wasm.Call) (evicted bool, err error) {
 	result.RLock()
 	defer result.RUnlock()
 
 	if result.evicted {
-		return false, nil
+		return true, nil
 	}
 
 	if tracer.Enabled() {
@@ -173,7 +175,7 @@ func (s *SharedCache) replay(originalContext context.Context, result *callEntry,
 	}
 	metrics.SkippedCachedWasmModules.Inc()
 	result.metricsGatherer.ApplyToStats(reqctx.ReqStats(originalContext))
-	return true, applyResult(result, call)
+	return false, applyResult(result, call)
 }
 
 // execute runs the WASM call and populates 'result', which must be write-locked by the caller.

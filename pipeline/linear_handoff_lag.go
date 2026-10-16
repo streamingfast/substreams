@@ -1,12 +1,23 @@
 package pipeline
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
 )
 
 const defaultMaxLinearHandoffLagSegments = 2
+
+// ErrBackprocessEndedTooFarBehind ends a production request whose back-processing completed
+// more than MaxLinearHandoffLagSegments behind the last final block. It is reported as
+// Unavailable so that the client reconnects and back-processes the gap in parallel.
+var ErrBackprocessEndedTooFarBehind = errors.New("back-processing ended too far behind the last final block of the chain, please reconnect to process the gap in parallel")
+
+// ErrStreamFellTooFarBehind ends a production request whose streamed final blocks trail the
+// last final block by more than MaxLinearHandoffLagSegments. It is reported as Unavailable so
+// that the client reconnects and back-processes the gap in parallel.
+var ErrStreamFellTooFarBehind = errors.New("stream fell too far behind the last final block of the chain, please reconnect to process the gap in parallel")
 
 // MaxLinearHandoffLagSegments is how many segments a production request may trail the last
 // final block (rounded down to a segment), either when backprocessing completes or while

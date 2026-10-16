@@ -45,7 +45,7 @@ func WithHeadBlockGetter(getter func() (uint64, error)) Option {
 	}
 }
 
-// WithFinalBlockLagCheck disconnects the request with ErrShuttingDown when, at a segment
+// WithFinalBlockLagCheck disconnects the request with ErrStreamFellTooFarBehind when, at a segment
 // boundary, its final block trails the last final block of the chain by more than
 // MaxLinearHandoffLagSegments.
 func WithFinalBlockLagCheck(getRecentFinalBlock func() (uint64, error), linearHandoff uint64) Option {

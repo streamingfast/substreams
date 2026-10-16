@@ -25,7 +25,7 @@ Once you find a package that fits your needs, you can choose how you want to con
 | Rust SDK   | O       | StreamingFast    |[substreams-sink-rust](https://github.com/streamingfast/substreams-sink-rust)|
 | JS SDK     | O       | StreamingFast    |[substreams-js](https://github.com/substreams-js/substreams-js)|
 | KV Store   | O       | StreamingFast    |[substreams-sink-kv](https://github.com/streamingfast/substreams-sink-kv)|
-| PubSub     | O       | StreamingFast    |[substreams-sink-pubsub](https://github.com/streamingfast/substreams-sink-pubsub)|
+| PubSub     | O       | StreamingFast    |[substreams sink pubsub](https://github.com/streamingfast/substreams/tree/develop/sink/pubsub), [substreams-sink-pubsub](https://github.com/streamingfast/substreams-sink-pubsub)|
 | ProtoJSON  | O       | StreamingFast    |[substreams-sink-protojson](https://github.com/streamingfast/substreams/tree/develop/sink/protojson)|
 | Webhook    | O       | StreamingFast    |[substreams-sink-webhook](https://github.com/streamingfast/substreams/tree/develop/sink/webhook)|
 | Noop       | O       | StreamingFast    |[substreams-sink-noop](https://github.com/streamingfast/substreams/tree/develop/sink/noop)|

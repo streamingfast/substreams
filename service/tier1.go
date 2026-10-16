@@ -1107,7 +1107,7 @@ func (s *Tier1Service) blocks(
 				zap.Uint64("last_final_block", lastFinalBlock),
 				zap.Uint64("max_lag_segments", pipeline.MaxLinearHandoffLagSegments),
 			)
-			return pipe.OnStreamTerminated(ctx, connect.NewError(connect.CodeUnavailable, errShuttingDown))
+			return pipe.OnStreamTerminated(ctx, connect.NewError(connect.CodeUnavailable, pipeline.ErrBackprocessEndedTooFarBehind))
 		}
 	}
 

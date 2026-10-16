@@ -45,6 +45,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Fix tier1 leaking a gRPC connection each time a job failed to reach a tier2. The error now also says what failed
   instead of just `connection refused`.
 
+- Production-mode requests disconnected for being more than 2 segments behind the last final block no longer get
+  the `endpoint is shutting down, please reconnect` error. They get `back-processing ended too far behind the last
+  final block of the chain, please reconnect to process the gap in parallel` when back-processing finishes, and
+  `stream fell too far behind the last final block of the chain, please reconnect to process the gap in parallel`
+  while streaming final blocks. Both are still `Unavailable`.
+
 ### Sink
 
 - Add `substreams sink pubsub`, which publishes any module output to a Google Cloud Pub/Sub topic as the

@@ -1,0 +1,16 @@
+[package]
+name = "substreams_wasm_buffa"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+substreams = "0.8"
+substreams-ethereum = "0.12"
+
+[profile.release]
+lto = true
+opt-level = "s"
+strip = "debuginfo"

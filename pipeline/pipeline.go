@@ -251,7 +251,6 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 }
 
 func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
-
 	storeMap, err := p.setupSubrequestStores(ctx)
 	if err != nil {
 		return fmt.Errorf("subrequest stores setup failed: %w", err)
@@ -261,6 +260,38 @@ func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
 
 	logger := reqctx.Logger(ctx)
 	logger.Debug("stores loaded", zap.Object("stores", p.stores.StoreMap), zap.Int("stage", reqctx.Details(ctx).Tier2Stage))
+
+	return nil
+}
+
+// InitTier2StoresForSkippedSegment sets up stores for a segment no module executor will run
+// this segment (every module is excluded by a cached block index). Unlike InitTier2Stores, it
+// never creates or loads dependency stores (the full KV snapshots of modules from earlier
+// stages, used only as WASM input): there is no executor left to read them. The only store it
+// does create is this stage's own output store, if any, because OnStreamTerminated still
+// flushes it (an empty partial, since nothing ran) and tier1's squasher expects that file.
+func (p *Pipeline) InitTier2StoresForSkippedSegment(ctx context.Context) error {
+	reqDetails := reqctx.Details(ctx)
+	logger := reqctx.Logger(ctx)
+
+	lastStage := len(p.executionStages) - 1
+	storeMap := store.NewMap()
+	for name := range p.stores.storesToWrite {
+		storeConfig := p.stores.configs[name]
+		if p.moduleNameToStage[name] != lastStage {
+			storeMap.Set(storeConfig.NewFullKV(logger))
+			continue
+		}
+
+		initialBlock := reqDetails.ResolvedStartBlockNum
+		if storeConfig.ModuleInitialBlock() > reqDetails.ResolvedStartBlockNum {
+			initialBlock = storeConfig.ModuleInitialBlock()
+		}
+		storeMap.Set(storeConfig.NewPartialKV(initialBlock, logger))
+	}
+
+	p.stores.SetStoreMap(storeMap)
+	logger.Debug("stores set up for a skipped segment", zap.Object("stores", p.stores.StoreMap))
 
 	return nil
 }

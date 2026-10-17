@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Tier2 skips loading dependency stores and compiling WASM modules for a segment once its
+  cached block index proves every module excludes all of the segment's blocks. It still writes
+  the same (empty) output files as before.
+
 - Add `Tier1Config.AllowPrunedChain`, forwarded to tier2. It lets
   requests keep running Substreams whose modules (mappers and stores) start before the chain's first streamable block,
   after that block was raised (the chain was pruned). Those modules run from the first streamable block on,

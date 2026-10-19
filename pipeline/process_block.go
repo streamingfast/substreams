@@ -424,7 +424,7 @@ func (p *Pipeline) checkFinalBlockLag(blockNum uint64) error {
 		zap.Uint64("last_final_block", lastFinalBlock),
 		zap.Uint64("max_lag_segments", MaxLinearHandoffLagSegments),
 	)
-	return ErrShuttingDown
+	return ErrStreamFellTooFarBehind
 }
 
 func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, parentBlock bstream.BlockRef, idx int32, isLast bool) (err error) {

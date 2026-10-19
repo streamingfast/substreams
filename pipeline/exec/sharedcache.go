@@ -80,6 +80,9 @@ type callEntry struct {
 
 	err      error
 	panicErr *wasm.PanicError
+
+	// evicted is set when the execution failed because of the host: the entry is removed from the cache and waiters run the call again
+	evicted bool
 }
 
 func applyResult(res *callEntry, call *wasm.Call) error {
@@ -126,60 +129,106 @@ func (s *SharedCache) Execute(
 		num: call.Clock.Number,
 	}
 
-	s.Lock() // do not return before unlocking this
+	for {
+		s.Lock() // do not return before unlocking this
 
-	if s.callEntries[clock] == nil {
-		s.callEntries[clock] = make(map[string]*callEntry)
-	}
-	result, found := s.callEntries[clock][moduleHash]
-	if !found {
-		result = &callEntry{clock: call.Clock}
-		s.callEntries[clock][moduleHash] = result
-
-		// this request will actually cause the WASM execution. It locks the 'result' object for writes until it populates it
-		result.Lock()
-		defer result.Unlock()
-	}
-
-	s.Unlock() // This lock is global, it should never wait for an execution!
-
-	if !found {
-		if tracer.Enabled() {
-			zlog.Debug("executing wasm call", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
+		if s.callEntries[clock] == nil {
+			s.callEntries[clock] = make(map[string]*callEntry)
 		}
-		metrics.ExecutedWasmModules.Inc()
-		result.metricsGatherer = &metrics.WasmMetricsGatherer{}
+		result, found := s.callEntries[clock][moduleHash]
+		if !found {
+			result = &callEntry{clock: call.Clock}
+			s.callEntries[clock][moduleHash] = result
 
-		// we create a context with just enough for the wasm module executor to work: the UniqueID, and a stats gatherer
-		ctx := reqctx.WithWasmExtensionReqStats(context.TODO(), result.metricsGatherer)
-		ctx = reqctx.WithRequest(ctx, &reqctx.RequestDetails{
-			UniqueID: reqctx.Details(originalContext).UniqueID,
-		})
-
-		if undoManager != nil {
-			var unsubscribe func()
-			ctx, unsubscribe = undoManager.Subscribe(ctx, clock.id)
-			defer unsubscribe()
+			// this request will actually cause the WASM execution. It locks the 'result' object for writes until it populates it
+			result.Lock()
 		}
 
-		inst, err := wasmModule.ExecuteNewCall(ctx, call, nil, wasmArguments, argValues)
-		if inst != nil {
-			inst.Close(ctx)
-		}
-		result.updateFromCall(call, err)
-		result.metricsGatherer.ApplyToStats(reqctx.ReqStats(originalContext))
+		s.Unlock() // This lock is global, it should never wait for an execution!
 
+		if !found {
+			defer result.Unlock()
+			return s.execute(originalContext, result, clock, wasmModule, moduleHash, call, wasmArguments, argValues, undoManager)
+		}
+
+		evicted, err := s.replay(originalContext, result, clock, moduleHash, call)
+		if evicted {
+			// the execution failed because of the host, so its error is not replayed: run the call again
+			continue
+		}
 		return err
 	}
+}
 
-	// the "second" request (and subsequent requests) waits here for the "first requestor" to finish the WASM execution
+// replay waits for the "first requestor" to finish the WASM execution, then applies its result to 'call'.
+// It returns evicted=true, without touching 'call', when that execution was evicted, in which case the call must run again.
+func (s *SharedCache) replay(originalContext context.Context, result *callEntry, clock cacheClock, moduleHash string, call *wasm.Call) (evicted bool, err error) {
 	result.RLock()
 	defer result.RUnlock()
+
+	if result.evicted {
+		return true, nil
+	}
 
 	if tracer.Enabled() {
 		zlog.Debug("getting wasm call from cache", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
 	}
 	metrics.SkippedCachedWasmModules.Inc()
 	result.metricsGatherer.ApplyToStats(reqctx.ReqStats(originalContext))
-	return applyResult(result, call)
+	return false, applyResult(result, call)
+}
+
+// execute runs the WASM call and populates 'result', which must be write-locked by the caller.
+func (s *SharedCache) execute(
+	originalContext context.Context,
+	result *callEntry,
+	clock cacheClock,
+	wasmModule wasm.Module,
+	moduleHash string,
+	call *wasm.Call,
+	wasmArguments []wasm.Argument,
+	argValues map[string][]byte,
+	undoManager *UndoManager,
+) error {
+	if tracer.Enabled() {
+		zlog.Debug("executing wasm call", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
+	}
+	metrics.ExecutedWasmModules.Inc()
+	result.metricsGatherer = &metrics.WasmMetricsGatherer{}
+
+	// we create a context with just enough for the wasm module executor to work: the UniqueID, and a stats gatherer
+	ctx := reqctx.WithWasmExtensionReqStats(context.TODO(), result.metricsGatherer)
+	ctx = reqctx.WithRequest(ctx, &reqctx.RequestDetails{
+		UniqueID: reqctx.Details(originalContext).UniqueID,
+	})
+
+	if undoManager != nil {
+		var unsubscribe func()
+		ctx, unsubscribe = undoManager.Subscribe(ctx, clock.id)
+		defer unsubscribe()
+	}
+
+	inst, err := wasmModule.ExecuteNewCall(ctx, call, nil, wasmArguments, argValues)
+	if inst != nil {
+		inst.Close(ctx)
+	}
+	result.updateFromCall(call, err)
+	result.metricsGatherer.ApplyToStats(reqctx.ReqStats(originalContext))
+
+	if isTransientExecError(err) {
+		s.evict(clock, moduleHash, result)
+	}
+
+	return err
+}
+
+// evict removes 'result' from the cache, so that the next request for this block and module runs the call again.
+func (s *SharedCache) evict(clock cacheClock, moduleHash string, result *callEntry) {
+	result.evicted = true
+
+	s.Lock()
+	defer s.Unlock()
+	if s.callEntries[clock][moduleHash] == result {
+		delete(s.callEntries[clock], moduleHash)
+	}
 }

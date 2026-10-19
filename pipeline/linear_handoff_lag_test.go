@@ -80,7 +80,7 @@ func TestCheckFinalBlockLag(t *testing.T) {
 
 	t.Run("more than max lag disconnects", func(t *testing.T) {
 		pipe, _ := newPipe(0, 1400, nil)
-		require.ErrorIs(t, pipe.checkFinalBlockLag(1100), ErrShuttingDown)
+		require.ErrorIs(t, pipe.checkFinalBlockLag(1100), ErrStreamFellTooFarBehind)
 	})
 
 	t.Run("stop block caps the target", func(t *testing.T) {
@@ -101,7 +101,7 @@ func TestCheckFinalBlockLag(t *testing.T) {
 		pipe.forkHandler = NewForkHandler()
 
 		require.NoError(t, pipe.handleStepFinal(&pbsubstreams.Clock{Number: 1050}))
-		require.ErrorIs(t, pipe.handleStepFinal(&pbsubstreams.Clock{Number: 1100}), ErrShuttingDown)
+		require.ErrorIs(t, pipe.handleStepFinal(&pbsubstreams.Clock{Number: 1100}), ErrStreamFellTooFarBehind)
 	})
 
 	t.Run("disabled without option", func(t *testing.T) {

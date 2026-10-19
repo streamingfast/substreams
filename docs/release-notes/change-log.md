@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Bumped `dauth`: with continuous authentication, each continuous `Authenticate` response now refreshes the stream's trusted headers, and metering reads them on every event (#980). A stream whose first authentication returned no identity is metered with it from the next continuous call on.
 - Add `Tier1Config.AllowPrunedChain`, forwarded to tier2. It lets
   requests keep running Substreams whose modules (mappers and stores) start before the chain's first streamable block,
   after that block was raised (the chain was pruned). Those modules run from the first streamable block on,

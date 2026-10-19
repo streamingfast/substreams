@@ -83,7 +83,10 @@ mod tests {
         );
     }
 
+    /// Regenerates the committed `_light.binpb` fixtures. Not run by default so a plain
+    /// `cargo test` doesn't rewrite them; run explicitly with `cargo test -- --ignored`.
     #[test]
+    #[ignore]
     fn generate_light_fixtures() {
         light_fixture("ethereum_mainnet_block_16021772");
         light_fixture("bnb_mainnet_block_78347457");

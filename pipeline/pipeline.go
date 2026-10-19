@@ -974,7 +974,6 @@ func getFoundationalStores(inputs []wasm.Argument) []pbservice.StoreClient {
 	return nil
 }
 
-// BuildModuleExecutors builds the ModuleExecutors, and the loadedModules.
 // newSegmentPartialKV returns the partial store a tier2 job writes for a store of its own
 // stage, starting at the segment start or at the module's initial block if that is later.
 func newSegmentPartialKV(storeConfig *store.Config, segmentStartBlock uint64, logger *zap.Logger) *store.PartialKV {
@@ -1007,6 +1006,7 @@ func ModuleBlockIndex(ctx context.Context, module *pbsubstreams.Module, existing
 	return index.NewBlockIndex(expr, module.BlockFilter.Module, precomputedBitmap), nil
 }
 
+// BuildModuleExecutors builds the ModuleExecutors, and the loadedModules.
 func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 	if p.StagedModuleExecutors != nil {
 		// Eventually, we can invalidate our catch to accommodate the PATCH

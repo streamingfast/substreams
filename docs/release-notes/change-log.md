@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Bumped `dauth`: with continuous authentication, each continuous `Authenticate` response now refreshes the stream's trusted headers, and metering reads them on every event (#980). A stream whose first authentication returned no identity is metered with it from the next continuous call on.
 - Add `Tier1Config.AllowPrunedChain`, forwarded to tier2. It lets
   requests keep running Substreams whose modules (mappers and stores) start before the chain's first streamable block,
   after that block was raised (the chain was pruned). Those modules run from the first streamable block on,
@@ -37,10 +38,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   first streamable block, or to a snapshot named after another initial block: its first job failed. It now starts at
   or above the first streamable block and skips those snapshots.
 
+- Fix wasm calls that fail because the host ran out of file descriptors or memory (e.g. `Too many open files` while
+  creating an instance) being reported as deterministic errors, which returned `InvalidArgument` and were cached for 1h.
+  They now return `Internal`, and the shared cache runs the call again instead of handing the same error to every
+  stream on that block. A store backend failure is no longer kept in the shared cache either.
+
+- Fix tier1 leaking a gRPC connection each time a job failed to reach a tier2. The error now also says what failed
+  instead of just `connection refused`.
+
+- Production-mode requests disconnected for being more than 2 segments behind the last final block no longer get
+  the `endpoint is shutting down, please reconnect` error. They get `back-processing ended too far behind the last
+  final block of the chain, please reconnect to process the gap in parallel` when back-processing finishes, and
+  `stream fell too far behind the last final block of the chain, please reconnect to process the gap in parallel`
+  while streaming final blocks. Both are still `Unavailable`.
+
+### Sink
+
+- Add `substreams sink pubsub`, which publishes any module output to a Google Cloud Pub/Sub topic as the
+  webhook sink's batch JSON: `{"manifest": {...}, "blocks": [{"clock": {...}, "data": {...}}]}`. While
+  Substreams is not live, `--pubsub-batch-max-blocks` groups blocks into one message. A live block is
+  published in that same JSON with only that block. `--pubsub-undo` publishes reorg notifications on that
+  topic, and message ordering uses the module name as the ordering key. A publish that still fails after
+  retries stops the process with status 75 and keeps the payload for the next start.
+  `--pubsub-on-failure=skip` is the opt-in that drops a block and continues.
+- Publish a module that emits `sf.substreams.sink.pubsub.v1.Publish` in the `substreams-sink-pubsub`
+  format: one Pub/Sub message per `Publish.Message`, with that message's bytes and attributes, attribute
+  `Cursor`, and an ordering key of the zero-padded block number and message index. A reorg on that module
+  is published with attributes `LastValidBlock`, `Step=Undo`, and `Cursor`. Any other module is published
+  as the webhook sink's batch JSON.
+- Fix `substreams sink pubsub` panicking when a block has no module output, including under
+  `--noop-mode`.
+- Count a Pub/Sub message in the sink totals only after it is published.
+
 ### Dependencies
 
 - `golang.org/x/net` is at v0.60.0, which clears CVE-2026-78663 (CRITICAL) and CVE-2026-78669, CVE-2026-78660 and
   CVE-2026-78659 (HIGH), all HTTP/2 issues reported by Docker Scout against the image.
+- Bumped OpenTelemetry to v1.47.0 and `github.com/streamingfast/dhttp` to v0.2.0 to fix known vulnerabilities.
+- Bumped `github.com/yuin/goldmark` to v1.7.17 to fix an XSS (GO-2026-5320) in the CLI's markdown rendering.
+- Go 1.27 or newer is now required to build.
 
 ## v1.25.0
 

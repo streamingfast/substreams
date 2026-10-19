@@ -101,6 +101,10 @@ func toConnectError(ctx context.Context, err error) error {
 		return connect.NewError(connect.CodeUnavailable, err)
 	}
 
+	if isTooFarBehind(err) {
+		return connect.NewError(connect.CodeUnavailable, err)
+	}
+
 	// context deadline exceeded
 	if errors.Is(err, context.DeadlineExceeded) {
 		return connect.NewError(connect.CodeDeadlineExceeded, err)
@@ -216,6 +220,10 @@ func toGrpcTier1Error(ctx context.Context, err error) error {
 		return status.Error(codes.Unavailable, err.Error())
 	}
 
+	if isTooFarBehind(err) {
+		return status.Error(codes.Unavailable, err.Error())
+	}
+
 	// context deadline exceeded
 	if errors.Is(err, context.DeadlineExceeded) {
 		return status.Error(codes.DeadlineExceeded, err.Error())
@@ -233,4 +241,10 @@ func toGrpcTier1Error(ctx context.Context, err error) error {
 	// Do we want to print the full cause as coming from Golang? Would we like to maybe trim off "operational"
 	// data?
 	return status.Error(codes.Internal, err.Error())
+}
+
+// isTooFarBehind reports whether err disconnects a request that trails the chain's last final
+// block, so that the client reconnects and back-processes the gap in parallel.
+func isTooFarBehind(err error) bool {
+	return errors.Is(err, pipeline.ErrBackprocessEndedTooFarBehind) || errors.Is(err, pipeline.ErrStreamFellTooFarBehind)
 }

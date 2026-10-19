@@ -2,12 +2,21 @@ package exec
 
 import (
 	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"syscall"
 	"testing"
 
+	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestGetWasmArgumentValues(t *testing.T) {
@@ -202,6 +211,93 @@ func TestCanSkipExecution(t *testing.T) {
 	}
 }
 
+func TestWasmCallErrorClassification(t *testing.T) {
+	testCases := []struct {
+		name                string
+		err                 error
+		expectDeterministic bool
+	}{
+		{
+			name:                "out of file descriptors during instantiation",
+			err:                 errors.New("could not instantiate wasm module: creating new instance: cannot create a memfd: Too many open files (os error 24)"),
+			expectDeterministic: false,
+		},
+		{
+			name:                "out of memory during instantiation",
+			err:                 fmt.Errorf("could not instantiate wasm module: %w", syscall.ENOMEM),
+			expectDeterministic: false,
+		},
+		{
+			name:                "store backend failure",
+			err:                 fmt.Errorf("store backend failed to set key %q: %w", "key", store.ErrStoreBackendFailure),
+			expectDeterministic: false,
+		},
+		{
+			name:                "unknown import during instantiation",
+			err:                 errors.New("could not instantiate wasm module: creating new instance: unknown import: `env::missing` has not been defined"),
+			expectDeterministic: true,
+		},
+		{
+			name:                "wasm execution failure",
+			err:                 errors.New("calling entrypoint: unreachable"),
+			expectDeterministic: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		for _, withSharedCache := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/shared_cache=%t", tc.name, withSharedCache), func(t *testing.T) {
+				var sharedCache *SharedCache
+				if withSharedCache {
+					sharedCache = NewSharedCache(10)
+					sharedCache.headBlock.Store(1)
+					require.True(t, sharedCache.Cachable(1))
+				}
+
+				_, err := newTestExecutor(&failingModule{err: tc.err}).wasmCall(newTestOutputGetter(), false, sharedCache, nil)
+				require.ErrorContains(t, err, tc.err.Error())
+				assert.Equal(t, tc.expectDeterministic, errors.Is(err, wasm.ErrWasmDeterministicExec))
+			})
+		}
+	}
+}
+
+func TestWasmCallSharedCacheRetriesTransientError(t *testing.T) {
+	sharedCache := NewSharedCache(10)
+	sharedCache.headBlock.Store(1)
+
+	transientErr := errors.New("creating new instance: cannot create a memfd: Too many open files (os error 24)")
+	module := &scriptedModule{errs: []error{transientErr}}
+
+	_, err := newTestExecutor(module).wasmCall(newTestOutputGetter(), false, sharedCache, nil)
+	require.ErrorContains(t, err, transientErr.Error())
+
+	_, err = newTestExecutor(module).wasmCall(newTestOutputGetter(), false, sharedCache, nil)
+	require.NoError(t, err)
+	assert.Equal(t, 2, module.callCount())
+}
+
+func newTestExecutor(module wasm.Module) *BaseExecutor {
+	stats := metrics.NewReqStats(&metrics.Config{}, nil, nil, zap.NewNop())
+	ctx := reqctx.WithReqStats(context.Background(), stats)
+	ctx = reqctx.WithRequest(ctx, &reqctx.RequestDetails{UniqueID: 1})
+	return &BaseExecutor{
+		ctx:           ctx,
+		moduleName:    "map_test",
+		moduleHash:    "map_test_hash",
+		wasmModule:    module,
+		wasmArguments: []wasm.Argument{wa("arg1")},
+		entrypoint:    "map_test",
+	}
+}
+
+func newTestOutputGetter() clockOutputGetter {
+	return clockOutputGetter{
+		mockOutputGetter: mockOutputGetter{"arg1": {1, 2, 3}},
+		clock:            &pbsubstreams.Clock{Id: "block-1", Number: 1},
+	}
+}
+
 func wa(in string) *wasm.MapInput {
 	return wasm.NewMapInput(in, 0)
 }
@@ -220,4 +316,13 @@ func (m mockOutputGetter) Get(name string) ([]byte, bool, error) {
 		return val, false, nil
 	}
 	return nil, false, execout.ErrNotFound
+}
+
+type clockOutputGetter struct {
+	mockOutputGetter
+	clock *pbsubstreams.Clock
+}
+
+func (c clockOutputGetter) Clock() *pbsubstreams.Clock {
+	return c.clock
 }

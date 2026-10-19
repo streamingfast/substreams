@@ -282,11 +282,7 @@ func (p *Pipeline) InitTier2StoresForSkippedSegment(ctx context.Context) error {
 	for name := range p.stores.storesToWrite {
 		storeConfig := p.stores.configs[name]
 		if p.moduleNameToStage[name] == lastStage {
-			initialBlock := reqDetails.ResolvedStartBlockNum
-			if storeConfig.ModuleInitialBlock() > reqDetails.ResolvedStartBlockNum {
-				initialBlock = storeConfig.ModuleInitialBlock()
-			}
-			storeMap.Set(storeConfig.NewPartialKV(initialBlock, logger))
+			storeMap.Set(newSegmentPartialKV(storeConfig, reqDetails.ResolvedStartBlockNum, logger))
 			storesToWrite[name] = struct{}{}
 			continue
 		}
@@ -298,13 +294,16 @@ func (p *Pipeline) InitTier2StoresForSkippedSegment(ctx context.Context) error {
 			continue
 		}
 
-		exists, err := storeConfig.ExistsFullKV(ctx, reqDetails.StopBlockNum)
+		exists, err := storeConfig.ExistsFullKV(ctx, reqDetails.ResolvedStartBlockNum)
 		if err != nil {
 			return fmt.Errorf("checking full store %q existence: %w", name, err)
 		}
-		if exists {
-			continue
+		if !exists {
+			filename := store.NewCompleteFileInfo(name, storeConfig.ModuleInitialBlock(), reqDetails.ResolvedStartBlockNum).Filename
+			return fmt.Errorf("full store %q: snapshot %q %w (it may have been pruned)", name, filename, store.ErrSnapshotMissing)
 		}
+		// An existing snapshot at the stop block has the same content: every store backend
+		// either keeps it or overwrites it with identical bytes.
 		if err := storeConfig.CopyFullKV(ctx, reqDetails.ResolvedStartBlockNum, reqDetails.StopBlockNum); err != nil {
 			return fmt.Errorf("full store %q: %w", name, err)
 		}
@@ -553,12 +552,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 			storeConfig := p.stores.configs[mod.Name]
 
 			if isLastStage {
-				initialBlock := reqDetails.ResolvedStartBlockNum
-				if storeConfig.ModuleInitialBlock() > reqDetails.ResolvedStartBlockNum {
-					initialBlock = storeConfig.ModuleInitialBlock()
-				}
-				partialStore := storeConfig.NewPartialKV(initialBlock, logger)
-				storeMap.Set(partialStore)
+				storeMap.Set(newSegmentPartialKV(storeConfig, reqDetails.ResolvedStartBlockNum, logger))
 
 			} else {
 				fullStore := storeConfig.NewFullKV(logger)
@@ -981,6 +975,38 @@ func getFoundationalStores(inputs []wasm.Argument) []pbservice.StoreClient {
 }
 
 // BuildModuleExecutors builds the ModuleExecutors, and the loadedModules.
+// newSegmentPartialKV returns the partial store a tier2 job writes for a store of its own
+// stage, starting at the segment start or at the module's initial block if that is later.
+func newSegmentPartialKV(storeConfig *store.Config, segmentStartBlock uint64, logger *zap.Logger) *store.PartialKV {
+	initialBlock := segmentStartBlock
+	if storeConfig.ModuleInitialBlock() > segmentStartBlock {
+		initialBlock = storeConfig.ModuleInitialBlock()
+	}
+	return storeConfig.NewPartialKV(initialBlock, logger)
+}
+
+// ModuleBlockIndex resolves module's block filter against the cached indices of its filter
+// module. It returns nil for a module without a block filter, and a BlockIndex without a
+// precomputed bitmap when the filter module's index is not cached.
+func ModuleBlockIndex(ctx context.Context, module *pbsubstreams.Module, existingIndices map[string]map[string]*roaring64.Bitmap) (*index.BlockIndex, error) {
+	if module.BlockFilter == nil {
+		return nil, nil
+	}
+	qs, err := module.BlockFilterQueryString()
+	if err != nil {
+		return nil, err
+	}
+	expr, err := sqe.Parse(ctx, qs)
+	if err != nil {
+		return nil, fmt.Errorf("parse block filter: %q: %w", module.BlockFilter.Query, err)
+	}
+	var precomputedBitmap *roaring64.Bitmap
+	if indices := existingIndices[module.BlockFilter.Module]; indices != nil {
+		precomputedBitmap = sqe.RoaringBitmapsApply(expr, indices)
+	}
+	return index.NewBlockIndex(expr, module.BlockFilter.Module, precomputedBitmap), nil
+}
+
 func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 	if p.StagedModuleExecutors != nil {
 		// Eventually, we can invalidate our catch to accommodate the PATCH
@@ -1038,22 +1064,9 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 				if err != nil {
 					return fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
 				}
-				var moduleBlockIndex *index.BlockIndex
-				if module.BlockFilter != nil {
-					qs, err := module.BlockFilterQueryString()
-					if err != nil {
-						return err
-					}
-					expr, err := sqe.Parse(ctx, qs)
-					if err != nil {
-						return fmt.Errorf("parse block filter: %q: %w", module.BlockFilter.Query, err)
-					}
-					var precomputedBitmap *roaring64.Bitmap
-
-					if indices := p.preexistingBlockIndices[module.BlockFilter.Module]; indices != nil {
-						precomputedBitmap = sqe.RoaringBitmapsApply(expr, indices)
-					}
-					moduleBlockIndex = index.NewBlockIndex(expr, module.BlockFilter.Module, precomputedBitmap)
+				moduleBlockIndex, err := ModuleBlockIndex(ctx, module, p.preexistingBlockIndices)
+				if err != nil {
+					return err
 				}
 
 				entrypoint := module.BinaryEntrypoint

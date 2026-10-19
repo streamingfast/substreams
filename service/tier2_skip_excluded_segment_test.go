@@ -209,64 +209,78 @@ func TestProcessRange_SkippedSegmentKeepsEarlierStageStore(t *testing.T) {
 	const startBlock = uint64(10)
 	const stopBlock = uint64(20)
 
-	tmpDir := t.TempDir()
-	stateStoreURL := filepath.Join(tmpDir, "state")
+	run := func(t *testing.T, writeStartSnapshot bool) (store.ConfigMap, error) {
+		tmpDir := t.TempDir()
+		stateStoreURL := filepath.Join(tmpDir, "state")
 
-	baseStateStore, err := dstore.NewStore(stateStoreURL, "zst", "zstd", false)
-	require.NoError(t, err)
-	cacheStore, err := baseStateStore.SubStore("tag")
-	require.NoError(t, err)
+		baseStateStore, err := dstore.NewStore(stateStoreURL, "zst", "zstd", false)
+		require.NoError(t, err)
+		cacheStore, err := baseStateStore.SubStore("tag")
+		require.NoError(t, err)
 
-	indexConfigs, err := index.NewConfigs(cacheStore, execGraph.UsedIndexesModulesUpToStage(int(stage)), execGraph.ModuleHashes(), 0, logger)
-	require.NoError(t, err)
-	indexFile := indexConfigs.ConfigMap["idx_a"].NewFile(&block.Range{StartBlock: startBlock, ExclusiveEndBlock: stopBlock})
-	other := roaring64.New()
-	other.Add(15)
-	indexFile.Set(map[string]*roaring64.Bitmap{"some_other_key": other})
-	require.NoError(t, indexFile.Save(context.Background()))
+		indexConfigs, err := index.NewConfigs(cacheStore, execGraph.UsedIndexesModulesUpToStage(int(stage)), execGraph.ModuleHashes(), 0, logger)
+		require.NoError(t, err)
+		indexFile := indexConfigs.ConfigMap["idx_a"].NewFile(&block.Range{StartBlock: startBlock, ExclusiveEndBlock: stopBlock})
+		other := roaring64.New()
+		other.Add(15)
+		indexFile.Set(map[string]*roaring64.Bitmap{"some_other_key": other})
+		require.NoError(t, indexFile.Save(context.Background()))
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), 0, 0, "", "")
-	require.NoError(t, err)
-	before := storeConfigs["store_a"].NewFullKV(logger)
-	before.Set(0, "a", "1")
-	before.Set(0, "b", "2")
-	require.NoError(t, before.Flush())
-	_, writer, err := before.Save(startBlock)
-	require.NoError(t, err)
-	require.NoError(t, writer.Write(context.Background()))
-	before.Close()
+		storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), 0, 0, "", "")
+		require.NoError(t, err)
+		if writeStartSnapshot {
+			before := storeConfigs["store_a"].NewFullKV(logger)
+			before.Set(0, "a", "1")
+			before.Set(0, "b", "2")
+			require.NoError(t, before.Flush())
+			_, writer, err := before.Save(startBlock)
+			require.NoError(t, err)
+			require.NoError(t, writer.Write(context.Background()))
+			before.Close()
+		}
 
-	svc := &Tier2Service{logger: zlog}
+		svc := &Tier2Service{logger: zlog}
 
-	ctx := context.Background()
-	ctx = reqctx.WithLogger(ctx, zlog)
-	ctx = metering.WithMetricsSender(ctx)
-	ctx = dmetering.WithBytesMeter(ctx)
-	ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, nil, nil, zlog))
-	ctx = reqctx.WithEmitter(ctx, noopEmitter{})
+		ctx := context.Background()
+		ctx = reqctx.WithLogger(ctx, zlog)
+		ctx = metering.WithMetricsSender(ctx)
+		ctx = dmetering.WithBytesMeter(ctx)
+		ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, nil, nil, zlog))
+		ctx = reqctx.WithEmitter(ctx, noopEmitter{})
 
-	request := &pbssinternal.ProcessRangeRequest{
-		Modules:              modulesPkg,
-		OutputModule:         "map_b",
-		Stage:                stage,
-		SegmentSize:          stopBlock - startBlock,
-		SegmentNumber:        1,
-		FirstStreamableBlock: 0,
-		BlockType:            "sf.substreams.v1.test.Block",
-		MergedBlocksStore:    filepath.Join(tmpDir, "blocks"),
-		StateStore:           stateStoreURL,
-		StateStoreDefaultTag: "tag",
+		request := &pbssinternal.ProcessRangeRequest{
+			Modules:              modulesPkg,
+			OutputModule:         "map_b",
+			Stage:                stage,
+			SegmentSize:          stopBlock - startBlock,
+			SegmentNumber:        1,
+			FirstStreamableBlock: 0,
+			BlockType:            "sf.substreams.v1.test.Block",
+			MergedBlocksStore:    filepath.Join(tmpDir, "blocks"),
+			StateStore:           stateStoreURL,
+			StateStoreDefaultTag: "tag",
+		}
+
+		return storeConfigs, svc.processRange(ctx, request, func(substreams.ResponseFromAnyTier) error { return nil })
 	}
 
-	require.NoError(t, svc.processRange(ctx, request, func(substreams.ResponseFromAnyTier) error { return nil }))
+	t.Run("copies start snapshot", func(t *testing.T) {
+		storeConfigs, err := run(t, true)
+		require.NoError(t, err)
 
-	after := storeConfigs["store_a"].NewFullKV(logger)
-	defer after.Close()
-	require.NoError(t, after.Load(context.Background(), store.NewCompleteFileInfo("store_a", 0, stopBlock)))
-	got := map[string]string{}
-	require.NoError(t, after.Iter(func(key string, value []byte) error {
-		got[key] = string(value)
-		return nil
-	}))
-	assert.Equal(t, map[string]string{"a": "1", "b": "2"}, got)
+		after := storeConfigs["store_a"].NewFullKV(logger)
+		defer after.Close()
+		require.NoError(t, after.Load(context.Background(), store.NewCompleteFileInfo("store_a", 0, stopBlock)))
+		got := map[string]string{}
+		require.NoError(t, after.Iter(func(key string, value []byte) error {
+			got[key] = string(value)
+			return nil
+		}))
+		assert.Equal(t, map[string]string{"a": "1", "b": "2"}, got)
+	})
+
+	t.Run("missing start snapshot", func(t *testing.T) {
+		_, err := run(t, false)
+		require.ErrorIs(t, err, store.ErrSnapshotMissing)
+	})
 }

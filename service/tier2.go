@@ -37,7 +37,6 @@ import (
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/active_requests"
-	"github.com/streamingfast/substreams/sqe"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/index"
 	"github.com/streamingfast/substreams/storage/store"
@@ -869,9 +868,8 @@ type ExecutionPlan struct {
 // OnStreamTerminated still writes the same (empty) exec-out, index and partial-store files a
 // normal run would produce for a segment with zero matching blocks.
 //
-// This mirrors the block-index resolution BuildModuleExecutors performs per module
-// (pipeline.go's moduleBlockIndex + index.BlockIndex.ExcludesAllBlocks), without needing the
-// stores or WASM modules it builds along the way.
+// It resolves each module's block index with pipeline.ModuleBlockIndex, as BuildModuleExecutors
+// does, without needing the stores or WASM modules that function builds along the way.
 func allModulesExcludedByBlockIndex(ctx context.Context, execGraph *exec.Graph, stage uint32, executionPlan *ExecutionPlan) (bool, error) {
 	for _, module := range execGraph.UsedModulesUpToStage(int(stage)) {
 		switch module.ModuleKind() {
@@ -891,38 +889,15 @@ func allModulesExcludedByBlockIndex(ctx context.Context, execGraph *exec.Graph, 
 			}
 		}
 
-		excluded, err := moduleExcludedByBlockIndex(ctx, module, executionPlan.ExistingIndices)
+		blockIndex, err := pipeline.ModuleBlockIndex(ctx, module, executionPlan.ExistingIndices)
 		if err != nil {
 			return false, err
 		}
-		if !excluded {
+		if !blockIndex.ExcludesAllBlocks() {
 			return false, nil
 		}
 	}
 	return true, nil
-}
-
-// moduleExcludedByBlockIndex reports whether module's block filter is backed by a cached
-// index whose resulting bitmap is empty. A module without a block filter is never excluded,
-// and one whose filter module's index isn't cached yet can't be proven excluded either.
-func moduleExcludedByBlockIndex(ctx context.Context, module *pbsubstreams.Module, existingIndices map[string]map[string]*roaring64.Bitmap) (bool, error) {
-	if module.BlockFilter == nil {
-		return false, nil
-	}
-	indices := existingIndices[module.BlockFilter.Module]
-	if indices == nil {
-		return false, nil
-	}
-	qs, err := module.BlockFilterQueryString()
-	if err != nil {
-		return false, err
-	}
-	expr, err := sqe.Parse(ctx, qs)
-	if err != nil {
-		return false, fmt.Errorf("parse block filter: %q: %w", module.BlockFilter.Query, err)
-	}
-	bitmap := sqe.RoaringBitmapsApply(expr, indices)
-	return index.NewBlockIndex(expr, module.BlockFilter.Module, bitmap).ExcludesAllBlocks(), nil
 }
 
 func GetExecutionPlan(

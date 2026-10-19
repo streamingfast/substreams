@@ -264,33 +264,54 @@ func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
 	return nil
 }
 
-// InitTier2StoresForSkippedSegment sets up stores for a segment no module executor will run
-// this segment (every module is excluded by a cached block index). Unlike InitTier2Stores, it
-// never creates or loads dependency stores (the full KV snapshots of modules from earlier
-// stages, used only as WASM input): there is no executor left to read them. The only store it
-// does create is this stage's own output store, if any, because OnStreamTerminated still
-// flushes it (an empty partial, since nothing ran) and tier1's squasher expects that file.
+// InitTier2StoresForSkippedSegment sets up stores for a segment where no module executor will
+// run (every module is excluded by a cached block index). Unlike InitTier2Stores, it never
+// loads the full KV snapshots of earlier-stage stores: there is no executor left to read them.
+//
+// Stores this stage writes get an empty partial, which OnStreamTerminated flushes because
+// tier1's squasher expects that file. An earlier-stage store this stage must also write did
+// not change over the segment, so its snapshot at the stop block is a copy of the one at the
+// start block; saving it from an empty FullKV would erase its state.
 func (p *Pipeline) InitTier2StoresForSkippedSegment(ctx context.Context) error {
 	reqDetails := reqctx.Details(ctx)
 	logger := reqctx.Logger(ctx)
 
 	lastStage := len(p.executionStages) - 1
 	storeMap := store.NewMap()
+	storesToWrite := make(map[string]struct{}, len(p.stores.storesToWrite))
 	for name := range p.stores.storesToWrite {
 		storeConfig := p.stores.configs[name]
-		if p.moduleNameToStage[name] != lastStage {
-			storeMap.Set(storeConfig.NewFullKV(logger))
+		if p.moduleNameToStage[name] == lastStage {
+			initialBlock := reqDetails.ResolvedStartBlockNum
+			if storeConfig.ModuleInitialBlock() > reqDetails.ResolvedStartBlockNum {
+				initialBlock = storeConfig.ModuleInitialBlock()
+			}
+			storeMap.Set(storeConfig.NewPartialKV(initialBlock, logger))
+			storesToWrite[name] = struct{}{}
 			continue
 		}
 
-		initialBlock := reqDetails.ResolvedStartBlockNum
-		if storeConfig.ModuleInitialBlock() > reqDetails.ResolvedStartBlockNum {
-			initialBlock = storeConfig.ModuleInitialBlock()
+		if storeConfig.ModuleInitialBlock() >= reqDetails.ResolvedStartBlockNum {
+			// No snapshot before this segment: the store is empty at the stop block.
+			storeMap.Set(storeConfig.NewFullKV(logger))
+			storesToWrite[name] = struct{}{}
+			continue
 		}
-		storeMap.Set(storeConfig.NewPartialKV(initialBlock, logger))
+
+		exists, err := storeConfig.ExistsFullKV(ctx, reqDetails.StopBlockNum)
+		if err != nil {
+			return fmt.Errorf("checking full store %q existence: %w", name, err)
+		}
+		if exists {
+			continue
+		}
+		if err := storeConfig.CopyFullKV(ctx, reqDetails.ResolvedStartBlockNum, reqDetails.StopBlockNum); err != nil {
+			return fmt.Errorf("full store %q: %w", name, err)
+		}
 	}
 
 	p.stores.SetStoreMap(storeMap)
+	p.stores.storesToWrite = storesToWrite
 	logger.Debug("stores set up for a skipped segment", zap.Object("stores", p.stores.StoreMap))
 
 	return nil

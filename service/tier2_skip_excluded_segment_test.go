@@ -151,3 +151,122 @@ func TestProcessRange_SkipsSegmentExcludedByCachedBlockIndex(t *testing.T) {
 	assert.True(t, plan.Skippable, "map_a's exec-out must be a cache hit after the segment was skipped")
 	assert.Contains(t, plan.ExistingExecOuts, "map_a")
 }
+
+// TestProcessRange_SkippedSegmentKeepsEarlierStageStore runs the last stage of a two-stage graph
+// on a segment every module is excluded from. The stage-0 store has no full KV at the stop block
+// yet, so this job must write it: since no block changed the store, it must hold the same keys
+// as the full KV at the segment's start block, not be empty.
+func TestProcessRange_SkippedSegmentKeepsEarlierStageStore(t *testing.T) {
+	logger := zap.NewNop()
+
+	blockFilter := &pbsubstreams.Module_BlockFilter{
+		Module: "idx_a",
+		Query:  &pbsubstreams.Module_BlockFilter_QueryString{QueryString: "never_present_key"},
+	}
+	blockInput := &pbsubstreams.Module_Input{
+		Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "sf.substreams.v1.test.Block"}},
+	}
+	modules := []*pbsubstreams.Module{
+		{
+			Name: "idx_a",
+			Kind: &pbsubstreams.Module_KindBlockIndex_{
+				KindBlockIndex: &pbsubstreams.Module_KindBlockIndex{OutputType: "proto:sf.substreams.index.v1.Keys"},
+			},
+			Inputs: []*pbsubstreams.Module_Input{blockInput},
+		},
+		{
+			Name: "store_a",
+			Kind: &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{
+				UpdatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
+				ValueType:    "string",
+			}},
+			Inputs:      []*pbsubstreams.Module_Input{blockInput},
+			BlockFilter: blockFilter,
+		},
+		{
+			Name: "map_b",
+			Kind: &pbsubstreams.Module_KindMap_{},
+			Inputs: []*pbsubstreams.Module_Input{
+				blockInput,
+				{Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{ModuleName: "store_a", Mode: pbsubstreams.Module_Input_Store_GET}}},
+			},
+			BlockFilter: blockFilter,
+		},
+	}
+
+	modulesPkg := &pbsubstreams.Modules{
+		Modules: modules,
+		Binaries: []*pbsubstreams.Binary{
+			{Type: "not-a-real-wasm-binary-type", Content: []byte("garbage: must never be compiled when the segment is skipped")},
+		},
+	}
+
+	execGraph, err := exec.NewOutputModuleGraph("map_b", true, modulesPkg, 0, false)
+	require.NoError(t, err)
+	require.Len(t, execGraph.StagedUsedModules(), 2)
+
+	const stage = uint32(1)
+	const startBlock = uint64(10)
+	const stopBlock = uint64(20)
+
+	tmpDir := t.TempDir()
+	stateStoreURL := filepath.Join(tmpDir, "state")
+
+	baseStateStore, err := dstore.NewStore(stateStoreURL, "zst", "zstd", false)
+	require.NoError(t, err)
+	cacheStore, err := baseStateStore.SubStore("tag")
+	require.NoError(t, err)
+
+	indexConfigs, err := index.NewConfigs(cacheStore, execGraph.UsedIndexesModulesUpToStage(int(stage)), execGraph.ModuleHashes(), 0, logger)
+	require.NoError(t, err)
+	indexFile := indexConfigs.ConfigMap["idx_a"].NewFile(&block.Range{StartBlock: startBlock, ExclusiveEndBlock: stopBlock})
+	other := roaring64.New()
+	other.Add(15)
+	indexFile.Set(map[string]*roaring64.Bitmap{"some_other_key": other})
+	require.NoError(t, indexFile.Save(context.Background()))
+
+	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), 0, 0, "", "")
+	require.NoError(t, err)
+	before := storeConfigs["store_a"].NewFullKV(logger)
+	before.Set(0, "a", "1")
+	before.Set(0, "b", "2")
+	require.NoError(t, before.Flush())
+	_, writer, err := before.Save(startBlock)
+	require.NoError(t, err)
+	require.NoError(t, writer.Write(context.Background()))
+	before.Close()
+
+	svc := &Tier2Service{logger: zlog}
+
+	ctx := context.Background()
+	ctx = reqctx.WithLogger(ctx, zlog)
+	ctx = metering.WithMetricsSender(ctx)
+	ctx = dmetering.WithBytesMeter(ctx)
+	ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, nil, nil, zlog))
+	ctx = reqctx.WithEmitter(ctx, noopEmitter{})
+
+	request := &pbssinternal.ProcessRangeRequest{
+		Modules:              modulesPkg,
+		OutputModule:         "map_b",
+		Stage:                stage,
+		SegmentSize:          stopBlock - startBlock,
+		SegmentNumber:        1,
+		FirstStreamableBlock: 0,
+		BlockType:            "sf.substreams.v1.test.Block",
+		MergedBlocksStore:    filepath.Join(tmpDir, "blocks"),
+		StateStore:           stateStoreURL,
+		StateStoreDefaultTag: "tag",
+	}
+
+	require.NoError(t, svc.processRange(ctx, request, func(substreams.ResponseFromAnyTier) error { return nil }))
+
+	after := storeConfigs["store_a"].NewFullKV(logger)
+	defer after.Close()
+	require.NoError(t, after.Load(context.Background(), store.NewCompleteFileInfo("store_a", 0, stopBlock)))
+	got := map[string]string{}
+	require.NoError(t, after.Iter(func(key string, value []byte) error {
+		got[key] = string(value)
+		return nil
+	}))
+	assert.Equal(t, map[string]string{"a": "1", "b": "2"}, got)
+}

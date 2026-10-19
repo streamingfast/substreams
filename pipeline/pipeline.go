@@ -251,7 +251,6 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 }
 
 func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
-
 	storeMap, err := p.setupSubrequestStores(ctx)
 	if err != nil {
 		return fmt.Errorf("subrequest stores setup failed: %w", err)
@@ -261,6 +260,58 @@ func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
 
 	logger := reqctx.Logger(ctx)
 	logger.Debug("stores loaded", zap.Object("stores", p.stores.StoreMap), zap.Int("stage", reqctx.Details(ctx).Tier2Stage))
+
+	return nil
+}
+
+// InitTier2StoresForSkippedSegment sets up stores for a segment where no module executor will
+// run (every module is excluded by a cached block index). Unlike InitTier2Stores, it never
+// loads the full KV snapshots of earlier-stage stores: there is no executor left to read them.
+//
+// Stores this stage writes get an empty partial, which OnStreamTerminated flushes because
+// tier1's squasher expects that file. An earlier-stage store this stage must also write did
+// not change over the segment, so its snapshot at the stop block is a copy of the one at the
+// start block; saving it from an empty FullKV would erase its state.
+func (p *Pipeline) InitTier2StoresForSkippedSegment(ctx context.Context) error {
+	reqDetails := reqctx.Details(ctx)
+	logger := reqctx.Logger(ctx)
+
+	lastStage := len(p.executionStages) - 1
+	storeMap := store.NewMap()
+	storesToWrite := make(map[string]struct{}, len(p.stores.storesToWrite))
+	for name := range p.stores.storesToWrite {
+		storeConfig := p.stores.configs[name]
+		if p.moduleNameToStage[name] == lastStage {
+			storeMap.Set(newSegmentPartialKV(storeConfig, reqDetails.ResolvedStartBlockNum, logger))
+			storesToWrite[name] = struct{}{}
+			continue
+		}
+
+		if storeConfig.ModuleInitialBlock() >= reqDetails.ResolvedStartBlockNum {
+			// No snapshot before this segment: the store is empty at the stop block.
+			storeMap.Set(storeConfig.NewFullKV(logger))
+			storesToWrite[name] = struct{}{}
+			continue
+		}
+
+		exists, err := storeConfig.ExistsFullKV(ctx, reqDetails.ResolvedStartBlockNum)
+		if err != nil {
+			return fmt.Errorf("checking full store %q existence: %w", name, err)
+		}
+		if !exists {
+			filename := store.NewCompleteFileInfo(name, storeConfig.ModuleInitialBlock(), reqDetails.ResolvedStartBlockNum).Filename
+			return fmt.Errorf("full store %q: snapshot %q %w (it may have been pruned)", name, filename, store.ErrSnapshotMissing)
+		}
+		// An existing snapshot at the stop block has the same content: every store backend
+		// either keeps it or overwrites it with identical bytes.
+		if err := storeConfig.CopyFullKV(ctx, reqDetails.ResolvedStartBlockNum, reqDetails.StopBlockNum); err != nil {
+			return fmt.Errorf("full store %q: %w", name, err)
+		}
+	}
+
+	p.stores.SetStoreMap(storeMap)
+	p.stores.storesToWrite = storesToWrite
+	logger.Debug("stores set up for a skipped segment", zap.Object("stores", p.stores.StoreMap))
 
 	return nil
 }
@@ -501,12 +552,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 			storeConfig := p.stores.configs[mod.Name]
 
 			if isLastStage {
-				initialBlock := reqDetails.ResolvedStartBlockNum
-				if storeConfig.ModuleInitialBlock() > reqDetails.ResolvedStartBlockNum {
-					initialBlock = storeConfig.ModuleInitialBlock()
-				}
-				partialStore := storeConfig.NewPartialKV(initialBlock, logger)
-				storeMap.Set(partialStore)
+				storeMap.Set(newSegmentPartialKV(storeConfig, reqDetails.ResolvedStartBlockNum, logger))
 
 			} else {
 				fullStore := storeConfig.NewFullKV(logger)
@@ -928,6 +974,38 @@ func getFoundationalStores(inputs []wasm.Argument) []pbservice.StoreClient {
 	return nil
 }
 
+// newSegmentPartialKV returns the partial store a tier2 job writes for a store of its own
+// stage, starting at the segment start or at the module's initial block if that is later.
+func newSegmentPartialKV(storeConfig *store.Config, segmentStartBlock uint64, logger *zap.Logger) *store.PartialKV {
+	initialBlock := segmentStartBlock
+	if storeConfig.ModuleInitialBlock() > segmentStartBlock {
+		initialBlock = storeConfig.ModuleInitialBlock()
+	}
+	return storeConfig.NewPartialKV(initialBlock, logger)
+}
+
+// ModuleBlockIndex resolves module's block filter against the cached indices of its filter
+// module. It returns nil for a module without a block filter, and a BlockIndex without a
+// precomputed bitmap when the filter module's index is not cached.
+func ModuleBlockIndex(ctx context.Context, module *pbsubstreams.Module, existingIndices map[string]map[string]*roaring64.Bitmap) (*index.BlockIndex, error) {
+	if module.BlockFilter == nil {
+		return nil, nil
+	}
+	qs, err := module.BlockFilterQueryString()
+	if err != nil {
+		return nil, err
+	}
+	expr, err := sqe.Parse(ctx, qs)
+	if err != nil {
+		return nil, fmt.Errorf("parse block filter: %q: %w", module.BlockFilter.Query, err)
+	}
+	var precomputedBitmap *roaring64.Bitmap
+	if indices := existingIndices[module.BlockFilter.Module]; indices != nil {
+		precomputedBitmap = sqe.RoaringBitmapsApply(expr, indices)
+	}
+	return index.NewBlockIndex(expr, module.BlockFilter.Module, precomputedBitmap), nil
+}
+
 // BuildModuleExecutors builds the ModuleExecutors, and the loadedModules.
 func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 	if p.StagedModuleExecutors != nil {
@@ -986,22 +1064,9 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 				if err != nil {
 					return fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
 				}
-				var moduleBlockIndex *index.BlockIndex
-				if module.BlockFilter != nil {
-					qs, err := module.BlockFilterQueryString()
-					if err != nil {
-						return err
-					}
-					expr, err := sqe.Parse(ctx, qs)
-					if err != nil {
-						return fmt.Errorf("parse block filter: %q: %w", module.BlockFilter.Query, err)
-					}
-					var precomputedBitmap *roaring64.Bitmap
-
-					if indices := p.preexistingBlockIndices[module.BlockFilter.Module]; indices != nil {
-						precomputedBitmap = sqe.RoaringBitmapsApply(expr, indices)
-					}
-					moduleBlockIndex = index.NewBlockIndex(expr, module.BlockFilter.Module, precomputedBitmap)
+				moduleBlockIndex, err := ModuleBlockIndex(ctx, module, p.preexistingBlockIndices)
+				if err != nil {
+					return err
 				}
 
 				entrypoint := module.BinaryEntrypoint

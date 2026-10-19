@@ -472,6 +472,12 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		logger.Info("no modules required to run, skipping")
 		return nil
 	}
+
+	allExcluded, err := allModulesExcludedByBlockIndex(ctx, execGraph, request.Stage, executionPlan)
+	if err != nil {
+		return fmt.Errorf("checking block index exclusion: %w", err)
+	}
+
 	stores := pipeline.NewStores(ctx, storeConfigs, request.SegmentSize, requestDetails.ResolvedStartBlockNum, stopBlock, true, executionPlan.StoresToWrite)
 	defer stores.Close()
 
@@ -590,43 +596,20 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("error during pipeline init: %w", err)
 	}
 
+	if allExcluded {
+		logger.Info("all executors are excluded by block index. Skipping execution of segment")
+		if err := pipe.InitTier2StoresForSkippedSegment(ctx); err != nil {
+			return fmt.Errorf("error building pipeline: %w", err)
+		}
+		return pipe.OnStreamTerminated(ctx, io.EOF)
+	}
+
 	if err := pipe.InitTier2Stores(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
 	if err := pipe.BuildModuleExecutors(ctx); err != nil {
 		return fmt.Errorf("error building module executors: %w", err)
-	}
-
-	allExecutorsExcludedByBlockIndex := true
-excludable:
-	for _, stage := range pipe.StagedModuleExecutors {
-		for _, executor := range stage {
-			switch executor := executor.(type) {
-			case *exec.MapperModuleExecutor:
-				if executionPlan.ExistingExecOuts[executor.Name()] != nil {
-					continue
-				}
-			case *exec.IndexModuleExecutor:
-				if executionPlan.ExistingIndices[executor.Name()] != nil {
-					continue
-				}
-			case *exec.StoreModuleExecutor:
-				if executionPlan.ExistingExecOuts[executor.Name()] != nil {
-					if _, ok := executionPlan.StoresToWrite[executor.Name()]; !ok {
-						continue
-					}
-				}
-			}
-			if !executor.BlockIndex().ExcludesAllBlocks() {
-				allExecutorsExcludedByBlockIndex = false
-				break excludable
-			}
-		}
-	}
-	if allExecutorsExcludedByBlockIndex {
-		logger.Info("all executors are excluded by block index. Skipping execution of segment")
-		return pipe.OnStreamTerminated(ctx, io.EOF)
 	}
 
 	var streamErr error
@@ -877,6 +860,44 @@ type ExecutionPlan struct {
 	RequiredModules  map[string]*pbsubstreams.Module
 	StoresToWrite    map[string]struct{}
 	Skippable        bool
+}
+
+// allModulesExcludedByBlockIndex reports whether every module up to the requested stage is
+// already known -- from a cached, empty block index -- to match no block in this segment.
+// When true, tier2 can skip loading dependency stores and compiling WASM modules entirely:
+// OnStreamTerminated still writes the same (empty) exec-out, index and partial-store files a
+// normal run would produce for a segment with zero matching blocks.
+//
+// It resolves each module's block index with pipeline.ModuleBlockIndex, as BuildModuleExecutors
+// does, without needing the stores or WASM modules that function builds along the way.
+func allModulesExcludedByBlockIndex(ctx context.Context, execGraph *exec.Graph, stage uint32, executionPlan *ExecutionPlan) (bool, error) {
+	for _, module := range execGraph.UsedModulesUpToStage(int(stage)) {
+		switch module.ModuleKind() {
+		case pbsubstreams.ModuleKindMap:
+			if executionPlan.ExistingExecOuts[module.Name] != nil {
+				continue
+			}
+		case pbsubstreams.ModuleKindStore:
+			if executionPlan.ExistingExecOuts[module.Name] != nil {
+				if _, ok := executionPlan.StoresToWrite[module.Name]; !ok {
+					continue
+				}
+			}
+		case pbsubstreams.ModuleKindBlockIndex:
+			if executionPlan.ExistingIndices[module.Name] != nil {
+				continue
+			}
+		}
+
+		blockIndex, err := pipeline.ModuleBlockIndex(ctx, module, executionPlan.ExistingIndices)
+		if err != nil {
+			return false, err
+		}
+		if !blockIndex.ExcludesAllBlocks() {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func GetExecutionPlan(

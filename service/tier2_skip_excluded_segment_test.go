@@ -155,61 +155,67 @@ func TestProcessRange_SkipsSegmentExcludedByCachedBlockIndex(t *testing.T) {
 // TestProcessRange_SkippedSegmentKeepsEarlierStageStore runs the last stage of a two-stage graph
 // on a segment every module is excluded from. The stage-0 store has no full KV at the stop block
 // yet, so this job must write it: since no block changed the store, it must hold the same keys
-// as the full KV at the segment's start block, not be empty.
+// as the full KV at the segment's start block, not be empty. A store starting at the segment
+// start has no earlier snapshot, and must be written empty.
 func TestProcessRange_SkippedSegmentKeepsEarlierStageStore(t *testing.T) {
 	logger := zap.NewNop()
-
-	blockFilter := &pbsubstreams.Module_BlockFilter{
-		Module: "idx_a",
-		Query:  &pbsubstreams.Module_BlockFilter_QueryString{QueryString: "never_present_key"},
-	}
-	blockInput := &pbsubstreams.Module_Input{
-		Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "sf.substreams.v1.test.Block"}},
-	}
-	modules := []*pbsubstreams.Module{
-		{
-			Name: "idx_a",
-			Kind: &pbsubstreams.Module_KindBlockIndex_{
-				KindBlockIndex: &pbsubstreams.Module_KindBlockIndex{OutputType: "proto:sf.substreams.index.v1.Keys"},
-			},
-			Inputs: []*pbsubstreams.Module_Input{blockInput},
-		},
-		{
-			Name: "store_a",
-			Kind: &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{
-				UpdatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
-				ValueType:    "string",
-			}},
-			Inputs:      []*pbsubstreams.Module_Input{blockInput},
-			BlockFilter: blockFilter,
-		},
-		{
-			Name: "map_b",
-			Kind: &pbsubstreams.Module_KindMap_{},
-			Inputs: []*pbsubstreams.Module_Input{
-				blockInput,
-				{Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{ModuleName: "store_a", Mode: pbsubstreams.Module_Input_Store_GET}}},
-			},
-			BlockFilter: blockFilter,
-		},
-	}
-
-	modulesPkg := &pbsubstreams.Modules{
-		Modules: modules,
-		Binaries: []*pbsubstreams.Binary{
-			{Type: "not-a-real-wasm-binary-type", Content: []byte("garbage: must never be compiled when the segment is skipped")},
-		},
-	}
-
-	execGraph, err := exec.NewOutputModuleGraph("map_b", true, modulesPkg, 0, false)
-	require.NoError(t, err)
-	require.Len(t, execGraph.StagedUsedModules(), 2)
 
 	const stage = uint32(1)
 	const startBlock = uint64(10)
 	const stopBlock = uint64(20)
 
-	run := func(t *testing.T, writeStartSnapshot bool) (store.ConfigMap, error) {
+	buildGraph := func(t *testing.T, storeInitialBlock uint64) (*pbsubstreams.Modules, *exec.Graph) {
+		blockFilter := &pbsubstreams.Module_BlockFilter{
+			Module: "idx_a",
+			Query:  &pbsubstreams.Module_BlockFilter_QueryString{QueryString: "never_present_key"},
+		}
+		blockInput := &pbsubstreams.Module_Input{
+			Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "sf.substreams.v1.test.Block"}},
+		}
+		modules := []*pbsubstreams.Module{
+			{
+				Name: "idx_a",
+				Kind: &pbsubstreams.Module_KindBlockIndex_{
+					KindBlockIndex: &pbsubstreams.Module_KindBlockIndex{OutputType: "proto:sf.substreams.index.v1.Keys"},
+				},
+				Inputs: []*pbsubstreams.Module_Input{blockInput},
+			},
+			{
+				Name: "store_a",
+				Kind: &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{
+					UpdatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
+					ValueType:    "string",
+				}},
+				Inputs:       []*pbsubstreams.Module_Input{blockInput},
+				BlockFilter:  blockFilter,
+				InitialBlock: storeInitialBlock,
+			},
+			{
+				Name: "map_b",
+				Kind: &pbsubstreams.Module_KindMap_{},
+				Inputs: []*pbsubstreams.Module_Input{
+					blockInput,
+					{Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{ModuleName: "store_a", Mode: pbsubstreams.Module_Input_Store_GET}}},
+				},
+				BlockFilter: blockFilter,
+			},
+		}
+
+		modulesPkg := &pbsubstreams.Modules{
+			Modules: modules,
+			Binaries: []*pbsubstreams.Binary{
+				{Type: "not-a-real-wasm-binary-type", Content: []byte("garbage: must never be compiled when the segment is skipped")},
+			},
+		}
+
+		execGraph, err := exec.NewOutputModuleGraph("map_b", true, modulesPkg, 0, false)
+		require.NoError(t, err)
+		require.Len(t, execGraph.StagedUsedModules(), 2)
+		return modulesPkg, execGraph
+	}
+
+	run := func(t *testing.T, storeInitialBlock uint64, writeStartSnapshot bool) (store.ConfigMap, error) {
+		modulesPkg, execGraph := buildGraph(t, storeInitialBlock)
 		tmpDir := t.TempDir()
 		stateStoreURL := filepath.Join(tmpDir, "state")
 
@@ -265,7 +271,7 @@ func TestProcessRange_SkippedSegmentKeepsEarlierStageStore(t *testing.T) {
 	}
 
 	t.Run("copies start snapshot", func(t *testing.T) {
-		storeConfigs, err := run(t, true)
+		storeConfigs, err := run(t, 0, true)
 		require.NoError(t, err)
 
 		after := storeConfigs["store_a"].NewFullKV(logger)
@@ -280,7 +286,17 @@ func TestProcessRange_SkippedSegmentKeepsEarlierStageStore(t *testing.T) {
 	})
 
 	t.Run("missing start snapshot", func(t *testing.T) {
-		_, err := run(t, false)
+		_, err := run(t, 0, false)
 		require.ErrorIs(t, err, store.ErrSnapshotMissing)
+	})
+
+	t.Run("store starting at segment start", func(t *testing.T) {
+		storeConfigs, err := run(t, startBlock, false)
+		require.NoError(t, err)
+
+		after := storeConfigs["store_a"].NewFullKV(logger)
+		defer after.Close()
+		require.NoError(t, after.Load(context.Background(), store.NewCompleteFileInfo("store_a", startBlock, stopBlock)))
+		assert.Zero(t, after.Length())
 	})
 }

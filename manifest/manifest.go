@@ -30,6 +30,15 @@ var (
 	// deployment id can start with a digit, so it cannot be validated with
 	// moduleNameRegexp.
 	foundationalStoreIDRegexp = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+	// organizationSlugRegexp matches an organization slug on the Substreams
+	// registry: runs of lowercase letters and digits joined by single hyphens.
+	organizationSlugRegexp = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+)
+
+const (
+	organizationSlugMinLength = 2
+	organizationSlugMaxLength = 39
 )
 
 const (

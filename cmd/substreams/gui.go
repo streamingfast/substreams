@@ -46,8 +46,9 @@ var guiOrRunLongUsage = `Stream module output from a given package on a remote e
 file in place of '<manifest_file>, or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
 You can also use "-" to read the manifest from standard input.
 
-You can also use substreams gui my-package@v0.1.0 to specify a specific version of the package. This will fetch it from
-the Substreams registry at https://substreams.dev`
+You can also use substreams gui my-package@v0.1.0, or my-org/my-package@v0.1.0 for a package published under an
+organization, to specify a specific version of the package. This will fetch it from the Substreams registry at
+https://substreams.dev`
 
 // guiCmd represents the command to run substreams remotely
 var guiCmd = &cobra.Command{

@@ -2,6 +2,7 @@ package foundational_store
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/streamingfast/dregistry"
@@ -48,6 +49,8 @@ func TestLookup(t *testing.T) {
 func TestDeploymentID(t *testing.T) {
 	assert.Equal(t, "deadbeef", DeploymentID("deadbeef@v1.2.3"))
 	assert.Equal(t, "deadbeef", DeploymentID("deadbeef"))
+	assert.Equal(t, "acme/token-balances", DeploymentID("acme/token-balances@v0.1.0"))
+	assert.Equal(t, "acme/token-balances", DeploymentID("acme/token-balances"))
 	assert.Equal(t, "dead@vbeef", DeploymentID("dead@vbeef@v2"))
 	assert.Equal(t, "@v1.0.0", DeploymentID("@v1.0.0"))
 	assert.Equal(t, "", DeploymentID(""))
@@ -64,6 +67,33 @@ func TestStripDeploymentID(t *testing.T) {
 	got, err := wrapped.Resolve(t.Context(), "deadbeef@v1.2.3")
 	require.NoError(t, err)
 	assert.Equal(t, "deadbeef", gotID)
+	assert.Equal(t, "deadbeef", got.Address)
+
+	got, err = wrapped.Resolve(t.Context(), "acme/token-balances@v0.1.0")
+	require.NoError(t, err)
+	assert.Equal(t, "acme/token-balances", gotID)
+	assert.Equal(t, "acme/token-balances", got.Address)
+}
+
+func TestStripDeploymentIDOrgReferenceNotFoundStopsChain(t *testing.T) {
+	notFound := resolverFunc(func(id string) (*dregistry.Endpoint, error) {
+		return nil, fmt.Errorf("%w: %q", dregistry.ErrNotFound, id)
+	})
+	passthrough, err := NewPassthroughResolver()
+	require.NoError(t, err)
+	chain := dregistry.Chain(stripDeploymentID{inner: notFound}, passthrough)
+
+	_, err = chain.Resolve(t.Context(), "acme/token-balances@v0.1.0")
+	require.Error(t, err)
+	assert.False(t, dregistry.IsNotFound(err))
+	assert.Contains(t, err.Error(), `no live hosted store matches "acme/token-balances"`)
+
+	got, err := chain.Resolve(t.Context(), "grpc://stores.example.com:9000")
+	require.NoError(t, err)
+	assert.Equal(t, "stores.example.com:9000", got.Address)
+
+	got, err = chain.Resolve(t.Context(), "deadbeef")
+	require.NoError(t, err)
 	assert.Equal(t, "deadbeef", got.Address)
 }
 

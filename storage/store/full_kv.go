@@ -247,6 +247,24 @@ func (s *FullKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error) {
 	return file, fw, nil
 }
 
+// SaveRetryable is Save, except the returned writer's Write may be called again after a
+// failure (see retryableSave): Save's writer is a one-shot stream straight off the live
+// snapshot, consumed by its first Write attempt — a retry would need a fresh Save, which
+// snapshots whatever the store looks like *then*, not at the endBoundaryBlock the
+// filename promises. retryableSave instead rewinds the same snapshot on every attempt.
+func (s *FullKV) SaveRetryable(endBoundaryBlock uint64) (*FileInfo, *retryableSave, error) {
+	s.logger.Debug("writing full store state (retryable)", zap.Object("store", s))
+
+	file := NewCompleteFileInfo(s.name, s.moduleInitialBlock, endBoundaryBlock)
+
+	snap, err := s.kvImpl.Snapshot()
+	if err != nil {
+		return nil, nil, fmt.Errorf("snapshotting store %q: %w", s.name, err)
+	}
+
+	return file, &retryableSave{store: s.objStore, filename: file.Filename, marshaller: s.marshaller, snap: snap}, nil
+}
+
 func (s *FullKV) Filename() string {
 	return s.loadedFrom
 }

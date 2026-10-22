@@ -605,25 +605,32 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 		return nil
 	}
 
-	s.logger.Debug("scheduling save of full store", zap.Stringer("store", partialKV))
-
 	endBlock := rng.ExclusiveEndBlock
+
+	// Open the snapshot now, synchronously, before the next segment's merge can touch
+	// this store: SaveRetryable's snapshot (and, on mmap, its open read transaction)
+	// reflects the store's state at exactly this point, never a later one. A failed
+	// upload's retry rewinds and re-streams this same snapshot (see retryableSave)
+	// instead of opening a fresh one, so it can't silently save a later segment's
+	// content under this one's filename.
+	meter.saveStart = time.Now()
+	_, retryable, err := fullKV.SaveRetryable(endBlock)
+	meter.saveEnd = time.Now()
+	if err != nil {
+		metrics.Tier1SquashersEnded.Inc()
+		return fmt.Errorf("snapshotting full store at segment %d: %w", mergeUnit.Segment, err)
+	}
+
+	s.logger.Debug("scheduling upload of full store", zap.Stringer("store", partialKV))
+
 	uploads.Go(func() error {
 		defer metrics.Tier1SquashersEnded.Inc()
-		err := derr.RetryContext(uploads.ctx, 5, func(ctx context.Context) error {
-			meter.saveStart = time.Now()
-			_, writer, err := fullKV.Save(endBlock)
-			if err != nil {
-				return fmt.Errorf("save full store: %w", err)
-			}
-			meter.saveEnd = time.Now()
-			meter.writeStart = time.Now()
-			err = writer.Write(ctx)
-			meter.writeEnd = time.Now()
-			return err
-		})
+		defer retryable.Close()
+		meter.writeStart = time.Now()
+		err := derr.RetryContext(uploads.ctx, 5, retryable.Write)
+		meter.writeEnd = time.Now()
 		if err != nil {
-			return fmt.Errorf("flushing full store at segment %d: %w", mergeUnit.Segment, err)
+			return fmt.Errorf("uploading full store at segment %d: %w", mergeUnit.Segment, err)
 		}
 
 		modState.advanceSnapshotEnd(endBlock)

@@ -599,6 +599,17 @@ func (it *mmapLongTxSnapshotIter) Next() (string, []byte, bool, error) {
 	return string(k), value, true, nil
 }
 
+// Reset rewinds Next back to the first entry without opening a new read transaction —
+// the same bbolt tx keeps its MVCC-stable view no matter how many times its cursor is
+// re-seeked, so this is safe no matter how long the transaction has been open.
+func (it *mmapLongTxSnapshotIter) Reset() error {
+	if it.closed {
+		return fmt.Errorf("mmap long-lived snapshot iterator used after close")
+	}
+	it.started = false
+	return nil
+}
+
 func (it *mmapLongTxSnapshotIter) Close() error {
 	if it.closed {
 		return nil
@@ -640,6 +651,21 @@ func (it *mmapSnapshotIter) Next() (string, []byte, bool, error) {
 	kv := it.buf[it.pos]
 	it.pos++
 	return kv.Key, kv.Value, true, nil
+}
+
+// Reset rewinds Next back to the first entry. Safe at any point: the exclusive write-gate
+// (snapMu) this iterator holds for its whole lifetime means nothing else can have written
+// to the store since it opened, so re-walking the bucket from the start yields the same
+// view as the first pass.
+func (it *mmapSnapshotIter) Reset() error {
+	if it.closed {
+		return fmt.Errorf("mmap snapshot iterator used after close")
+	}
+	it.buf = it.buf[:0]
+	it.pos = 0
+	it.lastKey = nil
+	it.exhausted = false
+	return nil
 }
 
 // refill copies the next batch of entries out of a short-lived View

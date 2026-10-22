@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"iter"
 	"sort"
 	"strings"
@@ -230,6 +231,14 @@ func (it *memorySnapshotIter) Next() (string, []byte, bool, error) {
 	e := it.entries[it.idx]
 	it.idx++
 	return e.key, e.value, true, nil
+}
+
+func (it *memorySnapshotIter) Reset() error {
+	if it.closed {
+		return fmt.Errorf("memory snapshot iterator used after close")
+	}
+	it.idx = 0
+	return nil
 }
 
 func (it *memorySnapshotIter) Close() error {

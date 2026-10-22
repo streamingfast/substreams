@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,6 +21,9 @@ func TestMmapInitialSizeForLimit(t *testing.T) {
 		{"tiny limit clamps to floor", 1 << 20, floor},
 		{"one gib reserves 1.5x", 1 << 30, int(1<<30 + (1<<30)/2)},
 		{"huge limit clamps to cap", 100 << 30, maxReservation},
+		// A limit near the uint64 max must clamp to the cap rather than overflowing
+		// the ~1.5x multiply and wrapping around to an arbitrary small reservation.
+		{"near-uint64-max limit clamps to cap without overflow", math.MaxUint64, maxReservation},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

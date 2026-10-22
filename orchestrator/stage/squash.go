@@ -477,9 +477,17 @@ func (q *localStepSquasher) squashStep(step []Unit) error {
 	}
 	// uploads.ctx is cancelled as soon as any of this run's uploads fails, so a failure
 	// stops the merge loop at its next step instead of merging further segments on top
-	// of a store whose save is already known to have failed.
-	if err := q.uploads.ctx.Err(); err != nil {
-		return err
+	// of a store whose save is already known to have failed. Wait (instead of returning
+	// uploads.ctx.Err() directly) surfaces the actual upload error — e.g. "uploading full
+	// store at segment %d: %w" — rather than a bare context.Canceled, which upstream
+	// (service/error.go's toConnectError, tier1's reqStats.SetError) specifically treats
+	// as a benign client cancellation and would otherwise misreport a real storage
+	// failure as the caller having canceled the request.
+	if q.uploads.ctx.Err() != nil {
+		if err := q.uploads.Wait(); err != nil {
+			return err
+		}
+		return q.uploads.ctx.Err()
 	}
 	if q.empty[step[0].Segment] {
 		// squashEmptyUnits drains and replaces *uploads itself before every
@@ -630,7 +638,7 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 		err := derr.RetryContext(uploads.ctx, 5, retryable.Write)
 		meter.writeEnd = time.Now()
 		if err != nil {
-			return fmt.Errorf("uploading full store at segment %d: %w", mergeUnit.Segment, err)
+			return fmt.Errorf("squash stage %d module %q: uploading full store at segment %d: %w", stage.idx, modState.name, mergeUnit.Segment, err)
 		}
 
 		modState.advanceSnapshotEnd(endBlock)

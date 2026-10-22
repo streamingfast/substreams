@@ -122,6 +122,13 @@ func mmapInitialSizeForLimit(totalSizeLimit uint64) int {
 	const floor = defaultInitialMmapSize
 	const maxReservation = 8 << 30 // 8 GiB
 
+	// Clamp before the ~1.5x multiply below: a totalSizeLimit close to the uint64 max
+	// (e.g. an unvalidated StoreSizeLimit from a request) would otherwise overflow
+	// want and wrap around to an arbitrary, possibly tiny, reservation.
+	if totalSizeLimit > maxReservation {
+		return maxReservation
+	}
+
 	want := totalSizeLimit + totalSizeLimit/2 // ~1.5x
 	if want < floor {
 		want = floor

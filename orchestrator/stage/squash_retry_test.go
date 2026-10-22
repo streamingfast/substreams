@@ -114,3 +114,24 @@ func TestSquashRetryUploadsExactSnapshot(t *testing.T) {
 		}
 	}
 }
+
+// TestSquashStepSurfacesUploadErrorNotBareCanceled guards against squashStep reporting a
+// pipelined upload failure as a bare context.Canceled: once uploads.ctx is done, squashStep
+// used to return uploads.ctx.Err() directly, discarding the real error (e.g. "uploading full
+// store at segment 4: disk full") that errgroup recorded. Downstream, service/error.go's
+// toConnectError and tier1's reqStats.SetError both special-case context.Canceled as a benign
+// client cancellation, so that bare error would misreport a genuine storage failure as the
+// caller having canceled the request. squashStep must instead surface the real error via
+// uploads.Wait().
+func TestSquashStepSurfacesUploadErrorNotBareCanceled(t *testing.T) {
+	uploads := newSquashUploads(t.Context())
+	sentinel := errors.New("uploading full store at segment 4: disk full")
+	uploads.Go(func() error { return sentinel })
+	require.ErrorIs(t, uploads.Wait(), sentinel) // drain so uploads.ctx is observably Done below
+
+	q := &localStepSquasher{stages: &Stages{ctx: t.Context()}, uploads: uploads}
+	err := q.squashStep(nil)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, sentinel, "squashStep must surface the real upload error")
+	assert.NotErrorIs(t, err, context.Canceled, "squashStep must not report a pipelined upload failure as a bare context.Canceled")
+}

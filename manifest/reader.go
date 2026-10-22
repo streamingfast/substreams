@@ -60,6 +60,10 @@ type Reader struct {
 	originalInput string
 	currentInput  string
 
+	// inputMayBeLocalPath is set when originalInput was read as an organization package
+	// reference only because no such local path exists, e.g. a mistyped "dir/subdir".
+	inputMayBeLocalPath bool
+
 	workingDir string
 
 	pkg *pbsubstreams.Package
@@ -209,7 +213,13 @@ func (r *Reader) read() error {
 	}
 
 	if r.IsRemotePackage(input) {
-		return r.readRemote(input)
+		if err := r.readRemote(input); err != nil {
+			if r.inputMayBeLocalPath {
+				return fmt.Errorf("%w (no local path %q either, prefix it with './' to read a local path)", err, r.originalInput)
+			}
+			return err
+		}
+		return nil
 	}
 
 	return r.readLocal(input)
@@ -447,6 +457,20 @@ func (r *Reader) resolveInputPath() error {
 		return nil
 	}
 
+	if existingPathWins(input, input) {
+		return r.resolveLocalInputPath(input)
+	}
+
+	if org, pkgName, version, isOrgReference, err := ParseOrgPackageReference(input); isOrgReference {
+		if err != nil {
+			return fmt.Errorf("invalid Substreams Registry package reference %q: %w", input, err)
+		}
+
+		r.currentInput = r.registryOrgPackageURL(org, pkgName, version)
+		r.inputMayBeLocalPath = !strings.Contains(input, "@")
+		return nil
+	}
+
 	if pkgName, version, likelyShortcut, validationErr := ParseShortPackageIdentifier(input); likelyShortcut || validationErr == nil {
 		if likelyShortcut && validationErr != nil {
 			return fmt.Errorf("invalid Substreams Registry short package identifier %q: %w", input, validationErr)
@@ -464,6 +488,10 @@ func (r *Reader) resolveInputPath() error {
 		return nil
 	}
 
+	return r.resolveLocalInputPath(input)
+}
+
+func (r *Reader) resolveLocalInputPath(input string) error {
 	stat, err := os.Stat(input)
 	if err != nil {
 		return fmt.Errorf("unable to stat input file %q: %w", input, err)
@@ -481,6 +509,21 @@ func (r *Reader) resolveInputPath() error {
 
 func (r *Reader) registryPackageURL(packageName string, version string) string {
 	return fmt.Sprintf("%s/v1/packages/%s/%s", r.registryBaseURL(), url.PathEscape(packageName), url.PathEscape(version))
+}
+
+func (r *Reader) registryOrgPackageURL(org, packageName, version string) string {
+	return fmt.Sprintf("%s/v1/packages/%s/%s/%s", r.registryBaseURL(), url.PathEscape(org), url.PathEscape(packageName), url.PathEscape(version))
+}
+
+// existingPathWins reports whether input, which could also read as an organization
+// package reference because it holds a '/', names an existing file or directory at
+// path. Input without a '/' is never treated as a path here.
+func existingPathWins(input, path string) bool {
+	if !strings.Contains(input, "/") {
+		return false
+	}
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func (r *Reader) registryBaseURL() string {
@@ -779,6 +822,47 @@ func ParseShortPackageIdentifier(input string) (packageName, version string, lik
 	return
 }
 
+// ParseOrgPackageReference parses an organization package reference in the format
+// "<org>/<package>@<version>", where <org> is the organization's slug on the Substreams
+// registry. A missing version, or "latest", is returned as "latest".
+//
+// isOrgReference is false when the input is not "<a>/<b>" with a single slash, starts with
+// "." or "/", or has no "@" and either part is not a valid organization slug or package
+// name: such input is a path (e.g. "./sf/pkg", "abis/erc20.spkg"). Once isOrgReference is
+// true, validation errors are returned as a multierror.
+func ParseOrgPackageReference(input string) (org, packageName, version string, isOrgReference bool, validationError error) {
+	if strings.HasPrefix(input, ".") || strings.HasPrefix(input, "/") || hasRemotePrefix(input) {
+		return "", "", "", false, nil
+	}
+
+	ref, version, hasAt := strings.Cut(input, "@")
+	org, packageName, hasSlash := strings.Cut(ref, "/")
+	if !hasSlash || strings.Contains(packageName, "/") {
+		return "", "", "", false, nil
+	}
+
+	if len(org) < organizationSlugMinLength || len(org) > organizationSlugMaxLength || !organizationSlugRegexp.MatchString(org) {
+		validationError = errors.Join(validationError, fmt.Errorf("organization %q is not a valid organization slug (lowercase letters, digits and single hyphens, %d to %d characters)", org, organizationSlugMinLength, organizationSlugMaxLength))
+	}
+	if !moduleNameRegexp.MatchString(packageName) {
+		validationError = errors.Join(validationError, fmt.Errorf("package name %s does not match regexp %s", packageName, moduleNameRegexp))
+	}
+
+	if !hasAt && validationError != nil {
+		return "", "", "", false, nil
+	}
+
+	if version == "" || version == "latest" {
+		return org, packageName, "latest", true, validationError
+	}
+
+	if !semver.IsValid(version) {
+		validationError = errors.Join(validationError, fmt.Errorf("version %q is not valid Semver format", version))
+	}
+
+	return org, packageName, version, true, validationError
+}
+
 // Deprecated: ParseStandardPackageAndVersion is deprecated, use [manifest.ParseShortPackageIdentifier] instead.
 func (r *Reader) ParseStandardPackageAndVersion(input string) (packageName, version string, err error) {
 	packageName, version, _, validationErr := ParseShortPackageIdentifier(input)
@@ -808,10 +892,15 @@ func (r *Reader) IsLocalManifest() bool {
 // by checking:
 //   - If the input starts with remote prefix ("https://", "http://", "ipfs://", "gs://", "s3://", "az://")
 //   - If the input is reading from standard input (i.e., `-`)
+//   - If the input is an organization package reference (`<org>/<package>[@<version>]`)
 //   - If the input ends with `.yaml`
 //   - If the input is a directory (we check for path separator)
 func IsLikelyManifestInput(in string) bool {
 	if hasRemotePrefix(in) {
+		return true
+	}
+
+	if _, _, _, isOrgReference, err := ParseOrgPackageReference(in); isOrgReference && err == nil {
 		return true
 	}
 
@@ -1045,8 +1134,22 @@ func loadImports(pkg *pbsubstreams.Package, manif *Manifest, parentReader *Reade
 		importLocation := kv[1]
 		var importPath string
 
+		localPath := manif.resolvePath(importLocation)
+		org, orgPackageName, orgVersion, isOrgReference, orgValidationErr := ParseOrgPackageReference(importLocation)
 		packageName, version, likelyShortcut, validationErr := ParseShortPackageIdentifier(importLocation)
-		if likelyShortcut {
+		if existingPathWins(importLocation, localPath) {
+			importPath = localPath
+		} else if isOrgReference {
+			if orgValidationErr != nil {
+				return fmt.Errorf("invalid import %q: %w", importLocation, orgValidationErr)
+			}
+
+			if orgVersion == "latest" {
+				return fmt.Errorf("import %q: no such local path, and an organization package import needs a specific version, e.g. %s/%s@v1.2.3 (prefix a local path with './')", importLocation, org, orgPackageName)
+			}
+
+			importPath = parentReader.registryOrgPackageURL(org, orgPackageName, orgVersion)
+		} else if likelyShortcut {
 			if validationErr != nil {
 				return fmt.Errorf("invalid import %q: %w", importLocation, validationErr)
 			}
@@ -1057,7 +1160,7 @@ func loadImports(pkg *pbsubstreams.Package, manif *Manifest, parentReader *Reade
 
 			importPath = parentReader.registryPackageURL(packageName, version)
 		} else {
-			importPath = manif.resolvePath(importLocation)
+			importPath = localPath
 		}
 
 		subpkgReader, err := NewReader(importPath,

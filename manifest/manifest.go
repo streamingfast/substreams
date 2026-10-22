@@ -31,15 +31,19 @@ var (
 	// moduleNameRegexp.
 	foundationalStoreIDRegexp = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
+	// organizationSlugRegexp matches an organization slug on the Substreams
+	// registry: runs of lowercase letters and digits joined by single hyphens.
+	organizationSlugRegexp = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+
 	// hostedStoreReferenceRegexp matches a hosted store named by its organization,
-	// `<org-slug>/<deployment-name>`: both are runs of lowercase letters and digits
-	// joined by single hyphens. validateHostedStoreReference checks their lengths.
+	// `<org-slug>/<deployment-name>`, both shaped like an organization slug.
+	// validateHostedStoreReference checks their lengths.
 	hostedStoreReferenceRegexp = regexp.MustCompile(`^([a-z0-9]+(?:-[a-z0-9]+)*)/([a-z0-9]+(?:-[a-z0-9]+)*)$`)
 )
 
 const (
-	hostedStoreOrgSlugMinLength    = 2
-	hostedStoreOrgSlugMaxLength    = 39
+	organizationSlugMinLength      = 2
+	organizationSlugMaxLength      = 39
 	hostedStoreDeploymentMaxLength = 63
 )
 
@@ -301,8 +305,8 @@ func validateHostedStoreReference(ref string) error {
 	if parts == nil {
 		return fmt.Errorf("expected <org-slug>/<deployment-name>, lowercase letters, digits and single hyphens")
 	}
-	if n := len(parts[1]); n < hostedStoreOrgSlugMinLength || n > hostedStoreOrgSlugMaxLength {
-		return fmt.Errorf("organization slug %q must be %d to %d characters", parts[1], hostedStoreOrgSlugMinLength, hostedStoreOrgSlugMaxLength)
+	if n := len(parts[1]); n < organizationSlugMinLength || n > organizationSlugMaxLength {
+		return fmt.Errorf("organization slug %q must be %d to %d characters", parts[1], organizationSlugMinLength, organizationSlugMaxLength)
 	}
 	if n := len(parts[2]); n > hostedStoreDeploymentMaxLength {
 		return fmt.Errorf("deployment name %q must be at most %d characters", parts[2], hostedStoreDeploymentMaxLength)

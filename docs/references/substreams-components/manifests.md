@@ -104,6 +104,9 @@ imports:
   # or:
   ethereum: substreams-ethereum-v1.0.0.spkg
   token: ../eth-token/substreams.yaml
+  # or, from the Substreams registry:
+  erc20: erc20-balances@v1.2.0
+  uniswap: streamingfast/uniswap-v4@v0.3.0
 
 ...
 
@@ -119,6 +122,8 @@ modules:
 Note the `:` separator that signifies to use the imported namespace, as defined under `imports`.
 
 The filename can be absolute or relative or a remote path prefixed by `http://` or `https://`. It can also be an IPFS reference.
+
+A registry package is written `<package>@<version>` or, for a package published under an organization, `<org>/<package>@<version>`. The version is required, and `@latest` is refused, so that the same manifest keeps building the same package. When a file or directory named like `<org>/<package>` exists next to the manifest, it is read instead; prefix a path with `./` to make it unambiguous.
 
 ### Environment variables
 

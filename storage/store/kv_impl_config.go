@@ -33,10 +33,26 @@ type MmapBackendConfig struct {
 	// virtual reservation only (pages are not resident until touched), so a
 	// generous value is cheap on 64-bit. Zero falls back to defaultInitialMmapSize.
 	InitialMmapSize int
+
+	// LongLivedSnapshot opts Snapshot() into holding a single bbolt read
+	// transaction for the whole save instead of the default exclusive write-gate.
+	// Writes (Set/BatchSet/Delete/Load/Clear) proceed concurrently with the save
+	// under bbolt's own MVCC — the point of this mode is letting the squasher
+	// merge the next segment while the current one's full store uploads. It
+	// relies on InitialMmapSize already covering the store's lifetime size so no
+	// remap ever races the open read transaction (see Snapshot's doc comment);
+	// Snapshot falls back to the exclusive gate itself when headroom looks thin.
+	LongLivedSnapshot bool
 }
 
-// MemoryBackendConfig holds in-memory backend options (none currently).
-type MemoryBackendConfig struct{}
+// MemoryBackendConfig holds in-memory backend options.
+type MemoryBackendConfig struct {
+	// MaxInFlightSnapshots bounds the number of concurrent Snapshot() pointer-copies
+	// outstanding on a single store, so a backlog of in-flight uploads can't pin an
+	// unbounded number of key/value slices. Zero falls back to
+	// defaultMaxInFlightMemorySnapshots.
+	MaxInFlightSnapshots int
+}
 
 func (MmapBackendConfig) implBackendConfig()   {}
 func (MemoryBackendConfig) implBackendConfig() {}
@@ -72,7 +88,11 @@ func (cfg *KVImplConfig) NewKVImpl(logger *zap.Logger) (KVImpl, error) {
 		return impl, nil
 	default: // KVImplTypeMemory, mmap is opt-in, memory is the default
 		logger.Debug("using in-memory KV store")
-		return newMemoryKVImplWithStoreName(cfg.StoreName), nil
+		memCfg, _ := cfg.Backend.(*MemoryBackendConfig)
+		if memCfg == nil {
+			memCfg = &MemoryBackendConfig{}
+		}
+		return newMemoryKVImplWithConfig(cfg.StoreName, memCfg), nil
 	}
 }
 

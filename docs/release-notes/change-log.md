@@ -70,6 +70,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   sink writing on top of a database that lost commits (restore, failover with asynchronous replication), and a flush
   retry applying a batch twice after a commit whose reply was lost (`ADD` fields were doubled). A conflict is not
   retried. Other cursor rows are not checked, and the cursor update stays the last statement of the transaction.
+- SQL sink (DatabaseChanges, PostgreSQL): add `--standby-lock` to run standby sinks. A sink takes a session advisory
+  lock on the cursors table before streaming and writes through that session; the others wait, checking every
+  `--standby-lock-poll-interval`, and the first to see the lock released takes over from the stored cursor. A sink
+  whose locked session is gone stops instead of retrying its flush, and standbys serve the metrics endpoint while they
+  wait. See [Standby Sinks](../references/sql/standby-sinks.md).
+- SQL sink (DatabaseChanges): add `--stall-timeout`, which stops the sink when the stream delivers no block or undo for
+  that long once live (blocks held by an undo buffer count). On PostgreSQL a flush now honours its context, so the stop
+  cancels a database call in progress (the transaction rolls back); ClickHouse flushes still always run to the end.
+  The sink library's new `Sinker.LastBlockMessageAt` reports when the stream last delivered a block or undo.
 - SQL sink (DatabaseChanges): an undo whose transaction fails is now rolled back.
 - Sink library: a handler error is never taken for the end of the stream anymore. One wrapping `io.EOF` (a lost database
   connection, say) used to end the run successfully, as if the stop block was reached, so a live sink exited with

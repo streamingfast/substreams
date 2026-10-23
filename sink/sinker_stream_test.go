@@ -167,6 +167,7 @@ func TestSinker_CompletionGetsLastHandledCursor(t *testing.T) {
 	assert.Equal(t, []uint64{10, 11, 12}, h.handled)
 	require.True(t, h.completionCalled)
 	assert.Equal(t, uint64(12), h.completionAtBlock, "the stream's cursor (14) is ahead of the handled blocks")
+	assert.False(t, s.LastBlockMessageAt().IsZero(), "blocks kept by the buffer count as received")
 }
 
 // A handler failing while the sinker stops must be reported, and the completion handler must not run

@@ -333,6 +333,20 @@ func TestSinker_CursorCheck(t *testing.T) {
 		assert.Equal(t, []string{l.CursorCheckQuery(module, cursorAt(9, 5)), `ROLLBACK`}, tx.Results())
 	})
 
+	t.Run("conflict while stopping is still reported", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		tx := &db2.TestTx{NoRowsAffected: isCheck}
+		sinker, _ := newSinker(t, tx, cursorAt(9, 5))
+
+		err := sinker.HandleBlockScopedData(ctx,
+			blockScopedData("db_out", []*pbdatabase.TableChange{insertRowSinglePK("xfer", "1234", "from", "sender1", "to", "receiver1")}, 10, 5),
+			flushEveryBlock, sink.MustNewCursor(simpleCursor(10, 5)))
+		require.ErrorIs(t, err, db2.ErrCursorConflict)
+		require.NotErrorIs(t, err, context.Canceled, "a conflict is a failure, not the stop")
+		require.ErrorIs(t, sinker.RunErr(), db2.ErrCursorConflict)
+	})
+
 	t.Run("conflict on revert", func(t *testing.T) {
 		ctx := context.Background()
 		tx := &db2.TestTx{NoRowsAffected: isCheck}
@@ -430,6 +444,52 @@ func TestSinker_CompletionFlush(t *testing.T) {
 		sinker.Shutdown(nil)
 		require.NoError(t, sinker.HandleBlockRangeCompletion(context.Background(), streamCursor))
 		assert.Empty(t, tx.Results())
+	})
+}
+
+func TestSinker_StallTimeout(t *testing.T) {
+	newSinker := func(t *testing.T) *SQLSinker {
+		l := db2.NewTestLoader(t, "psql://x:5432/x?schemaName=testschema", &db2.TestTx{}, db2.TestSinglePrimaryKeyTables("testschema"), logger, tracer)
+		s, err := sink.NewFromConfig(&sink.SinkerConfig{
+			Pkg:              testPackage,
+			OutputModule:     testPackage.Modules.Modules[0],
+			OutputModuleHash: manifest.ModuleHash([]byte("unused")),
+			ClientConfig:     testClientConfig,
+			Mode:             sink.SubstreamsModeDevelopment,
+			Logger:           logger,
+		})
+		require.NoError(t, err)
+		sinker, err := New(s, l, logger, nil, 3, time.Second)
+		require.NoError(t, err)
+		sinker.SetStallTimeout(100 * time.Millisecond)
+		return sinker
+	}
+
+	t.Run("stops when live and no block arrives", func(t *testing.T) {
+		sinker := newSinker(t)
+		sinker.recordBlockReceived(flushEveryBlock) // live
+		go sinker.watchStall()
+
+		select {
+		case <-sinker.Terminating():
+			require.ErrorContains(t, sinker.Err(), "no block received")
+		case <-time.After(2 * time.Second):
+			t.Fatal("stalled sink was not stopped")
+		}
+	})
+
+	t.Run("does not stop while catching up", func(t *testing.T) {
+		sinker := newSinker(t)
+		catchingUp := false
+		sinker.recordBlockReceived(&catchingUp)
+		go sinker.watchStall()
+		defer sinker.Shutdown(nil)
+
+		select {
+		case <-sinker.Terminating():
+			t.Fatalf("stopped while catching up: %v", sinker.Err())
+		case <-time.After(500 * time.Millisecond):
+		}
 	})
 }
 

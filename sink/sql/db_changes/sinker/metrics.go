@@ -17,3 +17,4 @@ var FlushedRowsCount = metrics.NewCounter("substreams_sink_postgres_flushed_rows
 var FlushDuration = metrics.NewCounter("substreams_sink_postgres_store_flush_duration", "The amount of time spent flushing cache to db (in nanoseconds)")
 var FlushedHeadBlockNumber = metrics.NewHeadBlockNumber("substreams_sink_postgres")
 var FlushedHeadBlockTimeDrift = metrics.NewHeadTimeDrift("substreams_sink_postgres")
+var WriterLockHeld = metrics.NewGauge("substreams_sink_postgres_writer_lock_held", "1 while this sink holds the writer lock (--standby-lock), 0 while it waits as a standby")

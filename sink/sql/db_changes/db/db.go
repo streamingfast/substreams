@@ -48,6 +48,15 @@ type Loader struct {
 	dsn    *DSN
 
 	batchOrdinal uint64 // Counter for ordinals within the current batch, resets on flush
+
+	// expectedCursor is the stored cursor of this sink's module as this loader last read or wrote
+	// it, nil until SetExpectedCursor. Flushes and reverts first check the stored cursor still has this
+	// value (see checkCursor).
+	expectedCursor *string
+
+	// writerConn, once the writer lock is held (see AcquireWriterLock), is the connection holding
+	// it. Cursor reads and every write go through it, so the lock covers them.
+	writerConn *sql.Conn
 }
 
 func NewLoader(
@@ -148,7 +157,34 @@ func (l *Loader) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error) {
 	if l.testTx != nil {
 		return l.testTx, nil
 	}
+	if l.writerConn != nil {
+		return l.writerConn.BeginTx(ctx, opts)
+	}
 	return l.DB.BeginTx(ctx, opts)
+}
+
+type queryExecutor interface {
+	sqlExecutor
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+// execer returns where statements outside a transaction run: the connection holding the writer
+// lock if any, the pool otherwise.
+func (l *Loader) execer() sqlExecutor {
+	return l.queryer()
+}
+
+func (l *Loader) queryer() queryExecutor {
+	if l.writerConn != nil {
+		return l.writerConn
+	}
+	return l.DB
+}
+
+// Close releases the writer lock, if held, and closes the database.
+func (l *Loader) Close() error {
+	l.ReleaseWriterLock()
+	return l.DB.Close()
 }
 
 func (l *Loader) BatchBlockFlushInterval() int {

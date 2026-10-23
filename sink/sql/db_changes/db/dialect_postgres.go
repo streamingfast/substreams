@@ -285,6 +285,14 @@ func (d PostgresDialect) GetUpdateCursorQuery(table, moduleHash string, cursor *
 	`, table, cursor, block_num, block_id, moduleHash)
 }
 
+// GetCursorCheckQuery returns a statement that locks the cursor row of moduleHash and affects one row
+// if its cursor is exactly expectedCursor, none otherwise (see cursorChecker). The "C" collation makes
+// the comparison bytewise whatever the column's collation.
+func (d PostgresDialect) GetCursorCheckQuery(table, moduleHash, expectedCursor string) string {
+	return fmt.Sprintf(`SELECT 1 FROM %s WHERE id = %s AND cursor = %s COLLATE "C" FOR UPDATE;`,
+		table, escapeStringValue(moduleHash), escapeStringValue(expectedCursor))
+}
+
 func (d PostgresDialect) GetAllCursorsQuery(table string) string {
 	return fmt.Sprintf("SELECT id, cursor, block_num, block_id FROM %s", table)
 }

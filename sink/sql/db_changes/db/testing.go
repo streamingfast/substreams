@@ -59,6 +59,13 @@ func TestSinglePrimaryKeyTables(schema string) map[string]*TableInfo {
 	})
 }
 
+// SetFlushIntervals overrides the loader's flush intervals in tests.
+func (l *Loader) SetFlushIntervals(batchBlock, batchRow, liveBlock int) {
+	l.batchBlockFlushInterval = batchBlock
+	l.batchRowFlushInterval = batchRow
+	l.liveBlockFlushInterval = liveBlock
+}
+
 func TestTables(schema string, customTable map[string]*TableInfo) map[string]*TableInfo {
 	out := map[string]*TableInfo{}
 
@@ -115,6 +122,9 @@ func mustNewTableInfo(schema, name string, pkList []string, columnsByName map[st
 type TestTx struct {
 	queries []string
 	next    []*sql.Rows
+
+	// NoRowsAffected, if set, makes the statements it matches report 0 affected rows.
+	NoRowsAffected func(query string) bool
 }
 
 func (t *TestTx) Rollback() error {
@@ -129,7 +139,10 @@ func (t *TestTx) Commit() error {
 
 func (t *TestTx) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	t.queries = append(t.queries, query)
-	return &testResult{}, nil
+	if t.NoRowsAffected != nil && t.NoRowsAffected(query) {
+		return &testResult{rowsAffected: 0}, nil
+	}
+	return &testResult{rowsAffected: 1}, nil
 }
 
 func (t *TestTx) Results() []string {
@@ -141,12 +154,19 @@ func (t *TestTx) QueryContext(ctx context.Context, query string, args ...any) (o
 	return nil, nil
 }
 
-type testResult struct{}
+type testResult struct {
+	rowsAffected int64
+}
 
 func (t *testResult) LastInsertId() (int64, error) {
 	return 0, nil
 }
 
 func (t *testResult) RowsAffected() (int64, error) {
-	return 1, nil
+	return t.rowsAffected, nil
+}
+
+// CursorCheckQuery returns the statement checking the stored cursor of moduleHash, for tests.
+func (l *Loader) CursorCheckQuery(moduleHash, expectedCursor string) string {
+	return l.dialect.(cursorChecker).GetCursorCheckQuery(l.cursorTable.identifier, moduleHash, expectedCursor)
 }

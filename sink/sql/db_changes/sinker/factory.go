@@ -25,6 +25,13 @@ type SinkerFactoryOptions struct {
 	HandleReorgs            bool
 	FlushRetryCount         int
 	FlushRetryDelay         time.Duration
+
+	// StandbyLock, PostgreSQL only: take the writer lock of the cursors table before streaming, and
+	// wait as a standby while another sink holds it (see SQLSinker.SetWriterLock).
+	StandbyLock             bool
+	StandbyLockPollInterval time.Duration
+	// StallTimeout stops the sink if no block arrives for that long while live (0 disables it).
+	StallTimeout time.Duration
 }
 
 func SinkerFactory(
@@ -35,6 +42,18 @@ func SinkerFactory(
 		dsn, err := db.ParseDSN(dsnString)
 		if err != nil {
 			return nil, fmt.Errorf("parsing dsn: %w", err)
+		}
+
+		if options.StallTimeout < 0 {
+			return nil, fmt.Errorf("the stall timeout cannot be negative, got %s", options.StallTimeout)
+		}
+		if options.StandbyLock {
+			if dsn.Driver() != "postgres" {
+				return nil, db.ErrWriterLockUnsupported
+			}
+			if options.StandbyLockPollInterval <= 0 {
+				return nil, fmt.Errorf("the standby lock poll interval must be positive, got %s", options.StandbyLockPollInterval)
+			}
 		}
 
 		dbLoader, err := db.NewLoader(
@@ -66,6 +85,10 @@ func SinkerFactory(
 		if err != nil {
 			return nil, fmt.Errorf("unable to setup SQL sinker: %w", err)
 		}
+		if options.StandbyLock {
+			sinker.SetWriterLock(options.StandbyLockPollInterval)
+		}
+		sinker.SetStallTimeout(options.StallTimeout)
 
 		return sinker, nil
 	}

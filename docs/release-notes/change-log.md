@@ -63,6 +63,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   undoing the later block missed them (permanently for `ADD` fields), and pending changes survived an undo. They are
   now kept as separate operations within the batch, and an undo drops the pending changes of reverted blocks and
   writes the rest with the cursor. Batching is unchanged.
+- SQL sink (DatabaseChanges, PostgreSQL): once the sink has read or written its cursor, each flush and revert
+  transaction starts by locking its cursor row and checking it still holds the cursor the sink last read or wrote.
+  Otherwise nothing is written and the sink stops with `the stored cursor is not the one this sink last read or wrote`,
+  to be restarted from the stored cursor. This stops a second sink of the same module writing to the same database, a
+  sink writing on top of a database that lost commits (restore, failover with asynchronous replication), and a flush
+  retry applying a batch twice after a commit whose reply was lost (`ADD` fields were doubled). A conflict is not
+  retried. Other cursor rows are not checked, and the cursor update stays the last statement of the transaction.
 - SQL sink (DatabaseChanges): an undo whose transaction fails is now rolled back.
 - Sink library: a handler error is never taken for the end of the stream anymore. One wrapping `io.EOF` (a lost database
   connection, say) used to end the run successfully, as if the stop block was reached, so a live sink exited with

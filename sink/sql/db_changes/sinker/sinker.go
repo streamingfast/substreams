@@ -104,7 +104,7 @@ func (s *SQLSinker) Run(ctx context.Context) {
 	s.runStarted.Store(true)
 	defer close(s.runDone)
 
-	cursor, mismatchDetected, err := s.loader.GetCursor(ctx, s.OutputModuleHash())
+	cursor, rawCursor, mismatchDetected, err := s.loader.GetCursor(ctx, s.OutputModuleHash())
 	if err != nil && !errors.Is(err, db2.ErrCursorNotFound) {
 		s.Shutdown(fmt.Errorf("unable to retrieve cursor: %w", err))
 		return
@@ -114,17 +114,24 @@ func (s *SQLSinker) Run(ctx context.Context) {
 	// only performs an `update` operation so an initial cursor is required in the database
 	// for the flush to work correctly.
 	if errors.Is(err, db2.ErrCursorNotFound) {
-		if err := s.loader.InsertCursor(ctx, s.OutputModuleHash(), sink.NewBlankCursor()); err != nil {
+		blank := sink.NewBlankCursor()
+		if err := s.loader.InsertCursor(ctx, s.OutputModuleHash(), blank); err != nil {
 			s.Shutdown(fmt.Errorf("unable to write initial empty cursor: %w", err))
 			return
 		}
+		rawCursor = blank.String()
 
 	} else if mismatchDetected {
 		if err := s.loader.InsertCursor(ctx, s.OutputModuleHash(), cursor); err != nil {
 			s.Shutdown(fmt.Errorf("unable to write new cursor after module mismatch: %w", err))
 			return
 		}
+		rawCursor = cursor.String()
 	}
+
+	// From here on, each flush and revert first checks that the stored cursor is still the one read or
+	// written above, or the one this sink wrote since.
+	s.loader.SetExpectedCursor(rawCursor)
 
 	// Works in all cases, even if the cursor is blank or nil (gives 0)
 	s.lastAppliedBlockNum = cursor.Block().Num()
@@ -183,6 +190,10 @@ func (s *SQLSinker) flushWithRetry(ctx context.Context, moduleHash string, curso
 				s.logger.Info("flush succeeded after retry", zap.Int("attempt", attempt))
 			}
 			return rowCount, nil
+		}
+		if errors.Is(err, db2.ErrCursorConflict) {
+			// Retrying cannot help: the sink must restart from the cursor stored in the database.
+			return 0, err
 		}
 		lastErr = err
 	}

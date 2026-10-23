@@ -69,9 +69,11 @@ func TestUndoAfterRestart_Postgres(t *testing.T) {
 
 	// The active sink handles two reversible blocks (final block 5), then is stopped
 	a, la := newSinker()
-	_, _, err = la.GetCursor(ctx, a.OutputModuleHash())
+	// Loading the cursor as Run does
+	_, _, _, err = la.GetCursor(ctx, a.OutputModuleHash())
 	require.ErrorIs(t, err, db2.ErrCursorNotFound)
 	require.NoError(t, la.InsertCursor(ctx, a.OutputModuleHash(), sink.NewBlankCursor()))
+	la.SetExpectedCursor(sink.NewBlankCursor().String())
 
 	live := true
 	for _, n := range []uint64{10, 11} {
@@ -85,8 +87,9 @@ func TestUndoAfterRestart_Postgres(t *testing.T) {
 
 	// A standby takes over from the stored cursor and the chain undoes block 11
 	b, lb := newSinker()
-	cursor, _, err := lb.GetCursor(ctx, b.OutputModuleHash())
+	cursor, rawCursor, _, err := lb.GetCursor(ctx, b.OutputModuleHash())
 	require.NoError(t, err)
+	lb.SetExpectedCursor(rawCursor)
 	require.Equal(t, uint64(11), cursor.Block().Num())
 
 	require.NoError(t, b.HandleBlockUndoSignal(ctx, &pbsubstreamsrpc.BlockUndoSignal{

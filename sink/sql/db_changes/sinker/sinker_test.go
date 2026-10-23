@@ -3,6 +3,7 @@ package sinker
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -251,6 +252,99 @@ type event struct {
 	libNum       uint64
 	tableChanges []*pbdatabase.TableChange
 	undoSignal   bool
+}
+
+// TestSinker_CursorCheck checks that once the stored cursor is known, each flush and revert starts by
+// checking it is still the one this sink last read or wrote, keeps the cursor update last, and that a
+// conflict rolls the transaction back without retrying.
+func TestSinker_CursorCheck(t *testing.T) {
+	const module = "756e75736564" // manifest.ModuleHash("unused")
+	cursorAt := func(num, lib uint64) string { return sink.MustNewCursor(simpleCursor(num, lib)).String() }
+	update := func(num, lib uint64) string {
+		return fmt.Sprintf(`UPDATE "testschema"."cursors" set cursor = '%s', block_num = %d, block_id = '%d' WHERE id = '%s';`, cursorAt(num, lib), num, num, module)
+	}
+	isCheck := func(query string) bool { return strings.HasSuffix(query, `COLLATE "C" FOR UPDATE;`) }
+
+	newSinker := func(t *testing.T, tx *db2.TestTx, expected string) (*SQLSinker, *db2.Loader) {
+		l := db2.NewTestLoader(t, "psql://x:5432/x?schemaName=testschema", tx, db2.TestSinglePrimaryKeyTables("testschema"), logger, tracer)
+		l.SetExpectedCursor(expected)
+		s, err := sink.NewFromConfig(&sink.SinkerConfig{
+			Pkg:              testPackage,
+			OutputModule:     testPackage.Modules.Modules[0],
+			OutputModuleHash: manifest.ModuleHash([]byte("unused")),
+			ClientConfig:     testClientConfig,
+			Mode:             sink.SubstreamsModeDevelopment,
+			Logger:           logger,
+		})
+		require.NoError(t, err)
+		sinker, err := New(s, l, logger, nil, 3, 1*time.Second)
+		require.NoError(t, err)
+		return sinker, l
+	}
+
+	t.Run("flushes and revert", func(t *testing.T) {
+		ctx := context.Background()
+		tx := &db2.TestTx{}
+		sinker, l := newSinker(t, tx, "")
+
+		require.NoError(t, sinker.HandleBlockScopedData(ctx,
+			blockScopedData("db_out", []*pbdatabase.TableChange{insertRowSinglePK("xfer", "1234", "from", "sender1", "to", "receiver1")}, 10, 5),
+			flushEveryBlock, sink.MustNewCursor(simpleCursor(10, 5))))
+		require.NoError(t, sinker.HandleBlockScopedData(ctx,
+			blockScopedData("db_out", []*pbdatabase.TableChange{insertRowSinglePK("xfer", "2345", "from", "sender2", "to", "receiver2")}, 11, 5),
+			flushEveryBlock, sink.MustNewCursor(simpleCursor(11, 5))))
+		require.NoError(t, sinker.HandleBlockUndoSignal(ctx, &pbsubstreamsrpc.BlockUndoSignal{
+			LastValidBlock:  &pbsubstreams.BlockRef{Id: "10", Number: 10},
+			LastValidCursor: simpleCursor(10, 5),
+		}, sink.MustNewCursor(simpleCursor(10, 5))))
+
+		assert.Equal(t, []string{
+			l.CursorCheckQuery(module, ""),
+			`INSERT INTO "testschema"."substreams_history" (op,table_name,pk,block_num) values ('I','"testschema"."xfer"','{"id":"1234"}',10);`,
+			`INSERT INTO "testschema"."xfer" ("from","id","to") VALUES ('sender1','1234','receiver1');`,
+			`DELETE FROM "testschema"."substreams_history" WHERE block_num <= 5;`,
+			update(10, 5),
+			`COMMIT`,
+			l.CursorCheckQuery(module, cursorAt(10, 5)),
+			`INSERT INTO "testschema"."substreams_history" (op,table_name,pk,block_num) values ('I','"testschema"."xfer"','{"id":"2345"}',11);`,
+			`INSERT INTO "testschema"."xfer" ("from","id","to") VALUES ('sender2','2345','receiver2');`,
+			`DELETE FROM "testschema"."substreams_history" WHERE block_num <= 5;`,
+			update(11, 5),
+			`COMMIT`,
+			l.CursorCheckQuery(module, cursorAt(11, 5)),
+			`SELECT op,table_name,pk,prev_value,block_num FROM "testschema"."substreams_history" WHERE "block_num" > 10 ORDER BY "block_num" DESC`,
+			`DELETE FROM "testschema"."substreams_history" WHERE "block_num" > 10;`,
+			update(10, 5),
+			`COMMIT`,
+		}, tx.Results())
+	})
+
+	t.Run("conflict is not retried", func(t *testing.T) {
+		ctx := context.Background()
+		tx := &db2.TestTx{NoRowsAffected: isCheck}
+		sinker, l := newSinker(t, tx, cursorAt(9, 5))
+
+		err := sinker.HandleBlockScopedData(ctx,
+			blockScopedData("db_out", []*pbdatabase.TableChange{insertRowSinglePK("xfer", "1234", "from", "sender1", "to", "receiver1")}, 10, 5),
+			flushEveryBlock, sink.MustNewCursor(simpleCursor(10, 5)))
+		require.ErrorIs(t, err, db2.ErrCursorConflict)
+
+		// One attempt, rolled back before any write
+		assert.Equal(t, []string{l.CursorCheckQuery(module, cursorAt(9, 5)), `ROLLBACK`}, tx.Results())
+	})
+
+	t.Run("conflict on revert", func(t *testing.T) {
+		ctx := context.Background()
+		tx := &db2.TestTx{NoRowsAffected: isCheck}
+		sinker, l := newSinker(t, tx, cursorAt(11, 5))
+
+		err := sinker.HandleBlockUndoSignal(ctx, &pbsubstreamsrpc.BlockUndoSignal{
+			LastValidBlock:  &pbsubstreams.BlockRef{Id: "10", Number: 10},
+			LastValidCursor: simpleCursor(10, 5),
+		}, sink.MustNewCursor(simpleCursor(10, 5)))
+		require.ErrorIs(t, err, db2.ErrCursorConflict)
+		assert.Equal(t, []string{l.CursorCheckQuery(module, cursorAt(11, 5)), `ROLLBACK`}, tx.Results())
+	})
 }
 
 // TestSinker_CompletionFlush checks the final flush when the stream ends, whether stopped or at its end:

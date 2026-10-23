@@ -47,7 +47,7 @@ func (l *Loader) Flush(ctx context.Context, outputModuleHash string, cursor *sin
 	return rowFlushedCount, nil
 }
 
-func (l *Loader) Revert(ctx context.Context, outputModuleHash string, cursor *sink.Cursor, lastValidBlock uint64) error {
+func (l *Loader) Revert(ctx context.Context, outputModuleHash string, cursor *sink.Cursor, lastValidBlock uint64) (err error) {
 	tx, err := l.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to being db transaction: %w", err)

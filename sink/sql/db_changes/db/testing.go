@@ -59,28 +59,6 @@ func TestSinglePrimaryKeyTables(schema string) map[string]*TableInfo {
 	})
 }
 
-// TestAccumulatorTables adds a `candle` table with a numeric column to TestSinglePrimaryKeyTables.
-func TestAccumulatorTables(schema string) map[string]*TableInfo {
-	tables := TestSinglePrimaryKeyTables(schema)
-	tables["candle"] = mustNewTableInfo(schema, "candle", []string{"id"}, map[string]*ColumnInfo{
-		"id":         NewColumnInfo("id", "text", ""),
-		"sell_count": NewColumnInfo("sell_count", "numeric", int64(0)),
-	})
-	return tables
-}
-
-// SetHandleReorgs overrides reorg handling in tests, as a non-zero undo buffer does.
-func (l *Loader) SetHandleReorgs(handle bool) {
-	l.handleReorgs = handle
-}
-
-// SetFlushIntervals overrides the loader's flush intervals in tests.
-func (l *Loader) SetFlushIntervals(batchBlock, batchRow, liveBlock int) {
-	l.batchBlockFlushInterval = batchBlock
-	l.batchRowFlushInterval = batchRow
-	l.liveBlockFlushInterval = liveBlock
-}
-
 func TestTables(schema string, customTable map[string]*TableInfo) map[string]*TableInfo {
 	out := map[string]*TableInfo{}
 

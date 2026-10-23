@@ -92,7 +92,7 @@ func runPack(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		manifestDir = filepath.Dir(manifestPath)
-		if manifestReader.IsRemotePackage(manifestPath) {
+		if manifestReader.IsRemotePackage(pkgBundle.ManifestPath) {
 			manifestDir = "."
 
 			if !manifestReader.IsLocalManifest() && !calledFromBuild {

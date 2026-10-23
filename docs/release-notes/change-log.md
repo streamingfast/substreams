@@ -79,6 +79,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `--noop-mode`.
 - Count a Pub/Sub message in the sink totals only after it is published.
 
+### CLI
+
+- Commands that take a package (`substreams run`, `gui`, `info`, ...) accept an organization package reference
+  `<org>/<package>@<version>`, fetched from the registry's `/v1/packages/<org>/<package>/<version>`. Without a
+  version, or with `@latest`, they fetch the package's latest release. An existing file or directory of the
+  same name is still read locally; prefix a path with `./` to keep it local in any case.
+- Manifest `imports` accept `<org>/<package>@<version>`. An organization package import needs a specific
+  version: `<org>/<package>` and `<org>/<package>@latest` are refused, as `<package>@latest` already is.
+
 ### Dependencies
 
 - `golang.org/x/net` is at v0.60.0, which clears CVE-2026-78663 (CRITICAL) and CVE-2026-78669, CVE-2026-78660 and

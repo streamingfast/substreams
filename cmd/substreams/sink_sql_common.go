@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -427,7 +428,16 @@ func runDatabaseChangesSink(cmd *cobra.Command, driver, manifestPath, outputModu
 
 	app.SuperviseAndStart(sqlSinker)
 
-	return app.WaitForTermination(zlog, 0*time.Second, 30*time.Second)
+	err = app.WaitForTermination(zlog, 0*time.Second, 30*time.Second)
+
+	// On a stop (a signal, say), the sinker terminates right away while its Run goroutine still writes
+	// the blocks handled so far: wait for it before exiting, and report its failure if the stop left none.
+	awaitCtx, cancel := context.WithTimeout(context.Background(), sinker.RunStopTimeout)
+	defer cancel()
+	if runErr := sqlSinker.AwaitRun(awaitCtx); err == nil {
+		err = runErr
+	}
+	return err
 }
 
 func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string, spkg *pbsubstreams.Package, outputModuleName string) error {

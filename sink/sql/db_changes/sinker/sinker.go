@@ -20,6 +20,16 @@ import (
 
 const BLOCK_FLUSH_INTERVAL_DISABLED = 0
 
+// FinalFlushTimeout bounds the retries of the flush of the handled blocks when the stream is stopped. An
+// attempt already writing is not interrupted.
+const FinalFlushTimeout = 40 * time.Second
+
+// RunStopTimeout is how long to wait for Run to return once the sinker is stopped, see [sink.Sinker.AwaitRun].
+// Past it the process exits and the flush transaction is rolled back, the sink then re-processes the blocks
+// since the stored cursor on restart. On Kubernetes, the pod's terminationGracePeriodSeconds (30s by default)
+// must be raised above it, or the pod is killed first, with the same outcome.
+const RunStopTimeout = FinalFlushTimeout + 5*time.Second
+
 type SQLSinker struct {
 	*shutter.Shutter
 	*sink.Sinker
@@ -34,6 +44,15 @@ type SQLSinker struct {
 
 	flushRetryCount int
 	flushRetryDelay time.Duration
+
+	// lastHandledCursor is the cursor of the last block or undo given to this sink, and
+	// lastFinalBlockHeight the last final block height the stream reported with a block. With an undo
+	// buffer, the stream's own cursor can be ahead of the last handled one.
+	lastHandledCursor    *sink.Cursor
+	lastFinalBlockHeight uint64
+	// handlerFailed is set once a block or undo failed to be handled: pending changes may then hold
+	// part of a block, so they must not be flushed.
+	handlerFailed bool
 }
 
 func New(sink *sink.Sinker, loader *db2.Loader, logger *zap.Logger, tracer logging.Tracer, flushRetryCount int, flushRetryDelay time.Duration) (*SQLSinker, error) {
@@ -52,17 +71,16 @@ func New(sink *sink.Sinker, loader *db2.Loader, logger *zap.Logger, tracer loggi
 	}, nil
 }
 
+// Close stops the sinker, waits for the base sinker's Run to return if it was started, then closes the
+// database.
 func (s *SQLSinker) Close() error {
-	if s.IsTerminated() {
-		return nil
-	}
-
 	s.logger.Info("closing SQL sinker")
+	s.Shutdown(nil)
+	_ = s.Sinker.AwaitRun(context.Background())
+
 	if err := s.loader.Close(); err != nil {
 		return fmt.Errorf("loader close: %w", err)
 	}
-
-	s.Shutdown(nil)
 	return nil
 }
 
@@ -101,6 +119,12 @@ func (s *SQLSinker) Run(ctx context.Context) {
 
 	s.OnTerminating(func(_ error) { s.stats.Close() })
 	s.stats.OnTerminated(func(err error) { s.Shutdown(err) })
+
+	// A stop that came before the callbacks above were registered must still stop the base sinker
+	if s.IsTerminating() {
+		s.Sinker.Shutdown(s.Err())
+		return
+	}
 
 	logEach := 15 * time.Second
 	if s.logger.Core().Enabled(zap.DebugLevel) {
@@ -153,8 +177,16 @@ func (s *SQLSinker) flushWithRetry(ctx context.Context, moduleHash string, curso
 	return 0, fmt.Errorf("flush failed after %d retries: %w", retries, lastErr)
 }
 
-func (s *SQLSinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *sink.Cursor) error {
+func (s *SQLSinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *sink.Cursor) (err error) {
 	blockReceivedAt := time.Now()
+	defer func() {
+		if err != nil {
+			s.handlerFailed = true
+			return
+		}
+		s.lastHandledCursor = cursor
+		s.lastFinalBlockHeight = data.FinalBlockHeight
+	}()
 
 	output := data.Output
 
@@ -332,20 +364,49 @@ func protoUpdateOpToDbUpdateOp(op pbdatabase.Field_UpdateOp) db2.UpdateOp {
 }
 
 func (s *SQLSinker) HandleBlockRangeCompletion(ctx context.Context, cursor *sink.Cursor) error {
-	// To be moved in the base sinker library, happens usually only on integration tests where the connection
-	// can close with "nil" error but we haven't completed the range for real yet.
-	// The stop block is exclusive: the last streamed block is stopBlock-1, which
-	// completes the range and must trigger the final flush.
-	stopBlock := s.Sinker.StopBlock()
-	if stopBlock > 0 && cursor.Block().Num() < stopBlock-1 {
-		s.logger.Debug("range not completed yet, skipping", zap.Stringer("block", cursor.Block()), zap.Uint64("stop_block", stopBlock))
+	if s.handlerFailed {
+		// Pending changes may hold part of a block: drop them, the sink resumes from the stored cursor.
+		s.logger.Info("a block failed to be handled, not flushing pending changes")
 		return nil
 	}
 
-	s.logger.Info("stream completed, flushing to database", zap.Stringer("block", cursor.Block()))
-	_, err := s.flushWithRetry(ctx, s.OutputModuleHash(), cursor, cursor.Block().Num(), s.flushRetryCount)
-	if err != nil {
-		return fmt.Errorf("failed to flush %s block on completion: %w", cursor.Block(), err)
+	// The stream also ends without error when it is stopped.
+	stopped := s.IsTerminating() || ctx.Err() != nil
+
+	if !stopped {
+		// To be moved in the base sinker library, happens usually only on integration tests where the connection
+		// can close with "nil" error but we haven't completed the range for real yet.
+		// The stop block is exclusive: the last streamed block is stopBlock-1, which
+		// completes the range and must trigger the final flush.
+		streamCursor := cursor
+		if received := s.Sinker.LastReceivedCursor(); received != nil {
+			streamCursor = received
+		}
+		stopBlock := s.Sinker.StopBlock()
+		if stopBlock > 0 && streamCursor.Block().Num() < stopBlock-1 {
+			s.logger.Debug("range not completed yet, skipping", zap.Stringer("block", streamCursor.Block()), zap.Uint64("stop_block", stopBlock))
+			return nil
+		}
+	}
+
+	// Flush with the cursor of the last block this sink handled and the final block height the stream
+	// reported. The stream's own cursor can be ahead of the handled blocks (undo buffer), and its block
+	// is not necessarily final: treating it as final would prune the undo history of blocks that are
+	// still reversible.
+	if s.lastHandledCursor == nil {
+		return nil
+	}
+	if stopped {
+		s.logger.Info("stream stopped, flushing handled blocks to database", zap.Stringer("block", s.lastHandledCursor.Block()))
+		// The stream's context is cancelled already: give this last flush its own, bounded one.
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.WithoutCancel(ctx), FinalFlushTimeout)
+		defer cancel()
+	} else {
+		s.logger.Info("stream completed, flushing to database", zap.Stringer("block", s.lastHandledCursor.Block()))
+	}
+	if _, err := s.flushWithRetry(ctx, s.OutputModuleHash(), s.lastHandledCursor, s.lastFinalBlockHeight, s.flushRetryCount); err != nil {
+		return fmt.Errorf("failed to flush %s block on completion: %w", s.lastHandledCursor.Block(), err)
 	}
 
 	return nil
@@ -356,8 +417,10 @@ func (s *SQLSinker) HandleBlockUndoSignal(ctx context.Context, data *pbsubstream
 
 	err := s.loader.Revert(ctx, s.OutputModuleHash(), cursor, data.LastValidBlock.Number)
 	if err != nil {
+		s.handlerFailed = true
 		return err
 	}
+	s.lastHandledCursor = cursor
 
 	handleUndoDuration := time.Since(handlerStart)
 	s.stats.RecordHandleUndoDuration(handleUndoDuration)

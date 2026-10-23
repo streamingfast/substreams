@@ -9,6 +9,8 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -53,7 +55,65 @@ type Sinker struct {
 	request                 *pbsubstreamsrpcv3.Request
 	stats                   *Stats
 	requestActiveStartBlock uint64
+
+	// lastHandledCursor is the cursor of the last block or undo signal the handler accepted. With an
+	// undo buffer, the stream's cursor (the last block received) can be ahead of it.
+	lastHandledCursor *Cursor
+	// lastReceivedCursor is the stream's cursor when it ended, set before the completion handler runs.
+	lastReceivedCursor *Cursor
+
+	runStarted atomic.Bool
+	runDone    chan struct{}
+	runErrMu   sync.Mutex
+	runErr     error
 }
+
+// LastReceivedCursor returns, from the completion handler on, the cursor of the last block or undo
+// signal the stream delivered. With an undo buffer it can be ahead of the cursor given to the handler.
+func (s *Sinker) LastReceivedCursor() *Cursor {
+	return s.lastReceivedCursor
+}
+
+// AwaitRun waits for Run to return, or for ctx to be done, then returns the first failure of Run. It
+// returns right away if Run was not started.
+//
+// Stopping the sinker (a signal, say) terminates it right away, while Run goes on until the stream
+// returns and the completion handler, which may still write what was handled so far, is done. A
+// caller about to exit waits here so it does not cut that work short, and gets its failure: the
+// sinker's own termination error was set by the stop, before that work ran, so it cannot carry it.
+func (s *Sinker) AwaitRun(ctx context.Context) error {
+	if s.runStarted.Load() {
+		select {
+		case <-s.runDone:
+		case <-ctx.Done():
+			return fmt.Errorf("sinker run did not finish, its last writes may or may not have completed: %w", ctx.Err())
+		}
+	}
+
+	s.runErrMu.Lock()
+	defer s.runErrMu.Unlock()
+	return s.runErr
+}
+
+// endRun shuts the sinker down with err, also kept for AwaitRun: when a stop came first, the sinker is
+// terminated already and its termination error cannot carry err anymore.
+func (s *Sinker) endRun(err error) {
+	if err != nil {
+		s.runErrMu.Lock()
+		if s.runErr == nil {
+			s.runErr = err
+		}
+		s.runErrMu.Unlock()
+	}
+
+	s.Shutdown(err)
+}
+
+// handlerError marks an error returned by the handler, as opposed to one from the stream.
+type handlerError struct{ err error }
+
+func (e *handlerError) Error() string { return e.err.Error() }
+func (e *handlerError) Unwrap() error { return e.err }
 
 // New creates a new Sinker instance with the provided parameters.
 //
@@ -103,6 +163,7 @@ func NewFromConfig(
 		Shutter:      shutter.New(),
 		SinkerConfig: config,
 		stats:        newStats(config.Logger),
+		runDone:      make(chan struct{}),
 	}
 
 	// Set up buffer unless final blocks only is configured
@@ -256,12 +317,19 @@ func (s *Sinker) PrintStats() {
 }
 
 func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler) {
+	s.runStarted.Store(true)
+	defer close(s.runDone)
+
 	ctx, cancel := context.WithCancel(ctx)
 	s.OnTerminating(func(_ error) {
 		s.Logger.Info("sinker terminating")
 		s.stats.Close()
 		cancel()
 	})
+	// A stop that came before the callback above was registered must still cancel the stream
+	if s.IsTerminating() {
+		cancel()
+	}
 	s.stats.OnTerminated(func(err error) { s.Shutdown(err) })
 	if s.SinkerConfig.PrometheusAddr != "" {
 		Metrics.Register()
@@ -295,28 +363,33 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 
 	s.Logger.Info("starting sinker", fields...)
 
+	s.lastHandledCursor = cursor
 	lastCursor, err := s.run(ctx, cursor, handler)
+	s.lastReceivedCursor = lastCursor
 	if err == nil {
 		s.Logger.Info("substreams ended correctly, reached your stop block", zap.Stringer("last_block_seen", lastCursor.Block()))
 
 		if v, ok := handler.(SinkerCompletionHandler); ok {
 			s.Logger.Info("substreams handler has completion callback defined, calling it")
 
-			if err := v.HandleBlockRangeCompletion(ctx, lastCursor); err != nil {
-				s.Shutdown(fmt.Errorf("sinker completion handler error: %w", err))
+			// The handler gets the cursor of the last block it accepted: with an undo buffer, the
+			// stream's cursor is ahead of the blocks still in the buffer.
+			if err := v.HandleBlockRangeCompletion(ctx, s.lastHandledCursor); err != nil {
+				s.endRun(fmt.Errorf("sinker completion handler error: %w", err))
 				return
 			}
 		}
 	}
 
 	// If the context is canceled and we are here, it we have stop running without any other error, so Shutdown without error,
-	// we are not the cause of the error. We still shutdown so Sinker last stats is still printed.
+	// we are not the cause of the error. We still shutdown so Sinker last stats is still printed. A handler error
+	// while stopping is taken as caused by the stop: a cancelled database call does not always wrap context.Canceled.
 	shutdownErr := err
 	if ctx.Err() == context.Canceled {
 		shutdownErr = nil
 	}
 
-	s.Shutdown(shutdownErr)
+	s.endRun(shutdownErr)
 }
 
 func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler) (activeCursor *Cursor, err error) {
@@ -416,7 +489,12 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 		}
 
 		if err != nil {
-			if errors.Is(err, io.EOF) {
+			var handlerErr *handlerError
+			isHandlerErr := errors.As(err, &handlerErr)
+
+			// Only the stream ending is the end of the range: a handler error wrapping io.EOF (a lost
+			// database connection, say) is a failure.
+			if !isHandlerErr && errors.Is(err, io.EOF) {
 				// We must assume that receiving an `io.EOF` means the stop block was reached. This is because
 				// on network that can skips block number, it's possible that we requested to stop on a block
 				// number that is no in the chain meaning we will receive `io.EOF` but the last seen block before
@@ -426,6 +504,11 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 			}
 
 			if ctxErr := ctx.Err(); errors.Is(ctxErr, context.Canceled) {
+				if isHandlerErr {
+					// The handler did not finish while we were terminating: return its error, so the
+					// completion handler does not run on top of that block. Run does not report it.
+					return activeCursor, err
+				}
 				s.Logger.Debug("substreams encountered an error but we are currently terminating, ignoring it", zap.Error(err))
 				return activeCursor, nil
 			}
@@ -754,8 +837,9 @@ func (s *Sinker) doRequest(
 
 			if s.buffer == nil {
 				if err := handler.HandleBlockUndoSignal(ctx, r.BlockUndoSignal, activeCursor); err != nil {
-					return activeCursor, receivedDataMessage, fmt.Errorf("handle BlockUndoSignal: %w", err)
+					return activeCursor, receivedDataMessage, &handlerError{fmt.Errorf("handle BlockUndoSignal: %w", err)}
 				}
+				s.lastHandledCursor = activeCursor
 			} else {
 				// A fork within the buffer is handled by dropping buffered blocks and the
 				// downstream handler never hears about it. A fork below what this process
@@ -769,15 +853,16 @@ func (s *Sinker) doRequest(
 				}
 				if !absorbed {
 					if err := handler.HandleBlockUndoSignal(ctx, r.BlockUndoSignal, activeCursor); err != nil {
-						return activeCursor, receivedDataMessage, fmt.Errorf("handle BlockUndoSignal: %w", err)
+						return activeCursor, receivedDataMessage, &handlerError{fmt.Errorf("handle BlockUndoSignal: %w", err)}
 					}
+					s.lastHandledCursor = activeCursor
 				}
 			}
 
 		case *pbsubstreamsrpc.Response_DebugSnapshotData:
 			if ss, ok := handler.(SinkerSnapshotHandler); ok {
 				if err := ss.HandleInitialSnapshotData(ctx, r.DebugSnapshotData); err != nil {
-					return activeCursor, receivedDataMessage, fmt.Errorf("handle initial snapshot data: %w", err)
+					return activeCursor, receivedDataMessage, &handlerError{fmt.Errorf("handle initial snapshot data: %w", err)}
 				}
 			} else {
 				s.Logger.Warn("received debug snapshot message, there is no reason to receive those here", zap.Reflect("message", r))
@@ -785,7 +870,7 @@ func (s *Sinker) doRequest(
 		case *pbsubstreamsrpc.Response_DebugSnapshotComplete:
 			if ss, ok := handler.(SinkerSnapshotHandler); ok {
 				if err := ss.HandleInitialSnapshotComplete(ctx, r.DebugSnapshotComplete); err != nil {
-					return activeCursor, receivedDataMessage, fmt.Errorf("handle initial snapshot complete: %w", err)
+					return activeCursor, receivedDataMessage, &handlerError{fmt.Errorf("handle initial snapshot complete: %w", err)}
 				}
 			} else {
 				s.Logger.Warn("received debug snapshot message, there is no reason to receive those here", zap.Reflect("message", r))
@@ -814,7 +899,7 @@ func (s *Sinker) doRequest(
 func (s *Sinker) handleSessionInit(ctx context.Context, handler SinkerHandler, session *pbsubstreamsrpc.SessionInit) error {
 	if sh, ok := handler.(SinkerSessionInitHandler); ok {
 		if err := sh.HandleSessionInit(ctx, s.request, session); err != nil {
-			return fmt.Errorf("handle session init: %w", err)
+			return &handlerError{fmt.Errorf("handle session init: %w", err)}
 		}
 	}
 
@@ -905,8 +990,9 @@ func (s *Sinker) processBlockScopedData(
 		}
 
 		if err := handler.HandleBlockScopedData(ctx, blockScopedData, isLive, currentCursor); err != nil {
-			return activeCursor, receivedDataMessage, fmt.Errorf("handle BlockScopedData message at block %s: %w", block, err)
+			return activeCursor, receivedDataMessage, &handlerError{fmt.Errorf("handle BlockScopedData message at block %s: %w", block, err)}
 		}
+		s.lastHandledCursor = currentCursor
 	}
 
 	return activeCursor, true, nil

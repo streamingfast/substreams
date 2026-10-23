@@ -808,6 +808,119 @@ func TestSinker_Integration_UndoBufferWorks(t *testing.T) {
 	)
 }
 
+// TestSinker_Integration_ReversibleBlocksInOneBatch checks that an undo reverts exactly the
+// orphaned blocks when one flush batch spans several reversible blocks touching the same row,
+// and that pending changes of orphaned blocks are never written.
+func TestSinker_Integration_ReversibleBlocksInOneBatch(t *testing.T) {
+	type CounterRow struct {
+		ID    string `db:"id"`
+		Count int64  `db:"count"`
+	}
+
+	equalsCounter := func(count int64) func(t *testing.T, dbx *sqlx.DB, schema string) {
+		return func(t *testing.T, dbx *sqlx.DB, schema string) {
+			require.Equal(t, []*CounterRow{{ID: "counter1", Count: count}}, readDbChangesRows[CounterRow](t, dbx, schema, "counters"))
+		}
+	}
+
+	tests := []struct {
+		sinkerTestCase
+		liveBlockFlushInterval int
+		stopBlock              uint64
+	}{
+		{
+			sinkerTestCase{
+				"add to same row in two reversible blocks of one batch, undo the later block",
+				streamMock(
+					// Flushes alone, so 10a and 11a are flushed together on 11a
+					dbChangesBlockData(t, "9a", finalBlock("8a")),
+					dbChangesBlockData(t, "10a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					dbChangesBlockData(t, "11a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					blockUndo(t, "10a", finalBlock("8a")),
+				),
+				equalsCounter(1),
+				"Block #10 (10a) - LIB #8 (8a)",
+			},
+			2, 0,
+		},
+		{
+			sinkerTestCase{
+				"add to same row in a final and a reversible block of one batch, undo the reversible block",
+				streamMock(
+					// Flushes alone, so 8a and 9a are flushed together on 9a
+					dbChangesBlockData(t, "7a", finalBlock("7a")),
+					dbChangesBlockData(t, "8a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					dbChangesBlockData(t, "9a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					blockUndo(t, "8a", finalBlock("8a")),
+				),
+				equalsCounter(1),
+				"Block #8 (8a) - LIB #8 (8a)",
+			},
+			2, 0,
+		},
+		{
+			sinkerTestCase{
+				"undo with pending changes writes the valid ones in the revert transaction",
+				streamMock(
+					dbChangesBlockData(t, "10a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					dbChangesBlockData(t, "11a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					blockUndo(t, "10a", finalBlock("8a")),
+				),
+				equalsCounter(1),
+				"Block #10 (10a) - LIB #8 (8a)",
+			},
+			// No interval flush and the stream ends on the undo, only the revert writes
+			1000, 0,
+		},
+		{
+			sinkerTestCase{
+				"undo with pending changes drops the orphaned block and writes the valid one",
+				streamMock(
+					dbChangesBlockData(t, "10a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					dbChangesBlockData(t, "11a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					blockUndo(t, "10a", finalBlock("8a")),
+					dbChangesBlockData(t, "11b", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("10"))),
+				),
+				equalsCounter(11),
+				"Block #11 (11b) - LIB #8 (8a)",
+			},
+			// No interval flush, only the revert and the completion flush on 11b write
+			1000, 12,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			runSinkerTest(
+				t,
+				sharedDbChangesPostgresContainer,
+				func(defaults []sink.Option) []sink.Option {
+					if test.stopBlock == 0 {
+						return defaults
+					}
+					return append(defaults, sink.WithBlockRange(bstream.MustParseRange(fmt.Sprintf("1-%d", test.stopBlock), bstream.WithExclusiveEnd())))
+				},
+				func(defaults sinker.SinkerFactoryOptions) sinker.SinkerFactoryOptions {
+					defaults.LiveBlockFlushInterval = test.liveBlockFlushInterval
+					defaults.BatchRowFlushInterval = 1000
+					return defaults
+				},
+				rawSQLInput(func(schema string) string {
+					return fmt.Sprintf(`
+						CREATE TABLE IF NOT EXISTS "%s".counters (
+							id TEXT PRIMARY KEY,
+							count BIGINT DEFAULT 0
+						);
+					`, schema)
+				}),
+				test.responses,
+				test.expected,
+				test.expectedFinalCursor,
+			)
+		})
+	}
+}
+
 // TestSinker_Integration_BoundedRunFlushesOnCompletion locks in the fix for the
 // bounded-run completion flush. With --stop-block set, the stop block is exclusive,
 // so the last streamed block is stopBlock-1. Here every interval flush is disabled

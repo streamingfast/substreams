@@ -58,6 +58,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
+- SQL sink (DatabaseChanges): fix undo leaving changes from orphaned blocks in the database. Changes to the same
+  row in different reversible blocks of one batch were merged into one operation recorded under a single block, so
+  undoing the later block missed them (permanently for `ADD` fields), and pending changes survived an undo. They are
+  now kept as separate operations within the batch, and an undo drops the pending changes of reverted blocks and
+  writes the rest with the cursor. Batching is unchanged.
 - Add `substreams sink pubsub`, which publishes any module output to a Google Cloud Pub/Sub topic as the
   webhook sink's batch JSON: `{"manifest": {...}, "blocks": [{"clock": {...}, "data": {...}}]}`. While
   Substreams is not live, `--pubsub-batch-max-blocks` groups blocks into one message. A live block is

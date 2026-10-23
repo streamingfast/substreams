@@ -168,6 +168,16 @@ func (l *Loader) FlushNeeded() bool {
 	return totalRows > l.batchRowFlushInterval
 }
 
+// HasPendingEntries reports whether any change is waiting to be flushed.
+func (l *Loader) HasPendingEntries() bool {
+	for pair := l.entries.Oldest(); pair != nil; pair = pair.Next() {
+		if pair.Value.Len() > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // getTablesFromSchema returns table information similar to schema.Tables()
 // but only inspects tables in the specified schema to avoid issues with database extensions
 func (l *Loader) getTablesFromSchema(schemaName string) (map[[2]string][]*sql.ColumnType, error) {

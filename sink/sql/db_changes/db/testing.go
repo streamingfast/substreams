@@ -59,6 +59,13 @@ func TestSinglePrimaryKeyTables(schema string) map[string]*TableInfo {
 	})
 }
 
+// SetFlushIntervals overrides the loader's flush intervals in tests.
+func (l *Loader) SetFlushIntervals(batchBlock, batchRow, liveBlock int) {
+	l.batchBlockFlushInterval = batchBlock
+	l.batchRowFlushInterval = batchRow
+	l.liveBlockFlushInterval = liveBlock
+}
+
 func TestTables(schema string, customTable map[string]*TableInfo) map[string]*TableInfo {
 	out := map[string]*TableInfo{}
 

@@ -253,6 +253,92 @@ type event struct {
 	undoSignal   bool
 }
 
+// TestSinker_CompletionFlush checks the final flush when the stream ends, whether stopped or at its end:
+// it writes the handled blocks with their own cursor and keeps the undo history of the blocks that are
+// still reversible, instead of treating the stream's latest block as final. Nothing is written after a
+// block failed to be handled.
+func TestSinker_CompletionFlush(t *testing.T) {
+	newSinker := func(t *testing.T, tx *db2.TestTx) *SQLSinker {
+		l := db2.NewTestLoader(t, "psql://x:5432/x?schemaName=testschema", tx, db2.TestSinglePrimaryKeyTables("testschema"), logger, tracer)
+		l.SetFlushIntervals(1000, 1_000_000, 1)
+		s, err := sink.NewFromConfig(&sink.SinkerConfig{
+			Pkg:              testPackage,
+			OutputModule:     testPackage.Modules.Modules[0],
+			OutputModuleHash: manifest.ModuleHash([]byte("unused")),
+			ClientConfig:     testClientConfig,
+			Mode:             sink.SubstreamsModeDevelopment,
+			Logger:           logger,
+		})
+		require.NoError(t, err)
+		sinker, err := New(s, l, logger, nil, 3, time.Second)
+		require.NoError(t, err)
+		return sinker
+	}
+
+	handle := func(t *testing.T, sinker *SQLSinker, n uint64, table string) error {
+		catchingUp := false
+		return sinker.HandleBlockScopedData(context.Background(),
+			blockScopedData("db_out", []*pbdatabase.TableChange{insertRowSinglePK(table, fmt.Sprintf("%d", n), "from", "a", "to", "b")}, n, 5),
+			&catchingUp, sink.MustNewCursor(simpleCursor(n, 5)))
+	}
+
+	// The stream's cursor is at 13 while the sink handled 10-11 (blocks 12-13 still in an undo buffer)
+	streamCursor := sink.MustNewCursor(simpleCursor(13, 5))
+	expectHandledBlocksFlushed := func(t *testing.T, results []string) {
+		assert.Contains(t, results, `DELETE FROM "testschema"."substreams_history" WHERE block_num <= 5;`)
+		assert.Contains(t, results, fmt.Sprintf(`UPDATE "testschema"."cursors" set cursor = '%s', block_num = 11, block_id = '11' WHERE id = '756e75736564';`, sink.MustNewCursor(simpleCursor(11, 5))))
+		for _, q := range results {
+			assert.NotContains(t, q, "block_num <= 13", "the stream's block is not final")
+			assert.NotContains(t, q, "block_num = 13")
+		}
+	}
+
+	t.Run("stopped", func(t *testing.T) {
+		tx := &db2.TestTx{}
+		sinker := newSinker(t, tx)
+		require.NoError(t, handle(t, sinker, 10, "xfer"))
+		require.NoError(t, handle(t, sinker, 11, "xfer"))
+		require.Empty(t, tx.Results(), "nothing flushed yet")
+
+		sinker.Shutdown(nil)
+		require.NoError(t, sinker.HandleBlockRangeCompletion(context.Background(), streamCursor))
+		expectHandledBlocksFlushed(t, tx.Results())
+	})
+
+	t.Run("context cancelled", func(t *testing.T) {
+		tx := &db2.TestTx{}
+		sinker := newSinker(t, tx)
+		require.NoError(t, handle(t, sinker, 10, "xfer"))
+		require.NoError(t, handle(t, sinker, 11, "xfer"))
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		require.NoError(t, sinker.HandleBlockRangeCompletion(ctx, streamCursor))
+		expectHandledBlocksFlushed(t, tx.Results())
+	})
+
+	t.Run("stream ended", func(t *testing.T) {
+		tx := &db2.TestTx{}
+		sinker := newSinker(t, tx)
+		require.NoError(t, handle(t, sinker, 10, "xfer"))
+		require.NoError(t, handle(t, sinker, 11, "xfer"))
+
+		require.NoError(t, sinker.HandleBlockRangeCompletion(context.Background(), streamCursor))
+		expectHandledBlocksFlushed(t, tx.Results())
+	})
+
+	t.Run("nothing written after a failed block", func(t *testing.T) {
+		tx := &db2.TestTx{}
+		sinker := newSinker(t, tx)
+		require.NoError(t, handle(t, sinker, 10, "xfer"))
+		require.Error(t, handle(t, sinker, 11, "unknown_table"))
+
+		sinker.Shutdown(nil)
+		require.NoError(t, sinker.HandleBlockRangeCompletion(context.Background(), streamCursor))
+		assert.Empty(t, tx.Results())
+	})
+}
+
 var T = true
 var flushEveryBlock = &T
 

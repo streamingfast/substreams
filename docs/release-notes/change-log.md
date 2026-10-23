@@ -63,6 +63,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   undoing the later block missed them (permanently for `ADD` fields), and pending changes survived an undo. They are
   now kept as separate operations within the batch, and an undo drops the pending changes of reverted blocks and
   writes the rest with the cursor. Batching is unchanged.
+- SQL sink (DatabaseChanges): an undo whose transaction fails is now rolled back.
+- Sink library: a handler error is never taken for the end of the stream anymore. One wrapping `io.EOF` (a lost database
+  connection, say) used to end the run successfully, as if the stop block was reached, so a live sink exited with
+  status 0. When the handler fails while the sinker is stopping, the completion handler no longer runs on top of the
+  block it did not finish, and the error is reported unless it was caused by the stop itself. The completion handler
+  now gets the cursor of the last block the handler accepted rather than of the last block received, which with
+  `--undo-buffer-size` was ahead of the blocks still in the buffer (`Sinker.LastReceivedCursor` still gives the
+  latter).
+- SQL sink (DatabaseChanges): fix the final flush when the stream ends (stopped, or at the stop block) treating the
+  stream's latest block as final. It pruned the undo history of blocks that were still reversible, so a reorg across
+  a sink restart left orphaned rows, and with `--undo-buffer-size` it saved a cursor past the blocks still in the
+  buffer, which were then skipped. It now writes the handled blocks with the last handled block's cursor and the
+  stream's final block height, and writes nothing if a block failed to be handled. The CLI now waits (up to 25 s) for
+  that last flush before exiting.
 - Add `substreams sink pubsub`, which publishes any module output to a Google Cloud Pub/Sub topic as the
   webhook sink's batch JSON: `{"manifest": {...}, "blocks": [{"clock": {...}, "data": {...}}]}`. While
   Substreams is not live, `--pubsub-batch-max-blocks` groups blocks into one message. A live block is

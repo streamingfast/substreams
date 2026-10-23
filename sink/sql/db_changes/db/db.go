@@ -48,6 +48,11 @@ type Loader struct {
 	dsn    *DSN
 
 	batchOrdinal uint64 // Counter for ordinals within the current batch, resets on flush
+
+	// expectedCursor is the stored cursor of this sink's module as this loader last read or wrote
+	// it, nil until SetExpectedCursor. Flushes and reverts first check the stored cursor still has this
+	// value (see checkCursor).
+	expectedCursor *string
 }
 
 func NewLoader(

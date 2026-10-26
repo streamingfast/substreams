@@ -427,7 +427,16 @@ func runDatabaseChangesSink(cmd *cobra.Command, driver, manifestPath, outputModu
 
 	app.SuperviseAndStart(sqlSinker)
 
-	return app.WaitForTermination(zlog, 0*time.Second, 30*time.Second)
+	err = app.WaitForTermination(zlog, 0*time.Second, 30*time.Second)
+	// Termination can complete while the sinker still writes the blocks it handled before stopping, and
+	// a failure while finishing does not change a termination that was requested first.
+	if !sqlSinker.WaitForRun(sinker.FinalFlushTimeout + 5*time.Second) {
+		return fmt.Errorf("sql sinker did not finish within %s; its last flush may or may not have been committed, the sink resumes from the stored cursor on restart", sinker.FinalFlushTimeout+5*time.Second)
+	}
+	if err == nil {
+		err = sqlSinker.RunErr()
+	}
+	return err
 }
 
 func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string, spkg *pbsubstreams.Package, outputModuleName string) error {

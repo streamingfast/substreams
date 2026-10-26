@@ -14,6 +14,13 @@ import (
 
 var ErrCursorNotFound = errors.New("cursor not found")
 
+// ErrCursorConflict means the stored cursor of this sink's module is no longer the one this loader
+// last read or wrote: another sink of the same module wrote it, the database lost commits (a restore
+// or a failover with asynchronous replication), or a commit this loader saw fail actually went
+// through. Nothing of the failed transaction was written. Restart the sink so it resumes from the
+// cursor in the database.
+var ErrCursorConflict = errors.New("the stored cursor is not the one this sink last read or wrote")
+
 type cursorRow struct {
 	ID       string
 	Cursor   string
@@ -24,41 +31,65 @@ type cursorRow struct {
 // GetAllCursors returns an unordered map given for each module's hash recorded
 // the active cursor for it.
 func (l *Loader) GetAllCursors(ctx context.Context) (out map[string]*sink.Cursor, err error) {
-	query := l.dialect.GetAllCursorsQuery(l.cursorTable.identifier)
-	rows, err := l.DB.QueryContext(ctx, query)
+	rows, err := l.allCursorRows(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("query all cursors: %w", err)
+		return nil, err
 	}
 
-	out = make(map[string]*sink.Cursor)
-	for rows.Next() {
-		c := &cursorRow{}
-		if err := rows.Scan(&c.ID, &c.Cursor, &c.BlockNum, &c.BlockID); err != nil {
-			return nil, fmt.Errorf("getting all cursors:  %w", err)
-		}
-
-		out[c.ID], err = sink.NewCursor(c.Cursor)
+	out = make(map[string]*sink.Cursor, len(rows))
+	for id, row := range rows {
+		out[id], err = sink.NewCursor(row.Cursor)
 		if err != nil {
-			return nil, fmt.Errorf("database corrupted: stored cursor %q is not a valid cursor", c.Cursor)
+			return nil, fmt.Errorf("database corrupted: stored cursor %q is not a valid cursor", row.Cursor)
 		}
 	}
 
 	return out, nil
 }
 
-func (l *Loader) GetCursor(ctx context.Context, outputModuleHash string) (cursor *sink.Cursor, mismatchDetected bool, err error) {
-	cursors, err := l.GetAllCursors(ctx)
+func (l *Loader) allCursorRows(ctx context.Context) (map[string]cursorRow, error) {
+	query := l.dialect.GetAllCursorsQuery(l.cursorTable.identifier)
+	rows, err := l.DB.QueryContext(ctx, query)
 	if err != nil {
-		return nil, false, fmt.Errorf("get cursor: %w", err)
+		return nil, fmt.Errorf("query all cursors: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[string]cursorRow)
+	for rows.Next() {
+		c := cursorRow{}
+		if err := rows.Scan(&c.ID, &c.Cursor, &c.BlockNum, &c.BlockID); err != nil {
+			return nil, fmt.Errorf("getting all cursors:  %w", err)
+		}
+		out[c.ID] = c
+	}
+
+	return out, rows.Err()
+}
+
+// GetCursor returns the cursor stored for outputModuleHash. When found, rawCursor is its stored value
+// as is, to pass to SetExpectedCursor; it is empty otherwise.
+func (l *Loader) GetCursor(ctx context.Context, outputModuleHash string) (cursor *sink.Cursor, rawCursor string, mismatchDetected bool, err error) {
+	rows, err := l.allCursorRows(ctx)
+	if err != nil {
+		return nil, "", false, fmt.Errorf("get cursor: %w", err)
+	}
+
+	cursors := make(map[string]*sink.Cursor, len(rows))
+	for id, row := range rows {
+		cursors[id], err = sink.NewCursor(row.Cursor)
+		if err != nil {
+			return nil, "", false, fmt.Errorf("database corrupted: stored cursor %q is not a valid cursor", row.Cursor)
+		}
 	}
 
 	if len(cursors) == 0 {
-		return sink.NewBlankCursor(), false, ErrCursorNotFound
+		return sink.NewBlankCursor(), "", false, ErrCursorNotFound
 	}
 
 	activeCursor, found := cursors[outputModuleHash]
 	if found {
-		return activeCursor, false, err
+		return activeCursor, rows[outputModuleHash].Cursor, false, nil
 	}
 
 	// It's not found at this point, look for one with highest block, we will report
@@ -67,7 +98,7 @@ func (l *Loader) GetCursor(ctx context.Context, outputModuleHash string) (cursor
 
 	switch l.moduleMismatchMode {
 	case OnModuleHashMismatchIgnore:
-		return activeCursor, true, err
+		return activeCursor, "", true, err
 
 	case OnModuleHashMismatchWarn:
 		l.logger.Warn(
@@ -76,10 +107,10 @@ func (l *Loader) GetCursor(ctx context.Context, outputModuleHash string) (cursor
 			zap.String("actual_module_hash", actualOutputModuleHash),
 		)
 
-		return activeCursor, true, err
+		return activeCursor, "", true, err
 
 	case OnModuleHashMismatchError:
-		return nil, true, fmt.Errorf("cursor module hash mismatch, refusing to continue because flag '--on-module-hash-mismatch=error' (defaults) is set, you can change to 'warn' or 'ignore': your module's hash is %q but cursor with highest block (%d) module hash is actually %q in the database",
+		return nil, "", true, fmt.Errorf("cursor module hash mismatch, refusing to continue because flag '--on-module-hash-mismatch=error' (defaults) is set, you can change to 'warn' or 'ignore': your module's hash is %q but cursor with highest block (%d) module hash is actually %q in the database",
 			outputModuleHash,
 			activeCursor.Block().Num(),
 			actualOutputModuleHash,
@@ -101,6 +132,7 @@ func cursorAtHighestBlock(in map[string]*sink.Cursor) (hash string, highest *sin
 	return
 }
 
+// InsertCursor inserts the cursor of moduleHash.
 func (l *Loader) InsertCursor(ctx context.Context, moduleHash string, c *sink.Cursor) error {
 	query := fmt.Sprintf("INSERT INTO %s (id, cursor, block_num, block_id) values ('%s', '%s', %d, '%s')",
 		l.cursorTable.identifier,
@@ -124,7 +156,57 @@ func (l *Loader) UpdateCursor(ctx context.Context, tx Tx, moduleHash string, c *
 	_, err := l.runModifiyQuery(ctx, tx, "update", l.dialect.GetUpdateCursorQuery(
 		l.cursorTable.identifier, moduleHash, c, c.Block().Num(), c.Block().ID(),
 	))
+	if err == nil && tx == nil {
+		// Committed already; in a transaction, the caller records it after its commit.
+		l.recordCursor(c)
+	}
 	return err
+}
+
+// cursorChecker is implemented by dialects that can check, inside a transaction, that a module's
+// stored cursor has a given value, locking its row until the transaction ends.
+type cursorChecker interface {
+	GetCursorCheckQuery(table, moduleHash, expectedCursor string) string
+}
+
+// checkingCursor reports whether flushes and reverts check the stored cursor first.
+func (l *Loader) checkingCursor() bool {
+	_, ok := l.dialect.(cursorChecker)
+	return ok && l.expectedCursor != nil
+}
+
+// checkCursor locks the cursor row of moduleHash and checks it holds what this loader last read or
+// wrote, returning ErrCursorConflict otherwise. Run first in a flush or revert transaction, it fails
+// before anything is written, and a concurrent writer of the same module waits on the row lock, then
+// fails the same check.
+func (l *Loader) checkCursor(ctx context.Context, tx Tx, moduleHash string) error {
+	query := l.dialect.(cursorChecker).GetCursorCheckQuery(l.cursorTable.identifier, moduleHash, *l.expectedCursor)
+	result, err := tx.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("check cursor: %w", err)
+	}
+	matched, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("check cursor: rows affected: %w", err)
+	}
+	if matched != 1 {
+		return fmt.Errorf("%w (module %s): another sink may be writing to this database or it lost commits; restart to resume from the cursor stored in the database", ErrCursorConflict, moduleHash)
+	}
+	return nil
+}
+
+// SetExpectedCursor makes each flush and revert from then on first check that the stored cursor of the
+// sink's module is still cursor, or the one this loader wrote since (see ErrCursorConflict). Call it
+// once the stored cursor is known: as read by GetCursor (its rawCursor), or as written by InsertCursor.
+func (l *Loader) SetExpectedCursor(cursor string) {
+	l.expectedCursor = &cursor
+}
+
+// recordCursor records a committed write of this sink's cursor, if checking.
+func (l *Loader) recordCursor(c *sink.Cursor) {
+	if l.expectedCursor != nil {
+		l.SetExpectedCursor(c.String())
+	}
 }
 
 // DeleteCursor deletes the active cursor for the given 'moduleHash'. If no cursor is active and

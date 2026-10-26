@@ -27,6 +27,14 @@ func (l *Loader) Flush(ctx context.Context, outputModuleHash string, cursor *sin
 		}
 	}()
 
+	// Checked first: fails before any write if the stored cursor moved, and its row lock makes a
+	// concurrent writer wait, then fail the same check.
+	if l.checkingCursor() {
+		if err := l.checkCursor(ctx, tx, outputModuleHash); err != nil {
+			return 0, err
+		}
+	}
+
 	rowFlushedCount, err = l.dialect.Flush(tx, ctx, l, outputModuleHash, lastFinalBlock)
 	if err != nil {
 		return 0, fmt.Errorf("dialect flush: %w", err)
@@ -40,6 +48,7 @@ func (l *Loader) Flush(ctx context.Context, outputModuleHash string, cursor *sin
 	if err := tx.Commit(); err != nil {
 		return 0, fmt.Errorf("failed to commit db transaction: %w", err)
 	}
+	l.recordCursor(cursor)
 	l.reset()
 
 	// We add + 1 to the table count because the `cursors` table is an implicit table
@@ -59,6 +68,13 @@ func (l *Loader) Revert(ctx context.Context, outputModuleHash string, cursor *si
 			}
 		}
 	}()
+
+	// See Flush: checked first.
+	if l.checkingCursor() {
+		if err := l.checkCursor(ctx, tx, outputModuleHash); err != nil {
+			return err
+		}
+	}
 
 	if err := l.dialect.Revert(tx, ctx, l, lastValidBlock); err != nil {
 		return err
@@ -80,6 +96,7 @@ func (l *Loader) Revert(ctx context.Context, outputModuleHash string, cursor *si
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit db transaction: %w", err)
 	}
+	l.recordCursor(cursor)
 	l.reset()
 
 	l.logger.Debug("reverted changes to database", zap.Uint64("last_valid_block", lastValidBlock), zap.Int("dropped_pending_operations", dropped))

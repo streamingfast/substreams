@@ -101,6 +101,28 @@ func (l *Loader) WriterSessionAlive(ctx context.Context) bool {
 	return l.writerConn.PingContext(ctx) == nil
 }
 
+// KeepWriterSessionAlive runs a trivial query on the session holding the writer lock, unless a
+// transaction is open on it (the session is busy then, not idle). Called regularly, it keeps the
+// session from looking idle during long stretches without flushes (large segments while catching up,
+// a slow chain, sparse data), so a proxy's idle timeout or the server's idle_session_timeout doesn't
+// end it, which would hand the lock to a standby and make the sinks take turns failing over.
+//
+// An error means the query failed: a connection error means the session, and the lock, are gone.
+func (l *Loader) KeepWriterSessionAlive(ctx context.Context, timeout time.Duration) error {
+	if !l.writerTxMu.TryLock() {
+		return nil
+	}
+	defer l.writerTxMu.Unlock()
+	if l.writerConn == nil {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	_, err := l.writerConn.ExecContext(ctx, "SELECT 1")
+	return err
+}
+
 // writerLockHolder describes the session holding the writer lock, for logs.
 func (l *Loader) writerLockHolder(ctx context.Context, conn *sql.Conn, key int64) []zap.Field {
 	// A bigint advisory key shows in pg_locks as classid (high 32 bits) and objid (low 32 bits).

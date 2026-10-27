@@ -130,3 +130,96 @@ func TestDiscardEndsLockedSession_Postgres(t *testing.T) {
 	defer cancel()
 	require.NoError(t, b.AcquireWriterLock(ctx, 50*time.Millisecond, nil), "the discarded session must not keep the lock")
 }
+
+// The writer lock's session must survive long stretches without flushes: an idle timeout ending it
+// would hand the lock to a standby, and the sinks would take turns failing over.
+func TestWriterLockKeepalive_Postgres(t *testing.T) {
+	ctx := context.Background()
+	dsn := pgTestSchema(t)
+	poll := 50 * time.Millisecond
+
+	newWriter := func(t *testing.T) *Loader {
+		l := pgTestLoader(t, dsn, true)
+		require.NoError(t, l.AcquireWriterLock(ctx, poll, nil))
+		_, err := l.writerConn.ExecContext(ctx, "SET idle_session_timeout = '300ms'")
+		require.NoError(t, err)
+		return l
+	}
+	lockTaken := func(t *testing.T, within time.Duration) bool {
+		other := pgTestLoader(t, dsn, true)
+		ctx, cancel := context.WithTimeout(ctx, within)
+		defer cancel()
+		err := other.AcquireWriterLock(ctx, poll, nil)
+		if err == nil {
+			other.ReleaseWriterLock()
+		}
+		return err == nil
+	}
+
+	t.Run("without the keepalive, an idle session loses the lock", func(t *testing.T) {
+		newWriter(t)
+		time.Sleep(time.Second)
+		require.True(t, lockTaken(t, 2*time.Second), "the idle timeout should have ended the session")
+	})
+
+	t.Run("the keepalive keeps an idle session and its lock", func(t *testing.T) {
+		a := newWriter(t)
+		require.NoError(t, a.InsertCursor(ctx, testModuleHash, sink.NewBlankCursor()))
+		a.SetExpectedCursor(sink.NewBlankCursor().String())
+		stop := make(chan struct{})
+		done := make(chan error, 1)
+		go func() {
+			ticker := time.NewTicker(100 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-stop:
+					done <- nil
+					return
+				case <-ticker.C:
+					if err := a.KeepWriterSessionAlive(ctx, time.Second); err != nil {
+						done <- err
+						return
+					}
+				}
+			}
+		}()
+		require.False(t, lockTaken(t, 1200*time.Millisecond), "another sink took the lock")
+		close(stop)
+		require.NoError(t, <-done)
+
+		add(t, a, "x", "1")
+		_, err := a.Flush(ctx, testModuleHash, pgCursor(10, 10), 10)
+		require.NoError(t, err, "the writer can still write")
+		a.ReleaseWriterLock()
+	})
+
+	t.Run("the keepalive stays out of an open transaction", func(t *testing.T) {
+		a := newWriter(t)
+		_, err := a.writerConn.ExecContext(ctx, "SET idle_session_timeout = 0")
+		require.NoError(t, err)
+		tx, err := a.BeginTx(ctx, nil)
+		require.NoError(t, err)
+		_, err = tx.ExecContext(ctx, "SELECT 1/0") // leaves the transaction aborted
+		require.Error(t, err)
+
+		require.NoError(t, a.KeepWriterSessionAlive(ctx, time.Second), "skipped, not run in the aborted transaction")
+		require.NoError(t, tx.Rollback())
+		require.NoError(t, a.KeepWriterSessionAlive(ctx, time.Second), "runs once the transaction ended")
+		require.True(t, a.WriterSessionAlive(ctx))
+		a.ReleaseWriterLock()
+	})
+
+	t.Run("the keepalive reports a lost session", func(t *testing.T) {
+		a := newWriter(t)
+		var pid int
+		require.NoError(t, a.writerConn.QueryRowContext(ctx, "SELECT pg_backend_pid()").Scan(&pid))
+		other := pgTestLoader(t, dsn, true)
+		_, err := other.DB.Exec("SELECT pg_terminate_backend($1)", pid)
+		require.NoError(t, err)
+
+		err = a.KeepWriterSessionAlive(ctx, time.Second)
+		require.Error(t, err)
+		require.False(t, IsCancellation(err), "a lost session is not a timeout: %v", err)
+	})
+}

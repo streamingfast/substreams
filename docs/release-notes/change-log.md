@@ -74,7 +74,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   lock on the cursors table before streaming and writes through that session; the others wait, checking every
   `--standby-lock-poll-interval`, and the first to see the lock released takes over from the stored cursor. A sink
   whose locked session is gone stops instead of retrying its flush, and standbys serve the metrics endpoint while they
-  wait. See [Standby Sinks](../references/sql/standby-sinks.md).
+  wait. The active sink queries its locked session every `--standby-lock-poll-interval` while not flushing, so a proxy
+  or `idle_session_timeout` doesn't end it during long stretches without writes (no failover ping-pong on sparse data). See [Standby Sinks](../references/sql/standby-sinks.md).
 - SQL sink (DatabaseChanges): add `--stall-timeout`, which stops the sink when the stream delivers no block or undo for
   that long once live (blocks held by an undo buffer count). On PostgreSQL a flush now honours its context, so the stop
   cancels a database call in progress (the transaction rolls back); ClickHouse flushes still always run to the end.

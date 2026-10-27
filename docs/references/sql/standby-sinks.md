@@ -66,6 +66,15 @@ Things to set up:
   there, replaying any blocks the failover lost. This relies on the old primary being fenced (for
   example Patroni with a watchdog): if two databases accept writes, each grants its own lock and its
   own cursor check passes.
+- **Idle timeouts:** the active sink can go a long time without writing: while it processes large
+  segments catching up, or when a slow chain or a sparse module yields nothing to flush. So every
+  `--standby-lock-poll-interval` it runs `SELECT 1` on the session holding the lock (skipped while a
+  flush is running, which keeps the session busy anyway). A proxy's idle timeout or the server's
+  `idle_session_timeout` therefore doesn't end a healthy sink's session, which would hand the lock to a
+  standby and make the sinks take turns failing over. Keep such timeouts well above the poll interval.
+  `idle_session_timeout` (for example `30s`, set on the sink's role) then also fences a frozen sink:
+  a process that stops running stops querying, its session ends, and a standby takes over. If the
+  query fails because the session is gone, the sink stops.
 - **Stalls:** a sink that is stuck but keeps its session keeps the lock. Use `--stall-timeout` (for
   example `2m`) to stop the sink when the stream delivers no block or undo for that long once live,
   which also happens while a database call hangs. The stop cancels the call in progress; the CLI

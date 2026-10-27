@@ -2,7 +2,9 @@ package sinker
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -491,6 +493,79 @@ func TestSinker_StallTimeout(t *testing.T) {
 		case <-time.After(500 * time.Millisecond):
 		}
 	})
+}
+
+// The active sink keeps the writer lock's session from idling out, and stops once that session is gone.
+func TestSinker_WriterSessionKeepalive_Postgres(t *testing.T) {
+	dsnString := os.Getenv("PG_DSN")
+	if dsnString == "" {
+		t.Skip("PG_DSN not set")
+	}
+	ctx := context.Background()
+
+	raw, err := sql.Open("postgres", mustDSN(t, dsnString).ConnString())
+	require.NoError(t, err)
+	defer raw.Close()
+	schema := fmt.Sprintf("keepalive_test_%d", time.Now().UnixNano())
+	_, err = raw.Exec("CREATE SCHEMA " + schema)
+	require.NoError(t, err)
+	defer raw.Exec("DROP SCHEMA " + schema + " CASCADE")
+
+	dsn := mustDSN(t, dsnString+"&schemaName="+schema)
+	l, err := db2.NewLoader(dsn, "cursors", "substreams_history", "", 0, 0, 0, db2.OnModuleHashMismatchError.String(), nil, logger, tracer)
+	require.NoError(t, err)
+	require.NoError(t, l.Setup(ctx, schema, "", false))
+	require.NoError(t, l.LoadTables(schema, "cursors", "substreams_history"))
+
+	s, err := sink.NewFromConfig(&sink.SinkerConfig{
+		Pkg:              testPackage,
+		OutputModule:     testPackage.Modules.Modules[0],
+		OutputModuleHash: manifest.ModuleHash([]byte("unused")),
+		ClientConfig:     testClientConfig,
+		Mode:             sink.SubstreamsModeDevelopment,
+		Logger:           logger,
+	})
+	require.NoError(t, err)
+	sinker, err := New(s, l, logger, nil, 3, time.Second)
+	require.NoError(t, err)
+	defer sinker.Close()
+	sinker.SetWriterLock(100 * time.Millisecond)
+	require.True(t, sinker.acquireWriterLock(ctx))
+
+	var pid int
+	require.NoError(t, raw.QueryRow(`SELECT pid FROM pg_locks WHERE locktype = 'advisory' AND granted AND objid = $1`, int64(uint32(l.WriterLockKey()))).Scan(&pid))
+
+	stop := sinker.keepWriterSessionAlive(ctx)
+	defer stop()
+
+	t.Run("an idle session is kept", func(t *testing.T) {
+		var idle time.Duration
+		for range 10 {
+			time.Sleep(50 * time.Millisecond)
+			var secs float64
+			require.NoError(t, raw.QueryRow(`SELECT EXTRACT(EPOCH FROM now() - state_change) FROM pg_stat_activity WHERE pid = $1`, pid).Scan(&secs))
+			idle = max(idle, time.Duration(secs*float64(time.Second)))
+		}
+		require.Less(t, idle, 400*time.Millisecond, "the session was left idle")
+		require.False(t, sinker.IsTerminating())
+	})
+
+	t.Run("the sink stops once the session is gone", func(t *testing.T) {
+		_, err := raw.Exec("SELECT pg_terminate_backend($1)", pid)
+		require.NoError(t, err)
+		select {
+		case <-sinker.Terminating():
+			require.ErrorContains(t, sinker.Err(), "lost the database session holding the writer lock")
+		case <-time.After(3 * time.Second):
+			t.Fatal("the sink kept running without its session")
+		}
+	})
+}
+
+func mustDSN(t *testing.T, s string) *db2.DSN {
+	dsn, err := db2.ParseDSN(s)
+	require.NoError(t, err)
+	return dsn
 }
 
 var T = true

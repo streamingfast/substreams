@@ -139,8 +139,10 @@ func (s *SQLSinker) Run(ctx context.Context) {
 		if !s.acquireWriterLock(ctx) {
 			return
 		}
+		stopKeepalive := s.keepWriterSessionAlive(ctx)
 		// Released once the stream loop below has returned, so never under a running flush.
 		defer func() {
+			stopKeepalive()
 			s.loader.ReleaseWriterLock()
 			WriterLockHeld.SetUint64(0)
 		}()
@@ -227,6 +229,42 @@ func (s *SQLSinker) acquireWriterLock(ctx context.Context) bool {
 
 	WriterLockHeld.SetUint64(1)
 	return true
+}
+
+// keepWriterSessionAlive queries the session holding the writer lock every poll interval while no
+// flush is running, so long stretches without flushes don't let a proxy or idle_session_timeout end
+// it (and hand the lock to a standby). If the session is gone, the sink stops: a standby may already
+// be writing. The returned function stops the keepalive and waits for it.
+func (s *SQLSinker) keepWriterSessionAlive(ctx context.Context) (stop func()) {
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(s.writerLockPollInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+			err := s.loader.KeepWriterSessionAlive(ctx, max(s.writerLockPollInterval, 5*time.Second))
+			switch {
+			case err == nil || ctx.Err() != nil:
+			case db2.IsCancellation(err):
+				// Timed out: the database is slow, but the session may well be alive; the next
+				// flush (or the stall timeout) will tell.
+				s.logger.Warn("writer lock session keepalive timed out", zap.Error(err))
+			default:
+				s.Shutdown(fmt.Errorf("lost the database session holding the writer lock: %w", err))
+				return
+			}
+		}
+	}()
+	return func() {
+		cancel()
+		<-done
+	}
 }
 
 func (s *SQLSinker) flushWithRetry(ctx context.Context, moduleHash string, cursor *sink.Cursor, finalBlockHeight uint64, retries int) (int, error) {

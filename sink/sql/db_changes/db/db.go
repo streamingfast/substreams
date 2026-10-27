@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"sync"
 
 	"github.com/streamingfast/logging"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
@@ -57,6 +58,9 @@ type Loader struct {
 	// writerConn, once the writer lock is held (see AcquireWriterLock), is the connection holding
 	// it. Cursor reads and every write go through it, so the lock covers them.
 	writerConn *sql.Conn
+	// writerTxMu is held while a transaction is open on writerConn, so the keepalive (see
+	// KeepWriterSessionAlive) never runs inside one.
+	writerTxMu sync.Mutex
 }
 
 func NewLoader(
@@ -158,9 +162,32 @@ func (l *Loader) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error) {
 		return l.testTx, nil
 	}
 	if l.writerConn != nil {
-		return l.writerConn.BeginTx(ctx, opts)
+		l.writerTxMu.Lock()
+		tx, err := l.writerConn.BeginTx(ctx, opts)
+		if err != nil {
+			l.writerTxMu.Unlock()
+			return nil, err
+		}
+		return &writerTx{Tx: tx, unlock: sync.OnceFunc(l.writerTxMu.Unlock)}, nil
 	}
 	return l.DB.BeginTx(ctx, opts)
+}
+
+// writerTx is a transaction on the writer lock's connection; it frees the connection for the
+// keepalive once it ends.
+type writerTx struct {
+	*sql.Tx
+	unlock func()
+}
+
+func (t *writerTx) Commit() error {
+	defer t.unlock()
+	return t.Tx.Commit()
+}
+
+func (t *writerTx) Rollback() error {
+	defer t.unlock()
+	return t.Tx.Rollback()
 }
 
 type queryExecutor interface {

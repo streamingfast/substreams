@@ -208,7 +208,7 @@ func addDatabaseChangesModeRunFlags(flags *pflag.FlagSet) {
 	flags.String("history-table", "substreams_history", "Name of the table to use for storing block history, used to handle reorgs")
 	flags.String(onModuleHashMismatchFlag, "error", "What to do when the module hash in the manifest does not match the one in the database, can be 'error', 'warn' or 'ignore'")
 	flags.Bool("standby-lock", false, "PostgreSQL only. Take a writer lock (a session advisory lock on the cursors table) before streaming, so several sinks can run against one database with a single writer: the others wait as standbys and the first to see the lock released takes over, resuming from the stored cursor. The lock is released when the active sink stops or its database session ends; set the server's tcp_keepalives_* settings so a dead client's session ends quickly. Needs a session connection: direct, or through a TCP proxy or a session-mode pooler, not a transaction-mode pooler.")
-	flags.Duration("standby-lock-poll-interval", 2*time.Second, "With --standby-lock, how often a standby checks whether the writer lock is free")
+	flags.Duration("standby-lock-poll-interval", 2*time.Second, "With --standby-lock, how often a standby checks whether the writer lock is free, and how often the active sink queries the session holding the lock so a proxy or idle_session_timeout never sees it idle")
 	flags.Duration("stall-timeout", 0, "Stop with an error if no block arrives for this long once live, so a supervisor restarts the sink (and, with --standby-lock, a standby takes over). 0 disables it.")
 }
 

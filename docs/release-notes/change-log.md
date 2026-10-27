@@ -58,6 +58,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
+- Sinks: the `substreams stream stats` log line reports backprocessing progress again until the sink is live, as a
+  `backprocessing_progress` object with the same figures as the `substreams run` progress view: overall percentage,
+  rate, ETA, running jobs, blocks to process and blocks cached, and for each stage its percentage, first block,
+  squashed-up-to block, jobs and segments waiting to be squashed. It replaces the `progress_block_rate`,
+  `progress_last_block`, `progress_running_jobs` and `progress_total_processed_blocks` fields, which were only logged
+  once the first block of data had arrived.
 - SQL sink (DatabaseChanges): fix undo leaving changes from orphaned blocks in the database. Changes to the same
   row in different reversible blocks of one batch were merged into one operation recorded under a single block, so
   undoing the later block missed them (permanently for `ADD` fields), and pending changes survived an undo. They are

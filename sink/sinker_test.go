@@ -44,6 +44,7 @@ func newTestSinker() *Sinker {
 	return &Sinker{
 		SinkerConfig: &SinkerConfig{Logger: zlog},
 		request:      &pbsubstreamsrpcv3.Request{StartBlockNum: 100},
+		stats:        newStats(zlog),
 	}
 }
 

@@ -58,9 +58,10 @@ type Loader struct {
 	// writerConn, once the writer lock is held (see AcquireWriterLock), is the connection holding
 	// it. Cursor reads and every write go through it, so the lock covers them.
 	writerConn *sql.Conn
-	// writerTxMu is held while a transaction is open on writerConn, so the keepalive (see
-	// KeepWriterSessionAlive) never runs inside one.
-	writerTxMu sync.Mutex
+	// writerConnMu is held while a transaction or a result set is open on writerConn, so the
+	// keepalive (see KeepWriterSessionAlive) never runs inside a transaction or between the rows of
+	// a query (lib/pq refuses a query while another one's rows are being read).
+	writerConnMu sync.Mutex
 }
 
 func NewLoader(
@@ -162,13 +163,13 @@ func (l *Loader) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error) {
 		return l.testTx, nil
 	}
 	if l.writerConn != nil {
-		l.writerTxMu.Lock()
+		l.writerConnMu.Lock()
 		tx, err := l.writerConn.BeginTx(ctx, opts)
 		if err != nil {
-			l.writerTxMu.Unlock()
+			l.writerConnMu.Unlock()
 			return nil, err
 		}
-		return &writerTx{Tx: tx, unlock: sync.OnceFunc(l.writerTxMu.Unlock)}, nil
+		return &writerTx{Tx: tx, unlock: sync.OnceFunc(l.writerConnMu.Unlock)}, nil
 	}
 	return l.DB.BeginTx(ctx, opts)
 }

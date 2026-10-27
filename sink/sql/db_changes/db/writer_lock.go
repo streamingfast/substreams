@@ -102,17 +102,17 @@ func (l *Loader) WriterSessionAlive(ctx context.Context) bool {
 }
 
 // KeepWriterSessionAlive runs a trivial query on the session holding the writer lock, unless a
-// transaction is open on it (the session is busy then, not idle). Called regularly, it keeps the
+// transaction or another query's rows are open on it (the session is busy then, not idle). Called regularly, it keeps the
 // session from looking idle during long stretches without flushes (large segments while catching up,
 // a slow chain, sparse data), so a proxy's idle timeout or the server's idle_session_timeout doesn't
 // end it, which would hand the lock to a standby and make the sinks take turns failing over.
 //
 // An error means the query failed: a connection error means the session, and the lock, are gone.
 func (l *Loader) KeepWriterSessionAlive(ctx context.Context, timeout time.Duration) error {
-	if !l.writerTxMu.TryLock() {
+	if !l.writerConnMu.TryLock() {
 		return nil
 	}
-	defer l.writerTxMu.Unlock()
+	defer l.writerConnMu.Unlock()
 	if l.writerConn == nil {
 		return nil
 	}

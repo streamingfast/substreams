@@ -49,6 +49,10 @@ func (l *Loader) GetAllCursors(ctx context.Context) (out map[string]*sink.Cursor
 
 func (l *Loader) allCursorRows(ctx context.Context) (map[string]cursorRow, error) {
 	query := l.dialect.GetAllCursorsQuery(l.cursorTable.identifier)
+	if l.writerConn != nil {
+		l.writerConnMu.Lock()
+		defer l.writerConnMu.Unlock()
+	}
 	rows, err := l.queryer().QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query all cursors: %w", err)

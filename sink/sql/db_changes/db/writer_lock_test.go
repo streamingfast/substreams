@@ -210,6 +210,42 @@ func TestWriterLockKeepalive_Postgres(t *testing.T) {
 		a.ReleaseWriterLock()
 	})
 
+	t.Run("the keepalive stays out of a cursor read", func(t *testing.T) {
+		a := newWriter(t)
+		_, err := a.writerConn.ExecContext(ctx, "SET idle_session_timeout = 0")
+		require.NoError(t, err)
+		// Enough cursor rows that reading them takes a while.
+		_, err = a.writerConn.ExecContext(ctx, fmt.Sprintf(
+			"INSERT INTO %s (id, cursor, block_num, block_id) SELECT 'm' || g, '', 0, '' FROM generate_series(1, 20000) g",
+			a.cursorTable.identifier,
+		))
+		require.NoError(t, err)
+
+		stop := make(chan struct{})
+		done := make(chan error, 1)
+		go func() {
+			for {
+				select {
+				case <-stop:
+					done <- nil
+					return
+				default:
+				}
+				if err := a.KeepWriterSessionAlive(ctx, time.Second); err != nil {
+					done <- err
+					return
+				}
+			}
+		}()
+		for range 10 {
+			_, err := a.allCursorRows(ctx)
+			require.NoError(t, err)
+		}
+		close(stop)
+		require.NoError(t, <-done, "the keepalive ran between the rows of the cursor read")
+		a.ReleaseWriterLock()
+	})
+
 	t.Run("the keepalive reports a lost session", func(t *testing.T) {
 		a := newWriter(t)
 		var pid int

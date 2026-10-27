@@ -710,6 +710,7 @@ func (s *Sinker) doRequest(
 			}
 
 			msg := r.Progress
+			s.stats.RecordProgress(msg)
 
 			latestEndBlockPerStage := make(map[uint32]uint64)
 			jobsPerStage := make(map[uint32]uint64)
@@ -862,6 +863,7 @@ func (s *Sinker) handleSessionInit(ctx context.Context, handler SinkerHandler, s
 		zap.String("trace_id", session.TraceId),
 	)
 	s.requestActiveStartBlock = session.ResolvedStartBlock
+	s.stats.RecordSession(session)
 
 	return nil
 }

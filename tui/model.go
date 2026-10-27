@@ -3,6 +3,7 @@ package tui
 import (
 	"time"
 
+	"github.com/streamingfast/substreams/internal/backprocessing"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
@@ -27,7 +28,7 @@ type model struct {
 	sessionAt time.Time
 	progress  *pbsubstreamsrpc.ModulesProgress
 
-	globalRate  *rateWindow
+	globalRate  *backprocessing.RateWindow
 	moduleRates *moduleWindow
 
 	Failures    int
@@ -41,10 +42,10 @@ func (m model) withDefaults() model {
 		m.now = time.Now
 	}
 	if m.globalRate == nil {
-		m.globalRate = newRateWindow(rateWindowDuration)
+		m.globalRate = backprocessing.NewRateWindow(backprocessing.RateWindowDuration)
 	}
 	if m.moduleRates == nil {
-		m.moduleRates = newModuleWindow(rateWindowDuration)
+		m.moduleRates = newModuleWindow(backprocessing.RateWindowDuration)
 	}
 	return m
 }

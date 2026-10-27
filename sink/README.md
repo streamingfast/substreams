@@ -46,12 +46,10 @@ handlers := sink.NewSinkerFullHandlers(
 )
 ```
 
-We invite you to take a look at our:
-- [Basic Example](./examples/basic/main.go) (and its accompanying [README.md](./examples/basic/README.md))
-- [Advanced Example](./examples/advanced/main.go) (and its accompanying [README.md](./examples/advanced/README.md))
+We invite you to take a look at our [Simple Sink Example](./examples/simple-sink/main.go).
 
 > [!NOTE]
-> We highly recommend to use the [Advanced Example](./examples/advanced/main.go) example for any serious sink implementation!
+> For production-grade sink implementations built on this library, see the repositories listed under [Example Implementations](#example-implementations).
 
 ### Handler Details
 
@@ -307,9 +305,9 @@ The sinker provides built-in statistics that can be accessed after completion:
 sinker.Run(ctx, cursor, handlers)
 
 // Print statistics
-fmt.Printf("Total Processed Bytes: %d\n", sink.ProgressMessageProcessedBytes.Get())
-fmt.Printf("Total Processed Blocks: %d\n", sink.ProgressMessageTotalProcessedBlocks.Get())
-fmt.Printf("Total Received Bytes: %d\n", sink.DataMessageSizeBytes.Get())
+fmt.Printf("Total Processed Bytes: %.0f\n", sink.ProcessedBytes.Get())
+fmt.Printf("Total Processed Blocks: %.0f\n", sink.ProcessedBlocks.Get())
+fmt.Printf("Total Received Bytes: %.0f\n", sink.MessageSizeBytes.Get())
 ```
 
 ### Example Implementations

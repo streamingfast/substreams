@@ -21,7 +21,7 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 {% hint style="warning" %}
 **Important**_:_ Endpoints serve protobuf models specific to the underlying blockchain protocol and must match the `source:` field for the module.
 
-**Streaming a `sf.near.type.v1.Block` from an Ethereum endpoint does not work!**
+**Streaming a `sf.solana.type.v1.Block` from an Ethereum endpoint does not work!**
 {% endhint %}
 
 <figure><img src="../../.gitbook/assets/chains-endpoints.png" alt="" width="100%"><figcaption><p>Protobuf for the different supported chains</p></figcaption></figure>
@@ -30,7 +30,6 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Ethereum | [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto)       | [ethereum-v0.10.4.spkg](https://github.com/streamingfast/sf-ethereum/releases/download/v0.10.2/ethereum-v0.10.4.spkg) |
 | Monad    | [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto)       |                                                                                                                       |
-| NEAR     | [`sf.near.type.v1.Block`](https://github.com/streamingfast/firehose-near/blob/develop/proto/sf/near/type/v1/type.proto)                   |                                                                                                                       |
 | Solana   | [`sf.solana.type.v1.Block`](https://github.com/streamingfast/firehose-solana/blob/develop/proto/sf/solana/type/v1/type.proto)             | [solana-v0.1.0.spkg](https://github.com/streamingfast/sf-solana/releases/download/v0.1.0/solana-v0.1.0.spkg)          |
 | Cosmos   | [`sf.cosmos.type.v2.Block`](https://github.com/streamingfast/firehose-cosmos/blob/develop/cosmos/proto/sf/cosmos/type/v2/block.proto#L10) |                                                                                                                       |
 | Antelope | [`sf.antelope.type.v1.Block`](https://buf.build/pinax/firehose-antelope/docs/main:sf.antelope.type.v1#sf.antelope.type.v1.Block)          |                                                                                                                       |
@@ -64,8 +63,6 @@ The data missing in the Base Block makes the corresponding Protobuf field empty.
 - **BNB**: `bnb.streamingfast.io:443`
 - **Optimism**: `mainnet.optimism.streamingfast.io:443`
 - **Avalanche C-Chain Mainnet**: `avalanche-mainnet.streamingfast.io:443`
-- **NEAR Mainnet**: `mainnet.near.streamingfast.io:443`
-- **NEAR Testnet**: `testnet.near.streamingfast.io:443`
 - **Solana Mainnet-Beta**: `mainnet.sol.streamingfast.io:443`
 - **Solana Devnet**: `devnet.sol.streamingfast.io:443`
 - **Solana Accounts**: `accounts.mainnet.sol.streamingfast.io:443`
@@ -105,8 +102,6 @@ The data missing in the Base Block makes the corresponding Protobuf field empty.
 - **Gnosis (Mainnet) Consensus Layer**: `gnosis-cl.substreams.pinax.network:443`
 - **Gnosis Chiado (Testnet) Consensus Layer**: `chiado-cl.substreams.pinax.network:443`
 - **Mode Network (Mainnet)**: `mode.substreams.pinax.network:443`
-- **NEAR (Mainnet)**: `near.substreams.pinax.network:443`
-- **NEAR (Testnet)**: `neartest.substreams.pinax.network:443`
 - **Polygon (Mainnet)**: `polygon.substreams.pinax.network:443`
 - **Polygon Amoy (Testnet)**: `amoy.substreams.pinax.network:443`
 - **Telos (Mainnet)**: `telos.substreams.pinax.network:443`

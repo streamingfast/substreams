@@ -41,12 +41,6 @@ TRON foundational modules offer:
 - **TRC-20 tokens**: Token transfer and balance tracking
 - **Smart contract events**: Decoded contract event data
 
-### NEAR
-NEAR foundational modules include:
-
-- **Function calls**: Parsed function call data and results
-- **Account state modifications**: Track account state changes
-
 ### Antelope
 Antelope foundational modules support:
 

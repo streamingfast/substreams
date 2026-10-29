@@ -328,14 +328,6 @@ binaries:
     build: cargo build --target wasm32-unknown-unknown --release --features my_feature
 ```
 
-### `network`
-
-The `network` field specifies the default network for this Substreams, for example `mainnet` or `solana-mainnet`. Clients use it to pick an endpoint, and it selects which entry of [`networks`](manifests.md#networks) applies by default.
-
-```yaml
-network: mainnet
-```
-
 ### `sink`
 
 The `sink` field specifies the sink you want to use to consume your data (for example, a database).
@@ -635,6 +627,14 @@ my_mod.inputs[0].params.value = "myvalue"
 which would be inserted just before starting the stream.
 
 Params that are defined under `networks` do not need to be repeated here (their value will be overwritten)
+
+### `network`
+
+The `network` field specifies the default network for this Substreams, for example `mainnet` or `solana-mainnet`. Clients use it to pick an endpoint, and it selects which entry of [`networks`](manifests.md#networks) applies by default.
+
+```yaml
+network: mainnet
+```
 
 ### `networks`
 

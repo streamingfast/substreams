@@ -20,8 +20,8 @@ Once you find a package that fits your needs, you can choose how you want to con
 
 | Name       | Support | Maintainer       | Source Code |
 |------------|---------|------------------|-------------|
-| SQL        | O       | StreamingFast    |[substreams-sink-sql](https://github.com/streamingfast/substreams-sink-sql)|
-| Go SDK     | O       | StreamingFast    |[substreams-sink](https://github.com/streamingfast/substreams-sink)|
+| SQL        | O       | StreamingFast    |[substreams sink postgres, substreams sink clickhouse](https://github.com/streamingfast/substreams/tree/develop/sink/sql)|
+| Go SDK     | O       | StreamingFast    |[substreams/sink](https://github.com/streamingfast/substreams/tree/develop/sink)|
 | Rust SDK   | O       | StreamingFast    |[substreams-sink-rust](https://github.com/streamingfast/substreams-sink-rust)|
 | JS SDK     | O       | StreamingFast    |[substreams-js](https://github.com/substreams-js/substreams-js)|
 | KV Store   | O       | StreamingFast    |[substreams-sink-kv](https://github.com/streamingfast/substreams-sink-kv)|

@@ -61,6 +61,7 @@
     * [Ethereum - ERC20 Token Metadata](how-to-guides/composing-substreams/foundational-stores/ethereum/erc20-token-metadata.md)
     * [Solana - SPL Initialized Account](how-to-guides/composing-substreams/foundational-stores/solana/spl-initialized-account.md)
   * [Published Packages](how-to-guides/composing-substreams/published-packages.md)
+* [Updating Your Substreams](how-to-guides/updating-your-substreams.md)
 * [Hosted Services](how-to-guides/hosted-services/hosted-services.md)
   * [Hosted Sinks](how-to-guides/hosted-services/hosted-sinks.md)
     * [Managing Your Sink](how-to-guides/sinks/hosted-sinks/manage-your-sink.md)

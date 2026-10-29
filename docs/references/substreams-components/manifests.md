@@ -565,7 +565,7 @@ See [Indexes](./modules/indexes.md) for a complete example.
 
 #### Module `use`
 
-The `use` field declares a module that runs the code of another module, already defined in this manifest or in an imported package. Use it to run the same module more than once with different `params`, `initialBlock`, or `inputs`, without writing any code.
+The `use` field declares a module that runs the code of another module, already defined in this manifest or in an imported package. Use it to run the same module more than once with different `params`, `initialBlock`, or `inputs`, without writing any code. You can also use it to keep running a module from a previous version of your package: the module keeps its previous code, so its hash and its cached data stay the same. See [Updating your Substreams](../../how-to-guides/updating-your-substreams.md).
 
 {% code title="substreams.yaml" %}
 ```yaml

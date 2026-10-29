@@ -553,11 +553,11 @@ The `blockFilter` field makes the module skip blocks, based on the keys emitted 
 
 Set exactly one of `query.string` or `query.params`. Setting `blockFilter: {}` means no filter, which is useful to remove the filter inherited through [`use`](manifests.md#module-use).
 
-See [Indexes](./modules/indexes.md) for a complete example.
+See [Block Filters](./modules/block-filters.md) for what a filter saves and how to use it well, and [Indexes](./modules/indexes.md) to write an index module.
 
 #### Module `use`
 
-The `use` field declares a module that runs the code of another module, already defined in this manifest or in an imported package. Use it to run the same module more than once with different `params`, `initialBlock`, or `inputs`, without writing any code. You can also use it to keep running a module from a previous version of your package: the module keeps its previous code, so its hash and its cached data stay the same. See [Updating your Substreams](../../how-to-guides/updating-your-substreams.md).
+The `use` field declares a module that runs the code of another module, already defined in this manifest or in an imported package. Use it to run the same module more than once with different `params`, `initialBlock`, or `inputs`, without writing any code. You can also use it to keep running a module from a previous version of your package: the module keeps its previous code, so its hash and its cached data stay the same. See [Updating your Substreams](../../how-to-guides/develop-your-own-substreams/generic/updating-your-substreams.md).
 
 {% code title="substreams.yaml" %}
 ```yaml

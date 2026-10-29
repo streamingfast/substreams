@@ -81,7 +81,15 @@ modules:
 ```
 {% endcode %}
 
-The WASM file must be the exact file of the previous version. Building the previous source code again can produce a different file. Every module the store reads from, directly or indirectly, must also use the previous binary, because their hashes are part of the store's hash.
+The WASM file must be the exact file of the previous version. Building the previous source code again can produce a different file, so extract it from the published `.spkg` with `substreams tools extract-wasm`:
+
+```bash
+substreams tools extract-wasm ./polymarket-v0.1.0.spkg ./previous/polymarket-v0.1.0.wasm
+```
+
+When the package holds more than one binary, add `--module store_markets` to extract the binary of that module. To extract the manifest and every binary of a package at once, use `substreams tools unpack ./polymarket-v0.1.0.spkg`, which writes them to a `polymarket-unpacked` folder.
+
+Every module the store reads from, directly or indirectly, must also use the previous binary, because their hashes are part of the store's hash.
 
 ### Check that the hash is unchanged
 

@@ -86,7 +86,7 @@ modules:
     kind: map
     inputs:
       - params: string
-      - map: solana:blocks_without_votes
+      - source: sf.solana.type.v1.Block
     blockFilter:
       module: solana:program_ids_without_votes
       query:

@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.25.1
 
 ### Server
 
@@ -112,6 +112,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+- `substreams pack` writes map entries in key order, so packing the same inputs twice gives a byte-identical
+  `.spkg`. Before, a package with a multi-entry map, such as `networks`, got a different digest from one pack to
+  the next.
 - Commands that take a package (`substreams run`, `gui`, `info`, ...) accept an organization package reference
   `<org>/<package>@<version>`, fetched from the registry's `/v1/packages/<org>/<package>/<version>`. Without a
   version, or with `@latest`, they fetch the package's latest release. An existing file or directory of the
@@ -148,10 +151,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `metering.AddExternalCalls`.
 
 ### CLI
-
-- `substreams pack` writes map entries in key order, so packing the same inputs twice gives a byte-identical
-  `.spkg`. Before, a package with a multi-entry map, such as `networks`, got a different digest from one pack to
-  the next.
 
 - **Breaking for Rust modules**: `substreams build` and `substreams protogen` generate buffa bindings for a
   project whose `Cargo.toml` depends on `buffa`, using `buf.build/anthropics/buffa:v0.9.2`. This pairs with

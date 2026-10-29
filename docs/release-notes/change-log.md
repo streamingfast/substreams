@@ -125,6 +125,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   CVE-2026-78659 (HIGH), all HTTP/2 issues reported by Docker Scout against the image.
 - Bumped OpenTelemetry to v1.47.0 and `github.com/streamingfast/dhttp` to v0.2.0 to fix known vulnerabilities.
 - Bumped `github.com/yuin/goldmark` to v1.7.17 to fix an XSS (GO-2026-5320) in the CLI's markdown rendering.
+- Bumped `github.com/go-jose/go-jose/v4` to v4.1.6 to fix CVE-2026-116587 (HIGH, inefficient algorithmic complexity).
 - Go 1.27 or newer is now required to build.
 
 ## v1.25.0

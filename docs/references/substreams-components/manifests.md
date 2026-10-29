@@ -565,17 +565,17 @@ imports:
   ethereum_common: ethereum_common@v0.3.3
 
 modules:
-  - name: usdc_logs
-    use: ethereum_common:filtered_logs
+  - name: usdc_events
+    use: ethereum_common:filtered_events
     initialBlock: 6082465
 
-  - name: usdt_logs
-    use: ethereum_common:filtered_logs
+  - name: usdt_events
+    use: ethereum_common:filtered_events
     initialBlock: 4634748
 
 params:
-  usdc_logs: "address=0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
-  usdt_logs: "address=0xdac17f958d2ee523a2206206994597c13d831ec7"
+  usdc_events: "evt_addr:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+  usdt_events: "evt_addr:0xdac17f958d2ee523a2206206994597c13d831ec7"
 ```
 {% endcode %}
 

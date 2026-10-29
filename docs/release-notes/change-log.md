@@ -80,16 +80,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Sink library: a handler error is never taken for the end of the stream anymore. One wrapping `io.EOF` (a lost database
   connection, say) used to end the run successfully, as if the stop block was reached, so a live sink exited with
   status 0. When the handler fails while the sinker is stopping, the completion handler no longer runs on top of the
-  block it did not finish, and the error is reported unless it was caused by the stop itself. The completion handler
+  block it did not finish (the failure is taken as caused by the stop and not reported). The completion handler
   now gets the cursor of the last block the handler accepted rather than of the last block received, which with
   `--undo-buffer-size` was ahead of the blocks still in the buffer (`Sinker.LastReceivedCursor` still gives the
   latter).
+- Sink library: add `Sinker.AwaitRun(ctx)`, which waits for `Run` to return and gives its first failure. A stop
+  terminates the sinker right away while `Run` still finishes its completion handler, so a caller about to exit can
+  wait for it there, and get a failure that the termination error, set by the stop, cannot carry.
 - SQL sink (DatabaseChanges): fix the final flush when the stream ends (stopped, or at the stop block) treating the
   stream's latest block as final. It pruned the undo history of blocks that were still reversible, so a reorg across
   a sink restart left orphaned rows, and with `--undo-buffer-size` it saved a cursor past the blocks still in the
   buffer, which were then skipped. It now writes the handled blocks with the last handled block's cursor and the
-  stream's final block height, and writes nothing if a block failed to be handled. The CLI now waits (up to 25 s) for
-  that last flush before exiting.
+  stream's final block height, and writes nothing if a block failed to be handled. The CLI now waits (up to 45 s) for
+  that last flush before exiting: on Kubernetes, raise the pod's `terminationGracePeriodSeconds` above it (30 s by
+  default), otherwise a pod killed first re-processes the blocks since the last stored cursor on restart.
 - Add `substreams sink pubsub`, which publishes any module output to a Google Cloud Pub/Sub topic as the
   webhook sink's batch JSON: `{"manifest": {...}, "blocks": [{"clock": {...}, "data": {...}}]}`. While
   Substreams is not live, `--pubsub-batch-max-blocks` groups blocks into one message. A live block is

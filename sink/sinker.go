@@ -9,6 +9,8 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -59,12 +61,52 @@ type Sinker struct {
 	lastHandledCursor *Cursor
 	// lastReceivedCursor is the stream's cursor when it ended, set before the completion handler runs.
 	lastReceivedCursor *Cursor
+
+	runStarted atomic.Bool
+	runDone    chan struct{}
+	runErrMu   sync.Mutex
+	runErr     error
 }
 
 // LastReceivedCursor returns, from the completion handler on, the cursor of the last block or undo
 // signal the stream delivered. With an undo buffer it can be ahead of the cursor given to the handler.
 func (s *Sinker) LastReceivedCursor() *Cursor {
 	return s.lastReceivedCursor
+}
+
+// AwaitRun waits for Run to return, or for ctx to be done, then returns the first failure of Run. It
+// returns right away if Run was not started.
+//
+// Stopping the sinker (a signal, say) terminates it right away, while Run goes on until the stream
+// returns and the completion handler, which may still write what was handled so far, is done. A
+// caller about to exit waits here so it does not cut that work short, and gets its failure: the
+// sinker's own termination error was set by the stop, before that work ran, so it cannot carry it.
+func (s *Sinker) AwaitRun(ctx context.Context) error {
+	if s.runStarted.Load() {
+		select {
+		case <-s.runDone:
+		case <-ctx.Done():
+			return fmt.Errorf("sinker run did not finish, its last writes may or may not have completed: %w", ctx.Err())
+		}
+	}
+
+	s.runErrMu.Lock()
+	defer s.runErrMu.Unlock()
+	return s.runErr
+}
+
+// endRun shuts the sinker down with err, also kept for AwaitRun: when a stop came first, the sinker is
+// terminated already and its termination error cannot carry err anymore.
+func (s *Sinker) endRun(err error) {
+	if err != nil {
+		s.runErrMu.Lock()
+		if s.runErr == nil {
+			s.runErr = err
+		}
+		s.runErrMu.Unlock()
+	}
+
+	s.Shutdown(err)
 }
 
 // handlerError marks an error returned by the handler, as opposed to one from the stream.
@@ -121,6 +163,7 @@ func NewFromConfig(
 		Shutter:      shutter.New(),
 		SinkerConfig: config,
 		stats:        newStats(config.Logger),
+		runDone:      make(chan struct{}),
 	}
 
 	// Set up buffer unless final blocks only is configured
@@ -274,12 +317,19 @@ func (s *Sinker) PrintStats() {
 }
 
 func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler) {
+	s.runStarted.Store(true)
+	defer close(s.runDone)
+
 	ctx, cancel := context.WithCancel(ctx)
 	s.OnTerminating(func(_ error) {
 		s.Logger.Info("sinker terminating")
 		s.stats.Close()
 		cancel()
 	})
+	// A stop that came before the callback above was registered must still cancel the stream
+	if s.IsTerminating() {
+		cancel()
+	}
 	s.stats.OnTerminated(func(err error) { s.Shutdown(err) })
 	if s.SinkerConfig.PrometheusAddr != "" {
 		Metrics.Register()
@@ -325,22 +375,21 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 			// The handler gets the cursor of the last block it accepted: with an undo buffer, the
 			// stream's cursor is ahead of the blocks still in the buffer.
 			if err := v.HandleBlockRangeCompletion(ctx, s.lastHandledCursor); err != nil {
-				s.Shutdown(fmt.Errorf("sinker completion handler error: %w", err))
+				s.endRun(fmt.Errorf("sinker completion handler error: %w", err))
 				return
 			}
 		}
 	}
 
 	// If the context is canceled and we are here, it we have stop running without any other error, so Shutdown without error,
-	// we are not the cause of the error. We still shutdown so Sinker last stats is still printed. A handler
-	// failure is still reported.
+	// we are not the cause of the error. We still shutdown so Sinker last stats is still printed. A handler error
+	// while stopping is taken as caused by the stop: a cancelled database call does not always wrap context.Canceled.
 	shutdownErr := err
-	var handlerErr *handlerError
-	if ctx.Err() == context.Canceled && (!errors.As(err, &handlerErr) || errors.Is(err, context.Canceled)) {
+	if ctx.Err() == context.Canceled {
 		shutdownErr = nil
 	}
 
-	s.Shutdown(shutdownErr)
+	s.endRun(shutdownErr)
 }
 
 func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler) (activeCursor *Cursor, err error) {
@@ -457,8 +506,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 			if ctxErr := ctx.Err(); errors.Is(ctxErr, context.Canceled) {
 				if isHandlerErr {
 					// The handler did not finish while we were terminating: return its error, so the
-					// completion handler does not run on top of that block. Run does not report an
-					// error caused by the cancellation itself.
+					// completion handler does not run on top of that block. Run does not report it.
 					return activeCursor, err
 				}
 				s.Logger.Debug("substreams encountered an error but we are currently terminating, ignoring it", zap.Error(err))
@@ -710,6 +758,7 @@ func (s *Sinker) doRequest(
 			}
 
 			msg := r.Progress
+			s.stats.RecordProgress(msg)
 
 			latestEndBlockPerStage := make(map[uint32]uint64)
 			jobsPerStage := make(map[uint32]uint64)
@@ -862,6 +911,7 @@ func (s *Sinker) handleSessionInit(ctx context.Context, handler SinkerHandler, s
 		zap.String("trace_id", session.TraceId),
 	)
 	s.requestActiveStartBlock = session.ResolvedStartBlock
+	s.stats.RecordSession(session)
 
 	return nil
 }

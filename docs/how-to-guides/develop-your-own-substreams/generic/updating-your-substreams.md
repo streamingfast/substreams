@@ -209,12 +209,3 @@ With this layout:
 * `map_trades_v2` must set `initialBlock`: its inputs start at different blocks, so it cannot be resolved from them.
 
 Choose `V1_END_BLOCK` before you deploy. Changing it later changes the WASM file, and so the hash of `store_markets_v2`. If you need to change it, reuse `store_markets_v2` from `v0.2.0` with one of the [two options](#two-ways-to-keep-a-modules-hash).
-
-## Structure your project for updates
-
-When you start a project, separate the modules that are expensive to process again from the modules you change often:
-
-* Put stable stores, and the modules they read from, in their own package and crate.
-* Import that package from the package that holds the modules you iterate on, such as `db_out` or filtering maps.
-
-A change to the second package then never changes the WASM file of the first one. See [Composing Substreams](../../composing-substreams/composing-substreams.md) and [Module Caching](../../../references/module-caching.md#designing-for-efficient-store-caching).

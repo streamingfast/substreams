@@ -1,5 +1,5 @@
 ---
-cover: https://staging.substreams.dev/static/images/thumbnail.png
+cover: .gitbook/assets/brand/social-preview.png
 coverY: 0
 ---
 

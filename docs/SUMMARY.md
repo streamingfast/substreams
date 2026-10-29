@@ -10,7 +10,6 @@
   * on Solana
     * [Transactions & Instructions](tutorials/solana/solana.md)
     * [Account Changes](tutorials/solana/account-changes.md)
-  * [on NEAR](tutorials/near.md)
   * [on Monad](tutorials/monad.md)
   * [on TRON](tutorials/tron.md)
   * [on Injective](tutorials/cosmos-compatible/injective.md)

@@ -15,7 +15,7 @@ Every module adds work on every block it processes:
 
 A pipeline with five modules does this five times per block, even if each module does very little.
 
-Put all the extraction logic in one module that reads the block, rather than one module per event, call, or instruction. Split a module only when its output is read by several of your other modules.
+Put all the extraction logic in one module that reads the block, rather than one module per event, call, or instruction. Split a module only when its output is certain to be reused by other packages.
 
 {% hint style="warning" %}
 **Don't create small modules for the sake of composability.** A module that is not reused by other modules adds serialization and cache I/O on every block, and makes nothing reusable. Composability comes from publishing a package with a few useful outputs, not from splitting your logic into many modules.
@@ -58,7 +58,7 @@ Before you update a package, read [Updating your Substreams](../how-to-guides/de
 
 A [block filter](substreams-components/modules/block-filters.md) skips the blocks that hold nothing of interest. When the index it uses is already cached, the server knows in advance which blocks to process, and skips whole segments that have no match.
 
-Use the index modules of the foundational packages, which are shared by all their users. Writing your own index module is only worth it when several of your modules filter on it.
+Use the index modules of the foundational packages, which are shared by all their users. Writing your own index module is only worth it when several packages filter on it.
 
 ## Set `initialBlock` as late as possible
 
@@ -95,11 +95,10 @@ modules:
       type: proto:my.types.v1.Trades
 ```
 
-Don't read the output of a foundational map, like `ethereum_common:all_events`, assuming it is cached: when it is not, your package processes it for every block in addition to your own module.
-
 Each `eth_call` is a network request to a node, made while the block is processed. The block cannot complete until the call returns, so calls slow down processing more than any computation in your module:
 
 * Make a call only when you need its result, for example the first time you see a token, not on every transfer.
+* Get all the data that you can from the execution traces (ex: storage_changes) instead of relying on eth_calls.
 * Batch the calls of a block with `RpcBatch`. See [Contract Calls](../how-to-guides/develop-your-own-substreams/evm/eth-calls.md#batching-calls).
 * Read data that does not change, like token decimals, from a Foundational Store such as [ERC20 Token Metadata](../how-to-guides/composing-substreams/foundational-stores/ethereum/erc20-token-metadata.md) instead of calling the contract.
 
@@ -108,11 +107,3 @@ Each `eth_call` is a network request to a node, made while the block is processe
 Read `sf.solana.type.v1.Block` directly. StreamingFast's Solana endpoints no longer serve vote transactions, so on those endpoints `blocks_without_votes` only adds a module to your pipeline.
 
 Filter on program IDs with the `program_ids_without_votes` index module of `solana_common`, and check the program ID of an instruction before decoding its data.
-
-## Measure
-
-* Measure in production mode. Development mode never reads or writes the cache, so it does not show how your package behaves on a backfill.
-* Compare runs in the same cache state. The first run of a module is always slower than the next ones. See [Module Caching](module-caching.md#performance-testing-considerations).
-* Benchmark a module's code on heavy blocks. See [Testing](testing.md#performance-testing).
-
-How you consume the output also affects speed. See [RPC Protocol](rpc-protocol.md#performance-considerations) for client-side settings, and the [SQL sink reference](sql/proto-annotations.md#performance-flags) for database sinks.

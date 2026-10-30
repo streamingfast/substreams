@@ -58,6 +58,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
+- Sinks: the `substreams stream stats` log line reports backprocessing progress again until the sink is live, as a
+  `backprocessing_progress` object with the same figures as the `substreams run` progress view: overall percentage,
+  rate, ETA, running jobs, blocks to process and blocks cached, and for each stage its percentage, first block,
+  squashed-up-to block, jobs and segments waiting to be squashed. It replaces the `progress_block_rate`,
+  `progress_last_block`, `progress_running_jobs` and `progress_total_processed_blocks` fields, which were only logged
+  once the first block of data had arrived.
 - SQL sink (DatabaseChanges): fix undo leaving changes from orphaned blocks in the database. Changes to the same
   row in different reversible blocks of one batch were merged into one operation recorded under a single block, so
   undoing the later block missed them (permanently for `ADD` fields), and pending changes survived an undo. They are
@@ -84,16 +90,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Sink library: a handler error is never taken for the end of the stream anymore. One wrapping `io.EOF` (a lost database
   connection, say) used to end the run successfully, as if the stop block was reached, so a live sink exited with
   status 0. When the handler fails while the sinker is stopping, the completion handler no longer runs on top of the
-  block it did not finish, and the error is reported unless it was caused by the stop itself. The completion handler
+  block it did not finish (the failure is taken as caused by the stop and not reported). The completion handler
   now gets the cursor of the last block the handler accepted rather than of the last block received, which with
   `--undo-buffer-size` was ahead of the blocks still in the buffer (`Sinker.LastReceivedCursor` still gives the
   latter).
+- Sink library: add `Sinker.AwaitRun(ctx)`, which waits for `Run` to return and gives its first failure. A stop
+  terminates the sinker right away while `Run` still finishes its completion handler, so a caller about to exit can
+  wait for it there, and get a failure that the termination error, set by the stop, cannot carry.
 - SQL sink (DatabaseChanges): fix the final flush when the stream ends (stopped, or at the stop block) treating the
   stream's latest block as final. It pruned the undo history of blocks that were still reversible, so a reorg across
   a sink restart left orphaned rows, and with `--undo-buffer-size` it saved a cursor past the blocks still in the
   buffer, which were then skipped. It now writes the handled blocks with the last handled block's cursor and the
-  stream's final block height, and writes nothing if a block failed to be handled. The CLI now waits (up to 25 s) for
-  that last flush before exiting.
+  stream's final block height, and writes nothing if a block failed to be handled. The CLI now waits (up to 45 s) for
+  that last flush before exiting: on Kubernetes, raise the pod's `terminationGracePeriodSeconds` above it (30 s by
+  default), otherwise a pod killed first re-processes the blocks since the last stored cursor on restart.
 - Add `substreams sink pubsub`, which publishes any module output to a Google Cloud Pub/Sub topic as the
   webhook sink's batch JSON: `{"manifest": {...}, "blocks": [{"clock": {...}, "data": {...}}]}`. While
   Substreams is not live, `--pubsub-batch-max-blocks` groups blocks into one message. A live block is
@@ -125,6 +135,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   CVE-2026-78659 (HIGH), all HTTP/2 issues reported by Docker Scout against the image.
 - Bumped OpenTelemetry to v1.47.0 and `github.com/streamingfast/dhttp` to v0.2.0 to fix known vulnerabilities.
 - Bumped `github.com/yuin/goldmark` to v1.7.17 to fix an XSS (GO-2026-5320) in the CLI's markdown rendering.
+- Bumped `github.com/go-jose/go-jose/v4` to v4.1.6 to fix CVE-2026-116587 (HIGH, inefficient algorithmic complexity).
 - Go 1.27 or newer is now required to build.
 
 ## v1.25.0

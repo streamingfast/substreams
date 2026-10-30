@@ -335,7 +335,7 @@ func TestSinker_CursorCheck(t *testing.T) {
 		assert.Equal(t, []string{l.CursorCheckQuery(module, cursorAt(9, 5)), `ROLLBACK`}, tx.Results())
 	})
 
-	t.Run("conflict while stopping is still reported", func(t *testing.T) {
+	t.Run("conflict while stopping is returned as a conflict", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 		tx := &db2.TestTx{NoRowsAffected: isCheck}
@@ -346,7 +346,6 @@ func TestSinker_CursorCheck(t *testing.T) {
 			flushEveryBlock, sink.MustNewCursor(simpleCursor(10, 5)))
 		require.ErrorIs(t, err, db2.ErrCursorConflict)
 		require.NotErrorIs(t, err, context.Canceled, "a conflict is a failure, not the stop")
-		require.ErrorIs(t, sinker.RunErr(), db2.ErrCursorConflict)
 	})
 
 	t.Run("conflict on revert", func(t *testing.T) {

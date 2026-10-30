@@ -68,7 +68,8 @@ func TestModelUpdate_ReconnectResetsSessionState(t *testing.T) {
 	assert.Empty(t, m.TraceID)
 	assert.Nil(t, m.session)
 	assert.Nil(t, m.progress)
-	assert.Empty(t, m.globalRate.samples)
+	_, _, hasRate := m.globalRate.PerSecond()
+	assert.False(t, hasRate)
 	assert.Empty(t, m.moduleRates.samples)
 	assert.Equal(t, "Connecting...\n", m.View())
 
@@ -100,7 +101,7 @@ func TestModelUpdate_ProgressFeedsWindows(t *testing.T) {
 	})
 
 	// 2000 module-blocks over 20 seconds.
-	rate, span, ok := m.globalRate.perSecond()
+	rate, span, ok := m.globalRate.PerSecond()
 	require.True(t, ok)
 	assert.Equal(t, 20*time.Second, span)
 	assert.InDelta(t, 100.0, rate, 0.001)
@@ -109,35 +110,6 @@ func TestModelUpdate_ProgressFeedsWindows(t *testing.T) {
 	cost, ok := m.moduleRates.msPerBlock("map_a")
 	require.True(t, ok)
 	assert.InDelta(t, 12.0, cost, 0.001)
-}
-
-// A window older than its duration must keep covering exactly that duration, which matters
-// because the server stretches its progress interval to 5s on long requests.
-func TestRateWindow_TrimsToWindow(t *testing.T) {
-	clock := newTestClock()
-	w := newRateWindow(30 * time.Second)
-
-	for i := range 20 {
-		w.add(clock.now(), uint64(i*100))
-		clock.advance(5 * time.Second)
-	}
-
-	_, span, ok := w.perSecond()
-	require.True(t, ok)
-	assert.LessOrEqual(t, span, 35*time.Second)
-	assert.GreaterOrEqual(t, span, 30*time.Second)
-}
-
-func TestRateWindow_IgnoresCounterReset(t *testing.T) {
-	clock := newTestClock()
-	w := newRateWindow(30 * time.Second)
-
-	w.add(clock.now(), 5_000)
-	clock.advance(5 * time.Second)
-	w.add(clock.now(), 100)
-
-	_, _, ok := w.perSecond()
-	assert.False(t, ok)
 }
 
 func TestModelView_ConnectedEdgeCases(t *testing.T) {
@@ -206,42 +178,6 @@ func TestModelUpdate_CtrlCCancelsTheWork(t *testing.T) {
 		require.NotNil(t, cmd, "key %v must also quit the program", key)
 		assert.Equal(t, tea.Quit(), cmd())
 	}
-}
-
-func TestComputeStageStats_MeasuresSquashedReadinessNotProducedRanges(t *testing.T) {
-	// Every segment produced, only a third squashed. Measured from CompletedRanges this reads
-	// 100%; the honest figure is the squashed frontier.
-	stats := computeStageStats([]*pbsubstreamsrpc.Stage{{
-		CompletedRanges:        []*pbsubstreamsrpc.BlockRange{{StartBlock: 1_000_000, EndBlock: 2_000_000}},
-		ReadyUpToExclusive:     1_300_000,
-		SquashWaitSegmentCount: 35,
-	}}, nil, 2_000_000)
-
-	require.Len(t, stats, 1)
-	assert.InDelta(t, 0.3, stats[0].Ratio, 0.001)
-	assert.Equal(t, uint64(35), stats[0].SquashWait)
-}
-
-// A stage that has not started reports where its modules begin, which is what anchors the low
-// end of its bar — ranges and jobs say nothing at all at that point.
-func TestComputeStageStats_UnstartedStageAnchorsOnReadiness(t *testing.T) {
-	stats := computeStageStats([]*pbsubstreamsrpc.Stage{{ReadyUpToExclusive: 1_000_000}}, nil, 2_000_000)
-
-	require.Len(t, stats, 1)
-	assert.Zero(t, stats[0].Ratio)
-	assert.Zero(t, stats[0].SquashWait)
-}
-
-// Zero is a legitimate readiness value for a stage whose modules and chain both start at 0, so
-// it must render as 0% rather than being taken for "no data" and skipped.
-func TestComputeStageStats_ZeroReadinessIsAValue(t *testing.T) {
-	stats := computeStageStats([]*pbsubstreamsrpc.Stage{{
-		ReadyUpToExclusive: 0,
-		CompletedRanges:    []*pbsubstreamsrpc.BlockRange{{StartBlock: 0, EndBlock: 500}},
-	}}, nil, 1_000)
-
-	require.Len(t, stats, 1)
-	assert.Zero(t, stats[0].Ratio)
 }
 
 func TestModelView_FailureBlock(t *testing.T) {

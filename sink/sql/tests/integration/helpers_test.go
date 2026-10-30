@@ -4,40 +4,45 @@ import (
 	"context"
 	"fmt"
 	protosql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
-	"net"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/moby/moby/api/types/network"
-	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/logging/zapx"
-	"github.com/streamingfast/substreams/client"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/sink/sinktest"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/clickhouse"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
-	"google.golang.org/protobuf/types/known/anypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var logger *zap.Logger
 var tracer logging.Tracer
 
-const defaultOutputModuleName = "map_output"
+// Short names for the shared fake stream helpers, see package sinktest
+const defaultOutputModuleName = sinktest.DefaultOutputModuleName
+
+type finalBlock = sinktest.FinalBlock
+
+var (
+	setupFakeSubstreamsServer = sinktest.SetupFakeSubstreamsServer
+	streamMock                = sinktest.StreamMock
+	blockScopedData           = sinktest.BlockScopedData
+	blockUndo                 = sinktest.BlockUndo
+	blockTime                 = sinktest.BlockTime
+	blockTimepb               = sinktest.BlockTimepb
+	fixedBaseTime             = sinktest.FixedBaseTime
+)
 
 func init() {
 	logger, tracer = logging.ApplicationLogger("test", "test", logging.WithDefaultLevel(zap.ErrorLevel))
@@ -247,51 +252,6 @@ func setupClickhouseContainer(t *testing.T, seedDb ClickhouseSeeder) (dbConnecti
 	return dbConnectionString, clickhouseContainer
 }
 
-// setupFakeSubstreamsServer creates a new fake stream server using bucket-based iterator pattern.
-//
-// The pattern is a slice of [any] where:
-//   - [*pbsubstreamsrpc.Response]: Send this message to the stream
-//   - [error]: Close the stream with this error
-//   - nil: End of bucket boundary (start new bucket for next Blocks() call)
-//
-// For example, if you have a pattern like:
-//
-//	pattern := []any{block1, block2, errors.New("stream error"), block3, nil}
-//
-// This will create two buckets:
-// - First bucket: sends block1, block2, then closes with error
-// - Second bucket: sends block3, then ends normally
-func setupFakeSubstreamsServer(t *testing.T, pattern ...any) *client.SubstreamsClientConfig {
-	t.Helper()
-
-	// Bind to 127.0.0.1 explicitly to avoid IPv6 issues. Binding to `:0` results
-	// in `[::]:port` which causes gRPC connection failures in some environments
-	// (e.g., AI sandboxes with proxy configurations). Using 127.0.0.1 works
-	// consistently in both local development and sandboxed environments.
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-
-	server := grpc.NewServer()
-	pbsubstreamsrpc.RegisterStreamServer(server, newFakeStreamServer(pattern))
-
-	go func() {
-		if err := server.Serve(listener); err != nil {
-			t.Logf("gRPC server error: %v", err)
-		}
-	}()
-
-	t.Cleanup(server.Stop)
-
-	return client.NewSubstreamsClientConfig(client.SubstreamsClientConfigOptions{
-		Endpoint:  listener.Addr().String(),
-		AuthToken: "",
-		AuthType:  client.None,
-		Insecure:  false,
-		PlainText: true,
-		Agent:     "sink-test",
-	})
-}
-
 // substreamsTestPackage creates a test package with the given output module name and file descriptor.
 //
 // File descriptor can usually be obtained from a generate Golang proto file and the field to look for
@@ -324,145 +284,10 @@ func substreamsTestPackage(fileDescriptor protoreflect.FileDescriptor, outputDes
 	}
 }
 
-func blockScopedData(t *testing.T, blockIdentifier string, output proto.Message, extraArgs ...any) *pbsubstreamsrpc.Response {
-	t.Helper()
-
-	blockNum, blockId := expandBlockIdentifier(blockIdentifier)
-	blockTime := timestamppb.New(fixedBaseTime.Add(time.Duration(blockNum * uint64(time.Minute))))
-
-	outputData, err := anypb.New(output)
-	require.NoError(t, err)
-
-	currentRef := bstream.NewBlockRef(blockId, blockNum)
-	finalRef := bstream.BlockRefEmpty
-
-	for _, arg := range extraArgs {
-		switch v := arg.(type) {
-		case finalBlock:
-			finalBlockNum, finalBlockId := expandBlockIdentifier(string(v))
-			finalRef = bstream.NewBlockRef(finalBlockId, finalBlockNum)
-
-		case *timestamppb.Timestamp:
-			blockTime = v
-		}
-	}
-
-	cursor := bstream.Cursor{Step: bstream.StepNew, Block: currentRef, HeadBlock: currentRef, LIB: finalRef}
-	if currentRef.ID() == finalRef.ID() {
-		cursor.Step = bstream.StepNewIrreversible
-	}
-
-	return &pbsubstreamsrpc.Response{
-		Message: &pbsubstreamsrpc.Response_BlockScopedData{
-			BlockScopedData: &pbsubstreamsrpc.BlockScopedData{
-				Cursor: cursor.ToOpaque(),
-				Clock: &pbsubstreams.Clock{
-					Id:        blockId,
-					Number:    blockNum,
-					Timestamp: blockTime,
-				},
-				Output: &pbsubstreamsrpc.MapModuleOutput{
-					Name:      defaultOutputModuleName,
-					MapOutput: outputData,
-				},
-				FinalBlockHeight: finalRef.Num(),
-			},
-		},
-	}
-}
-
-// blockUndo creates a BlockUndoSignal response for tests
-func blockUndo(t *testing.T, lastValidBlockIdentifier string, extraArgs ...any) *pbsubstreamsrpc.Response {
-	t.Helper()
-
-	blockNum, blockId := expandBlockIdentifier(lastValidBlockIdentifier)
-	finalRef := bstream.BlockRefEmpty
-
-	for _, arg := range extraArgs {
-		switch v := arg.(type) {
-		case finalBlock:
-			finalBlockNum, finalBlockId := expandBlockIdentifier(string(v))
-			finalRef = bstream.NewBlockRef(finalBlockId, finalBlockNum)
-		}
-	}
-
-	cursor := bstream.Cursor{Step: bstream.StepUndo, Block: bstream.NewBlockRef(blockId, blockNum), HeadBlock: bstream.NewBlockRef(blockId, blockNum), LIB: finalRef}
-
-	return &pbsubstreamsrpc.Response{
-		Message: &pbsubstreamsrpc.Response_BlockUndoSignal{
-			BlockUndoSignal: &pbsubstreamsrpc.BlockUndoSignal{
-				LastValidBlock:  &pbsubstreams.BlockRef{Id: blockId, Number: blockNum},
-				LastValidCursor: cursor.ToOpaque(),
-			},
-		},
-	}
-}
-
-// finalBlock can be used in [blockScopedData] to pass final block for the response.
-type finalBlock string
-
-var fixedBaseTime = time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-
-// blockTime can be used in [blockScopedData] to specify the block time for the response.
-// Always returns time in UTC to match database output.
-func blockTime(t *testing.T, in string) time.Time {
-	return blockTimepb(t, in).AsTime().UTC()
-}
-
-// blockTimepb can be used in [blockScopedData] to specify the block time for the response.
-func blockTimepb(t *testing.T, in string) *timestamppb.Timestamp {
-	t.Helper()
-
-	if in == "now" {
-		return timestamppb.Now()
-	}
-
-	if parsedTime, err := time.Parse(time.RFC3339, in); err == nil {
-		return timestamppb.New(parsedTime)
-	}
-
-	if parsedTime, err := time.Parse("2006-01-02 15:04:05", in); err == nil {
-		return timestamppb.New(parsedTime)
-	}
-
-	if parsedTime, err := time.Parse("2006-01-02", in); err == nil {
-		return timestamppb.New(parsedTime)
-	}
-
-	require.Fail(t, "invalid block time format", "expected RFC3339, <2006-01-02 15:04:05> or <2006-01-02> formats, got %q", in)
-	return nil // This line will never be reached due to require.Fail
-}
-
-func expandBlockIdentifier(in string) (blockNum uint64, blockId string) {
-	blockId = in
-	if in == "" {
-		return 0, "0"
-	}
-
-	i := 0
-	for i < len(in) && in[i] >= '0' && in[i] <= '9' {
-		i++
-	}
-
-	if i > 0 {
-		// Parse the numeric part
-		if num, err := strconv.ParseUint(in[:i], 10, 64); err == nil {
-			blockNum = num
-		}
-	}
-
-	return
-}
-
 type isAlwaysLiveChecker struct{}
 
 func (c *isAlwaysLiveChecker) IsLive(block *pbsubstreams.Clock) bool {
 	return true
-}
-
-// streamMock is a helper function that creates a stream of responses for testing
-func streamMock(responses ...any) []any {
-	return responses
 }
 
 func readRowsBy[T any](t *testing.T, db *sqlx.DB, tableAndOrSchema, orderBy string) []*T {

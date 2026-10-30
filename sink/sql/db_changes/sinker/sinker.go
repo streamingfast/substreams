@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -22,8 +21,15 @@ import (
 
 const BLOCK_FLUSH_INTERVAL_DISABLED = 0
 
-// FinalFlushTimeout bounds the flush of the handled blocks when the stream is stopped.
-const FinalFlushTimeout = 20 * time.Second
+// FinalFlushTimeout bounds the retries of the flush of the handled blocks when the stream is stopped. An
+// attempt already writing is not interrupted.
+const FinalFlushTimeout = 40 * time.Second
+
+// RunStopTimeout is how long to wait for Run to return once the sinker is stopped, see [sink.Sinker.AwaitRun].
+// Past it the process exits and the flush transaction is rolled back, the sink then re-processes the blocks
+// since the stored cursor on restart. On Kubernetes, the pod's terminationGracePeriodSeconds (30s by default)
+// must be raised above it, or the pod is killed first, with the same outcome.
+const RunStopTimeout = FinalFlushTimeout + 5*time.Second
 
 type SQLSinker struct {
 	*shutter.Shutter
@@ -58,10 +64,9 @@ type SQLSinker struct {
 	// part of a block, so they must not be flushed.
 	handlerFailed bool
 
+	// runStarted and runDone track Run as a whole, standby wait and lock release included (see AwaitRun).
 	runStarted atomic.Bool
 	runDone    chan struct{}
-	runErrMu   sync.Mutex
-	runErr     error
 }
 
 func New(sink *sink.Sinker, loader *db2.Loader, logger *zap.Logger, tracer logging.Tracer, flushRetryCount int, flushRetryDelay time.Duration) (*SQLSinker, error) {
@@ -86,9 +91,7 @@ func New(sink *sink.Sinker, loader *db2.Loader, logger *zap.Logger, tracer loggi
 func (s *SQLSinker) Close() error {
 	s.logger.Info("closing SQL sinker")
 	s.Shutdown(nil)
-	if s.runStarted.Load() {
-		<-s.runDone
-	}
+	_ = s.AwaitRun(context.Background())
 
 	if err := s.loader.Close(); err != nil {
 		return fmt.Errorf("loader close: %w", err)
@@ -96,18 +99,19 @@ func (s *SQLSinker) Close() error {
 	return nil
 }
 
-// WaitForRun waits until Run has returned, for at most timeout, and reports whether it did. Run can
-// still be flushing after the sinker terminated.
-func (s *SQLSinker) WaitForRun(timeout time.Duration) bool {
-	if !s.runStarted.Load() {
-		return true
+// AwaitRun waits for Run to return, or for ctx to be done, then returns the first failure of the base
+// sinker's Run. It also covers what Run does around the stream, standing by for the writer lock and
+// releasing it, which the base sinker's AwaitRun does not see. It returns right away if Run was not
+// started.
+func (s *SQLSinker) AwaitRun(ctx context.Context) error {
+	if s.runStarted.Load() {
+		select {
+		case <-s.runDone:
+		case <-ctx.Done():
+			return fmt.Errorf("sinker run did not finish, its last writes may or may not have completed: %w", ctx.Err())
+		}
 	}
-	select {
-	case <-s.runDone:
-		return true
-	case <-time.After(timeout):
-		return false
-	}
+	return s.Sinker.AwaitRun(ctx)
 }
 
 // SetWriterLock makes Run take the writer lock of the cursors table before loading the cursor. While
@@ -189,6 +193,12 @@ func (s *SQLSinker) Run(ctx context.Context) {
 
 	s.OnTerminating(func(_ error) { s.stats.Close() })
 	s.stats.OnTerminated(func(err error) { s.Shutdown(err) })
+
+	// A stop that came before the callbacks above were registered must still stop the base sinker
+	if s.IsTerminating() {
+		s.Sinker.Shutdown(s.Err())
+		return
+	}
 
 	logEach := 15 * time.Second
 	if s.logger.Core().Enabled(zap.DebugLevel) {
@@ -338,37 +348,6 @@ func (s *SQLSinker) watchStall() {
 	}
 }
 
-// cancellationAware marks a database call aborted because the stream was being stopped as caused by
-// the cancellation, so stopping is not reported as a failure. Nothing of the aborted call was written,
-// and nothing is flushed after it (handlerFailed). Any other error is a real failure, reported even
-// while stopping, and kept as the run's error.
-func (s *SQLSinker) cancellationAware(ctx context.Context, err error) error {
-	if ctxErr := ctx.Err(); ctxErr != nil && db2.IsCancellation(err) {
-		if !errors.Is(err, ctxErr) {
-			err = fmt.Errorf("%w: %w", ctxErr, err)
-		}
-		return err
-	}
-	s.setRunErr(err)
-	return err
-}
-
-func (s *SQLSinker) setRunErr(err error) {
-	s.runErrMu.Lock()
-	defer s.runErrMu.Unlock()
-	if s.runErr == nil {
-		s.runErr = err
-	}
-}
-
-// RunErr returns the first failure of Run, if any. The sinker's own termination error can miss it: a
-// stop requested first terminates the sinker without error, before a later failure while finishing.
-func (s *SQLSinker) RunErr() error {
-	s.runErrMu.Lock()
-	defer s.runErrMu.Unlock()
-	return s.runErr
-}
-
 func (s *SQLSinker) recordBlockReceived(isLive *bool) {
 	s.lastBlockAt.Store(time.Now().UnixNano())
 	if isLive != nil {
@@ -382,7 +361,6 @@ func (s *SQLSinker) HandleBlockScopedData(ctx context.Context, data *pbsubstream
 	defer func() {
 		if err != nil {
 			s.handlerFailed = true
-			err = s.cancellationAware(ctx, err)
 			return
 		}
 		s.lastHandledCursor = cursor
@@ -607,9 +585,7 @@ func (s *SQLSinker) HandleBlockRangeCompletion(ctx context.Context, cursor *sink
 		s.logger.Info("stream completed, flushing to database", zap.Stringer("block", s.lastHandledCursor.Block()))
 	}
 	if _, err := s.flushWithRetry(ctx, s.OutputModuleHash(), s.lastHandledCursor, s.lastFinalBlockHeight, s.flushRetryCount); err != nil {
-		err = fmt.Errorf("failed to flush %s block on completion: %w", s.lastHandledCursor.Block(), err)
-		s.setRunErr(err)
-		return err
+		return fmt.Errorf("failed to flush %s block on completion: %w", s.lastHandledCursor.Block(), err)
 	}
 
 	return nil
@@ -622,7 +598,7 @@ func (s *SQLSinker) HandleBlockUndoSignal(ctx context.Context, data *pbsubstream
 	err := s.loader.Revert(ctx, s.OutputModuleHash(), cursor, data.LastValidBlock.Number)
 	if err != nil {
 		s.handlerFailed = true
-		return s.cancellationAware(ctx, err)
+		return err
 	}
 	s.lastHandledCursor = cursor
 

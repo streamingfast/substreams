@@ -41,6 +41,12 @@ func (w *Writer) Write(clock *pbsubstreams.Clock, buffer *Buffer) error {
 	return nil
 }
 
+// Wait blocks until the current file's write to the store has ended, which happens once the
+// file is closed or the context the writer was created with is cancelled.
+func (w *Writer) Wait() {
+	w.CurrentFile.Wait()
+}
+
 func (w *Writer) Close() error {
 	// Skip outputs file saving for blockIndex module
 	if w.isWriterForIndex {

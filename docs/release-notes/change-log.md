@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.26.0
 
 ### Server
 
@@ -81,7 +81,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `--standby-lock-poll-interval`, and the first to see the lock released takes over from the stored cursor. A sink
   whose locked session is gone stops instead of retrying its flush, and standbys serve the metrics endpoint while they
   wait. The active sink queries its locked session every `--standby-lock-poll-interval` while not flushing, so a proxy
-  or `idle_session_timeout` doesn't end it during long stretches without writes (no failover ping-pong on sparse data). See [Standby Sinks](../references/sql/standby-sinks.md).
+  or `idle_session_timeout` doesn't end it during long stretches without writes (no failover ping-pong on sparse data).
+  See [Standby Sinks](../references/sql/standby-sinks.md).
 - SQL sink (DatabaseChanges): add `--stall-timeout`, which stops the sink when the stream delivers no block or undo for
   that long once live (blocks held by an undo buffer count). On PostgreSQL a flush now honours its context, so the stop
   cancels a database call in progress (the transaction rolls back); ClickHouse flushes still always run to the end.
@@ -122,6 +123,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+- `substreams pack` writes map entries in key order, so packing the same inputs twice gives a byte-identical
+  `.spkg`. Before, a package with a multi-entry map, such as `networks`, got a different digest from one pack to
+  the next.
 - Commands that take a package (`substreams run`, `gui`, `info`, ...) accept an organization package reference
   `<org>/<package>@<version>`, fetched from the registry's `/v1/packages/<org>/<package>/<version>`. Without a
   version, or with `@latest`, they fetch the package's latest release. An existing file or directory of the
@@ -160,10 +164,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `metering.AddExternalCalls`.
 
 ### CLI
-
-- `substreams pack` writes map entries in key order, so packing the same inputs twice gives a byte-identical
-  `.spkg`. Before, a package with a multi-entry map, such as `networks`, got a different digest from one pack to
-  the next.
 
 - **Breaking for Rust modules**: `substreams build` and `substreams protogen` generate buffa bindings for a
   project whose `Cargo.toml` depends on `buffa`, using `buf.build/anthropics/buffa:v0.9.2`. This pairs with

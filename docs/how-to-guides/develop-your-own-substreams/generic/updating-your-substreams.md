@@ -47,7 +47,7 @@ imports:
 modules:
   - name: store_markets
     use: v0_1_0:store_markets
-    initialBlock: 40000000
+    initialBlock: 40000000 # must be the same as in the previous version
 ```
 {% endcode %}
 

@@ -16,9 +16,10 @@ func (l *Loader) Flush(ctx context.Context, outputModuleHash string, cursor *sin
 	// on a hung call) rolls it all back. ClickHouse writes are not transactional: a flush cut short
 	// could leave some tables written without the cursor, so it always runs to the end there.
 	if _, transactional := l.dialect.(*PostgresDialect); !transactional {
-		ctx = context.Background()
+		// Inserts return once written, whatever the DSN or the server settings say: the cursor
+		// must not be taken as stored before it is.
+		ctx = clickhouse.Context(context.Background(), clickhouse.WithSettings(clickhouse.Settings{"async_insert": 0}))
 	}
-	ctx = clickhouse.Context(ctx, clickhouse.WithStdAsync(false))
 
 	startAt := time.Now()
 	tx, err := l.BeginTx(ctx, nil)

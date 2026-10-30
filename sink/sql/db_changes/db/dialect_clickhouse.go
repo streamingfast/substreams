@@ -213,12 +213,8 @@ func (d ClickhouseDialect) DriverSupportRowsAffected() bool {
 	return false
 }
 
-func (d ClickhouseDialect) OnlyInserts() bool {
-	return true
-}
-
-func (d ClickhouseDialect) AllowPkDuplicates() bool {
-	return true
+func (d ClickhouseDialect) Capabilities() DialectCapabilities {
+	return DialectCapabilities{DuplicateInserts: true}
 }
 
 func (d ClickhouseDialect) CreateUser(tx Tx, ctx context.Context, l *Loader, username string, password string, _database string, readOnly bool) error {

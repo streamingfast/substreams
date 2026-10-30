@@ -128,12 +128,12 @@ func NewLoader(
 
 	if handleReorgs == nil {
 		// automatic detection
-		l.handleReorgs = !l.dialect.OnlyInserts()
+		l.handleReorgs = l.dialect.Capabilities().Reorgs
 	} else {
 		l.handleReorgs = *handleReorgs
 	}
 
-	if l.handleReorgs && l.dialect.OnlyInserts() {
+	if l.handleReorgs && !l.dialect.Capabilities().Reorgs {
 		return nil, fmt.Errorf("driver %s does not support reorg handling. You must use set a non-zero undo-buffer-size", sqlDB.Driver())
 	}
 
@@ -651,7 +651,7 @@ func (l *Loader) setupCursorTable(ctx context.Context, schemaName string, withPo
 }
 
 func (l *Loader) setupHistoryTable(ctx context.Context, schemaName string, withPostgraphile bool) error {
-	if l.dialect.OnlyInserts() {
+	if !l.dialect.Capabilities().Reorgs {
 		return nil
 	}
 	query := l.dialect.GetCreateHistoryQuery(schemaName, withPostgraphile)

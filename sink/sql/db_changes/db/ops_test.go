@@ -120,6 +120,7 @@ func TestLoader_CompositePrimaryKeysWithSlashKeptApart(t *testing.T) {
 		values[pair.Value.primaryKey["a"]] = pair.Value.data["value"].Value
 	}
 	assert.Equal(t, map[string]string{"x/y": "1", "x": "2"}, values)
+}
 
 func TestLoader_InvalidUpdateOpTransitionFails(t *testing.T) {
 	for _, op := range []string{"upsert", "update"} {

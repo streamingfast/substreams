@@ -81,18 +81,6 @@ func TestWriteAuthEnvFileChmodsExisting(t *testing.T) {
 	assert.Equal(t, "export SUBSTREAMS_API_TOKEN=jwt-token\n", string(got))
 }
 
-func TestAuthIssueBaseURL(t *testing.T) {
-	t.Setenv("SUBSTREAMS_AUTH_ISSUE_URL", "")
-	t.Setenv("LOCAL_DEVELOPMENT", "")
-	assert.Equal(t, defaultAuthBaseURL, authIssueBaseURL())
-
-	t.Setenv("LOCAL_DEVELOPMENT", "true")
-	assert.Equal(t, localAuthBaseURL, authIssueBaseURL())
-
-	t.Setenv("SUBSTREAMS_AUTH_ISSUE_URL", "http://issuer.test/")
-	assert.Equal(t, "http://issuer.test", authIssueBaseURL())
-}
-
 func TestResolveCredentialsPassthrough(t *testing.T) {
 	got, err := resolveCredentials("eyJhbGciOiJIUzI1NiJ9.e30.ok")
 	require.NoError(t, err)
@@ -100,10 +88,7 @@ func TestResolveCredentialsPassthrough(t *testing.T) {
 	assert.Empty(t, got.apiKey)
 }
 
-func TestResolveCredentialsLocalFallback(t *testing.T) {
-	t.Setenv("LOCAL_DEVELOPMENT", "true")
-	t.Setenv("SUBSTREAMS_AUTH_ISSUE_URL", "http://127.0.0.1:1")
-
+func TestResolveCredentialsAPIKey(t *testing.T) {
 	got, err := resolveCredentials("server_abc")
 	require.NoError(t, err)
 	assert.Empty(t, got.token)

@@ -436,10 +436,20 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("configuring indexes: %w", err)
 	}
 
-	executionPlan, err := GetExecutionPlan(ctx, logger, execGraph, request.Stage, startBlock, stopBlock, request.OutputModule, execOutputConfigs, indexConfigs, storeConfigs)
+	// The exec-out writers write from goroutines that end only once their file is closed or
+	// planCtx is cancelled: cancel and wait for them so that no write outlives this call.
+	planCtx, cancelPlan := context.WithCancel(ctx)
+	defer cancelPlan()
+	executionPlan, err := GetExecutionPlan(planCtx, logger, execGraph, request.Stage, startBlock, stopBlock, request.OutputModule, execOutputConfigs, indexConfigs, storeConfigs)
 	if err != nil {
 		return fmt.Errorf("creating execution plan: %w", err)
 	}
+	defer func() {
+		cancelPlan()
+		for _, w := range executionPlan.ExecoutWriters {
+			w.Wait()
+		}
+	}()
 
 	if executionPlan.Skippable && request.StreamOutput {
 		logger.Info("no modules required to run, skipping, but sending outputs anyway because StreamOutput is set")

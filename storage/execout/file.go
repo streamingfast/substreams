@@ -56,6 +56,7 @@ func OpenFileReader(ctx context.Context, store dstore.Store, logger *zap.Logger,
 type FileWriter interface {
 	SetItem(clock *pbsubstreams.Clock, data []byte) error
 	Close() error
+	Wait()
 	ModuleName() string
 	Filename() string
 	Range() *block.Range
@@ -311,6 +312,12 @@ func (fw *fileWriter) Close() error {
 	}
 	fw.setDataSizeMetadata()
 	return nil
+}
+
+// Wait blocks until the write to the store has ended: after Close, or once the context the
+// file was created with is cancelled.
+func (fw *fileWriter) Wait() {
+	<-fw.writeError
 }
 
 // setDataSizeMetadata records the uncompressed payload size of the file, and how many items

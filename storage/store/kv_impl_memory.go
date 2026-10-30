@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"iter"
 	"sort"
 	"strings"
@@ -9,18 +10,27 @@ import (
 	"github.com/streamingfast/substreams/storage/store/marshaller"
 )
 
+// defaultMaxInFlightMemorySnapshots bounds concurrent Snapshot() pointer-copies on a
+// memory-backed store when the caller doesn't set MemoryBackendConfig.MaxInFlightSnapshots.
+const defaultMaxInFlightMemorySnapshots = 4
+
 // memoryKVImpl is an in-memory KVImpl backed by a Go map.
 // All data lives in the Go heap. This is the original behavior and is kept for backward compatibility.
 type memoryKVImpl struct {
 	kv        map[string][]byte
 	storeName string // for metrics labels
+
+	// snapshotSem bounds concurrent in-flight Snapshot() pointer-copies; see
+	// MemoryBackendConfig.MaxInFlightSnapshots.
+	snapshotSem chan struct{}
 }
 
 // newMemoryKVImpl creates a new in-memory KVImpl.
 func newMemoryKVImpl() *memoryKVImpl {
 	return &memoryKVImpl{
-		kv:        make(map[string][]byte),
-		storeName: "unknown",
+		kv:          make(map[string][]byte),
+		storeName:   "unknown",
+		snapshotSem: make(chan struct{}, defaultMaxInFlightMemorySnapshots),
 	}
 }
 
@@ -34,6 +44,17 @@ func newMemoryKVImplWithStoreName(storeName string) *memoryKVImpl {
 		metrics.StoreBackendType.SetFloat64(2.0, "memory", storeName)
 	}
 
+	return impl
+}
+
+// newMemoryKVImplWithConfig creates a new in-memory KVImpl with explicit backend options.
+func newMemoryKVImplWithConfig(storeName string, cfg *MemoryBackendConfig) *memoryKVImpl {
+	impl := newMemoryKVImplWithStoreName(storeName)
+	maxInFlight := cfg.MaxInFlightSnapshots
+	if maxInFlight <= 0 {
+		maxInFlight = defaultMaxInFlightMemorySnapshots
+	}
+	impl.snapshotSem = make(chan struct{}, maxInFlight)
 	return impl
 }
 
@@ -176,6 +197,8 @@ func (m *memoryKVImpl) Save() iter.Seq2[marshaller.StoreDataEntry, error] {
 // never mutates a stored []byte in place, so the captured slices stay valid and
 // unchanged for the snapshot's lifetime without duplicating the payload.
 func (m *memoryKVImpl) Snapshot() (marshaller.KVSnapshotIter, error) {
+	m.snapshotSem <- struct{}{}
+
 	keys := make([]string, 0, len(m.kv))
 	for k := range m.kv {
 		keys = append(keys, k)
@@ -186,7 +209,7 @@ func (m *memoryKVImpl) Snapshot() (marshaller.KVSnapshotIter, error) {
 	for i, k := range keys {
 		entries[i] = memorySnapshotEntry{key: k, value: m.kv[k]}
 	}
-	return &memorySnapshotIter{entries: entries}, nil
+	return &memorySnapshotIter{entries: entries, release: func() { <-m.snapshotSem }}, nil
 }
 
 type memorySnapshotEntry struct {
@@ -197,6 +220,8 @@ type memorySnapshotEntry struct {
 type memorySnapshotIter struct {
 	entries []memorySnapshotEntry
 	idx     int
+	closed  bool
+	release func()
 }
 
 func (it *memorySnapshotIter) Next() (string, []byte, bool, error) {
@@ -208,8 +233,21 @@ func (it *memorySnapshotIter) Next() (string, []byte, bool, error) {
 	return e.key, e.value, true, nil
 }
 
+func (it *memorySnapshotIter) Reset() error {
+	if it.closed {
+		return fmt.Errorf("memory snapshot iterator used after close")
+	}
+	it.idx = 0
+	return nil
+}
+
 func (it *memorySnapshotIter) Close() error {
+	if it.closed {
+		return nil
+	}
+	it.closed = true
 	it.entries = nil
+	it.release()
 	return nil
 }
 

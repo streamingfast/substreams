@@ -49,6 +49,13 @@ type Marshaller interface {
 // mid-iteration.
 type KVSnapshotIter interface {
 	Next() (key string, value []byte, ok bool, err error)
+
+	// Reset rewinds Next back to the first entry, reusing the same underlying
+	// consistent view rather than taking a new one — so a caller retrying a failed
+	// upload re-reads the exact same point-in-time snapshot on every attempt instead
+	// of a later (by-then-mutated) one. Returns an error if called after Close.
+	Reset() error
+
 	Close() error
 }
 

@@ -66,12 +66,12 @@ modules:
     kind: map
     inputs:
       - source: sf.ethereum.type.v2.Block
-      - map: ethereum_common:filtered_logs
+      - map: ethereum_common:filtered_events
     output:
       type: proto:my.custom.Output
       
 params:
-  ethereum_common:filtered_logs: "address=0xa0b86a33e6776e1b1c4b0b8b8b8b8b8b8b8b8b8b" # lowercase is important! this is an exact string match
+  ethereum_common:filtered_events: "evt_addr:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" # lowercase is important! this is an exact string match
 ```
 
 ### Example: Using Ethereum Log Filtering
@@ -117,12 +117,12 @@ modules:
   - name: filtered_transfers
     kind: map
     inputs:
-      - map: ethereum_common:filtered_logs
+      - map: ethereum_common:filtered_events
     output:
       type: proto:my.transfers.Transfers
       
 params:
-  ethereum_common:filtered_logs: "address=0xa0b86a33e6776e1b1c4b0b8b8b8b8b8b8b8b8b8b&topic0=0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+  ethereum_common:filtered_events: "evt_addr:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 && evt_sig:0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 ```
 
 ### Performance Benefits

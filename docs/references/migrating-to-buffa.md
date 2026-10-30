@@ -10,11 +10,11 @@ Read on if you are moving an existing module to 0.8.0, or if a build fails becau
 
 A crate generates types for one protobuf implementation, so every crate in a module must come from the same row. Mixing rows puts two incompatible copies of `substreams` in the dependency tree.
 
-| `substreams` | `substreams-ethereum` | `substreams-solana` | `substreams-bitcoin` | `substreams-near` | `substreams-database-change` | Protobuf |
-| --- | --- | --- | --- | --- | --- | --- |
-| 0.8.0 | 0.12.0 | 0.16.0 | 3.0.0 | 0.11.0 | 5.0.0 | buffa |
-| 0.7.x | 0.11.x | 0.15.x | | | 3.x, 4.x | prost |
-| 0.6.x | 0.10.x | 0.14.x | 2.x | 0.10.x | 2.x | prost |
+| `substreams` | `substreams-ethereum` | `substreams-solana` | `substreams-bitcoin` | `substreams-database-change` | Protobuf |
+| --- | --- | --- | --- | --- | --- |
+| 0.8.0 | 0.12.0 | 0.16.0 | 3.0.0 | 5.0.0 | buffa |
+| 0.7.x | 0.11.x | 0.15.x | | 3.x, 4.x | prost |
+| 0.6.x | 0.10.x | 0.14.x | 2.x | 2.x | prost |
 
 ## Update your dependencies
 

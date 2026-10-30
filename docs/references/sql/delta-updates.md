@@ -101,5 +101,5 @@ use substreams_database_change::pb::sf::substreams::sink::database::v1::Database
 ## Further Reading
 
 - [substreams-sink-database-changes Crate Documentation](https://docs.rs/substreams-database-change/latest/substreams_database_change/) - API reference for delta update methods
-- [substreams-sink-sql Repository](https://github.com/streamingfast/substreams-sink-sql) - Sink SQL source code and documentation
+- [SQL sink source code](https://github.com/streamingfast/substreams/tree/develop/sink/sql) - Source code of `substreams sink postgres` and `substreams sink clickhouse`
 - [Uniswap V4 Candles Demo](https://github.com/streamingfast/substreams-eth-uni-v4-demo-candles) - Complete working example using delta updates

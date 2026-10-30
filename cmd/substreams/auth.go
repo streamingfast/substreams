@@ -2,17 +2,13 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -23,8 +19,6 @@ import (
 const (
 	defaultPortalAPIURL = "https://admin.streamingfast.io"
 	localPortalAPIURL   = "http://localhost:9000"
-	defaultAuthBaseURL  = "https://auth.thegraph.market"
-	localAuthBaseURL    = "http://localhost:8080"
 	defaultMarketURL    = "https://thegraph.market"
 	localMarketURL      = "http://localhost:3000"
 	deviceClientName    = "substreams CLI"
@@ -37,8 +31,8 @@ var authCmd = &cobra.Command{
 	Long: `Login to The Graph Market and retrieve an API key without copy/paste.
 
 The command opens a browser so you can pick an organization (if you have more
-than one) and an API key. The selected key is fetched over the API, exchanged
-for a JWT, and written to .substreams.env.
+than one) and an API key. The selected key is fetched over the API and written
+to .substreams.env as SUBSTREAMS_API_KEY.
 
 Use --paste to enter a JWT or API key yourself.`,
 	RunE:         runAuthE,
@@ -121,23 +115,10 @@ type authCredentials struct {
 }
 
 func resolveCredentials(value string) (authCredentials, error) {
-	if !strings.HasPrefix(value, "server_") {
-		return authCredentials{token: value}, nil
+	if strings.HasPrefix(value, "server_") {
+		return authCredentials{apiKey: value}, nil
 	}
-
-	fmt.Println("Exchanging API key for JWT token...")
-	jwtToken, err := exchangeAPIKeyForJWT(value, authIssueBaseURL())
-	if err != nil {
-		if os.Getenv("LOCAL_DEVELOPMENT") == "true" {
-			fmt.Println("Could not issue a JWT from the local issuer; writing the API key instead.")
-			fmt.Println()
-			return authCredentials{apiKey: value}, nil
-		}
-		return authCredentials{}, fmt.Errorf("exchanging API key for JWT token: %w", err)
-	}
-	fmt.Println("Successfully obtained JWT token.")
-	fmt.Println()
-	return authCredentials{token: jwtToken}, nil
+	return authCredentials{token: value}, nil
 }
 
 func writeAuthCredentials(creds authCredentials) error {
@@ -184,16 +165,6 @@ func portalAPIBaseURL() string {
 	return defaultPortalAPIURL
 }
 
-func authIssueBaseURL() string {
-	if u := strings.TrimSpace(os.Getenv("SUBSTREAMS_AUTH_ISSUE_URL")); u != "" {
-		return strings.TrimRight(u, "/")
-	}
-	if os.Getenv("LOCAL_DEVELOPMENT") == "true" {
-		return localAuthBaseURL
-	}
-	return defaultAuthBaseURL
-}
-
 func tryOpenURL(rawURL string) error {
 	if !isHTTPURL(rawURL) {
 		return fmt.Errorf("refusing to open non-http(s) URL")
@@ -209,46 +180,6 @@ func tryOpenURL(rawURL string) error {
 		name, args = "xdg-open", []string{rawURL}
 	}
 	return exec.Command(name, args...).Start()
-}
-
-func exchangeAPIKeyForJWT(apiKey string, authBaseURL string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	data := fmt.Sprintf(`{"api_key":"%s"}`, apiKey)
-	body := strings.NewReader(data)
-
-	request, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/v1/auth/issue", authBaseURL), body)
-	if err != nil {
-		return "", fmt.Errorf("creating HTTP request: %w", err)
-	}
-	request.Header.Set("Content-Type", "application/json")
-
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return "", fmt.Errorf("HTTP POST request: %w", err)
-	}
-	defer response.Body.Close()
-
-	fullBody, err := io.ReadAll(response.Body)
-	if err != nil {
-		return "", fmt.Errorf("reading response body: %w", err)
-	}
-
-	if response.StatusCode != 200 {
-		return "", fmt.Errorf("request failed with code %d: %s", response.StatusCode, redactSecrets(string(fullBody)))
-	}
-
-	var authResp authIssueResponse
-	if err := json.Unmarshal(fullBody, &authResp); err != nil {
-		return "", fmt.Errorf("unmarshalling response %q: %w", redactSecrets(string(fullBody)), err)
-	}
-
-	return authResp.Token, nil
-}
-
-type authIssueResponse struct {
-	Token string `json:"token"`
 }
 
 var (

@@ -185,7 +185,7 @@ modules:
   - name: defi_analytics
     kind: map
     inputs:
-      - map: ethereum_common:filtered_logs
+      - map: ethereum_common:filtered_events
       - map: uniswap_v3:pool_events
       - map: aave_v2:lending_events
     output:

@@ -81,18 +81,18 @@ imports:
   ethereum_common: ethereum_common@v0.3.3
 
 modules:
-  - name: filtered_logs_one
-    use: ethereum_common:filtered_logs
+  - name: usdc_events
+    use: ethereum_common:filtered_events
     
-  - name: filtered_logs_two
-    use: ethereum_common:filtered_logs
+  - name: usdt_events
+    use: ethereum_common:filtered_events
     
 params:
-  filtered_logs_one: "address=0xa0b86a33e6776e1b1c4b0b8b8b8b8b8b8b8b8b8b" # lowercase is important! this is an exact string match
-  filtered_logs_two: "address=0x1234567890aaaabcccddeeefffffffffffffffff"
+  usdc_events: "evt_addr:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" # lowercase is important! this is an exact string match
+  usdt_events: "evt_addr:0xdac17f958d2ee523a2206206994597c13d831ec7"
 ```
 
-While this example could be achieved simply with the parameter `address=0xa0b86a33e6776e1b1c4b0b8b8b8b8b8b8b8b8b8b||address=0x1234567890aaaabcccddeeefffffffffffffffff`, there are some scenarios where you will need this level of flexibility.
+While this example could be achieved simply with the parameter `evt_addr:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 || evt_addr:0xdac17f958d2ee523a2206206994597c13d831ec7`, there are some scenarios where you will need this level of flexibility.
 
 ## Advanced parameters
 

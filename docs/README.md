@@ -1,6 +1,10 @@
 ---
-cover: .gitbook/assets/brand/social-preview.png
+cover: .gitbook/assets/brand/cover.png
 coverY: 0
+layout:
+  cover:
+    visible: true
+    size: hero
 ---
 
 # Introduction
@@ -11,7 +15,7 @@ Substreams is a powerful indexing technology, which allows you to:
 * Apply custom transformations to the data.
 * Send the data to a place of your choice (for example, a Postgres database or a file).
 
-<figure><img src=".gitbook/assets/intro/supported-chains.png" alt="" width="100%"><figcaption></figcaption></figure>
+<figure><picture><source srcset=".gitbook/assets/intro/supported-chains.png" media="(prefers-color-scheme: dark)"><img src=".gitbook/assets/intro/supported-chains-light.png" alt="" width="100%"></picture><figcaption></figcaption></figure>
 
 **You can use Substreams packages to define which specific data you want to extract from the blockchain**. For example, consider that you want to retrieve data from the Uniswap v3 smart contract. You can simply use the [Uniswap v3 Substreams Package](https://substreams.dev/packages/uniswap-v3/v0.2.10) and send that data wherever you want!
 

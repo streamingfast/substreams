@@ -14,10 +14,11 @@ Source: `@streamingfast/ui-tokens` v0.1.0 (brand logos and `tokens.css`).
 | `logo-on-dark.png` / `.svg`          | Header logo, dark mode. Same, light text.                                 |
 | `icon-light.png` / `.svg`            | Site icon (favicon), light mode. Substreams icon on `#fafcfc` tile, 512×512. |
 | `icon-dark.png` / `.svg`             | Site icon (favicon), dark mode. Same on `#141516` tile.                   |
-| `social-preview.png` / `.svg`        | Social preview (`og:image`).                                              |
+| `cover.png` / `.svg`                 | Introduction page cover (`docs/README.md` front matter, hero size), 1600×400. |
+| `social-preview.png` / `.svg`        | Social preview (`og:image`), 1200×630. Logo kept inside the center 630×630 square, Slack crops to it. |
 
-PNGs are rendered from the SVGs with `rsvg-convert` (`-w 1200` for logos, `-w 512 -h 512` for icons). The icon is
-the gradient mark cut out of `substreams/svg/substreams-on-dark.svg`, on the rounded tile of `streamingfast/icon/*`.
+PNGs are rendered from the SVGs with `rsvg-convert` (`-w 1200` for logos, `-w 512 -h 512` for icons, `-w 1600 -h 400`
+for the cover). The icon is the gradient mark cut out of `substreams/svg/substreams-on-dark.svg`, on the rounded tile of `streamingfast/icon/*`.
 
 ## Customization settings
 
@@ -41,10 +42,11 @@ Site → **Customization**. Labels match the [GitBook docs](https://gitbook.com/
 
 **Site styles**
 
-- **Custom fonts** → **Add custom font** "Urbanist", regular + semibold + bold `.woff2`:
-  [400](https://cdn.jsdelivr.net/fontsource/fonts/urbanist@latest/latin-400-normal.woff2),
-  [600](https://cdn.jsdelivr.net/fontsource/fonts/urbanist@latest/latin-600-normal.woff2),
-  [700](https://cdn.jsdelivr.net/fontsource/fonts/urbanist@latest/latin-700-normal.woff2)
+- **Custom fonts** → **Add custom font** "Urbanist", one weight step heavier than the slot it fills, because Urbanist
+  reads too thin at its nominal weights. Upload each `.woff2` into the slot named before the arrow:
+  regular (400) ← [500](https://cdn.jsdelivr.net/fontsource/fonts/urbanist@latest/latin-500-normal.woff2),
+  semibold (600) ← [700](https://cdn.jsdelivr.net/fontsource/fonts/urbanist@latest/latin-700-normal.woff2),
+  bold (700) ← [800](https://cdn.jsdelivr.net/fontsource/fonts/urbanist@latest/latin-800-normal.woff2)
   (from [Fontsource](https://fontsource.org/fonts/urbanist), OFL).
 - **Font family** → **Main font**: Urbanist. **Headings**: same as main font.
 - **Font family** → **Monospace**: JetBrains Mono (built-in).

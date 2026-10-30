@@ -34,11 +34,17 @@ var (
 	// organizationSlugRegexp matches an organization slug on the Substreams
 	// registry: runs of lowercase letters and digits joined by single hyphens.
 	organizationSlugRegexp = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+
+	// hostedStoreReferenceRegexp matches a hosted store named by its organization,
+	// `<org-slug>/<deployment-name>`, both shaped like an organization slug.
+	// validateHostedStoreReference checks their lengths.
+	hostedStoreReferenceRegexp = regexp.MustCompile(`^([a-z0-9]+(?:-[a-z0-9]+)*)/([a-z0-9]+(?:-[a-z0-9]+)*)$`)
 )
 
 const (
-	organizationSlugMinLength = 2
-	organizationSlugMaxLength = 39
+	organizationSlugMinLength      = 2
+	organizationSlugMaxLength      = 39
+	hostedStoreDeploymentMaxLength = 63
 )
 
 const (
@@ -248,11 +254,30 @@ func (i *Input) parseFoundationalStore() error {
 
 	ref, version, hasAt := strings.Cut(id, "@")
 
+	// A hosted store can be named by its organization, `<org-slug>/<deployment-name>`,
+	// which the server resolves on every run. The version is optional there and is
+	// not checked against the deployed store.
+	if strings.Contains(ref, "/") {
+		if err := validateHostedStoreReference(ref); err != nil {
+			return fmt.Errorf("invalid foundational-store identifier %q: %w", id, err)
+		}
+		if !hasAt {
+			return nil
+		}
+		if version == "" || version == "latest" {
+			return fmt.Errorf("foundational-store input %q: omit the version or use a specific semver (e.g., v1.2.3)", id)
+		}
+		if !semver.IsValid(version) {
+			return fmt.Errorf("foundational-store input %q: version %q is not valid Semver format", id, version)
+		}
+		return nil
+	}
+
 	// The reference is either a hosted-store deployment id (a UUID) or a short
 	// package identifier (a package name). Deployment ids can start with a digit,
 	// so they are not valid package names and must be matched separately.
 	if !foundationalStoreIDRegexp.MatchString(ref) && !moduleNameRegexp.MatchString(ref) {
-		return fmt.Errorf("invalid foundational-store identifier %q: expected a deployment id (UUID) or a package name", id)
+		return fmt.Errorf("invalid foundational-store identifier %q: expected a deployment id (UUID), an <org-slug>/<deployment-name> reference or a package name", id)
 	}
 
 	if !hasAt {
@@ -272,6 +297,20 @@ func (i *Input) parseFoundationalStore() error {
 		return fmt.Errorf("foundational-store input %q: version %q is not valid Semver format", id, version)
 	}
 
+	return nil
+}
+
+func validateHostedStoreReference(ref string) error {
+	parts := hostedStoreReferenceRegexp.FindStringSubmatch(ref)
+	if parts == nil {
+		return fmt.Errorf("expected <org-slug>/<deployment-name>, lowercase letters, digits and single hyphens")
+	}
+	if n := len(parts[1]); n < organizationSlugMinLength || n > organizationSlugMaxLength {
+		return fmt.Errorf("organization slug %q must be %d to %d characters", parts[1], organizationSlugMinLength, organizationSlugMaxLength)
+	}
+	if n := len(parts[2]); n > hostedStoreDeploymentMaxLength {
+		return fmt.Errorf("deployment name %q must be at most %d characters", parts[2], hostedStoreDeploymentMaxLength)
+	}
 	return nil
 }
 

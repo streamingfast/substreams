@@ -128,6 +128,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   same name is still read locally; prefix a path with `./` to keep it local in any case.
 - Manifest `imports` accept `<org>/<package>@<version>`. An organization package import needs a specific
   version: `<org>/<package>` and `<org>/<package>@latest` are refused, as `<package>@latest` already is.
+- Manifest: a `foundational-store:` input accepts a hosted store named by its organization,
+  `<org-slug>/<deployment-name>`, with an optional `@<version>`. The server resolves the name to the
+  organization's live store on every run. A deployment id or `<package>@<version>` works as before.
 
 ### Dependencies
 

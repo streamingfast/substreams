@@ -12,7 +12,13 @@ import (
 )
 
 func (l *Loader) Flush(ctx context.Context, outputModuleHash string, cursor *sink.Cursor, lastFinalBlock uint64) (rowFlushedCount int, err error) {
-	ctx = clickhouse.Context(context.Background(), clickhouse.WithStdAsync(false))
+	// On PostgreSQL the flush is one transaction, so cancelling it (the sink is stopping, or stalled
+	// on a hung call) rolls it all back. ClickHouse writes are not transactional: a flush cut short
+	// could leave some tables written without the cursor, so it always runs to the end there.
+	if _, transactional := l.dialect.(*PostgresDialect); !transactional {
+		ctx = context.Background()
+	}
+	ctx = clickhouse.Context(ctx, clickhouse.WithStdAsync(false))
 
 	startAt := time.Now()
 	tx, err := l.BeginTx(ctx, nil)

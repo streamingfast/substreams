@@ -10,7 +10,6 @@
   * on Solana
     * [Transactions & Instructions](tutorials/solana/solana.md)
     * [Account Changes](tutorials/solana/account-changes.md)
-  * [on NEAR](tutorials/near.md)
   * [on Monad](tutorials/monad.md)
   * [on TRON](tutorials/tron.md)
   * [on Injective](tutorials/cosmos-compatible/injective.md)
@@ -121,6 +120,7 @@
     * [Proto Annotations](references/sql/proto-annotations.md)
     * [Delta Updates](references/sql/delta-updates.md)
     * [Reorg Handling](references/sql/reorg-handling.md)
+    * [Standby Sinks](references/sql/standby-sinks.md)
     * [Progress & Performance Output](references/sql/progress-info.md)
 * Operators
   * [Hosting Foundational Stores](./references/foundational-stores/hosting-foundational-stores.md)

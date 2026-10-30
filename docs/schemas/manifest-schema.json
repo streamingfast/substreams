@@ -6,35 +6,45 @@
   "properties": {
     "specVersion": {
       "title": "manifest's specVersion",
-      "description": "A specVersion\nhttps://docs.substreams.dev/reference-material/manifests#specversion",
+      "description": "A specVersion\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#specversion",
       "enum": [
         "v0.1.0"
       ]
     },
     "package": {
       "title": "package",
-      "description": "A package",
+      "description": "A package\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#package",
       "type": "object",
       "properties": {
         "name": {
-          "title": "package property",
-          "description": "A package name\nhttps://docs.substreams.dev/reference-material/manifests#package.name",
+          "title": "package name",
+          "description": "A package name\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#package.name",
           "type": "string",
-          "pattern": "^([a-zA-Z][a-zA-Z0-9_]{0,63})$"
+          "pattern": "^([a-zA-Z][a-zA-Z0-9_-]{0,63})$"
         },
         "version": {
           "title": "package version",
-          "description": "A package version\nhttps://docs.substreams.dev/reference-material/manifests#package.version",
+          "description": "A package version, in Semantic Versioning\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#package.version",
           "type": "string"
         },
         "url": {
           "title": "package url",
-          "description": "A package url\nhttps://docs.substreams.dev/reference-material/manifests#package.url",
+          "description": "A package url\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#package.url",
+          "type": "string"
+        },
+        "description": {
+          "title": "package description",
+          "description": "A one-line package description\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#package.description",
           "type": "string"
         },
         "doc": {
           "title": "package doc",
-          "description": "A package doc\nhttps://docs.substreams.dev/reference-material/manifests#package.docs",
+          "description": "A package doc, in Markdown\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#package.doc",
+          "type": "string"
+        },
+        "image": {
+          "title": "package image",
+          "description": "Path to a JPEG, WebP or PNG icon of 2 MiB or less, relative to the manifest\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#package.image",
           "type": "string"
         }
       },
@@ -46,7 +56,7 @@
     },
     "imports": {
       "title": "imports",
-      "description": "An import\nhttps://docs.substreams.dev/reference-material/manifests#imports",
+      "description": "An import\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#imports",
       "type": "object",
       "propertyNames": {
         "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
@@ -58,364 +68,110 @@
     },
     "protobuf": {
       "title": "protobuf",
-      "description": "A protobuf\nhttps://docs.substreams.dev/reference-material/manifests#protobuf",
+      "description": "A protobuf\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#protobuf",
       "type": "object",
       "properties": {
         "files": {
-          "type": "array",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "title": "protobuf file",
-            "descriptions": "a file",
+            "description": "a .proto file, relative to one of the importPaths",
             "type": "string",
             "pattern": "\\.proto$"
-          },
-          "minItems": 1,
-          "unevaluatedItems": false
+          }
         },
         "importPaths": {
-          "type": "array",
-          "prefixFiles": [
-            {
-              "title": "protobuf prefixFile",
-              "descriptions": "a prefixFile",
-              "type": "string"
-            }
+          "type": [
+            "array",
+            "null"
           ],
-          "minItems": 1
+          "items": {
+            "title": "protobuf import path",
+            "description": "a directory to look up .proto files in",
+            "type": "string"
+          }
+        },
+        "excludePaths": {
+          "description": "Files or directories skipped when generating Rust code\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#protobuf.excludepaths",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "descriptorSets": {
+          "description": "Precompiled protobuf definitions from the Buf Schema Registry\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#protobuf.descriptorsets",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "module": {
+                "description": "a Buf module, like buf.build/organization/repository, optionally with an @version",
+                "type": "string"
+              },
+              "version": {
+                "description": "a semantic version or latest",
+                "type": "string"
+              },
+              "symbols": {
+                "description": "protobuf symbols to import, all of them when omitted",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "localPath": {
+                "description": "a local descriptor set file",
+                "type": "string"
+              }
+            },
+            "required": [
+              "module"
+            ],
+            "additionalProperties": false
+          }
         }
       },
-      "required": [
-        "files",
-        "importPaths"
-      ],
-      "unevaluatedProperties": false
+      "additionalProperties": false
     },
     "binaries": {
       "title": "binaries",
-      "description": "A binary\nhttps://docs.substreams.dev/reference-material/manifests#binaries",
+      "description": "A binary\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#binaries",
       "type": "object",
-      "properties": {
-        "default": {
-          "title": "default binary",
-          "description": "the default binary",
-          "type": "object",
-          "properties": {
-            "type": {
-              "title": "binary type",
-              "description": "A binary type\nhttps://docs.substreams.dev/reference-material/manifests#binaries-name-.type",
-              "enum": [
-                "wasm/rust-v1"
-              ]
-            },
-            "file": {
-              "title": "binary file",
-              "description": "A binary file\nhttps://docs.substreams.dev/reference-material/manifests#binaries-name-.file",
-              "type": "string"
-            },
-            "protoPackageMapping": {
-              "title": "binary protoPackageMapping",
-              "description": "a protoPackageMapping",
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "string"
-              },
-              "minProperties": 1
-            }
-          },
-          "required": [
-            "type",
-            "file"
-          ],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "default"
-      ],
-      "unevaluatedProperties": false
+      "additionalProperties": {
+        "$ref": "#/$defs/binary"
+      }
     },
     "modules": {
       "title": "modules",
-      "description": "A module \nhttps://docs.substreams.dev/reference-material/manifests#modules",
+      "description": "A module\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#modules",
       "type": "array",
       "items": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "description": "A module name\nhttps://docs.substreams.dev/reference-material/manifests#module-name",
-            "type": "string"
-          },
-          "initialBlock": {
-            "description": "A module initialBlock\nhttps://docs.substreams.dev/reference-material/manifests#module-initialBlock",
-            "type": "number"
-          },
-          "kind": {
-            "description": "A module kind\nhttps://docs.substreams.dev/reference-material/manifests#module-kind",
-            "enum": [
-              "map",
-              "store"
-            ]
-          },
-          "binary": {
-            "description": "A module binary\nhttps://docs.substreams.dev/reference-material/manifests#module-binary",
-            "type": "string"
-          },
-          "inputs": {
-            "description": "A module input\nhttps://docs.substreams.dev/reference-material/manifests#module-inputs",
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "store": {
-                  "description": "an input store",
-                  "type": "string"
-                },
-                "source": {
-                  "description": "an input source",
-                  "type": "string"
-                },
-                "map": {
-                  "description": "an input map",
-                  "type": "string"
-                }
-              },
-              "if": {
-                "properties": {
-                  "store": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "store"
-                ]
-              },
-              "then": {
-                "maxProperties": 2,
-                "properties": {
-                  "mode": {
-                    "description": "an input mode",
-                    "type": "string"
-                  }
-                }
-              },
-              "else": {
-                "maxProperties": 1
-              },
-              "minProperties": 1,
-              "unevaluatedProperties": false
-            },
-            "unevaluatedItems": false
-          }
-        },
-        "if": {
-          "properties": {
-            "kind": {
-              "const": "store"
-            }
-          },
-          "required": [
-            "kind"
-          ]
-        },
-        "then": {
-          "properties": {
-            "updatePolicy": {
-              "description": "A module's updatePolicy\nhttps://docs.substreams.dev/reference-material/manifests#module-updatepolicy",
-              "enum": [
-                "set",
-                "set_if_not_exists",
-                "append",
-                "add",
-                "min",
-                "max"
-              ]
-            },
-            "valueType": {
-              "description": "A module's valueType\nhttps://docs.substreams.dev/reference-material/manifests#module-valuetype",
-              "type": [
-                "string",
-                "number"
-              ]
-            },
-            "name": {
-              "description": "A module name\nhttps://docs.substreams.dev/reference-material/manifests#module-name",
-              "type": "string"
-            },
-            "initialBlock": {
-              "description": "A module initialBlock\nhttps://docs.substreams.dev/reference-material/manifests#module-initialBlock",
-              "type": "number"
-            },
-            "kind": {
-              "description": "A module kind\nhttps://docs.substreams.dev/reference-material/manifests#module-kind",
-              "enum": [
-                "map",
-                "store"
-              ]
-            },
-            "binary": {
-              "description": "A module binary\nhttps://docs.substreams.dev/reference-material/manifests#module-binary",
-              "type": "string"
-            },
-            "inputs": {
-              "description": "A module input\nhttps://docs.substreams.dev/reference-material/manifests#module-inputs",
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "store": {
-                    "description": "an input store",
-                    "type": "string"
-                  },
-                  "source": {
-                    "description": "an input source",
-                    "type": "string"
-                  },
-                  "map": {
-                    "description": "an input map",
-                    "type": "string"
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "store": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "store"
-                  ]
-                },
-                "then": {
-                  "maxProperties": 2,
-                  "properties": {
-                    "store": {
-                      "description": "an input store",
-                      "type": "string"
-                    },
-                    "mode": {
-                      "description": "an input mode",
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
-                },
-                "else": {
-                  "maxProperties": 1
-                },
-                "minProperties": 1,
-                "unevaluatedProperties": false
-              },
-              "unevaluatedItems": false
-            }
-          },
-          "additionalProperties": false
-        },
-        "else": {
-          "properties": {
-            "name": {
-              "description": "A module name\nhttps://docs.substreams.dev/reference-material/manifests#module-name",
-              "type": "string"
-            },
-            "initialBlock": {
-              "description": "A module initialBlock\nhttps://docs.substreams.dev/reference-material/manifests#module-initialBlock",
-              "type": "number"
-            },
-            "kind": {
-              "description": "A module kind\nhttps://docs.substreams.dev/reference-material/manifests#module-kind",
-              "enum": [
-                "map",
-                "store"
-              ]
-            },
-            "binary": {
-              "description": "A module binary\nhttps://docs.substreams.dev/reference-material/manifests#module-binary",
-              "type": "string"
-            },
-            "inputs": {
-              "description": "A module input\nhttps://docs.substreams.dev/reference-material/manifests#module-inputs",
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "store": {
-                    "description": "an input store",
-                    "type": "string"
-                  },
-                  "source": {
-                    "description": "an input source",
-                    "type": "string"
-                  },
-                  "map": {
-                    "description": "an input map",
-                    "type": "string"
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "store": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "store"
-                  ]
-                },
-                "then": {
-                  "maxProperties": 2,
-                  "properties": {
-                    "mode": {
-                      "description": "an input mode",
-                      "type": "string"
-                    }
-                  }
-                },
-                "else": {
-                  "maxProperties": 1
-                },
-                "minProperties": 1,
-                "unevaluatedProperties": false
-              },
-              "unevaluatedItems": false
-            },
-            "output": {
-              "description": "A module's output\nhttps://docs.substreams.dev/reference-material/manifests#module-output",
-              "type": "object",
-              "properties": {
-                "type": {
-                  "description": "an output's type",
-                  "type": "string"
-                }
-              },
-              "required": [
-                "type"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "additionalProperties": false
-        },
-        "required": [
-          "kind",
-          "name",
-          "inputs"
-        ],
-        "unevaluatedProperties": false
-      },
-      "additionalItems": false,
-      "minItems": 1
+        "$ref": "#/$defs/module"
+      }
+    },
+    "params": {
+      "title": "params",
+      "description": "Default value of each module's params input, by module name\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#params",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     },
     "network": {
       "title": "network",
-      "description": "Target blockchain where the Substreams package will execute. See supported chains at https://thegraph.com/docs/en/supported-networks/",
+      "description": "Default network of the Substreams package\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#network",
       "type": "string",
       "pattern": "[a-zA-Z0-9_-]+"
     },
     "networks": {
       "title": "networks",
-      "description": "Per-network overrides for initialBlock and params",
+      "description": "Per-network overrides for initialBlock and params\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#networks",
       "type": "object",
       "propertyNames": {
         "pattern": "[a-zA-Z0-9_-]+"
@@ -450,14 +206,386 @@
         "additionalProperties": false
       },
       "minProperties": 1
+    },
+    "sink": {
+      "title": "sink",
+      "description": "The sink that consumes the package's output\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#sink",
+      "type": "object",
+      "properties": {
+        "module": {
+          "description": "name of the module that emits the data to the sink",
+          "type": "string"
+        },
+        "type": {
+          "description": "protobuf message of the sink configuration, for example sf.substreams.sink.sql.v1.Service",
+          "type": "string"
+        },
+        "config": {
+          "description": "sink-specific configuration, matching the message named in type"
+        }
+      },
+      "required": [
+        "module",
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "blockFilters": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   },
   "required": [
     "specVersion",
-    "package",
-    "protobuf",
-    "binaries",
-    "modules"
+    "package"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "binary": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "title": "binary type",
+          "description": "A binary type, optionally followed by +extensions, like wasm/rust-v1+wasm-bindgen-shims\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#binaries-name-.type",
+          "type": "string",
+          "pattern": "^(wasm/rust-v1|wasip1/tinygo-v1)(\\+.+)?$",
+          "examples": [
+            "wasm/rust-v1",
+            "wasm/rust-v1+wasm-bindgen-shims",
+            "wasip1/tinygo-v1"
+          ]
+        },
+        "file": {
+          "title": "binary file",
+          "description": "A binary file, relative to the manifest\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#binaries-name-.file",
+          "type": "string"
+        },
+        "build": {
+          "title": "binary build command",
+          "description": "Command that substreams build runs to compile the binary\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#binaries-name-.build",
+          "type": "string"
+        },
+        "entrypoint": {
+          "type": "string"
+        },
+        "native": {
+          "type": "string"
+        },
+        "protoPackageMapping": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "file"
+      ],
+      "additionalProperties": false
+    },
+    "module": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "A module name\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#module-name",
+          "type": "string",
+          "pattern": "^([a-zA-Z][a-zA-Z0-9_-]{0,63})$"
+        },
+        "doc": {
+          "description": "A module doc, in Markdown\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#module-doc",
+          "type": "string"
+        },
+        "kind": {
+          "description": "A module kind\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#module-kind",
+          "enum": [
+            "map",
+            "store",
+            "blockIndex"
+          ]
+        },
+        "use": {
+          "description": "Run the code of another module, from this manifest or an imported package\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#module-use",
+          "type": "string"
+        },
+        "initialBlock": {
+          "description": "A module initialBlock\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#module-initialblock",
+          "type": "integer",
+          "minimum": 0
+        },
+        "updatePolicy": {
+          "description": "A store's updatePolicy\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#module-updatepolicy",
+          "enum": [
+            "set",
+            "set_if_not_exists",
+            "set_sum",
+            "append",
+            "add",
+            "min",
+            "max"
+          ]
+        },
+        "valueType": {
+          "description": "A store's valueType\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#module-valuetype",
+          "type": "string",
+          "anyOf": [
+            {
+              "enum": [
+                "bigdecimal",
+                "bigfloat",
+                "bigint",
+                "int64",
+                "float64",
+                "bytes",
+                "string"
+              ]
+            },
+            {
+              "pattern": "^proto:.+"
+            }
+          ]
+        },
+        "binary": {
+          "description": "A module binary, defaults to default\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#module-binary",
+          "type": "string"
+        },
+        "blockFilter": {
+          "description": "Skip blocks based on the keys of a blockIndex module\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#module-blockfilter",
+          "type": "object",
+          "properties": {
+            "module": {
+              "description": "name of a module of kind blockIndex",
+              "type": "string"
+            },
+            "query": {
+              "type": "object",
+              "properties": {
+                "string": {
+                  "description": "query matched against the block keys",
+                  "type": "string"
+                },
+                "params": {
+                  "description": "use the module's params input as the query",
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "inputs": {
+          "description": "A module input\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#module-inputs",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/input"
+          }
+        },
+        "output": {
+          "description": "A module's output\nhttps://docs.substreams.dev/reference-material/manifest-and-components/manifests#module-output",
+          "type": "object",
+          "properties": {
+            "type": {
+              "description": "an output's type, like proto:my.types.v1.Events",
+              "type": "string",
+              "pattern": "^proto:.+"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "use"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "kind"
+                  ]
+                },
+                {
+                  "required": [
+                    "output"
+                  ]
+                },
+                {
+                  "required": [
+                    "updatePolicy"
+                  ]
+                },
+                {
+                  "required": [
+                    "valueType"
+                  ]
+                },
+                {
+                  "required": [
+                    "binary"
+                  ]
+                }
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "kind"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "store"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "updatePolicy",
+              "valueType"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "map",
+                  "blockIndex"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "output"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "blockIndex"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "output": {
+                "properties": {
+                  "type": {
+                    "const": "proto:sf.substreams.index.v1.Keys"
+                  }
+                }
+              }
+            },
+            "not": {
+              "required": [
+                "blockFilter"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "input": {
+      "type": "object",
+      "oneOf": [
+        {
+          "properties": {
+            "source": {
+              "description": "a block type, like sf.ethereum.type.v2.Block",
+              "type": "string"
+            }
+          },
+          "required": [
+            "source"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "map": {
+              "description": "name of a map module",
+              "type": "string"
+            }
+          },
+          "required": [
+            "map"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "store": {
+              "description": "name of a store module",
+              "type": "string"
+            },
+            "mode": {
+              "description": "get (default) or deltas",
+              "enum": [
+                "get",
+                "deltas"
+              ]
+            }
+          },
+          "required": [
+            "store"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "params": {
+              "description": "the value is set under the top-level params mapping",
+              "const": "string"
+            }
+          },
+          "required": [
+            "params"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "foundational-store": {
+              "description": "a foundational store, as package@version or deployment-id@version",
+              "type": "string"
+            }
+          },
+          "required": [
+            "foundational-store"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
 }

@@ -31,6 +31,7 @@
       * [Option struct](how-to-guides/develop-your-own-substreams/generic/rust/option.md)
       * [Result struct](how-to-guides/develop-your-own-substreams/generic/rust/result.md)
     * [Protobuf](how-to-guides/develop-your-own-substreams/generic/creating-protobuf-schemas.md)
+    * [Updating Your Substreams](how-to-guides/develop-your-own-substreams/generic/updating-your-substreams.md)
   * [on EVM](how-to-guides/develop-your-own-substreams/evm)
     * [Exploring Ethereum](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/exploring-ethereum.md)
       * [Filter Transactions](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/map_filter_transactions_module.md)
@@ -95,6 +96,7 @@
   * [Foundational Stores](references/foundational-store-reference.md)
   * [Module Concepts](references/substreams-components/modules/modules.md)
   * [Module Caching](references/module-caching.md)
+  * [Performance Guidelines](references/performance-guidelines.md)
   * [Reliability Guarantees](references/reliability-guarantees.md)
   * [FAQ](references/faq.md)
 * Manifest & Components
@@ -105,6 +107,7 @@
   * [Module Outputs](references/substreams-components/modules/outputs.md)
   * [Module Handlers](references/substreams-components/modules/setting-up-handlers.md)
   * [Indexes](references/substreams-components/modules/indexes.md)
+  * [Block Filters](references/substreams-components/modules/block-filters.md)
   * [Keys in Stores](references/substreams-components/modules/keys-in-stores.md)
   * [Parameterized Modules](references/substreams-components/modules/parameterized-modules.md)
   * [Dynamic Data Sources](references/substreams-components/modules/dynamic-data-sources.md)

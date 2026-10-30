@@ -1,4 +1,4 @@
-The [Substreams Go Sink library](https://github.com/streamingfast/substreams-sink) allows to you to programmatically stream a Substreams using the Go programming language. The library handles reconnections and provides best practices for error handling.
+The [Substreams Go Sink library](https://github.com/streamingfast/substreams/tree/develop/sink) allows to you to programmatically stream a Substreams using the Go programming language. The library handles reconnections and provides best practices for error handling.
 
 The [Substreams Sink Examples GitHub repository](https://github.com/streamingfast/substreams-sink-examples) contains an example that you can use as the starting point to build your custom sink logic. After cloning the repository, move to the `go` directory.
 

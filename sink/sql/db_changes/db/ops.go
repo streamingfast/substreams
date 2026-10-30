@@ -165,7 +165,9 @@ func (l *Loader) Upsert(tableName string, primaryKey map[string]string, data map
 			l.logger.Debug("primary key entry already exist for table, merging columns together", zap.String("primary_key", uniqueID), zap.String("table_name", tableName))
 		}
 
-		op.mergeOperation(data)
+		if err := op.mergeOperation(data); err != nil {
+			return fmt.Errorf("merging changes into pending operation of table %q, primary key %q: %w", tableName, primaryKey, err)
+		}
 		entry.Set(key, op)
 		return nil
 	} else {
@@ -235,7 +237,9 @@ func (l *Loader) Update(tableName string, primaryKey map[string]string, data map
 			l.logger.Debug("primary key entry already exist for table, merging fields together", zap.String("primary_key", uniqueID), zap.String("table_name", tableName))
 		}
 
-		op.mergeOperation(data)
+		if err := op.mergeOperation(data); err != nil {
+			return fmt.Errorf("merging changes into pending operation of table %q, primary key %q: %w", tableName, primaryKey, err)
+		}
 		entry.Set(key, op)
 		return nil
 	} else {

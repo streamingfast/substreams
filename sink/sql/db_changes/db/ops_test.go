@@ -120,4 +120,21 @@ func TestLoader_CompositePrimaryKeysWithSlashKeptApart(t *testing.T) {
 		values[pair.Value.primaryKey["a"]] = pair.Value.data["value"].Value
 	}
 	assert.Equal(t, map[string]string{"x/y": "1", "x": "2"}, values)
+
+func TestLoader_InvalidUpdateOpTransitionFails(t *testing.T) {
+	for _, op := range []string{"upsert", "update"} {
+		t.Run(op, func(t *testing.T) {
+			l := NewTestLoader(t, "psql://x:5432/x?schemaName=testschema", nil, TestSinglePrimaryKeyTables("testschema"), zlog, tracer)
+			apply := l.Upsert
+			if op == "update" {
+				apply = l.Update
+			}
+
+			pk := map[string]string{"id": "1234"}
+			require.NoError(t, apply("xfer", pk, map[string]FieldData{"from": {Value: "5", UpdateOp: UpdateOpMax}}, nil))
+
+			err := apply("xfer", pk, map[string]FieldData{"from": {Value: "3", UpdateOp: UpdateOpAdd}}, nil)
+			require.ErrorContains(t, err, `invalid UpdateOp transition for field "from"`)
+		})
+	}
 }

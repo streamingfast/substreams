@@ -87,13 +87,17 @@ func createRowUniqueID(m map[string]string) string {
 	keys := slices.Collect(maps.Keys(m))
 	slices.Sort(keys)
 
+	// Values are joined with "/", so a "/" or "\" inside a value is escaped: otherwise ("a/b", "c")
+	// and ("a", "b/c") would give the same ID and their operations would be merged together.
 	values := make([]string, len(keys))
 	for i, key := range keys {
-		values[i] = m[key]
+		values[i] = compositeKeyEscaper.Replace(m[key])
 	}
 
 	return strings.Join(values, "/")
 }
+
+var compositeKeyEscaper = strings.NewReplacer(`\`, `\\`, `/`, `\/`)
 
 func (l *Loader) GetPrimaryKey(tableName string, pk string) (map[string]string, error) {
 	primaryKeyColumns := l.tables[tableName].primaryColumns

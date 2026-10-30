@@ -99,6 +99,29 @@ func TestLoader_PendingOperationsMerge(t *testing.T) {
 	}
 }
 
+func TestLoader_CompositePrimaryKeysWithSlashKeptApart(t *testing.T) {
+	l := NewTestLoader(t, "psql://x:5432/x?schemaName=testschema", nil, TestTables("testschema", map[string]*TableInfo{
+		"pair": mustNewTableInfo("testschema", "pair", []string{"a", "b"}, map[string]*ColumnInfo{
+			"a":     NewColumnInfo("a", "text", ""),
+			"b":     NewColumnInfo("b", "text", ""),
+			"value": NewColumnInfo("value", "text", ""),
+		}),
+	}), zlog, tracer)
+
+	require.NoError(t, l.Upsert("pair", map[string]string{"a": "x/y", "b": "z"}, map[string]FieldData{"value": {Value: "1"}}, nil))
+	require.NoError(t, l.Upsert("pair", map[string]string{"a": "x", "b": "y/z"}, map[string]FieldData{"value": {Value: "2"}}, nil))
+
+	entries, found := l.entries.Get("pair")
+	require.True(t, found)
+	require.Equal(t, 2, entries.Len())
+
+	values := map[string]string{}
+	for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
+		values[pair.Value.primaryKey["a"]] = pair.Value.data["value"].Value
+	}
+	assert.Equal(t, map[string]string{"x/y": "1", "x": "2"}, values)
+}
+
 func TestLoader_InvalidUpdateOpTransitionFails(t *testing.T) {
 	for _, op := range []string{"upsert", "update"} {
 		t.Run(op, func(t *testing.T) {

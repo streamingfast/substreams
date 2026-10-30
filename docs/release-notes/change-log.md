@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
+- SQL sink (DatabaseChanges): fix changes to rows with a composite primary key being applied to the wrong row when a
+  key value contains `/`. Within a batch, keys like (`a/b`, `c`) and (`a`, `b/c`) were taken for the same row, so the
+  second change was merged into the first row's operation (or rejected as a duplicate insert) and never written to
+  its own row.
 - SQL sink (DatabaseChanges): an invalid `UpdateOp` sequence on one field within a batch (for example `ADD` after
   `MAX`) now stops the sink with an error. Upserts and updates used to ignore it, so the change was silently dropped,
   along with any other fields of that change not merged yet.

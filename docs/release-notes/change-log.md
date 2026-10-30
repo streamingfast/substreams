@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### CLI
+
+- `substreams auth` now writes the selected API key to `.substreams.env` as `SUBSTREAMS_API_KEY` instead of exchanging it for a JWT, which expired and was never refreshed. A pasted JWT is still written as `SUBSTREAMS_API_TOKEN`. The `SUBSTREAMS_AUTH_ISSUE_URL` environment variable is no longer used.
+
 ### Sink
 
 - SQL sink (DatabaseChanges): fix changes to rows with a composite primary key being applied to the wrong row when a

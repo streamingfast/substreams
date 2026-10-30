@@ -11,7 +11,7 @@ This document lists all environment variables used by the Substreams project, or
 - **Purpose**: Indicates if running in local development mode
 - **Usage**: Set to "true" to use localhost URLs instead of production URLs
 - **Default**: `false` (device login talks to `https://admin.streamingfast.io`; `--paste` uses `https://thegraph.market`)
-- **Local values**: device login talks to `http://localhost:9000`; `--paste` uses `http://localhost:3000`. JWT issue uses `http://localhost:8080` (see `SUBSTREAMS_AUTH_ISSUE_URL`); if that issuer is unavailable the API key is stored instead of failing.
+- **Local values**: device login talks to `http://localhost:9000`; `--paste` uses `http://localhost:3000`.
 - **Location**: `cmd/substreams/auth.go`
 
 #### `SUBSTREAMS_PORTAL_API`
@@ -19,13 +19,6 @@ This document lists all environment variables used by the Substreams project, or
 - **Purpose**: Override the Portal API used by `substreams auth` browser login
 - **Usage**: Full base URL, e.g. `http://localhost:9000`
 - **Default**: `https://admin.streamingfast.io` (or `http://localhost:9000` when `LOCAL_DEVELOPMENT=true`)
-- **Location**: `cmd/substreams/auth.go`
-
-#### `SUBSTREAMS_AUTH_ISSUE_URL`
-**JWT issue base URL override**
-- **Purpose**: Override the `/v1/auth/issue` host used to exchange a `server_` API key for a JWT
-- **Usage**: Full base URL, e.g. `http://localhost:8080`
-- **Default**: `https://auth.thegraph.market` (or `http://localhost:8080` when `LOCAL_DEVELOPMENT=true`)
 - **Location**: `cmd/substreams/auth.go`
 
 ### `substreams registry` Commands

@@ -1,6 +1,10 @@
 ---
-cover: .gitbook/assets/brand/social-preview.png
+cover: .gitbook/assets/brand/cover.png
 coverY: 0
+layout:
+  cover:
+    visible: true
+    size: hero
 ---
 
 # Introduction

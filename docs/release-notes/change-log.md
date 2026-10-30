@@ -9,6 +9,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Sink
+
+- SQL sink (DatabaseChanges): fix changes to rows with a composite primary key being applied to the wrong row when a
+  key value contains `/`. Within a batch, keys like (`a/b`, `c`) and (`a`, `b/c`) were taken for the same row, so the
+  second change was merged into the first row's operation (or rejected as a duplicate insert) and never written to
+  its own row.
+
 ## v1.26.0
 
 ### Server

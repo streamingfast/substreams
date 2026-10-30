@@ -49,7 +49,11 @@ func (l *Loader) GetAllCursors(ctx context.Context) (out map[string]*sink.Cursor
 
 func (l *Loader) allCursorRows(ctx context.Context) (map[string]cursorRow, error) {
 	query := l.dialect.GetAllCursorsQuery(l.cursorTable.identifier)
-	rows, err := l.DB.QueryContext(ctx, query)
+	if l.writerConn != nil {
+		l.writerConnMu.Lock()
+		defer l.writerConnMu.Unlock()
+	}
+	rows, err := l.queryer().QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query all cursors: %w", err)
 	}
@@ -141,7 +145,7 @@ func (l *Loader) InsertCursor(ctx context.Context, moduleHash string, c *sink.Cu
 		c.Block().Num(),
 		c.Block().ID(),
 	)
-	if _, err := l.DB.ExecContext(ctx, query); err != nil {
+	if _, err := l.execer().ExecContext(ctx, query); err != nil {
 		return fmt.Errorf("insert cursor: %w", err)
 	}
 
@@ -237,7 +241,7 @@ type sqlExecutor interface {
 // If `tx` is nil, we use `l.DB` as the execution context, so an operations happening outside
 // a transaction. Otherwise, tx is the execution context.
 func (l *Loader) runModifiyQuery(ctx context.Context, tx Tx, action string, query string) (rowsAffected int64, err error) {
-	var executor sqlExecutor = l.DB
+	var executor sqlExecutor = l.execer()
 	if tx != nil {
 		executor = tx
 	}

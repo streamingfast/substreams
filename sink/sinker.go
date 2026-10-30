@@ -56,9 +56,13 @@ type Sinker struct {
 	stats                   *Stats
 	requestActiveStartBlock uint64
 
+	metricsServing sync.Once
+
 	// lastHandledCursor is the cursor of the last block or undo signal the handler accepted. With an
 	// undo buffer, the stream's cursor (the last block received) can be ahead of it.
 	lastHandledCursor *Cursor
+	// lastBlockMessageAt is when the last block or undo signal was received (unix nanoseconds).
+	lastBlockMessageAt atomic.Int64
 	// lastReceivedCursor is the stream's cursor when it ended, set before the completion handler runs.
 	lastReceivedCursor *Cursor
 
@@ -72,6 +76,15 @@ type Sinker struct {
 // signal the stream delivered. With an undo buffer it can be ahead of the cursor given to the handler.
 func (s *Sinker) LastReceivedCursor() *Cursor {
 	return s.lastReceivedCursor
+}
+
+// LastBlockMessageAt returns when the stream last delivered a block or an undo signal, before any undo
+// buffer, or the zero time if it has not yet. It stops advancing while a handler call is running.
+func (s *Sinker) LastBlockMessageAt() time.Time {
+	if at := s.lastBlockMessageAt.Load(); at != 0 {
+		return time.Unix(0, at)
+	}
+	return time.Time{}
 }
 
 // AwaitRun waits for Run to return, or for ctx to be done, then returns the first failure of Run. It
@@ -114,6 +127,18 @@ type handlerError struct{ err error }
 
 func (e *handlerError) Error() string { return e.err.Error() }
 func (e *handlerError) Unwrap() error { return e.err }
+
+// ServeMetrics starts the Prometheus endpoint if one is configured, once. Run calls it; a sink that
+// waits before calling Run (e.g. a standby) can call it earlier to expose its own metrics meanwhile.
+func (s *Sinker) ServeMetrics() {
+	if s.SinkerConfig.PrometheusAddr == "" {
+		return
+	}
+	s.metricsServing.Do(func() {
+		Metrics.Register()
+		go dmetrics.Serve(s.SinkerConfig.PrometheusAddr)
+	})
+}
 
 // New creates a new Sinker instance with the provided parameters.
 //
@@ -331,10 +356,7 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 		cancel()
 	}
 	s.stats.OnTerminated(func(err error) { s.Shutdown(err) })
-	if s.SinkerConfig.PrometheusAddr != "" {
-		Metrics.Register()
-		go dmetrics.Serve(s.SinkerConfig.PrometheusAddr)
-	}
+	s.ServeMetrics()
 
 	logEach := 15 * time.Second
 	if s.Logger.Core().Enabled(zap.DebugLevel) {
@@ -829,6 +851,7 @@ func (s *Sinker) doRequest(
 			}
 
 			activeCursor = cursor
+			s.lastBlockMessageAt.Store(time.Now().UnixNano())
 
 			// We record our stats before the buffer action, so user sees state of "stream" and not state of buffer
 			s.stats.RecordBlock(block)
@@ -963,6 +986,7 @@ func (s *Sinker) processBlockScopedData(
 	}
 
 	activeCursor = cursor
+	s.lastBlockMessageAt.Store(time.Now().UnixNano())
 
 	var dataToProcess []*pbsubstreamsrpc.BlockScopedData
 	if s.buffer == nil {

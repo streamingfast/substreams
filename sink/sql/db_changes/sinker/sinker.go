@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/streamingfast/logging"
@@ -45,6 +46,15 @@ type SQLSinker struct {
 	flushRetryCount int
 	flushRetryDelay time.Duration
 
+	// writerLockPollInterval, when non-zero, makes Run take the writer lock first, waiting as a
+	// standby while another sink holds it (see db.Loader.AcquireWriterLock).
+	writerLockPollInterval time.Duration
+
+	// stallTimeout, when non-zero, stops the sink if no block arrives for that long while live.
+	stallTimeout time.Duration
+	lastBlockAt  atomic.Int64 // unix nanoseconds
+	live         atomic.Bool
+
 	// lastHandledCursor is the cursor of the last block or undo given to this sink, and
 	// lastFinalBlockHeight the last final block height the stream reported with a block. With an undo
 	// buffer, the stream's own cursor can be ahead of the last handled one.
@@ -53,6 +63,10 @@ type SQLSinker struct {
 	// handlerFailed is set once a block or undo failed to be handled: pending changes may then hold
 	// part of a block, so they must not be flushed.
 	handlerFailed bool
+
+	// runStarted and runDone track Run as a whole, standby wait and lock release included (see AwaitRun).
+	runStarted atomic.Bool
+	runDone    chan struct{}
 }
 
 func New(sink *sink.Sinker, loader *db2.Loader, logger *zap.Logger, tracer logging.Tracer, flushRetryCount int, flushRetryDelay time.Duration) (*SQLSinker, error) {
@@ -68,15 +82,16 @@ func New(sink *sink.Sinker, loader *db2.Loader, logger *zap.Logger, tracer loggi
 		lastAppliedBlockNum: 0,
 		flushRetryCount:     flushRetryCount,
 		flushRetryDelay:     flushRetryDelay,
+		runDone:             make(chan struct{}),
 	}, nil
 }
 
-// Close stops the sinker, waits for the base sinker's Run to return if it was started, then closes the
-// database.
+// Close stops the sinker, waits for Run to return if it was started, then closes the database,
+// releasing the writer lock if held.
 func (s *SQLSinker) Close() error {
 	s.logger.Info("closing SQL sinker")
 	s.Shutdown(nil)
-	_ = s.Sinker.AwaitRun(context.Background())
+	_ = s.AwaitRun(context.Background())
 
 	if err := s.loader.Close(); err != nil {
 		return fmt.Errorf("loader close: %w", err)
@@ -84,7 +99,59 @@ func (s *SQLSinker) Close() error {
 	return nil
 }
 
+// AwaitRun waits for Run to return, or for ctx to be done, then returns the first failure of the base
+// sinker's Run. It also covers what Run does around the stream, standing by for the writer lock and
+// releasing it, which the base sinker's AwaitRun does not see. It returns right away if Run was not
+// started.
+func (s *SQLSinker) AwaitRun(ctx context.Context) error {
+	if s.runStarted.Load() {
+		select {
+		case <-s.runDone:
+		case <-ctx.Done():
+			return fmt.Errorf("sinker run did not finish, its last writes may or may not have completed: %w", ctx.Err())
+		}
+	}
+	return s.Sinker.AwaitRun(ctx)
+}
+
+// SetWriterLock makes Run take the writer lock of the cursors table before loading the cursor. While
+// another sink holds it, this one waits as a standby, checking every pollInterval. PostgreSQL only.
+func (s *SQLSinker) SetWriterLock(pollInterval time.Duration) {
+	s.writerLockPollInterval = pollInterval
+}
+
+// SetStallTimeout makes the sink stop with an error if no block arrives for timeout while live, so a
+// supervisor restarts it (and, with the writer lock, a standby can take over). Zero disables it.
+func (s *SQLSinker) SetStallTimeout(timeout time.Duration) {
+	s.stallTimeout = timeout
+}
+
 func (s *SQLSinker) Run(ctx context.Context) {
+	s.runStarted.Store(true)
+	defer close(s.runDone)
+
+	// Cancelled as soon as this sinker terminates, whatever stage Run is at: standing by, loading the
+	// cursor, or streaming (the stream loop gets this context too).
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	s.OnTerminating(func(_ error) { cancel() })
+	if s.IsTerminating() {
+		return
+	}
+
+	if s.writerLockPollInterval > 0 {
+		if !s.acquireWriterLock(ctx) {
+			return
+		}
+		stopKeepalive := s.keepWriterSessionAlive(ctx)
+		// Released once the stream loop below has returned, so never under a running flush.
+		defer func() {
+			stopKeepalive()
+			s.loader.ReleaseWriterLock()
+			WriterLockHeld.SetUint64(0)
+		}()
+	}
+
 	cursor, rawCursor, mismatchDetected, err := s.loader.GetCursor(ctx, s.OutputModuleHash())
 	if err != nil && !errors.Is(err, db2.ErrCursorNotFound) {
 		s.Shutdown(fmt.Errorf("unable to retrieve cursor: %w", err))
@@ -140,12 +207,74 @@ func (s *SQLSinker) Run(ctx context.Context) {
 
 	s.stats.Start(logEach, cursor)
 
+	if s.stallTimeout > 0 {
+		s.lastBlockAt.Store(time.Now().UnixNano())
+		go s.watchStall()
+	}
+
 	s.logger.Info("starting sql sink",
 		zapx.HumanDuration("stats_refresh_each", logEach),
 		zap.Stringer("restarting_at", cursor.Block()),
 		zap.String("loader", s.loader.GetIdentifier()),
 	)
 	s.Sinker.Run(ctx, cursor, s)
+}
+
+// acquireWriterLock waits as a standby until the writer lock is held, and reports whether it is.
+// The metrics endpoint is served meanwhile, so standbys report the writer lock gauge.
+func (s *SQLSinker) acquireWriterLock(ctx context.Context) bool {
+	s.Sinker.ServeMetrics()
+	WriterLockHeld.SetUint64(0)
+
+	err := s.loader.AcquireWriterLock(ctx, s.writerLockPollInterval, s.Terminating())
+	if s.IsTerminating() || ctx.Err() != nil {
+		s.loader.ReleaseWriterLock() // stopping while standing by
+		s.Shutdown(nil)
+		return false
+	}
+	if err != nil {
+		s.Shutdown(fmt.Errorf("unable to take the writer lock: %w", err))
+		return false
+	}
+
+	WriterLockHeld.SetUint64(1)
+	return true
+}
+
+// keepWriterSessionAlive queries the session holding the writer lock every poll interval while no
+// flush is running, so long stretches without flushes don't let a proxy or idle_session_timeout end
+// it (and hand the lock to a standby). If the session is gone, the sink stops: a standby may already
+// be writing. The returned function stops the keepalive and waits for it.
+func (s *SQLSinker) keepWriterSessionAlive(ctx context.Context) (stop func()) {
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(s.writerLockPollInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+			err := s.loader.KeepWriterSessionAlive(ctx, max(s.writerLockPollInterval, 5*time.Second))
+			switch {
+			case err == nil || ctx.Err() != nil:
+			case db2.IsCancellation(err):
+				// Timed out: the database is slow, but the session may well be alive; the next
+				// flush (or the stall timeout) will tell.
+				s.logger.Warn("writer lock session keepalive timed out", zap.Error(err))
+			default:
+				s.Shutdown(fmt.Errorf("lost the database session holding the writer lock: %w", err))
+				return
+			}
+		}
+	}()
+	return func() {
+		cancel()
+		<-done
+	}
 }
 
 func (s *SQLSinker) flushWithRetry(ctx context.Context, moduleHash string, cursor *sink.Cursor, finalBlockHeight uint64, retries int) (int, error) {
@@ -182,14 +311,53 @@ func (s *SQLSinker) flushWithRetry(ctx context.Context, moduleHash string, curso
 			// Retrying cannot help: the sink must restart from the cursor stored in the database.
 			return 0, err
 		}
+		if s.loader.HoldsWriterLock() && !s.loader.WriterSessionAlive(ctx) {
+			// The writer lock went with its session; a standby may already be writing.
+			return 0, fmt.Errorf("lost the database session holding the writer lock: %w", err)
+		}
 		lastErr = err
 	}
 
 	return 0, fmt.Errorf("flush failed after %d retries: %w", retries, lastErr)
 }
 
+// watchStall stops the sink if no block arrives for stallTimeout while live. A sink stuck on a
+// silent stream or a hung database would otherwise keep running (and keep the writer lock).
+func (s *SQLSinker) watchStall() {
+	interval := max(min(s.stallTimeout/4, 5*time.Second), 10*time.Millisecond)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.Terminating():
+			return
+		case <-ticker.C:
+			// The stream's own record, taken before any undo buffer, counts blocks the buffer keeps
+			// back; it stops advancing while a handler call (a database write) hangs.
+			last := time.Unix(0, s.lastBlockAt.Load())
+			if received := s.Sinker.LastBlockMessageAt(); received.After(last) {
+				last = received
+			}
+			idle := time.Since(last)
+			if s.live.Load() && idle > s.stallTimeout {
+				s.Shutdown(fmt.Errorf("no block received for %s while live (--stall-timeout %s), stopping so the sink can be restarted", idle.Round(time.Second), s.stallTimeout))
+				return
+			}
+		}
+	}
+}
+
+func (s *SQLSinker) recordBlockReceived(isLive *bool) {
+	s.lastBlockAt.Store(time.Now().UnixNano())
+	if isLive != nil {
+		s.live.Store(*isLive)
+	}
+}
+
 func (s *SQLSinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *sink.Cursor) (err error) {
 	blockReceivedAt := time.Now()
+	s.recordBlockReceived(isLive)
 	defer func() {
 		if err != nil {
 			s.handlerFailed = true
@@ -425,6 +593,7 @@ func (s *SQLSinker) HandleBlockRangeCompletion(ctx context.Context, cursor *sink
 
 func (s *SQLSinker) HandleBlockUndoSignal(ctx context.Context, data *pbsubstreamsrpc.BlockUndoSignal, cursor *sink.Cursor) error {
 	handlerStart := time.Now()
+	s.recordBlockReceived(nil)
 
 	err := s.loader.Revert(ctx, s.OutputModuleHash(), cursor, data.LastValidBlock.Number)
 	if err != nil {

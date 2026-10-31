@@ -44,6 +44,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - SQL sink (DatabaseChanges): count live flushes skipped because the average flush outlasts the time between blocks.
   The periodic stats log shows `live_flush_skipped` once any is skipped, and
   `substreams_sink_postgres_live_flush_skipped_count` exposes it as a metric.
+- SQL sink (DatabaseChanges): changes to one field merged within a batch (`ADD`, `MAX`, `MIN`) are now exact. They were
+  rounded to 18 decimals and written with 18 (`150.000000000000000000`), so a result could depend on how blocks were
+  batched: the same changes in separate flushes were added by the database at full precision. Merged values now keep
+  the larger scale of their operands, as PostgreSQL's `numeric` does (`1.50` + `2` gives `3.50`, `1` + `2` gives `3`).
 
 ## v1.26.0
 

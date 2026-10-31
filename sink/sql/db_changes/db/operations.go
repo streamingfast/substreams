@@ -3,11 +3,12 @@ package db
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"reflect"
 	"regexp"
 	"strings"
 	"time"
+
+	shopspring "github.com/shopspring/decimal"
 )
 
 type TypeGetter func(tableName string, columnName string) (reflect.Type, error)
@@ -142,7 +143,7 @@ func (o *Operation) mergeData(newData map[string]FieldData) error {
 			newDec, err2 := parseDecimal(fd.Value)
 			if err1 == nil && err2 == nil {
 				maxVal := existingDec
-				if newDec.Cmp(existingDec.Rat) > 0 {
+				if newDec.Cmp(existingDec) > 0 {
 					maxVal = newDec
 				}
 				o.data[k] = FieldData{
@@ -160,7 +161,7 @@ func (o *Operation) mergeData(newData map[string]FieldData) error {
 			newDec, err2 := parseDecimal(fd.Value)
 			if err1 == nil && err2 == nil {
 				minVal := existingDec
-				if newDec.Cmp(existingDec.Rat) < 0 {
+				if newDec.Cmp(existingDec) < 0 {
 					minVal = newDec
 				}
 				o.data[k] = FieldData{
@@ -238,53 +239,36 @@ func updateOpName(op UpdateOp) string {
 	}
 }
 
+// maxDecimalExponent bounds the exponent of a value written in scientific notation, so a value
+// like 1e99999999 cannot make a huge number.
+const maxDecimalExponent = 1000
+
 func parseDecimal(s string) (decimal, error) {
-	// Simple decimal parsing - just use big.Rat for precision
-	var d decimal
-	_, ok := d.SetString(s)
-	if !ok {
+	d, err := shopspring.NewFromString(s)
+	if err != nil || d.Exponent() > maxDecimalExponent || d.Exponent() < -maxDecimalExponent {
 		return decimal{}, fmt.Errorf("invalid decimal: %s", s)
 	}
-	return d, nil
+	return decimal{d}, nil
 }
 
-// decimal is a simple wrapper around big.Rat for delta accumulation
+// decimal is an exact decimal number for delta accumulation, with its scale, like PostgreSQL's
+// numeric: sums are never rounded and keep the larger scale of their operands, so merging changes
+// within a batch gives what the database gives applying them one by one.
 type decimal struct {
-	*big.Rat
-}
-
-func (d *decimal) SetString(s string) (*decimal, bool) {
-	if d.Rat == nil {
-		d.Rat = new(big.Rat)
-	}
-	_, ok := d.Rat.SetString(s)
-	return d, ok
+	shopspring.Decimal
 }
 
 func (d decimal) Add(other decimal) decimal {
-	result := new(big.Rat)
-	result.Add(d.Rat, other.Rat)
-	return decimal{result}
+	return decimal{d.Decimal.Add(other.Decimal)}
 }
 
-func (d decimal) Sub(other decimal) decimal {
-	result := new(big.Rat)
-	result.Sub(d.Rat, other.Rat)
-	return decimal{result}
+func (d decimal) Cmp(other decimal) int {
+	return d.Decimal.Cmp(other.Decimal)
 }
 
-func (d decimal) Neg() decimal {
-	result := new(big.Rat)
-	result.Neg(d.Rat)
-	return decimal{result}
-}
-
-func (d decimal) Sign() int {
-	return d.Rat.Sign()
-}
-
+// String writes the number with its scale, as PostgreSQL writes a numeric ("1.50", not "1.5").
 func (d decimal) String() string {
-	return d.Rat.FloatString(18)
+	return d.StringFixed(max(0, -d.Exponent()))
 }
 
 // mergeOperation merges another operation into this one, keeping the lowest ordinal

@@ -3,6 +3,8 @@ package db
 import (
 	"context"
 	"fmt"
+	"math/big"
+	"math/rand/v2"
 	"os"
 	"strings"
 	"testing"
@@ -214,24 +216,24 @@ func TestMergeData_ValidTransitions(t *testing.T) {
 	}{
 		// SET → any (all allowed)
 		{"SET → SET", UpdateOpSet, "100", UpdateOpSet, "200", "200", UpdateOpSet},
-		{"SET → ADD", UpdateOpSet, "100", UpdateOpAdd, "50", "150.000000000000000000", UpdateOpSet},
-		{"SET → MAX", UpdateOpSet, "100", UpdateOpMax, "150", "150.000000000000000000", UpdateOpSet},
-		{"SET → MAX (existing wins)", UpdateOpSet, "200", UpdateOpMax, "150", "200.000000000000000000", UpdateOpSet},
-		{"SET → MIN", UpdateOpSet, "100", UpdateOpMin, "50", "50.000000000000000000", UpdateOpSet},
-		{"SET → MIN (existing wins)", UpdateOpSet, "50", UpdateOpMin, "100", "50.000000000000000000", UpdateOpSet},
+		{"SET → ADD", UpdateOpSet, "100", UpdateOpAdd, "50", "150", UpdateOpSet},
+		{"SET → MAX", UpdateOpSet, "100", UpdateOpMax, "150", "150", UpdateOpSet},
+		{"SET → MAX (existing wins)", UpdateOpSet, "200", UpdateOpMax, "150", "200", UpdateOpSet},
+		{"SET → MIN", UpdateOpSet, "100", UpdateOpMin, "50", "50", UpdateOpSet},
+		{"SET → MIN (existing wins)", UpdateOpSet, "50", UpdateOpMin, "100", "50", UpdateOpSet},
 		{"SET → SET_IF_NULL", UpdateOpSet, "100", UpdateOpSetIfNull, "200", "100", UpdateOpSet},
 
 		// ADD → ADD (accumulates)
-		{"ADD → ADD", UpdateOpAdd, "100", UpdateOpAdd, "50", "150.000000000000000000", UpdateOpAdd},
-		{"ADD → ADD (negative)", UpdateOpAdd, "100", UpdateOpAdd, "-30", "70.000000000000000000", UpdateOpAdd},
+		{"ADD → ADD", UpdateOpAdd, "100", UpdateOpAdd, "50", "150", UpdateOpAdd},
+		{"ADD → ADD (negative)", UpdateOpAdd, "100", UpdateOpAdd, "-30", "70", UpdateOpAdd},
 
 		// MAX → MAX (computes max)
-		{"MAX → MAX (new wins)", UpdateOpMax, "100", UpdateOpMax, "150", "150.000000000000000000", UpdateOpMax},
-		{"MAX → MAX (existing wins)", UpdateOpMax, "200", UpdateOpMax, "150", "200.000000000000000000", UpdateOpMax},
+		{"MAX → MAX (new wins)", UpdateOpMax, "100", UpdateOpMax, "150", "150", UpdateOpMax},
+		{"MAX → MAX (existing wins)", UpdateOpMax, "200", UpdateOpMax, "150", "200", UpdateOpMax},
 
 		// MIN → MIN (computes min)
-		{"MIN → MIN (new wins)", UpdateOpMin, "100", UpdateOpMin, "50", "50.000000000000000000", UpdateOpMin},
-		{"MIN → MIN (existing wins)", UpdateOpMin, "50", UpdateOpMin, "100", "50.000000000000000000", UpdateOpMin},
+		{"MIN → MIN (new wins)", UpdateOpMin, "100", UpdateOpMin, "50", "50", UpdateOpMin},
+		{"MIN → MIN (existing wins)", UpdateOpMin, "50", UpdateOpMin, "100", "50", UpdateOpMin},
 
 		// SET_IF_NULL → SET_IF_NULL (first value wins)
 		{"SET_IF_NULL → SET_IF_NULL", UpdateOpSetIfNull, "100", UpdateOpSetIfNull, "200", "100", UpdateOpSetIfNull},
@@ -357,8 +359,12 @@ func TestMergeData_DecimalPrecision(t *testing.T) {
 		expectedValue string
 	}{
 		{"small decimals", "0.000000000000000001", "0.000000000000000002", "0.000000000000000003"},
-		{"large numbers", "1000000000000000000", "1000000000000000000", "2000000000000000000.000000000000000000"},
-		{"mixed precision", "100.5", "50.25", "150.750000000000000000"},
+		{"large numbers", "1000000000000000000", "1000000000000000000", "2000000000000000000"},
+		{"uint256", "115792089237316195423570985008687907853269984665640564039457584007913129639935", "-1", "115792089237316195423570985008687907853269984665640564039457584007913129639934"},
+		{"more than 18 decimals", "0.0000000000000000000001", "0.0000000000000000000002", "0.0000000000000000000003"},
+		{"keeps the larger scale", "1.50", "2", "3.50"},
+		{"exponent", "1.5e3", "2.5e-2", "1500.025"},
+		{"mixed precision", "100.5", "50.25", "150.75"},
 	}
 
 	for _, tt := range tests {
@@ -399,13 +405,13 @@ func TestMergeData_MultipleFields(t *testing.T) {
 	err := op.mergeData(incoming)
 	require.NoError(t, err)
 
-	assert.Equal(t, "150.000000000000000000", op.data["counter"].Value)
+	assert.Equal(t, "150", op.data["counter"].Value)
 	assert.Equal(t, UpdateOpAdd, op.data["counter"].UpdateOp)
 
-	assert.Equal(t, "75.000000000000000000", op.data["max_price"].Value)
+	assert.Equal(t, "75", op.data["max_price"].Value)
 	assert.Equal(t, UpdateOpMax, op.data["max_price"].UpdateOp)
 
-	assert.Equal(t, "80.000000000000000000", op.data["min_price"].Value)
+	assert.Equal(t, "80", op.data["min_price"].Value)
 	assert.Equal(t, UpdateOpMin, op.data["min_price"].UpdateOp)
 
 	assert.Equal(t, "2024-01-01", op.data["first_seen"].Value)
@@ -425,4 +431,53 @@ func TestMergeData_DeleteOperation(t *testing.T) {
 	err := op.mergeData(map[string]FieldData{"field": {Value: "100", UpdateOp: UpdateOpSet}})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "delete operation")
+}
+
+// TestMergeData_SameAsAppliedOneByOne checks merged sums are exact: what PostgreSQL's numeric gives
+// adding the values one by one, however the changes were batched.
+func TestMergeData_SameAsAppliedOneByOne(t *testing.T) {
+	r := rand.New(rand.NewPCG(1, 2))
+	number := func() string {
+		switch r.IntN(5) {
+		case 0:
+			return fmt.Sprint(r.Int64N(1_000_000) - 500_000)
+		case 1:
+			return new(big.Int).Lsh(big.NewInt(r.Int64()), uint(r.IntN(190))).String()
+		case 2:
+			return fmt.Sprintf("%d.%0*d", r.Int64N(1000)-500, r.IntN(30)+1, r.Int64N(1_000_000_000))
+		case 3:
+			return fmt.Sprintf("-0.%040d", r.Int64N(1_000_000_000_000))
+		default:
+			return fmt.Sprintf("%de%d", r.Int64N(1000), r.IntN(20)-10)
+		}
+	}
+	exact := func(values []string) *big.Rat {
+		sum := new(big.Rat)
+		for _, v := range values {
+			x, ok := new(big.Rat).SetString(v)
+			require.True(t, ok, v)
+			sum.Add(sum, x)
+		}
+		return sum
+	}
+
+	for i := 0; i < 5000; i++ {
+		values := []string{number(), number(), number(), number()}
+		op := &Operation{opType: OperationTypeUpsert, data: map[string]FieldData{"v": {Value: values[0], UpdateOp: UpdateOpAdd}}}
+		for _, v := range values[1:] {
+			require.NoError(t, op.mergeData(map[string]FieldData{"v": {Value: v, UpdateOp: UpdateOpAdd}}))
+		}
+		merged, ok := new(big.Rat).SetString(op.data["v"].Value)
+		require.True(t, ok, op.data["v"].Value)
+		require.Zero(t, merged.Cmp(exact(values)), "%v gave %s", values, op.data["v"].Value)
+	}
+}
+
+func TestMergeData_HugeExponentFails(t *testing.T) {
+	for _, op := range []UpdateOp{UpdateOpAdd, UpdateOpMax, UpdateOpMin} {
+		o := &Operation{opType: OperationTypeUpsert, data: map[string]FieldData{"v": {Value: "1", UpdateOp: op}}}
+		err := o.mergeData(map[string]FieldData{"v": {Value: "1e99999999", UpdateOp: op}})
+		require.ErrorIs(t, err, errDecimalOutOfRange, updateOpName(op))
+		require.ErrorContains(t, err, `merging field "v"`)
+	}
 }

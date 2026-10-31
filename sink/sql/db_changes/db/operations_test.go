@@ -433,7 +433,6 @@ func TestMergeData_DeleteOperation(t *testing.T) {
 	assert.Contains(t, err.Error(), "delete operation")
 }
 
-
 // TestMergeData_SameAsAppliedOneByOne checks merged sums are exact: what PostgreSQL's numeric gives
 // adding the values one by one, however the changes were batched.
 func TestMergeData_SameAsAppliedOneByOne(t *testing.T) {
@@ -474,8 +473,11 @@ func TestMergeData_SameAsAppliedOneByOne(t *testing.T) {
 	}
 }
 
-func TestMergeData_HugeExponentIsNotANumber(t *testing.T) {
-	op := &Operation{opType: OperationTypeUpsert, data: map[string]FieldData{"v": {Value: "1", UpdateOp: UpdateOpAdd}}}
-	require.NoError(t, op.mergeData(map[string]FieldData{"v": {Value: "1e99999999", UpdateOp: UpdateOpAdd}}))
-	assert.Equal(t, "1e99999999", op.data["v"].Value, "not numeric: the latest value wins, as for any non-numeric value")
+func TestMergeData_HugeExponentFails(t *testing.T) {
+	for _, op := range []UpdateOp{UpdateOpAdd, UpdateOpMax, UpdateOpMin} {
+		o := &Operation{opType: OperationTypeUpsert, data: map[string]FieldData{"v": {Value: "1", UpdateOp: op}}}
+		err := o.mergeData(map[string]FieldData{"v": {Value: "1e99999999", UpdateOp: op}})
+		require.ErrorIs(t, err, errDecimalOutOfRange, updateOpName(op))
+		require.ErrorContains(t, err, `merging field "v"`)
+	}
 }

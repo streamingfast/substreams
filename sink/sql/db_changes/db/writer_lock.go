@@ -13,7 +13,7 @@ import (
 )
 
 // ErrWriterLockUnsupported is returned by AcquireWriterLock for a database other than PostgreSQL.
-var ErrWriterLockUnsupported = errors.New("the writer lock is only supported on PostgreSQL")
+var ErrWriterLockUnsupported = errors.New("the writer lock is only supported on PostgreSQL, and on ClickHouse in stateful mode (--clickhouse-stateful)")
 
 // WriterLockKey is the advisory lock key of a cursors table: one writer per cursors table, whatever
 // the module hash, since sinks writing different modules to one schema share its tables.
@@ -35,6 +35,9 @@ func (l *Loader) WriterLockKey() int64 {
 // It returns when the lock is held, or with the context's error, or nil if stop is closed first
 // (check HoldsWriterLock).
 func (l *Loader) AcquireWriterLock(ctx context.Context, pollInterval time.Duration, stop <-chan struct{}) error {
+	if d, ok := l.dialect.(*ClickhouseDialect); ok && d.isStateful() {
+		return l.acquireClickhouseWriterLock(ctx, d, pollInterval, stop)
+	}
 	if _, ok := l.dialect.(*PostgresDialect); !ok {
 		return ErrWriterLockUnsupported
 	}
@@ -87,12 +90,17 @@ func (l *Loader) AcquireWriterLock(ctx context.Context, pollInterval time.Durati
 
 // HoldsWriterLock reports whether AcquireWriterLock succeeded and the lock was not released since.
 func (l *Loader) HoldsWriterLock() bool {
-	return l.writerConn != nil
+	return l.writerConn != nil || l.clickhouseLease != nil
 }
 
 // WriterSessionAlive reports whether the session holding the writer lock still answers. Once it is
 // gone, so is the lock, and this loader cannot write anymore.
 func (l *Loader) WriterSessionAlive(ctx context.Context) bool {
+	if d, ok := l.dialect.(*ClickhouseDialect); ok && l.clickhouseLease != nil {
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		return l.checkClickhouseLease(ctx, d, 0) == nil
+	}
 	if l.writerConn == nil {
 		return false
 	}
@@ -109,6 +117,12 @@ func (l *Loader) WriterSessionAlive(ctx context.Context) bool {
 //
 // An error means the query failed: a connection error means the session, and the lock, are gone.
 func (l *Loader) KeepWriterSessionAlive(ctx context.Context, timeout time.Duration) error {
+	if d, ok := l.dialect.(*ClickhouseDialect); ok && l.clickhouseLease != nil {
+		// The lease is renewed even during a flush: letting it expire would hand it to a standby.
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		return l.renewClickhouseLease(ctx, d)
+	}
 	if !l.writerConnMu.TryLock() {
 		return nil
 	}
@@ -145,6 +159,10 @@ func (l *Loader) writerLockHolder(ctx context.Context, conn *sql.Conn, key int64
 // the database ends the session anyway; unlocking first keeps a pooled connection from carrying the
 // lock.
 func (l *Loader) ReleaseWriterLock() {
+	if d, ok := l.dialect.(*ClickhouseDialect); ok && l.clickhouseLease != nil {
+		l.releaseClickhouseLease(d)
+		return
+	}
 	if l.writerConn == nil {
 		return
 	}

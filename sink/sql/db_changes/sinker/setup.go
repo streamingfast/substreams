@@ -23,6 +23,7 @@ type SinkerSetupOptions struct {
 	CursorTableName            string
 	HistoryTableName           string
 	ClickhouseCluster          string
+	ClickhouseStateful         bool
 	OnModuleHashMismatch       string
 	SystemTablesOnly           bool
 	IgnoreDuplicateTableErrors bool
@@ -63,6 +64,12 @@ func SinkerSetup(
 		return fmt.Errorf("creating loader: %w", err)
 	}
 	defer dbLoader.Close()
+
+	if options.ClickhouseStateful {
+		if err := dbLoader.EnableClickhouseStateful(db2.DefaultJournalTableName, options.HistoryTableName, true); err != nil {
+			return err
+		}
+	}
 
 	userSQLSchema := sinkConfig.Schema
 	if options.SystemTablesOnly {

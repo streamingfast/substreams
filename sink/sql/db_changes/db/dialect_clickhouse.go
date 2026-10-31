@@ -24,6 +24,9 @@ type ClickhouseDialect struct {
 	cursorTableName string
 	cluster         string
 	schemaName      string
+
+	// stateful is set in stateful mode (see clickhouse_stateful.go), nil otherwise.
+	stateful *clickhouseStateful
 }
 
 func NewClickhouseDialect(schemaName string, cursorTableName string, cluster string) *ClickhouseDialect {
@@ -38,6 +41,10 @@ func NewClickhouseDialect(schemaName string, cursorTableName string, cluster str
 // driver doesn't support Transactions for multiple tables. The only way to add in batches is
 // creating a transaction for a table, adding all rows and commiting it.
 func (d ClickhouseDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputModuleHash string, lastFinalBlock uint64) (int, error) {
+	if d.isStateful() {
+		return d.flushStateful(ctx, l, outputModuleHash, lastFinalBlock)
+	}
+
 	var entryCount int
 	for entriesPair := l.entries.Oldest(); entriesPair != nil; entriesPair = entriesPair.Next() {
 		tableName := entriesPair.Key
@@ -94,6 +101,9 @@ func (d ClickhouseDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputMo
 }
 
 func (d ClickhouseDialect) Revert(tx Tx, ctx context.Context, l *Loader, lastValidFinalBlock uint64) error {
+	if d.isStateful() && d.stateful.reorgs {
+		return d.revertStateful(ctx, l, lastValidFinalBlock)
+	}
 	return fmt.Errorf("clickhouse driver does not support reorg management.")
 }
 
@@ -119,6 +129,9 @@ func (d ClickhouseDialect) GetCreateCursorQuery(schema string, withPostgraphile 
 }
 
 func (d ClickhouseDialect) GetCreateHistoryQuery(schema string, withPostgraphile bool) string {
+	if d.isStateful() {
+		return d.getCreateHistoryQuery()
+	}
 	panic("clickhouse does not support reorg management")
 }
 
@@ -214,6 +227,9 @@ func (d ClickhouseDialect) DriverSupportRowsAffected() bool {
 }
 
 func (d ClickhouseDialect) Capabilities() DialectCapabilities {
+	if d.isStateful() {
+		return DialectCapabilities{Mutations: true, Reorgs: d.stateful.reorgs}
+	}
 	return DialectCapabilities{DuplicateInserts: true}
 }
 
@@ -424,6 +440,11 @@ func (d ClickhouseDialect) GetTableColumns(db *sql.DB, schemaName, tableName str
 
 		// Skip AggregateFunction columns and MATERIALIZED columns
 		// MATERIALIZED columns are auto-computed and cannot be inserted into
+		// In stateful mode, the sink's own columns are written by the sink, not by modules
+		if d.isStateful() && isStatefulManagedColumn(name) {
+			continue
+		}
+
 		if !strings.Contains(dataType, "AggregateFunction") && defaultType != "MATERIALIZED" {
 			nonAggregateColumns = append(nonAggregateColumns, EscapeIdentifier(name))
 		}

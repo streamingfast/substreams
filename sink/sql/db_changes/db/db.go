@@ -234,26 +234,54 @@ func (l *Loader) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error) {
 			l.writerConnMu.Unlock()
 			return nil, err
 		}
-		return &writerTx{Tx: tx, unlock: sync.OnceFunc(l.writerConnMu.Unlock)}, nil
+		return &connTx{Tx: tx, conn: l.writerConn, release: sync.OnceFunc(l.writerConnMu.Unlock)}, nil
+	}
+	if l.dsn.Driver() == "postgres" {
+		conn, err := l.Conn(ctx)
+		if err != nil {
+			return nil, err
+		}
+		tx, err := conn.BeginTx(ctx, opts)
+		if err != nil {
+			_ = conn.Close()
+			return nil, err
+		}
+		return &connTx{Tx: tx, conn: conn, release: sync.OnceFunc(func() { _ = conn.Close() })}, nil
 	}
 	return l.DB.BeginTx(ctx, opts)
 }
 
-// writerTx is a transaction on the writer lock's connection; it frees the connection for the
-// keepalive once it ends.
-type writerTx struct {
+// connTx is a PostgreSQL transaction on a known connection (the writer lock's or one of its own), to
+// reach the driver's pipeline on it. It releases the connection once it ends.
+type connTx struct {
 	*sql.Tx
-	unlock func()
+	conn    *sql.Conn
+	release func()
 }
 
-func (t *writerTx) Commit() error {
-	defer t.unlock()
+func (t *connTx) Commit() error {
+	defer t.release()
 	return t.Tx.Commit()
 }
 
-func (t *writerTx) Rollback() error {
-	defer t.unlock()
+func (t *connTx) Rollback() error {
+	defer t.release()
 	return t.Tx.Rollback()
+}
+
+// sendStatements runs statements in order in one round trip, as a pipeline: each is a statement of
+// its own for the server (timestamp, timeout, errors). It gives how many completed before an error.
+func (t *connTx) sendStatements(ctx context.Context, statements []string) (completed int, err error) {
+	err = t.conn.Raw(func(driverConn any) error {
+		batch := &pgconn.Batch{}
+		for _, statement := range statements {
+			batch.ExecParams(statement, nil, nil, nil, nil)
+		}
+		results, err := driverConn.(*stdlib.Conn).Conn().PgConn().ExecBatch(ctx, batch).ReadAll()
+		completed = len(results)
+		return err
+	})
+	return completed, err
 }
 
 type queryExecutor interface {

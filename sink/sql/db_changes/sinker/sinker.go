@@ -11,10 +11,11 @@ import (
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/logging/zapx"
 	"github.com/streamingfast/shutter"
-	sink "github.com/streamingfast/substreams/sink"
 	pbdatabase "github.com/streamingfast/substreams-sink-database-changes/pb/sf/substreams/sink/database/v1"
-	db2 "github.com/streamingfast/substreams/sink/sql/db_changes/db"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	sink "github.com/streamingfast/substreams/sink"
+	db2 "github.com/streamingfast/substreams/sink/sql/db_changes/db"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
@@ -38,6 +39,9 @@ type SQLSinker struct {
 	loader *db2.Loader
 	logger *zap.Logger
 	tracer logging.Tracer
+
+	// backgroundFlush, while a flush runs in the background, gets its result.
+	backgroundFlush <-chan flushResult
 
 	stats                *Stats
 	lastAppliedBlockNum  uint64
@@ -218,6 +222,11 @@ func (s *SQLSinker) Run(ctx context.Context) {
 		zap.String("loader", s.loader.GetIdentifier()),
 	)
 	s.Sinker.Run(ctx, cursor, s)
+
+	// Before the writer lock goes: the stream can end without its completion being handled.
+	if err := s.waitBackgroundFlush(); err != nil {
+		s.Shutdown(err)
+	}
 }
 
 // acquireWriterLock waits as a standby until the writer lock is held, and reports whether it is.
@@ -428,38 +437,98 @@ func (s *SQLSinker) HandleBlockScopedData(ctx context.Context, data *pbsubstream
 			zap.Bool("row_flush_interval_reached", rowFlushNeeded),
 		)
 
-		flushStart := time.Now()
-		rowFlushedCount, err := s.flushWithRetry(ctx, s.OutputModuleHash(), cursor, data.FinalBlockHeight, s.flushRetryCount)
-		if err != nil {
-			return fmt.Errorf("failed to flush at block %s: %w", cursor.Block(), err)
+		// One flush at a time, in order: the previous one has written its cursor before this one starts.
+		if err := s.waitBackgroundFlush(); err != nil {
+			return err
 		}
-
-		flushDuration := time.Since(flushStart)
-		handleBlockDuration := time.Since(blockReceivedAt)
-
-		if flushDuration > 5*time.Second {
-			level := zap.InfoLevel
-			if flushDuration > 30*time.Second {
-				level = zap.WarnLevel
-			}
-
-			s.logger.Check(level, "flush to database took a long time to complete, could cause long sync time along the road").Write(zapx.HumanDuration("took", flushDuration))
-		}
-
-		FlushCount.Inc()
-		FlushedRowsCount.AddInt(rowFlushedCount)
-		FlushDuration.AddInt64(flushDuration.Nanoseconds())
-		FlushedHeadBlockTimeDrift.SetBlockTime(data.Clock.GetTimestamp().AsTime())
-		FlushedHeadBlockNumber.SetUint64(data.Clock.GetNumber())
-
-		s.stats.RecordBlock(cursor.Block())
-		s.stats.RecordFlushDuration(flushDuration)
-		s.stats.RecordHandleBlockDuration(handleBlockDuration)
 		s.lastAppliedBlockNum = data.Clock.Number
 		s.lastAppliedBlockTime = data.Clock.Timestamp.AsTime()
+
+		// While catching up, the next blocks can be handled during the flush. Near the head, a block's
+		// changes are written before the next one is handled.
+		if isLive != nil && !*isLive && s.loader.SupportsBackgroundFlush() {
+			s.loader.DetachPending()
+			s.backgroundFlush = s.startFlush(ctx, cursor, data.FinalBlockHeight, data.Clock)
+			return nil
+		}
+
+		result := s.flush(ctx, cursor, data.FinalBlockHeight, data.Clock)
+		if result.err != nil {
+			return result.err
+		}
+		s.recordFlush(result)
+		s.stats.RecordHandleBlockDuration(time.Since(blockReceivedAt))
 	}
 
 	return nil
+}
+
+// flushResult is what a flush did, recorded on the sink's goroutine as stats aren't shared.
+type flushResult struct {
+	cursor   *sink.Cursor
+	clock    *pbsubstreams.Clock
+	rows     int
+	duration time.Duration
+	err      error
+}
+
+func (s *SQLSinker) flush(ctx context.Context, cursor *sink.Cursor, finalBlockHeight uint64, clock *pbsubstreams.Clock) flushResult {
+	start := time.Now()
+	rows, err := s.flushWithRetry(ctx, s.OutputModuleHash(), cursor, finalBlockHeight, s.flushRetryCount)
+	if err != nil {
+		err = fmt.Errorf("failed to flush at block %s: %w", cursor.Block(), err)
+	}
+	return flushResult{cursor: cursor, clock: clock, rows: rows, duration: time.Since(start), err: err}
+}
+
+// startFlush flushes the detached changes in the background.
+func (s *SQLSinker) startFlush(ctx context.Context, cursor *sink.Cursor, finalBlockHeight uint64, clock *pbsubstreams.Clock) <-chan flushResult {
+	done := make(chan flushResult, 1)
+	go func() {
+		result := s.flush(ctx, cursor, finalBlockHeight, clock)
+		// Stopped right away, as the stream may have nothing more to send for a while.
+		if result.err != nil && !(s.IsTerminating() && db2.IsCancellation(result.err)) {
+			s.Shutdown(result.err)
+		}
+		done <- result
+	}()
+	return done
+}
+
+// waitBackgroundFlush waits for the flush running in the background, if any, and gives its error.
+// Changes handled since then are dropped with it: the sink resumes from the stored cursor.
+func (s *SQLSinker) waitBackgroundFlush() error {
+	if s.backgroundFlush == nil {
+		return nil
+	}
+	result := <-s.backgroundFlush
+	s.backgroundFlush = nil
+	if result.err != nil {
+		s.handlerFailed = true
+		return result.err
+	}
+	s.recordFlush(result)
+	return nil
+}
+
+func (s *SQLSinker) recordFlush(result flushResult) {
+	if result.duration > 5*time.Second {
+		level := zap.InfoLevel
+		if result.duration > 30*time.Second {
+			level = zap.WarnLevel
+		}
+
+		s.logger.Check(level, "flush to database took a long time to complete, could cause long sync time along the road").Write(zapx.HumanDuration("took", result.duration))
+	}
+
+	FlushCount.Inc()
+	FlushedRowsCount.AddInt(result.rows)
+	FlushDuration.AddInt64(result.duration.Nanoseconds())
+	FlushedHeadBlockTimeDrift.SetBlockTime(result.clock.GetTimestamp().AsTime())
+	FlushedHeadBlockNumber.SetUint64(result.clock.GetNumber())
+
+	s.stats.RecordBlock(result.cursor.Block())
+	s.stats.RecordFlushDuration(result.duration)
 }
 
 func (s *SQLSinker) applyDatabaseChanges(dbChanges *pbdatabase.DatabaseChanges, blockNum, finalBlockNum uint64) error {
@@ -545,6 +614,13 @@ func protoUpdateOpToDbUpdateOp(op pbdatabase.Field_UpdateOp) db2.UpdateOp {
 }
 
 func (s *SQLSinker) HandleBlockRangeCompletion(ctx context.Context, cursor *sink.Cursor) error {
+	if err := s.waitBackgroundFlush(); err != nil {
+		if (s.IsTerminating() || ctx.Err() != nil) && db2.IsCancellation(err) {
+			s.logger.Info("stopping during a background flush, the sink resumes from the stored cursor", zap.Error(err))
+			return nil
+		}
+		return err
+	}
 	if s.handlerFailed {
 		// Pending changes may hold part of a block: drop them, the sink resumes from the stored cursor.
 		s.logger.Info("a block failed to be handled, not flushing pending changes")
@@ -597,6 +673,9 @@ func (s *SQLSinker) HandleBlockUndoSignal(ctx context.Context, data *pbsubstream
 	handlerStart := time.Now()
 	s.recordBlockReceived(nil)
 
+	if err := s.waitBackgroundFlush(); err != nil {
+		return err
+	}
 	err := s.loader.Revert(ctx, s.OutputModuleHash(), cursor, data.LastValidBlock.Number)
 	if err != nil {
 		s.handlerFailed = true

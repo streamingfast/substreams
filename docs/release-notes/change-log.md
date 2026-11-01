@@ -27,6 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
+- SQL sink (DatabaseChanges, PostgreSQL): while catching up, flush in the background so the next blocks are handled during
+  the flush, one flush at a time and each cursor written after its changes. Near the head, flushes work as before.
 - SQL sink (DatabaseChanges): stop formatting each block's whole output as text to check that it isn't empty, which took
   over a third of the sink's CPU on a busy module.
 - SQL sink (DatabaseChanges, PostgreSQL): send a flush's statements through a pipeline instead of one round trip each, in

@@ -61,10 +61,13 @@ func (l *Loader) Flush(ctx context.Context, outputModuleHash string, cursor *sin
 		return 0, fmt.Errorf("failed to commit db transaction: %w", err)
 	}
 	l.recordCursor(cursor)
-	l.reset()
+	if l.detached != nil {
+		l.detached = nil
+	} else {
+		l.reset()
+	}
 
-	// We add + 1 to the table count because the `cursors` table is an implicit table
-	l.logger.Debug("flushed table(s) rows to database", zap.Int("table_count", l.entries.Len()+1), zap.Int("row_count", rowFlushedCount), zapx.HumanDuration("took", time.Since(startAt)), zapx.HumanDuration("cursor_took", cursorDuration))
+	l.logger.Debug("flushed table(s) rows to database", zap.Int("row_count", rowFlushedCount), zapx.HumanDuration("took", time.Since(startAt)), zapx.HumanDuration("cursor_took", cursorDuration))
 	return rowFlushedCount, nil
 }
 
@@ -130,6 +133,31 @@ func (l *Loader) dropPendingAfter(lastValidBlock uint64) (dropped int) {
 		dropped += len(orphaned)
 	}
 	return dropped
+}
+
+// SupportsBackgroundFlush reports whether Flush can run while changes are added.
+func (l *Loader) SupportsBackgroundFlush() bool {
+	_, postgres := l.dialect.(*PostgresDialect)
+	return postgres
+}
+
+// DetachPending sets the pending changes apart for the next Flush, so that new ones can be added
+// while it runs. The caller must not call it again before that Flush succeeded.
+func (l *Loader) DetachPending() {
+	l.detached = l.entries
+	entries := NewOrderedMap[string, *OrderedMap[string, *Operation]]()
+	for pair := l.detached.Oldest(); pair != nil; pair = pair.Next() {
+		entries.Set(pair.Key, NewOrderedMap[string, *Operation]())
+	}
+	l.entries = entries
+	l.batchOrdinal = 0
+}
+
+func (l *Loader) pendingForFlush() *OrderedMap[string, *OrderedMap[string, *Operation]] {
+	if l.detached != nil {
+		return l.detached
+	}
+	return l.entries
 }
 
 func (l *Loader) reset() {

@@ -380,7 +380,7 @@ func (s *SQLSinker) HandleBlockScopedData(ctx context.Context, data *pbsubstream
 	dbChanges := &pbdatabase.DatabaseChanges{}
 	mapOutput := output.GetMapOutput()
 
-	if mapOutput.String() != "" {
+	if mapOutput.GetTypeUrl() != "" || len(mapOutput.GetValue()) > 0 {
 		if !mapOutput.MessageIs(dbChanges) && mapOutput.TypeUrl != "type.googleapis.com/sf.substreams.database.v1.DatabaseChanges" {
 			return fmt.Errorf("mismatched message type: trying to unmarshal unknown type %q", mapOutput.MessageName())
 		}

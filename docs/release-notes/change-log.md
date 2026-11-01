@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
+- SQL sink (DatabaseChanges): stop formatting each block's whole output as text to check that it isn't empty, which took
+  over a third of the sink's CPU on a busy module.
 - SQL sink (DatabaseChanges): fix changes to rows with a composite primary key being applied to the wrong row when a
   key value contains `/`. Within a batch, keys like (`a/b`, `c`) and (`a`, `b/c`) were taken for the same row, so the
   second change was merged into the first row's operation (or rejected as a duplicate insert) and never written to

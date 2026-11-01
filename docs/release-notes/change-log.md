@@ -25,6 +25,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - SQL sink (DatabaseChanges): stop formatting each block's whole output as text to check that it isn't empty, which took
   over a third of the sink's CPU on a busy module.
+- SQL sink (PostgreSQL): connect through pgx rather than lib/pq, which the proto sink already used for binary COPY.
+  Connections behave as before: TLS stays required unless configured otherwise, and sessions use the same date style,
+  encoding and string settings.
 - SQL sink (DatabaseChanges): fix changes to rows with a composite primary key being applied to the wrong row when a
   key value contains `/`. Within a batch, keys like (`a/b`, `c`) and (`a`, `b/c`) were taken for the same row, so the
   second change was merged into the first row's operation (or rejected as a duplicate insert) and never written to

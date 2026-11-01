@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"testing"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 	"github.com/streamingfast/substreams/sink/sql/db_proto"
 	protosql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	pbrelations "github.com/streamingfast/substreams/sink/sql/tests/relations"
@@ -25,7 +25,7 @@ func TestDbProtoPostgresBlockNumberIndex(t *testing.T) {
 	postgresContainer := sharedDbChangesPostgresContainer
 	ctx := context.Background()
 
-	db, err := sql.Open("postgres", postgresContainer.ConnectionString)
+	db, err := sql.Open("pgx", postgresContainer.ConnectionString)
 	require.NoError(t, err)
 	dbx := sqlx.NewDb(db, "postgres").Unsafe()
 	defer dbx.Close()

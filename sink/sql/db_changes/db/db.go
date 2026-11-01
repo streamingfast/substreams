@@ -5,7 +5,15 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"os"
+	"reflect"
 	"sync"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgconn/ctxwatch"
+	"github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/streamingfast/logging"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
@@ -60,7 +68,7 @@ type Loader struct {
 	writerConn *sql.Conn
 	// writerConnMu is held while a transaction or a result set is open on writerConn, so the
 	// keepalive (see KeepWriterSessionAlive) never runs inside a transaction or between the rows of
-	// a query (lib/pq refuses a query while another one's rows are being read).
+	// a query (a connection refuses a query while another one's rows are being read).
 	writerConnMu sync.Mutex
 }
 
@@ -83,7 +91,7 @@ func NewLoader(
 		}
 	}
 
-	sqlDB, err := sql.Open(dsn.Driver(), dsn.ConnString())
+	sqlDB, err := OpenDB(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open db connection: %w", err)
 	}
@@ -135,10 +143,67 @@ func NewLoader(
 	return l, nil
 }
 
+// OpenDB opens the database.
+func OpenDB(dsn *DSN) (*sql.DB, error) {
+	if dsn.Driver() != "postgres" {
+		return sql.Open(dsn.Driver(), dsn.ConnString())
+	}
+	config, err := postgresConnConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	return stdlib.OpenDB(*config), nil
+}
+
+// postgresConnConfig is how the sink connects to PostgreSQL:
+//
+//   - TLS is required unless the DSN, PGSSLMODE or a service says otherwise, never falling back to
+//     plain;
+//   - statements are sent as plain SQL rather than prepared, as their values are in their text, in a
+//     session set up to read them the same whatever the server's or role's defaults;
+//   - a cancelled context sends the server a cancel request, leaving the connection and its session
+//     usable, which the writer lock lives in.
+func postgresConnConfig(dsn *DSN) (*pgx.ConnConfig, error) {
+	connString := dsn.ConnString()
+	if dsn.Options.Get("sslmode") == "" && dsn.Options.Get("service") == "" && os.Getenv("PGSSLMODE") == "" && os.Getenv("PGSERVICE") == "" {
+		connString += " sslmode=require"
+	}
+	config, err := pgx.ParseConfig(connString)
+	if err != nil {
+		return nil, err
+	}
+	for _, option := range []string{"binary_parameters", "disable_prepared_binary_result", "sslinline", "ssl_min_protocol_version", "ssl_max_protocol_version", "load_balance_hosts", "hostaddr", "tz"} {
+		delete(config.RuntimeParams, option) // options of lib/pq, which the server would refuse
+	}
+	config.RuntimeParams["client_encoding"] = "UTF8"
+	config.RuntimeParams["datestyle"] = "ISO, MDY"
+	config.RuntimeParams["standard_conforming_strings"] = "on"
+	config.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	config.BuildContextWatcherHandler = func(conn *pgconn.PgConn) ctxwatch.Handler {
+		return &pgconn.CancelRequestContextWatcherHandler{Conn: conn, DeadlineDelay: postgresCancelDeadline}
+	}
+	return config, nil
+}
+
+// postgresCancelDeadline is how long a cancelled query gets to stop before its connection is closed.
+const postgresCancelDeadline = 5 * time.Second
+
+// postgresScanType is how a column's values are written (see normalizeValueType). A column of any
+// other type than these takes its value as the module gives it, whatever the driver scans it to.
+func postgresScanType(column *sql.ColumnType) reflect.Type {
+	switch column.DatabaseTypeName() {
+	case "INT2", "INT4", "INT8", "FLOAT4", "FLOAT8", "BOOL", "BYTEA", "TEXT", "VARCHAR", "BIT", "VARBIT":
+		return column.ScanType()
+	case "TIMESTAMP", "TIMESTAMPTZ", "DATE", "TIME", "TIMETZ", "1266": // the driver names timetz by its OID
+		return reflectTypeTime
+	}
+	return reflect.TypeFor[any]()
+}
+
 func newDialect(driver driver.Driver, dsn *DSN, cursorTableName string, historyTableName string, clickHouseClusterName string) (Dialect, error) {
 	driverType := fmt.Sprintf("%T", driver)
 	switch driverType {
-	case "*pq.Driver":
+	case "*stdlib.Driver":
 		return NewPostgresDialect(dsn.Schema(), cursorTableName, historyTableName), nil
 	case "*clickhouse.stdDriver":
 		return NewClickhouseDialect(dsn.Schema(), cursorTableName, clickHouseClusterName), nil
@@ -306,11 +371,15 @@ func (l *Loader) LoadTables(schemaName string, cursorTableName string, historyTa
 
 		columnByName := make(map[string]*ColumnInfo, len(columns))
 		for _, f := range columns {
+			scanType := f.ScanType()
+			if _, isPostgres := l.dialect.(*PostgresDialect); isPostgres {
+				scanType = postgresScanType(f)
+			}
 			columnByName[f.Name()] = &ColumnInfo{
 				name:             f.Name(),
 				escapedName:      EscapeIdentifier(f.Name()),
 				databaseTypeName: f.DatabaseTypeName(),
-				scanType:         f.ScanType(),
+				scanType:         scanType,
 			}
 		}
 

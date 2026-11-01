@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/cenkalti/backoff/v4"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -94,7 +94,7 @@ func TestDbProtoPostgresUndo(t *testing.T) {
 			require.NoError(t, dbSinker.Run(ctx))
 			require.NoError(t, dbSinker.Err())
 
-			db, err := sql.Open("postgres", postgresContainer.ConnectionString)
+			db, err := sql.Open("pgx", postgresContainer.ConnectionString)
 			require.NoError(t, err)
 			dbx := sqlx.NewDb(db, "postgres").Unsafe()
 			defer dbx.Close()

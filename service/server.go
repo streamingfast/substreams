@@ -46,6 +46,7 @@ func ListenTier1(
 	logger *zap.Logger,
 	healthCheck dgrpcserver.HealthCheck,
 	enforceCompression bool,
+	statusPage *StatusPage,
 ) (err error) {
 	grpcServer := grpcServer(svc, infoService, auth, healthCheck, enforceCompression, logger)
 	connectServer := connectServer(connectSvc, infoServiceConnect, auth, healthCheck, enforceCompression, logger)
@@ -73,7 +74,7 @@ func ListenTier1(
 
 	rootMux := http.NewServeMux()
 	rootMux.Handle("/healthz", grpcServer.HealthHandler())
-	rootMux.Handle("/", compressionHandler)
+	rootMux.Handle("/", statusPage.Handler(compressionHandler))
 
 	for _, addr := range listenAddresses {
 		go func() {

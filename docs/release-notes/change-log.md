@@ -22,6 +22,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - SQL sink (DatabaseChanges): an invalid `UpdateOp` sequence on one field within a batch (for example `ADD` after
   `MAX`) now stops the sink with an error. Upserts and updates used to ignore it, so the change was silently dropped,
   along with any other fields of that change not merged yet.
+- SQL sink (DatabaseChanges, PostgreSQL): undo a block's changes last to first on a reorg. The order within a block was
+  left to the database, so undoing a child row inserted after its parent in one block could fail on a foreign key and
+  stop the sink.
 
 ## v1.26.0
 

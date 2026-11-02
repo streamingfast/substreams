@@ -190,7 +190,7 @@ func TestSinker_SQLStatements(t *testing.T) {
 				`DELETE FROM "testschema"."substreams_history" WHERE block_num <= 5;`,
 				`UPDATE "testschema"."cursors" set cursor = 'Euaqz6R-ylLG0gbdej7Me6WwLpcyB1tlVArvLxtE', block_num = 11, block_id = '11' WHERE id = '756e75736564';`,
 				`COMMIT`,
-				`SELECT op,table_name,pk,prev_value,block_num FROM "testschema"."substreams_history" WHERE "block_num" > 10 ORDER BY "block_num" DESC`,
+				`SELECT op,table_name,pk,prev_value,block_num FROM "testschema"."substreams_history" WHERE "block_num" > 10 ORDER BY "block_num" DESC, "id" DESC`,
 
 				//`DELETE FROM "testschema"."xfer" WHERE "id" = "2345";`, // this mechanism is tested in db.revertOp
 				`DELETE FROM "testschema"."substreams_history" WHERE "block_num" > 10;`,
@@ -314,7 +314,7 @@ func TestSinker_CursorCheck(t *testing.T) {
 			update(11, 5),
 			`COMMIT`,
 			l.CursorCheckQuery(module, cursorAt(11, 5)),
-			`SELECT op,table_name,pk,prev_value,block_num FROM "testschema"."substreams_history" WHERE "block_num" > 10 ORDER BY "block_num" DESC`,
+			`SELECT op,table_name,pk,prev_value,block_num FROM "testschema"."substreams_history" WHERE "block_num" > 10 ORDER BY "block_num" DESC, "id" DESC`,
 			`DELETE FROM "testschema"."substreams_history" WHERE "block_num" > 10;`,
 			update(10, 5),
 			`COMMIT`,

@@ -34,7 +34,7 @@ func NewPostgresDialect(schemaName string, cursorTableName string, historyTableN
 }
 
 func (d PostgresDialect) Revert(tx Tx, ctx context.Context, l *Loader, lastValidFinalBlock uint64) error {
-	query := fmt.Sprintf(`SELECT op,table_name,pk,prev_value,block_num FROM %s WHERE "block_num" > %d ORDER BY "block_num" DESC`,
+	query := fmt.Sprintf(`SELECT op,table_name,pk,prev_value,block_num FROM %s WHERE "block_num" > %d ORDER BY "block_num" DESC, "id" DESC`,
 		d.historyTable(d.schemaName),
 		lastValidFinalBlock,
 	)

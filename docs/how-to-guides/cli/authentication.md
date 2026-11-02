@@ -44,8 +44,10 @@ Paste the key when prompted; it is written to `.substreams.env` like above. You 
 export SUBSTREAMS_API_KEY="<YOUR-API-KEY>"
 ```
 
-{% hint style="info" %}
-JWTs are for advanced use cases only. If you hold a JWT, export it as `SUBSTREAMS_API_TOKEN`. When both `SUBSTREAMS_API_KEY` and `SUBSTREAMS_API_TOKEN` are set, the API key is used.
+{% hint style="warning" %}
+**Already have `SUBSTREAMS_API_TOKEN` set?** If you don't know why you use an API token (JWT) instead of an API key, and only set it because you followed previous versions of this guide, migrate to the API key: see [Migrating from API Token to API Key](../../references/migrating-to-api-key.md). A JWT is short-lived and is not refreshed by the CLI, so it stops working once it expires.
+
+JWTs are meant for advanced use cases only, see the [Authentication Reference](../../references/authentication.md). When both `SUBSTREAMS_API_KEY` and `SUBSTREAMS_API_TOKEN` are set, the API key is used.
 {% endhint %}
 
 ## Step 3: Verify authentication
@@ -57,6 +59,11 @@ substreams gui ethereum-common@v0.3.1 all_events --start-block=15000000
 ```
 
 If the stream starts without an authentication error, your credentials are in place.
+
+## Learn More
+
+- [Authentication Reference](../../references/authentication.md): API key vs JWT, when to use each, issuing and handling tokens.
+- [Migrating from API Token to API Key](../../references/migrating-to-api-key.md)
 
 ## Need Help?
 

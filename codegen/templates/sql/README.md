@@ -26,9 +26,9 @@ substreams --version
 
 ```
 
-Get a development API token using the following command:
+Get a development API key using the following command:
 
 ```bash
 substreams auth
-. ./.substreams.dev  # or insert the SUBSTREAMS_API_TOKEN into the `config.toml` file.
+. ./.substreams.env
 ```

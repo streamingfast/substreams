@@ -83,10 +83,11 @@ func (p *StatusPage) template() (*template.Template, error) {
 	return tmpl, nil
 }
 
-// Handler serves the status page on `GET /` when the client accepts HTML, and
-// its data as JSON when the client asks for `application/json`. Every other
-// request goes to next. gRPC and Connect calls are always POST on a service
-// path, so they never match.
+// Handler serves the status page on `GET /`, or its data as JSON when the
+// client asks for `application/json`. Every other request goes to next. gRPC
+// and Connect calls are always POST on a service path, so they never match.
+// `GET /` is handled here whatever the Accept header says, so the page is
+// never subject to compression enforcement.
 func (p *StatusPage) Handler(next http.Handler) http.Handler {
 	if p == nil {
 		return next
@@ -99,18 +100,14 @@ func (p *StatusPage) Handler(next http.Handler) http.Handler {
 		}
 
 		accept := r.Header.Get("Accept")
-		switch {
-		case strings.Contains(accept, "text/html"):
-			p.serveHTML(w, r)
-
-		case strings.Contains(accept, "application/json"):
+		if strings.Contains(accept, "application/json") && !strings.Contains(accept, "text/html") {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Cache-Control", "no-store")
 			json.NewEncoder(w).Encode(p.infoFunc(r.Context()))
-
-		default:
-			next.ServeHTTP(w, r)
+			return
 		}
+
+		p.serveHTML(w, r)
 	})
 }
 

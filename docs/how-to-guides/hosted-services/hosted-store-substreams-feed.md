@@ -247,6 +247,12 @@ modules:
 > **Note:** the `@<version>` suffix (e.g. `@v0.1.0`) is **ignored by the system** — the store is
 > resolved by its deployment ID alone — but it must be present to pass manifest validation.
 
+A store can also be named by its organization, `foundational-store: <org-slug>/<deployment-name>`,
+with an optional `@<version>` suffix. That reference is resolved to the organization's live store
+of that name on every run. The version is not checked against the deployed store, and the module
+hash does not change when the store behind a name is redeployed, so change the version when the
+store's content changes to keep cached outputs apart.
+
 Add the proto dependency in `buf.yaml` so the hosted store types are available:
 
 ```yaml

@@ -25,8 +25,12 @@ RUN --mount=target=. \
 
 FROM ubuntu:24.04
 
+# apt is purged once the install is done: the image only ships a static binary, and
+# the apt package carries an unfixed HIGH CVE (CVE-2026-109518) that fails the Docker Scout scan.
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
-      apt-get -y install -y ca-certificates libssl3
+      apt-get -y install -y ca-certificates libssl3 && \
+      rm -rf /var/lib/apt/lists/* && \
+      dpkg --purge --force-remove-protected --force-remove-essential apt
 
 COPY --from=build /app/substreams /app/substreams
 

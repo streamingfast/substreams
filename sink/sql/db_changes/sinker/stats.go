@@ -1,6 +1,7 @@
 package sinker
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -20,6 +21,7 @@ type Stats struct {
 	handleBlockDuration *dmetrics.AvgDurationCounter
 	handleUndoDuration  *dmetrics.AvgDurationCounter
 	hasUndoSegments     bool
+	liveFlushSkipped    atomic.Uint64
 	lastBlock           bstream.BlockRef
 	logger              *zap.Logger
 }
@@ -50,6 +52,10 @@ func (s *Stats) AverageFlushDuration() time.Duration {
 
 func (s *Stats) RecordFlushDuration(duration time.Duration) {
 	s.dbFlushAvgDuration.AddDuration(duration)
+}
+
+func (s *Stats) RecordLiveFlushSkipped() {
+	s.liveFlushSkipped.Add(1)
 }
 
 func (s *Stats) RecordHandleBlockDuration(duration time.Duration) {
@@ -98,6 +104,12 @@ func (s *Stats) LogNow() {
 	// Only log undo metrics if we've had any undo operations (typically in live mode)
 	if s.hasUndoSegments {
 		fields = append(fields, zap.Stringer("handle_undo_duration", s.handleUndoDuration))
+	}
+
+	// Live flushes are skipped while the average flush outlasts the time between blocks: a non-zero
+	// count means flushes are now batching several blocks because the database is too slow.
+	if skipped := s.liveFlushSkipped.Load(); skipped > 0 {
+		fields = append(fields, zap.Uint64("live_flush_skipped", skipped))
 	}
 
 	fields = append(fields, zap.Stringer("last_block", s.lastBlock))

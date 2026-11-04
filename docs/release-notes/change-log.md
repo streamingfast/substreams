@@ -35,6 +35,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - SQL sink (DatabaseChanges, PostgreSQL): undo a block's changes last to first on a reorg. The order within a block was
   left to the database, so undoing a child row inserted after its parent in one block could fail on a foreign key and
   stop the sink.
+- SQL sink (DatabaseChanges, ClickHouse): write the cursor before a flush returns. It was sent as an asynchronous
+  insert not waited for, so a restart soon after a flush could read the previous cursor and write blocks again, and a
+  server crash could lose the cursor of a flush taken as done.
+- SQL sink (DatabaseChanges): report how long the cursor write takes. The flush debug log gains `cursor_took`, and
+  `substreams_sink_sql_tx_query_execution_duration` gains a `cursor` series. ClickHouse table inserts now feed its
+  `normal` series too, which was only filled for PostgreSQL.
+- SQL sink (DatabaseChanges): count live flushes skipped because the average flush outlasts the time between blocks.
+  The periodic stats log shows `live_flush_skipped` once any is skipped, and
+  `substreams_sink_postgres_live_flush_skipped_count` exposes it as a metric.
 
 ## v1.26.0
 

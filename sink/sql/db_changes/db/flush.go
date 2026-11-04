@@ -48,9 +48,14 @@ func (l *Loader) Flush(ctx context.Context, outputModuleHash string, cursor *sin
 	}
 
 	rowFlushedCount += 1
+	cursorStartAt := time.Now()
 	if err := l.UpdateCursor(ctx, tx, outputModuleHash, cursor); err != nil {
 		return 0, fmt.Errorf("update cursor: %w", err)
 	}
+	// Timed on its own: on ClickHouse the cursor insert waits for the server to write it, so it
+	// can account for a large share of a flush on a slow storage.
+	cursorDuration := time.Since(cursorStartAt)
+	QueryExecutionDuration.AddInt64(cursorDuration.Nanoseconds(), "cursor")
 
 	if err := tx.Commit(); err != nil {
 		return 0, fmt.Errorf("failed to commit db transaction: %w", err)
@@ -59,7 +64,7 @@ func (l *Loader) Flush(ctx context.Context, outputModuleHash string, cursor *sin
 	l.reset()
 
 	// We add + 1 to the table count because the `cursors` table is an implicit table
-	l.logger.Debug("flushed table(s) rows to database", zap.Int("table_count", l.entries.Len()+1), zap.Int("row_count", rowFlushedCount), zapx.HumanDuration("took", time.Since(startAt)))
+	l.logger.Debug("flushed table(s) rows to database", zap.Int("table_count", l.entries.Len()+1), zap.Int("row_count", rowFlushedCount), zapx.HumanDuration("took", time.Since(startAt)), zapx.HumanDuration("cursor_took", cursorDuration))
 	return rowFlushedCount, nil
 }
 

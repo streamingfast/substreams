@@ -131,6 +131,8 @@
   * [Logging & Debugging](references/log-and-debug.md)
   * [Testing](references/testing.md)
   * [Dev Container Reference](references/devcontainer-ref.md)
+* [Authentication](references/authentication.md)
+  * [Migrating from API Token to API Key](references/migrating-to-api-key.md)
 * [Migrating from prost to buffa](references/migrating-to-buffa.md)
 * [Change log](release-notes/change-log.md)
 

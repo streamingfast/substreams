@@ -43,22 +43,11 @@ func TestWriteAuthEnvFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".substreams.env")
 
-	require.NoError(t, writeAuthEnvFile(path, authCredentials{token: "jwt-token"}))
+	require.NoError(t, writeAuthEnvFile(path, "server_abc"))
 
 	info, err := os.Stat(path)
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
-
-	got, err := os.ReadFile(path)
-	require.NoError(t, err)
-	assert.Equal(t, "export SUBSTREAMS_API_TOKEN=jwt-token\n", string(got))
-}
-
-func TestWriteAuthEnvFileAPIKey(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, ".substreams.env")
-
-	require.NoError(t, writeAuthEnvFile(path, authCredentials{apiKey: "server_abc"}))
 
 	got, err := os.ReadFile(path)
 	require.NoError(t, err)
@@ -70,7 +59,7 @@ func TestWriteAuthEnvFileChmodsExisting(t *testing.T) {
 	path := filepath.Join(dir, ".substreams.env")
 	require.NoError(t, os.WriteFile(path, []byte("export OLD=1\n"), 0o644))
 
-	require.NoError(t, writeAuthEnvFile(path, authCredentials{token: "jwt-token"}))
+	require.NoError(t, writeAuthEnvFile(path, "server_abc"))
 
 	info, err := os.Stat(path)
 	require.NoError(t, err)
@@ -78,36 +67,18 @@ func TestWriteAuthEnvFileChmodsExisting(t *testing.T) {
 
 	got, err := os.ReadFile(path)
 	require.NoError(t, err)
-	assert.Equal(t, "export SUBSTREAMS_API_TOKEN=jwt-token\n", string(got))
+	assert.Equal(t, "export SUBSTREAMS_API_KEY=server_abc\n", string(got))
 }
 
-func TestAuthIssueBaseURL(t *testing.T) {
-	t.Setenv("SUBSTREAMS_AUTH_ISSUE_URL", "")
-	t.Setenv("LOCAL_DEVELOPMENT", "")
-	assert.Equal(t, defaultAuthBaseURL, authIssueBaseURL())
-
-	t.Setenv("LOCAL_DEVELOPMENT", "true")
-	assert.Equal(t, localAuthBaseURL, authIssueBaseURL())
-
-	t.Setenv("SUBSTREAMS_AUTH_ISSUE_URL", "http://issuer.test/")
-	assert.Equal(t, "http://issuer.test", authIssueBaseURL())
+func TestWriteAuthEnvFileRejectsEmpty(t *testing.T) {
+	require.Error(t, writeAuthEnvFile(filepath.Join(t.TempDir(), ".substreams.env"), " "))
 }
 
-func TestResolveCredentialsPassthrough(t *testing.T) {
-	got, err := resolveCredentials("eyJhbGciOiJIUzI1NiJ9.e30.ok")
-	require.NoError(t, err)
-	assert.Equal(t, "eyJhbGciOiJIUzI1NiJ9.e30.ok", got.token)
-	assert.Empty(t, got.apiKey)
-}
-
-func TestResolveCredentialsLocalFallback(t *testing.T) {
-	t.Setenv("LOCAL_DEVELOPMENT", "true")
-	t.Setenv("SUBSTREAMS_AUTH_ISSUE_URL", "http://127.0.0.1:1")
-
-	got, err := resolveCredentials("server_abc")
-	require.NoError(t, err)
-	assert.Empty(t, got.token)
-	assert.Equal(t, "server_abc", got.apiKey)
+func TestValidateAPIKey(t *testing.T) {
+	require.NoError(t, validateAPIKey("server_abc"))
+	require.Error(t, validateAPIKey(""))
+	require.Error(t, validateAPIKey("  "))
+	require.ErrorContains(t, validateAPIKey("eyJhbGciOiJIUzI1NiJ9.e30.ok"), "SUBSTREAMS_API_TOKEN")
 }
 
 func TestRedactSecrets(t *testing.T) {

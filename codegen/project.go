@@ -29,73 +29,6 @@ type Project struct {
 	Flavor           string
 }
 
-func (p *Project) AddSubgraphEntityType(name string, field *descriptorpb.FieldDescriptorProto) {
-	subgraphtype := func() *SubgraphType {
-		switch field.GetType() {
-		case
-			descriptorpb.FieldDescriptorProto_TYPE_UINT64,
-			descriptorpb.FieldDescriptorProto_TYPE_FIXED64,
-			descriptorpb.FieldDescriptorProto_TYPE_FIXED32,
-			descriptorpb.FieldDescriptorProto_TYPE_UINT32,
-			descriptorpb.FieldDescriptorProto_TYPE_SFIXED32,
-			descriptorpb.FieldDescriptorProto_TYPE_SINT32,
-			descriptorpb.FieldDescriptorProto_TYPE_SINT64,
-			descriptorpb.FieldDescriptorProto_TYPE_INT64,
-			descriptorpb.FieldDescriptorProto_TYPE_SFIXED64:
-			return &SubgraphBigInt
-		case descriptorpb.FieldDescriptorProto_TYPE_FLOAT, descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:
-			return &SubgraphBigDecimal
-		case descriptorpb.FieldDescriptorProto_TYPE_INT32:
-			return &SubgraphInt
-		case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
-			return &SubgraphBoolean
-		case descriptorpb.FieldDescriptorProto_TYPE_STRING:
-			return &SubgraphString
-		case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
-			descriptorpb.FieldDescriptorProto_TYPE_GROUP,
-			descriptorpb.FieldDescriptorProto_TYPE_ENUM:
-			// Let's not support the nested message and groups for now as it is more complex
-			// and would probably require foreign tables / subgraph entities to work
-			// not even sure this works as of today
-			fmt.Printf("skipping message, group and enum - not supported for the moment ")
-			return nil
-		case descriptorpb.FieldDescriptorProto_TYPE_BYTES:
-			return &SubgraphBytes
-		// if field.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
-		// 	if *field.Label == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
-		//		splitMessagePath := strings.Split(typeName, ".")
-		//		name splitMessagePath[len(splitMessagePath)-1]
-
-		// 		p.Entities = append(p.Entities, &Entity{
-		// 			// NameAsProtoField: textcase.CamelCase(field.GetName()),
-		// 			// NameAsEntity:     "My" + name,
-		// 			Name:             name,
-		// 		})
-
-		// 		if p.protoTypeMapping[*field.TypeName] == nil {
-		// 			return fmt.Errorf("nested message type: %q not found", *field.TypeName)
-		// 		}
-
-		// 		for _, nestedMessageField := range p.protoTypeMapping[*field.TypeName].Field {
-		// 			switch *nestedMessageField.Type {
-		// 			case descriptorpb.FieldDescriptorProto_TYPE_STRING, descriptorpb.FieldDescriptorProto_TYPE_INT64, descriptorpb.FieldDescriptorProto_TYPE_UINT64, descriptorpb.FieldDescriptorProto_TYPE_UINT32, descriptorpb.FieldDescriptorProto_TYPE_BYTES:
-		// 				p.Entity.ID = textcase.CamelCase(nestedMessageField.GetName())
-		// 			default:
-		// 				continue
-		// 			}
-		// 		}
-		// 	}
-		// }
-		default:
-			panic("field type not supported")
-		}
-	}()
-
-	if subgraphtype != nil {
-		p.EntityTypes = append(p.EntityTypes, &SubgraphEntityType{name, *subgraphtype})
-	}
-}
-
 func (p *Project) AddPostgreSQLType(name string, field *descriptorpb.FieldDescriptorProto) {
 	postgreSqltype := func() *SQLType {
 		switch field.GetType() {
@@ -259,10 +192,6 @@ func (p *Project) BuildOutputEntity() error {
 			p.EntityInfo.IDFieldName = field.GetName()
 		}
 
-		if p.OutputType == "Subgraph" {
-			p.AddSubgraphEntityType(field.GetName(), field)
-		}
-
 		if p.OutputType == "sql" {
 			if p.Flavor == "PostgresSQL" {
 				p.AddPostgreSQLType(field.GetName(), field)
@@ -365,24 +294,6 @@ func (p *Project) Render(withDevEnv bool) (projectFiles map[string][]byte, err e
 
 	var templateFiles map[string]string
 	switch p.OutputType {
-	case Subgraph:
-		templateFiles = map[string]string{
-			"subgraph/buf.gen.yaml":           "buf.gen.yaml",
-			"subgraph/package.json.gotmpl":    "package.json",
-			"subgraph/gitignore":              ".gitignore",
-			"subgraph/tsconfig.json":          "tsconfig.json",
-			"subgraph/subgraph.yaml.gotmpl":   "subgraph.yaml",
-			"subgraph/schema.graphql.gotmpl":  "schema.graphql",
-			"subgraph/src/mappings.ts.gotmpl": "src/mappings.ts",
-			"subgraph/README.md":              "README.md",
-		}
-
-		if withDevEnv {
-			templateFiles["subgraph/run-local.sh.gotmpl"] = "run-local.sh"
-			templateFiles["subgraph/dev-environment/docker-compose.yml"] = "dev-environment/docker-compose.yml"
-			templateFiles["subgraph/dev-environment/start.sh"] = "dev-environment/start.sh"
-			templateFiles["subgraph/dev-environment/config.toml.gotmpl"] = "dev-environment/config.toml"
-		}
 	case Sql:
 		templateFiles = map[string]string{
 			"sql/src/lib.rs.gotmpl":   "src/lib.rs",

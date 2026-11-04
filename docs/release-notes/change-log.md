@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Docker
+
+- The `substreams` Docker image no longer ships `apt` (nor `libapt-pkg6.0t64`) to clear a Docker Scout HIGH CVE in Ubuntu's `apt`. Images built `FROM` it can no longer run `apt-get`; install packages in a separate build stage instead.
+
 ### Server
 
 - Log `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` on the `incoming Substreams Blocks request` and `incoming Substreams Estimate request` log lines when the auth plugin provides them (`x-auth-method`, `x-auth-jwt-lifetime-bucket`, `x-auth-jwt-iat`, `x-auth-jwt-exp`). Nothing changes without the plugin.

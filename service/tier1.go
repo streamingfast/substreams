@@ -497,6 +497,8 @@ func (s *Tier1Service) BlocksAny(
 				zap.String("cache_tag", cacheTag),
 			)
 		}
+
+		fields = append(fields, auth.AuthLogFields()...)
 	}
 
 	stat := s.getOverloadedStatus()

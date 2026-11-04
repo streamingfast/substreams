@@ -97,6 +97,7 @@ jobs:
           dockerhub-password: ${{ secrets.DOCKER_SCOUT_PASSWORD }}
           command: cves
           only-severities: critical,high
+          only-fixed: true # CVEs with no fix available (e.g. in the ubuntu base image) can't be acted on
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sha.outputs.short }}
           github-token: ${{ secrets.PR_COMMENTER }}
           exit-code: true # This will fail the GitHub Action step if CVEs are found

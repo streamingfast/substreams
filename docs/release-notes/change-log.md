@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Server
+
+- Log `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` on the `incoming Substreams Blocks request` and `incoming Substreams Estimate request` log lines when the auth plugin provides them (`x-auth-method`, `x-auth-jwt-lifetime-bucket`, `x-auth-jwt-iat`, `x-auth-jwt-exp`). Nothing changes without the plugin.
+
 ### CLI
 
 - `substreams auth` now writes the selected API key to `.substreams.env` as `SUBSTREAMS_API_KEY` instead of exchanging it for a JWT, which expired and was never refreshed. `substreams auth --paste` now only accepts an API key (a JWT is rejected; export `SUBSTREAMS_API_TOKEN` yourself for advanced use).

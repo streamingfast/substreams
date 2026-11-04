@@ -2,6 +2,7 @@ package tui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/streamingfast/substreams/internal/backprocessing"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
@@ -20,7 +21,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.TraceID = ""
 		m.session = nil
 		m.progress = nil
-		m.globalRate.reset()
+		m.globalRate.Reset()
 		m.moduleRates.reset()
 	case Connected:
 		m.Connected = true
@@ -53,7 +54,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.progress = msg
 
 		at := m.now()
-		m.globalRate.add(at, globalDone(msg))
+		m.globalRate.Add(at, backprocessing.Done(msg))
 		for _, stats := range msg.ModulesStats {
 			m.moduleRates.add(at, stats.Name, stats.TotalProcessingTimeMs, stats.TotalProcessedBlockCount)
 		}

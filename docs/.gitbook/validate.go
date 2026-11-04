@@ -168,10 +168,17 @@ func validateAllFilesAreInSummary(docsRoot string) bool {
 		}
 	}
 
+	gitbookDir := filepath.Join(docsRoot, ".gitbook") + string(filepath.Separator)
+
 	unlinkedFiles := []string{}
 	for sourceFile := range sourceFiles {
 		// Skip SUMMARY.md itself
 		if sourceFile == summaryPath {
+			continue
+		}
+
+		// Skip GitBook's own folder (assets, tooling notes), it never holds pages
+		if strings.HasPrefix(sourceFile, gitbookDir) {
 			continue
 		}
 

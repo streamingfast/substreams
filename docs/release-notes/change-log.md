@@ -11,6 +11,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### CLI
+
+- `substreams auth` now writes the selected API key to `.substreams.env` as `SUBSTREAMS_API_KEY` instead of exchanging it for a JWT, which expired and was never refreshed. `substreams auth --paste` now only accepts an API key (a JWT is rejected; export `SUBSTREAMS_API_TOKEN` yourself for advanced use).
+- Add an [Authentication Reference](../references/authentication.md) (API key vs short-lived JWT) and a guide to [migrate from `SUBSTREAMS_API_TOKEN` to `SUBSTREAMS_API_KEY`](../references/migrating-to-api-key.md).
+- Remove the unused Substreams-powered subgraph code generator (it was no longer registered under `substreams codegen`). The `SUBSTREAMS_AUTH_ISSUE_URL` environment variable is no longer used.
+
+### Sink
+
+- SQL sink (DatabaseChanges): stop formatting each block's whole output as text to check that it isn't empty, which took
+  over a third of the sink's CPU on a busy module.
+- SQL sink (DatabaseChanges): fix changes to rows with a composite primary key being applied to the wrong row when a
+  key value contains `/`. Within a batch, keys like (`a/b`, `c`) and (`a`, `b/c`) were taken for the same row, so the
+  second change was merged into the first row's operation (or rejected as a duplicate insert) and never written to
+  its own row.
+- SQL sink (DatabaseChanges): an invalid `UpdateOp` sequence on one field within a batch (for example `ADD` after
+  `MAX`) now stops the sink with an error. Upserts and updates used to ignore it, so the change was silently dropped,
+  along with any other fields of that change not merged yet.
+- SQL sink (DatabaseChanges, PostgreSQL): undo a block's changes last to first on a reorg. The order within a block was
+  left to the database, so undoing a child row inserted after its parent in one block could fail on a foreign key and
+  stop the sink.
+
+## v1.26.0
+
 ### Server
 
 - Tier2 skips loading dependency stores and compiling WASM modules for a segment once its
@@ -58,6 +81,53 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
+- Sinks: the `substreams stream stats` log line reports backprocessing progress again until the sink is live, as a
+  `backprocessing_progress` object with the same figures as the `substreams run` progress view: overall percentage,
+  rate, ETA, running jobs, blocks to process and blocks cached, and for each stage its percentage, first block,
+  squashed-up-to block, jobs and segments waiting to be squashed. It replaces the `progress_block_rate`,
+  `progress_last_block`, `progress_running_jobs` and `progress_total_processed_blocks` fields, which were only logged
+  once the first block of data had arrived.
+- SQL sink (DatabaseChanges): fix undo leaving changes from orphaned blocks in the database. Changes to the same
+  row in different reversible blocks of one batch were merged into one operation recorded under a single block, so
+  undoing the later block missed them (permanently for `ADD` fields), and pending changes survived an undo. They are
+  now kept as separate operations within the batch, and an undo drops the pending changes of reverted blocks and
+  writes the rest with the cursor. Batching is unchanged.
+- SQL sink (DatabaseChanges, PostgreSQL): once the sink has read or written its cursor, each flush and revert
+  transaction starts by locking its cursor row and checking it still holds the cursor the sink last read or wrote.
+  Otherwise nothing is written and the sink stops with `the stored cursor is not the one this sink last read or wrote`,
+  to be restarted from the stored cursor. This stops a second sink of the same module writing to the same database, a
+  sink writing on top of a database that lost commits (restore, failover with asynchronous replication), and a flush
+  retry applying a batch twice after a commit whose reply was lost (`ADD` fields were doubled). A conflict is not
+  retried. Other cursor rows are not checked, and the cursor update stays the last statement of the transaction.
+- SQL sink (DatabaseChanges, PostgreSQL): add `--standby-lock` to run standby sinks. A sink takes a session advisory
+  lock on the cursors table before streaming and writes through that session; the others wait, checking every
+  `--standby-lock-poll-interval`, and the first to see the lock released takes over from the stored cursor. A sink
+  whose locked session is gone stops instead of retrying its flush, and standbys serve the metrics endpoint while they
+  wait. The active sink queries its locked session every `--standby-lock-poll-interval` while not flushing, so a proxy
+  or `idle_session_timeout` doesn't end it during long stretches without writes (no failover ping-pong on sparse data).
+  See [Standby Sinks](../references/sql/standby-sinks.md).
+- SQL sink (DatabaseChanges): add `--stall-timeout`, which stops the sink when the stream delivers no block or undo for
+  that long once live (blocks held by an undo buffer count). On PostgreSQL a flush now honours its context, so the stop
+  cancels a database call in progress (the transaction rolls back); ClickHouse flushes still always run to the end.
+  The sink library's new `Sinker.LastBlockMessageAt` reports when the stream last delivered a block or undo.
+- SQL sink (DatabaseChanges): an undo whose transaction fails is now rolled back.
+- Sink library: a handler error is never taken for the end of the stream anymore. One wrapping `io.EOF` (a lost database
+  connection, say) used to end the run successfully, as if the stop block was reached, so a live sink exited with
+  status 0. When the handler fails while the sinker is stopping, the completion handler no longer runs on top of the
+  block it did not finish (the failure is taken as caused by the stop and not reported). The completion handler
+  now gets the cursor of the last block the handler accepted rather than of the last block received, which with
+  `--undo-buffer-size` was ahead of the blocks still in the buffer (`Sinker.LastReceivedCursor` still gives the
+  latter).
+- Sink library: add `Sinker.AwaitRun(ctx)`, which waits for `Run` to return and gives its first failure. A stop
+  terminates the sinker right away while `Run` still finishes its completion handler, so a caller about to exit can
+  wait for it there, and get a failure that the termination error, set by the stop, cannot carry.
+- SQL sink (DatabaseChanges): fix the final flush when the stream ends (stopped, or at the stop block) treating the
+  stream's latest block as final. It pruned the undo history of blocks that were still reversible, so a reorg across
+  a sink restart left orphaned rows, and with `--undo-buffer-size` it saved a cursor past the blocks still in the
+  buffer, which were then skipped. It now writes the handled blocks with the last handled block's cursor and the
+  stream's final block height, and writes nothing if a block failed to be handled. The CLI now waits (up to 45 s) for
+  that last flush before exiting: on Kubernetes, raise the pod's `terminationGracePeriodSeconds` above it (30 s by
+  default), otherwise a pod killed first re-processes the blocks since the last stored cursor on restart.
 - Add `substreams sink pubsub`, which publishes any module output to a Google Cloud Pub/Sub topic as the
   webhook sink's batch JSON: `{"manifest": {...}, "blocks": [{"clock": {...}, "data": {...}}]}`. While
   Substreams is not live, `--pubsub-batch-max-blocks` groups blocks into one message. A live block is
@@ -76,6 +146,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+- `substreams pack` writes map entries in key order, so packing the same inputs twice gives a byte-identical
+  `.spkg`. Before, a package with a multi-entry map, such as `networks`, got a different digest from one pack to
+  the next.
 - Commands that take a package (`substreams run`, `gui`, `info`, ...) accept an organization package reference
   `<org>/<package>@<version>`, fetched from the registry's `/v1/packages/<org>/<package>/<version>`. Without a
   version, or with `@latest`, they fetch the package's latest release. An existing file or directory of the
@@ -92,7 +165,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   CVE-2026-78659 (HIGH), all HTTP/2 issues reported by Docker Scout against the image.
 - Bumped OpenTelemetry to v1.47.0 and `github.com/streamingfast/dhttp` to v0.2.0 to fix known vulnerabilities.
 - Bumped `github.com/yuin/goldmark` to v1.7.17 to fix an XSS (GO-2026-5320) in the CLI's markdown rendering.
+- Bumped `github.com/go-jose/go-jose/v4` to v4.1.6 to fix CVE-2026-116587 (HIGH, inefficient algorithmic complexity).
 - Go 1.27 or newer is now required to build.
+- `github.com/go-jose/go-jose/v4` is at v4.1.6, which clears CVE-2026-116587 (HIGH), reported by Docker Scout against the image.
 
 ## v1.25.0
 
@@ -115,10 +190,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `metering.AddExternalCalls`.
 
 ### CLI
-
-- `substreams pack` writes map entries in key order, so packing the same inputs twice gives a byte-identical
-  `.spkg`. Before, a package with a multi-entry map, such as `networks`, got a different digest from one pack to
-  the next.
 
 - **Breaking for Rust modules**: `substreams build` and `substreams protogen` generate buffa bindings for a
   project whose `Cargo.toml` depends on `buffa`, using `buf.build/anthropics/buffa:v0.9.2`. This pairs with

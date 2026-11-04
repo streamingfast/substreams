@@ -154,6 +154,10 @@ type Tier1Config struct {
 	// reconnect). Set it a bit under the stream duration limit of any load
 	// balancer in front of tier1.
 	MaxRequestDuration time.Duration
+
+	// StatusPageTemplateFile is a Go html/template file served to browsers
+	// hitting the root of the endpoint. Empty serves no status page.
+	StatusPageTemplateFile string
 }
 
 type Tier1App struct {
@@ -398,6 +402,11 @@ func (a *Tier1App) Run() error {
 
 	tier1ServiceConnect := service.NewService(tier1Service)
 
+	statusPage, err := service.NewStatusPage(a.config.StatusPageTemplateFile, a.statusPageInfoFunc(forkableHub), a.logger)
+	if err != nil {
+		return fmt.Errorf("setting up status page: %w", err)
+	}
+
 	a.OnTerminating(func(err error) {
 		metrics.AppReadinessTier1.SetNotReady()
 
@@ -439,11 +448,36 @@ func (a *Tier1App) Run() error {
 			a.logger.Error("no gRPC listen addresses provided")
 			return
 		}
-		err := service.ListenTier1(addresses, tier1Service, tier1ServiceConnect, infoServer, infoServerConnect, a.modules.Authenticator, a.logger, a.HealthCheck, a.config.EnforceCompression)
+		err := service.ListenTier1(addresses, tier1Service, tier1ServiceConnect, infoServer, infoServerConnect, a.modules.Authenticator, a.logger, a.HealthCheck, a.config.EnforceCompression, statusPage)
 		a.Shutdown(err)
 	}()
 
 	return nil
+}
+
+func (a *Tier1App) statusPageInfoFunc(forkableHub *hub.ForkableHub) service.StatusPageInfoFunc {
+	return func(ctx context.Context) *service.StatusPageInfo {
+		info := &service.StatusPageInfo{
+			Ready: a.IsReady(ctx),
+			Live:  forkableHub != nil,
+		}
+
+		if a.modules.InfoServer != nil {
+			if resp, err := a.modules.InfoServer.Info(ctx, &pbfirehose.InfoRequest{}); err == nil {
+				info.ChainName = resp.ChainName
+			}
+		}
+
+		if forkableHub != nil {
+			if num, id, blockTime, _, err := forkableHub.HeadInfo(); err == nil {
+				info.HeadBlockNum = num
+				info.HeadBlockID = id
+				info.HeadBlockTime = blockTime
+			}
+		}
+
+		return info
+	}
 }
 
 func (a *Tier1App) HealthCheck(ctx context.Context) (bool, interface{}, error) {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"sync"
 
 	"github.com/streamingfast/logging"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
@@ -48,6 +49,19 @@ type Loader struct {
 	dsn    *DSN
 
 	batchOrdinal uint64 // Counter for ordinals within the current batch, resets on flush
+
+	// expectedCursor is the stored cursor of this sink's module as this loader last read or wrote
+	// it, nil until SetExpectedCursor. Flushes and reverts first check the stored cursor still has this
+	// value (see checkCursor).
+	expectedCursor *string
+
+	// writerConn, once the writer lock is held (see AcquireWriterLock), is the connection holding
+	// it. Cursor reads and every write go through it, so the lock covers them.
+	writerConn *sql.Conn
+	// writerConnMu is held while a transaction or a result set is open on writerConn, so the
+	// keepalive (see KeepWriterSessionAlive) never runs inside a transaction or between the rows of
+	// a query (lib/pq refuses a query while another one's rows are being read).
+	writerConnMu sync.Mutex
 }
 
 func NewLoader(
@@ -148,7 +162,57 @@ func (l *Loader) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error) {
 	if l.testTx != nil {
 		return l.testTx, nil
 	}
+	if l.writerConn != nil {
+		l.writerConnMu.Lock()
+		tx, err := l.writerConn.BeginTx(ctx, opts)
+		if err != nil {
+			l.writerConnMu.Unlock()
+			return nil, err
+		}
+		return &writerTx{Tx: tx, unlock: sync.OnceFunc(l.writerConnMu.Unlock)}, nil
+	}
 	return l.DB.BeginTx(ctx, opts)
+}
+
+// writerTx is a transaction on the writer lock's connection; it frees the connection for the
+// keepalive once it ends.
+type writerTx struct {
+	*sql.Tx
+	unlock func()
+}
+
+func (t *writerTx) Commit() error {
+	defer t.unlock()
+	return t.Tx.Commit()
+}
+
+func (t *writerTx) Rollback() error {
+	defer t.unlock()
+	return t.Tx.Rollback()
+}
+
+type queryExecutor interface {
+	sqlExecutor
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+// execer returns where statements outside a transaction run: the connection holding the writer
+// lock if any, the pool otherwise.
+func (l *Loader) execer() sqlExecutor {
+	return l.queryer()
+}
+
+func (l *Loader) queryer() queryExecutor {
+	if l.writerConn != nil {
+		return l.writerConn
+	}
+	return l.DB
+}
+
+// Close releases the writer lock, if held, and closes the database.
+func (l *Loader) Close() error {
+	l.ReleaseWriterLock()
+	return l.DB.Close()
 }
 
 func (l *Loader) BatchBlockFlushInterval() int {
@@ -166,6 +230,16 @@ func (l *Loader) FlushNeeded() bool {
 		totalRows += pair.Value.Len()
 	}
 	return totalRows > l.batchRowFlushInterval
+}
+
+// HasPendingEntries reports whether any change is waiting to be flushed.
+func (l *Loader) HasPendingEntries() bool {
+	for pair := l.entries.Oldest(); pair != nil; pair = pair.Next() {
+		if pair.Value.Len() > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // getTablesFromSchema returns table information similar to schema.Tables()

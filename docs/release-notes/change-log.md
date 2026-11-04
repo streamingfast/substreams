@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Docker
 
-- The `substreams` Docker image no longer ships `apt` (nor `libapt-pkg6.0t64`) to clear a Docker Scout HIGH CVE in Ubuntu's `apt`. Images built `FROM` it can no longer run `apt-get`; install packages in a separate build stage instead.
+- Upgrade packages (including `apt`, now 2.8.4) when building the `substreams` Docker image to clear a Docker Scout HIGH CVE inherited from the Ubuntu 24.04 base image.
 
 ### Server
 

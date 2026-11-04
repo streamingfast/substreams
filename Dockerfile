@@ -26,10 +26,9 @@ RUN --mount=target=. \
 FROM ubuntu:24.04
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
+      apt-get -y upgrade && \
       apt-get -y install -y ca-certificates libssl3 && \
-      rm -rf /var/lib/apt/lists/* && \
-      dpkg --purge --force-remove-protected --force-remove-essential apt libapt-pkg6.0t64 && \
-      rm -f /var/lib/dpkg/status-old
+      rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/substreams /app/substreams
 

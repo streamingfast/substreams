@@ -210,13 +210,13 @@ func (s *Tier1Service) estimate(
 	details.MaxStageLayerParallelExecutor = parallelism.StageLayerExecutors
 	ctx = reqctx.WithRequest(ctx, details)
 
-	logger.Info("incoming Substreams Estimate request",
+	logger.Info("incoming Substreams Estimate request", append([]zap.Field{
 		zap.String("output_module", req.OutputModule),
 		zap.String("output_module_hash", outputModuleHash),
 		zap.Uint64("resolved_start_block", details.ResolvedStartBlockNum),
 		zap.Uint64("stop_block", stopBlock),
 		zap.Float64("sample_percentage", percentage),
-	)
+	}, dauth.FromContext(ctx).AuthLogFields()...)...)
 	defer func() {
 		reqStats.SetError(err)
 		reqStats.LogAndClose(ctx, details.ResolvedStartBlockNum)

@@ -279,6 +279,10 @@ func (t *connTx) sendStatements(ctx context.Context, statements []string) (compl
 		}
 		results, err := driverConn.(*stdlib.Conn).Conn().PgConn().ExecBatch(ctx, batch).ReadAll()
 		completed = len(results)
+		// A statement that fails after describing its rows has a result of its own, holding the error.
+		if completed > 0 && results[completed-1].Err != nil {
+			completed--
+		}
 		return err
 	})
 	return completed, err

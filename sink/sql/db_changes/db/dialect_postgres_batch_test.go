@@ -46,6 +46,28 @@ func TestPostgresFlush_ErrorNamesTheFailedStatement(t *testing.T) {
 	}
 }
 
+// sendStatements gives how many statements completed before the error, whether the failed one
+// returned rows or not.
+func TestPostgresSendStatements_Completed(t *testing.T) {
+	ctx := context.Background()
+	l := pgTestLoader(t, pgTestSchema(t), true)
+	for name, failing := range map[string]string{
+		"no rows":         `SET statement_timeout = 'invalid'`,
+		"after some rows": `SELECT 1 / (x - 1) FROM generate_series(0, 1) x`,
+		"before any rows": `SELECT 1 / x FROM generate_series(0, 1) x`,
+		"at parsing":      `NOT SQL`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			tx, err := l.Begin()
+			require.NoError(t, err)
+			defer func() { _ = tx.Rollback() }()
+			completed, err := tx.(statementSender).sendStatements(ctx, []string{`SELECT 1`, failing, `SELECT 2`})
+			require.Error(t, err)
+			assert.Equal(t, 1, completed)
+		})
+	}
+}
+
 // Each statement of a batch is its own for the server.
 func TestPostgresStatementBatch_StatementsStaySeparate(t *testing.T) {
 	ctx := context.Background()

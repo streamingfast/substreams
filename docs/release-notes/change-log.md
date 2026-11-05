@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Docker
+
+- Upgrade packages (including `apt`, now 2.8.4) when building the `substreams` Docker image to clear a Docker Scout HIGH CVE inherited from the Ubuntu 24.04 base image.
+
 ### Server
 
 - Log `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` on the `incoming Substreams Blocks request` and `incoming Substreams Estimate request` log lines when the auth plugin provides them (`x-auth-method`, `x-auth-jwt-lifetime-bucket`, `x-auth-jwt-iat`, `x-auth-jwt-exp`). Nothing changes without the plugin.

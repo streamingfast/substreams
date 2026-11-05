@@ -152,24 +152,55 @@ func (t *recordingSender) sendStatements(ctx context.Context, statements []strin
 	return len(statements), nil
 }
 
-// BenchmarkPostgresFlush times a flush against the database in PG_DSN.
+// BenchmarkPostgresFlush times a flush against the database in PG_DSN, which can go through a proxy
+// to add network latency. "insert" writes new rows. "upsert_undo" writes half new rows and half
+// updates, in a reversible block: each one also records how to undo it.
 func BenchmarkPostgresFlush(b *testing.B) {
 	const rows = 1000
 	ctx := context.Background()
-	l := pgTestLoader(b, pgTestSchema(b), true)
-	require.NoError(b, l.InsertCursor(ctx, testModuleHash, pgCursor(1, 1)))
-
-	block := uint64(1)
-	for b.Loop() {
-		b.StopTimer()
-		block++
-		for i := range rows {
-			id := map[string]string{"id": fmt.Sprintf("%d-%d", block, i)}
-			require.NoError(b, l.Insert("acc", id, map[string]FieldData{"n": {Value: "1"}}, nil))
-		}
-		b.StartTimer()
-		_, err := l.Flush(ctx, testModuleHash, pgCursor(block, block), block)
-		require.NoError(b, err)
+	setup := func(b *testing.B) *Loader {
+		l := pgTestLoader(b, pgTestSchema(b), true)
+		require.NoError(b, l.InsertCursor(ctx, testModuleHash, pgCursor(1, 1)))
+		return l
 	}
-	b.ReportMetric(float64(rows)*float64(b.N)/b.Elapsed().Seconds(), "rows/s")
+	report := func(b *testing.B) {
+		b.ReportMetric(float64(rows)*float64(b.N)/b.Elapsed().Seconds(), "rows/s")
+	}
+
+	b.Run("insert", func(b *testing.B) {
+		l := setup(b)
+		block := uint64(1)
+		for b.Loop() {
+			b.StopTimer()
+			block++
+			for i := range rows {
+				id := map[string]string{"id": fmt.Sprintf("%d-%d", block, i)}
+				require.NoError(b, l.Insert("acc", id, map[string]FieldData{"n": {Value: "1"}}, nil))
+			}
+			b.StartTimer()
+			_, err := l.Flush(ctx, testModuleHash, pgCursor(block, block), block)
+			require.NoError(b, err)
+		}
+		report(b)
+	})
+
+	b.Run("upsert_undo", func(b *testing.B) {
+		l := setup(b)
+		block := uint64(1)
+		for b.Loop() {
+			b.StopTimer()
+			block++
+			for i := range rows {
+				id := fmt.Sprintf("%d-%d", block, i)
+				if i%2 == 1 && block > 2 {
+					id = fmt.Sprintf("%d-%d", block-1, i-1) // a row of the previous flush
+				}
+				require.NoError(b, l.Upsert("acc", map[string]string{"id": id}, map[string]FieldData{"n": {Value: "1"}}, &block))
+			}
+			b.StartTimer()
+			_, err := l.Flush(ctx, testModuleHash, pgCursor(block, 1), 1)
+			require.NoError(b, err)
+		}
+		report(b)
+	})
 }

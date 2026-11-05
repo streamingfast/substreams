@@ -1,11 +1,22 @@
 package db
 
 import (
+	"cmp"
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"net/netip"
+	"os"
+	"reflect"
 	"sync"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgconn/ctxwatch"
+	"github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/streamingfast/logging"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
@@ -60,7 +71,7 @@ type Loader struct {
 	writerConn *sql.Conn
 	// writerConnMu is held while a transaction or a result set is open on writerConn, so the
 	// keepalive (see KeepWriterSessionAlive) never runs inside a transaction or between the rows of
-	// a query (lib/pq refuses a query while another one's rows are being read).
+	// a query (a connection refuses a query while another one's rows are being read).
 	writerConnMu sync.Mutex
 }
 
@@ -83,7 +94,7 @@ func NewLoader(
 		}
 	}
 
-	sqlDB, err := sql.Open(dsn.Driver(), dsn.ConnString())
+	sqlDB, err := OpenDB(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open db connection: %w", err)
 	}
@@ -135,10 +146,174 @@ func NewLoader(
 	return l, nil
 }
 
+// OpenDB opens the database.
+func OpenDB(dsn *DSN) (*sql.DB, error) {
+	if dsn.Driver() != "postgres" {
+		return sql.Open(dsn.Driver(), dsn.ConnString())
+	}
+	config, err := PostgresConnConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	return stdlib.OpenDB(*config), nil
+}
+
+// PostgresConnConfig is how the sink connects to PostgreSQL:
+//
+//   - TLS is required unless the DSN or PGSSLMODE says otherwise, or a service turns it off, never
+//     falling back to plain;
+//   - statements are sent as plain SQL rather than prepared, as their values are in their text, in a
+//     session set up to read them the same whatever the server's or role's defaults;
+//   - a cancelled context sends the server a cancel request, leaving the connection and its session
+//     usable, which the writer lock lives in.
+func PostgresConnConfig(dsn *DSN) (*pgx.ConnConfig, error) {
+	connString := dsn.ConnString()
+	config, err := pgx.ParseConfig(connString)
+	if err != nil {
+		return nil, err
+	}
+	if dsn.Options.Get("sslmode") == "" && os.Getenv("PGSSLMODE") == "" && postgresFallsBackToPlain(config) {
+		config, err = pgx.ParseConfig(connString + " sslmode=require")
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := applyLibpqOptions(dsn, config); err != nil {
+		return nil, err
+	}
+	config.RuntimeParams["client_encoding"] = "UTF8"
+	config.RuntimeParams["datestyle"] = "ISO, MDY"
+	config.RuntimeParams["standard_conforming_strings"] = "on"
+	config.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	config.BuildContextWatcherHandler = func(conn *pgconn.PgConn) ctxwatch.Handler {
+		return &pgconn.CancelRequestContextWatcherHandler{Conn: conn, DeadlineDelay: postgresCancelDeadline}
+	}
+	return config, nil
+}
+
+// postgresFallsBackToPlain reports whether config is sslmode=prefer, which pgx defaults to: each host
+// tried with TLS, then without.
+func postgresFallsBackToPlain(config *pgx.ConnConfig) bool {
+	previousTLS, previousHost := config.TLSConfig, config.Host
+	for _, fallback := range config.Fallbacks {
+		if previousTLS != nil && fallback.TLSConfig == nil && fallback.Host == previousHost {
+			return true
+		}
+		previousTLS, previousHost = fallback.TLSConfig, fallback.Host
+	}
+	return false
+}
+
+// applyLibpqOptions handles the DSN options lib/pq took and pgx doesn't know, which it would send
+// the server as settings to be refused. Those it can't do are an error rather than ignored.
+func applyLibpqOptions(dsn *DSN, config *pgx.ConnConfig) error {
+	take := func(option string) string {
+		value := config.RuntimeParams[option]
+		delete(config.RuntimeParams, option)
+		return value
+	}
+
+	// How lib/pq sent values, or in the others' case read and never used.
+	take("binary_parameters")
+	take("disable_prepared_binary_result")
+	take("tz")
+	take("geqo")
+	// pgx sets the session's time zone from PGTZ, lib/pq left it to the server.
+	if tz := os.Getenv("PGTZ"); tz != "" && dsn.Options.Get("timezone") == "" && config.RuntimeParams["timezone"] == tz {
+		take("timezone")
+	}
+
+	if name := take("fallback_application_name"); name != "" {
+		if _, set := config.RuntimeParams["application_name"]; !set {
+			config.RuntimeParams["application_name"] = name
+		}
+	}
+
+	minVersion, err := postgresTLSVersion("ssl_min_protocol_version", cmp.Or(take("ssl_min_protocol_version"), os.Getenv("SSLPGMINPROTOCOLVERSION")))
+	if err != nil {
+		return err
+	}
+	maxVersion, err := postgresTLSVersion("ssl_max_protocol_version", cmp.Or(take("ssl_max_protocol_version"), os.Getenv("SSLPGMAXPROTOCOLVERSION")))
+	if err != nil {
+		return err
+	}
+	tlsConfigs := []*tls.Config{config.TLSConfig}
+	for _, fallback := range config.Fallbacks {
+		tlsConfigs = append(tlsConfigs, fallback.TLSConfig)
+	}
+	for _, tlsConfig := range tlsConfigs {
+		if tlsConfig != nil {
+			tlsConfig.MinVersion = minVersion
+			tlsConfig.MaxVersion = maxVersion
+		}
+	}
+
+	if hostaddr := cmp.Or(take("hostaddr"), os.Getenv("PGHOSTADDR")); hostaddr != "" {
+		addr, err := netip.ParseAddr(hostaddr)
+		if err != nil {
+			return fmt.Errorf("hostaddr %q is not supported, only a single address: %w", hostaddr, err)
+		}
+		if network, _ := pgconn.NetworkAddress(config.Host, config.Port); network == "unix" {
+			return fmt.Errorf("hostaddr is not supported with a socket as host")
+		}
+		for _, fallback := range config.Fallbacks {
+			if fallback.Host != config.Host {
+				return fmt.Errorf("hostaddr is not supported with several hosts")
+			}
+		}
+		// The host name stays what TLS names, and checks the server against with verify-full.
+		config.LookupFunc = func(context.Context, string) ([]string, error) {
+			return []string{addr.String()}, nil
+		}
+	}
+
+	switch value := take("sslinline"); value {
+	case "", "0", "f", "F", "false", "FALSE", "False", "no", "off":
+	default:
+		return fmt.Errorf("the sslinline option is not supported, use files for sslcert, sslkey and sslrootcert")
+	}
+	if value := cmp.Or(take("load_balance_hosts"), os.Getenv("PGLOADBALANCEHOSTS")); value != "" && value != "disable" {
+		return fmt.Errorf("load_balance_hosts=%s is not supported", value)
+	}
+	return nil
+}
+
+// postgresTLSVersion gives the TLS version of a lib/pq option's value, 0 when it isn't set.
+func postgresTLSVersion(option, value string) (uint16, error) {
+	switch value {
+	case "":
+		return 0, nil
+	case "TLSv1.0":
+		return tls.VersionTLS10, nil
+	case "TLSv1.1":
+		return tls.VersionTLS11, nil
+	case "TLSv1.2":
+		return tls.VersionTLS12, nil
+	case "TLSv1.3":
+		return tls.VersionTLS13, nil
+	}
+	return 0, fmt.Errorf("invalid %s %q", option, value)
+}
+
+// postgresCancelDeadline is how long a cancelled query gets to stop before its connection is closed.
+const postgresCancelDeadline = 5 * time.Second
+
+// postgresScanType is how a column's values are written (see normalizeValueType). A column of any
+// other type than these takes its value as the module gives it, whatever the driver scans it to.
+func postgresScanType(column *sql.ColumnType) reflect.Type {
+	switch column.DatabaseTypeName() {
+	case "INT2", "INT4", "INT8", "FLOAT4", "FLOAT8", "BOOL", "BYTEA", "TEXT", "VARCHAR", "BIT", "VARBIT":
+		return column.ScanType()
+	case "TIMESTAMP", "TIMESTAMPTZ", "DATE", "TIME", "TIMETZ", "1266": // the driver names timetz by its OID
+		return reflectTypeTime
+	}
+	return reflect.TypeFor[any]()
+}
+
 func newDialect(driver driver.Driver, dsn *DSN, cursorTableName string, historyTableName string, clickHouseClusterName string) (Dialect, error) {
 	driverType := fmt.Sprintf("%T", driver)
 	switch driverType {
-	case "*pq.Driver":
+	case "*stdlib.Driver":
 		return NewPostgresDialect(dsn.Schema(), cursorTableName, historyTableName), nil
 	case "*clickhouse.stdDriver":
 		return NewClickhouseDialect(dsn.Schema(), cursorTableName, clickHouseClusterName), nil
@@ -169,26 +344,58 @@ func (l *Loader) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error) {
 			l.writerConnMu.Unlock()
 			return nil, err
 		}
-		return &writerTx{Tx: tx, unlock: sync.OnceFunc(l.writerConnMu.Unlock)}, nil
+		return &connTx{Tx: tx, conn: l.writerConn, release: sync.OnceFunc(l.writerConnMu.Unlock)}, nil
+	}
+	if l.dsn.Driver() == "postgres" {
+		conn, err := l.Conn(ctx)
+		if err != nil {
+			return nil, err
+		}
+		tx, err := conn.BeginTx(ctx, opts)
+		if err != nil {
+			_ = conn.Close()
+			return nil, err
+		}
+		return &connTx{Tx: tx, conn: conn, release: sync.OnceFunc(func() { _ = conn.Close() })}, nil
 	}
 	return l.DB.BeginTx(ctx, opts)
 }
 
-// writerTx is a transaction on the writer lock's connection; it frees the connection for the
-// keepalive once it ends.
-type writerTx struct {
+// connTx is a PostgreSQL transaction on a known connection (the writer lock's or one of its own), to
+// reach the driver's pipeline on it. It releases the connection once it ends.
+type connTx struct {
 	*sql.Tx
-	unlock func()
+	conn    *sql.Conn
+	release func()
 }
 
-func (t *writerTx) Commit() error {
-	defer t.unlock()
+func (t *connTx) Commit() error {
+	defer t.release()
 	return t.Tx.Commit()
 }
 
-func (t *writerTx) Rollback() error {
-	defer t.unlock()
+func (t *connTx) Rollback() error {
+	defer t.release()
 	return t.Tx.Rollback()
+}
+
+// sendStatements runs statements in order in one round trip, as a pipeline: each is a statement of
+// its own for the server (timestamp, timeout, errors). It gives how many completed before an error.
+func (t *connTx) sendStatements(ctx context.Context, statements []string) (completed int, err error) {
+	err = t.conn.Raw(func(driverConn any) error {
+		batch := &pgconn.Batch{}
+		for _, statement := range statements {
+			batch.ExecParams(statement, nil, nil, nil, nil)
+		}
+		results, err := driverConn.(*stdlib.Conn).Conn().PgConn().ExecBatch(ctx, batch).ReadAll()
+		completed = len(results)
+		// A statement that fails after describing its rows has a result of its own, holding the error.
+		if completed > 0 && results[completed-1].Err != nil {
+			completed--
+		}
+		return err
+	})
+	return completed, err
 }
 
 type queryExecutor interface {
@@ -306,11 +513,15 @@ func (l *Loader) LoadTables(schemaName string, cursorTableName string, historyTa
 
 		columnByName := make(map[string]*ColumnInfo, len(columns))
 		for _, f := range columns {
+			scanType := f.ScanType()
+			if _, isPostgres := l.dialect.(*PostgresDialect); isPostgres {
+				scanType = postgresScanType(f)
+			}
 			columnByName[f.Name()] = &ColumnInfo{
 				name:             f.Name(),
 				escapedName:      EscapeIdentifier(f.Name()),
 				databaseTypeName: f.DatabaseTypeName(),
-				scanType:         f.ScanType(),
+				scanType:         scanType,
 			}
 		}
 

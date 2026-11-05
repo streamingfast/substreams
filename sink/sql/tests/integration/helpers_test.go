@@ -112,7 +112,7 @@ func setupRawPostgresContainer(config PostgresContainerConfig) (*PostgresContain
 		postgres.WithUsername(dbUser),
 		postgres.WithPassword(dbPassword),
 		testcontainers.WithWaitStrategy(
-			wait.ForSQL("5432/tcp", "postgres", func(host string, port network.Port) string {
+			wait.ForSQL("5432/tcp", "pgx", func(host string, port network.Port) string {
 				return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", dbUser, dbPassword, host, port.Port(), dbName)
 			}).WithStartupTimeout(60*time.Second).WithQuery("SELECT 1"),
 		),
@@ -122,12 +122,12 @@ func setupRawPostgresContainer(config PostgresContainerConfig) (*PostgresContain
 	}
 
 	return &PostgresContainerExt{
-			PostgresContainer: postgresContainer,
-			Configuration:     &config,
-			ConnectionString:  postgresContainer.MustConnectionString(ctx, "sslmode=disable"),
-		}, func() {
-			_ = testcontainers.TerminateContainer(postgresContainer)
-		}
+		PostgresContainer: postgresContainer,
+		Configuration:     &config,
+		ConnectionString:  postgresContainer.MustConnectionString(ctx, "sslmode=disable"),
+	}, func() {
+		_ = testcontainers.TerminateContainer(postgresContainer)
+	}
 }
 
 type PostgresContainerExt struct {
@@ -187,12 +187,12 @@ func setupRawClickhouseContainer(config ClickhouseContainerConfig) (*ClickhouseC
 	connectionString := fmt.Sprintf("clickhouse://%s:%s@%s:%s/%s", dbUser, dbPassword, host, mappedPort.Port(), dbName)
 
 	return &ClickhouseContainerExt{
-			ClickHouseContainer: clickhouseContainer,
-			Configuration:       &config,
-			ConnectionString:    connectionString,
-		}, func() {
-			_ = testcontainers.TerminateContainer(clickhouseContainer)
-		}
+		ClickHouseContainer: clickhouseContainer,
+		Configuration:       &config,
+		ConnectionString:    connectionString,
+	}, func() {
+		_ = testcontainers.TerminateContainer(clickhouseContainer)
+	}
 }
 
 // setupClickhouseContainer spins up a ClickHouse Docker container and let a seeder function seed the database.

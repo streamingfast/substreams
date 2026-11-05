@@ -8,7 +8,7 @@ import (
 	"hash/fnv"
 	"time"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 )
 
@@ -175,6 +175,6 @@ func IsCancellation(err error) bool {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, sql.ErrTxDone) {
 		return true
 	}
-	var pqErr *pq.Error
-	return errors.As(err, &pqErr) && pqErr.Code == "57014"
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "57014"
 }

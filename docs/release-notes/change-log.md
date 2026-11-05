@@ -27,7 +27,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   over a third of the sink's CPU on a busy module.
 - SQL sink (DatabaseChanges, PostgreSQL): send a flush's statements through a pipeline instead of one round trip each, in
   the same order and transaction, so a flush waits far less on the network. Each is still a statement of its own for the
-  server. `tx_query_execution_duration` reports one `batch` type instead of `normal` and `undo`.
+  server. With about 1 ms of latency to the database, `BenchmarkPostgresFlush` goes from 707 to 54,440 rows/s on inserts.
+  This times the flush only, so a full run gains less. `tx_query_execution_duration` reports one `batch` type instead of
+  `normal` and `undo`.
 - SQL sink (PostgreSQL): connect through pgx rather than lib/pq, which the proto sink already used for binary COPY.
   Connections behave as before: TLS stays required unless configured otherwise, and sessions use the same date style,
   encoding and string settings. lib/pq's DSN options still work, except an enabled `sslinline`,

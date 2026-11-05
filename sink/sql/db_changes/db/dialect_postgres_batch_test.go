@@ -152,9 +152,16 @@ func (t *recordingSender) sendStatements(ctx context.Context, statements []strin
 	return len(statements), nil
 }
 
-// BenchmarkPostgresFlush times a flush against the database in PG_DSN, which can go through a proxy
-// to add network latency. "insert" writes new rows. "upsert_undo" writes half new rows and half
-// updates, in a reversible block: each one also records how to undo it.
+// BenchmarkPostgresFlush times a flush against the database in PG_DSN. "insert" writes new rows.
+// "upsert_undo" writes half new rows and half updates, in a reversible block: each one also records
+// how to undo it.
+//
+// To add about 1 ms of round trip, put toxiproxy in front of the database and point PG_DSN at it:
+//
+//	docker run -d -p 15433:15433 -p 8474:8474 ghcr.io/shopify/toxiproxy:2.9.0
+//	curl -X POST localhost:8474/proxies -d '{"name":"pg","listen":"0.0.0.0:15433","upstream":"<database host>:5432"}'
+//	curl -X POST localhost:8474/proxies/pg/toxics -d '{"name":"lat","type":"latency","stream":"downstream","attributes":{"latency":1}}'
+//	PG_DSN="psql://<user>:<password>@localhost:15433/<database>?sslmode=disable" go test -run '^$' -bench BenchmarkPostgresFlush -benchtime=10x ./sink/sql/db_changes/db/
 func BenchmarkPostgresFlush(b *testing.B) {
 	const rows = 1000
 	ctx := context.Background()

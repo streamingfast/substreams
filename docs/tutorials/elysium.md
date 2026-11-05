@@ -12,6 +12,10 @@ The CLI installation is supported only on Linux and macOS. If you're using Windo
 **Tip**: Using an AI coding assistant? Install the [Substreams agent skills](../how-to-guides/develop-your-own-substreams/generic/agent-skills.md) to get expert Substreams guidance while building.
 {% endhint %}
 
+## About Elysium
+
+[Elysium](https://elysium.kinetiq.xyz/docs/what-is-elysium) is a general-purpose, high-performance L2 for Hyperliquid, built by Kinetiq on Arbitrum Orbit (Nitro/ArbOS). It settles to HyperEVM, and HYPE is its native gas token.
+
 ## Step 1: Initialize Your Elysium Substreams Project
 
 1. [Install the Substreams CLI](../how-to-guides/cli/installing-the-cli.md).
@@ -56,6 +60,8 @@ Elysium is an EVM-compatible blockchain built on Arbitrum Nitro, which means:
 - You can leverage existing EVM foundational modules and libraries
 - Blocks are [Extended Blocks](../references/chains-and-endpoints.md#evm-extended-vs-base-block-model), so rich data such as internal calls, balance changes, and storage changes is available
 - `eth_call` is supported in Substreams modules
+- Blocks are produced every 100 ms. Expect a much higher block rate than most EVM chains, which affects how quickly a backfill progresses and how much data you process per block range.
+- Native currency is HYPE, which bridges 1:1 from HyperEVM and is used for gas and `msg.value`.
 
 ## Additional Resources
 

@@ -24,6 +24,9 @@ const limitProcessedBlocksFlag = "limit-processed-blocks"
 // sentence that ends without telling the user which knob to turn — and the numbers it quotes
 // are ones the client was itself told during session init.
 func explainRunError(err error, work sessionWorkReporter, limit uint64) error {
+	if err != nil && strings.Contains(err.Error(), "stream auth failure") {
+		return fmt.Errorf("%w\n\nAuthenticate with `substreams auth`, or set SUBSTREAMS_API_KEY", err)
+	}
 	if err == nil || !strings.Contains(err.Error(), limitProcessedBlocksFlag) {
 		return err
 	}

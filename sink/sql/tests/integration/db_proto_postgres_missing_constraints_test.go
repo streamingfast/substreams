@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/streamingfast/substreams/sink/sql/db_proto"
 	protosql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	pbrelations "github.com/streamingfast/substreams/sink/sql/tests/relations"

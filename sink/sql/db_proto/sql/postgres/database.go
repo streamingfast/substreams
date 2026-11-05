@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/lib/pq"
 	"github.com/streamingfast/logging/zapx"
 	sink "github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/sink/sql/bytes"
@@ -37,7 +37,7 @@ type Database struct {
 	*sql.BaseDatabase
 	db *pgsql.DB
 	// pool is only created when the spool is enabled: binary COPY needs pgx, the rest of
-	// the sink talks to PostgreSQL through database/sql and lib/pq.
+	// the sink talks to PostgreSQL through database/sql.
 	pool         *pgxpool.Pool
 	spoolOptions *spool.Options
 	tx           *pgsql.Tx
@@ -165,7 +165,7 @@ func NewDatabase(schema *schema.Schema, dsn *db.DSN, moduleOutputType string, ro
 	logger = logger.Named("postgres")
 
 	logger.Info("connecting to db", zap.String("host", dsn.Host), zap.Int64("port", dsn.Port), zap.String("database", dsn.Database))
-	sqlDB, err := pgsql.Open(dsn.Driver(), dsn.ConnString())
+	sqlDB, err := db.OpenDB(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open db connection: %w", err)
 	}
@@ -216,6 +216,10 @@ func (d *Database) Open() error {
 	poolConfig, err := pgxpool.ParseConfig(d.dsn.ConnString())
 	if err != nil {
 		return fmt.Errorf("parsing the connection string for binary COPY: %w", err)
+	}
+	poolConfig.ConnConfig, err = db.PostgresConnConfig(d.dsn)
+	if err != nil {
+		return fmt.Errorf("setting up the connections for binary COPY: %w", err)
 	}
 	// One applier goroutine COPYs one segment at a time, so the pgx default of four
 	// connections per core is a fleet of idle connections against the server.
@@ -484,7 +488,7 @@ func (d *Database) EnsureBlockNumberIndexes(ctx context.Context) error {
 			// will ever use, and IF NOT EXISTS would happily keep it forever.
 			d.logger.Info("dropping an index a previous concurrent build left unusable", zap.String("index", key.name))
 			if _, err := d.db.ExecContext(ctx, fmt.Sprintf("DROP INDEX CONCURRENTLY IF EXISTS %s.%s",
-				pq.QuoteIdentifier(d.schema.Name), pq.QuoteIdentifier(key.name))); err != nil {
+				pgx.Identifier{d.schema.Name}.Sanitize(), pgx.Identifier{key.name}.Sanitize())); err != nil {
 				return fmt.Errorf("dropping the invalid index %q: %w", key.name, err)
 			}
 		} else if existing[key] {
@@ -761,7 +765,7 @@ func (d *Database) DropConstraints() error {
 
 			pending = append(pending, statement{
 				kind: kind,
-				sql:  fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s", key.relation, pq.QuoteIdentifier(key.name)),
+				sql:  fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s", key.relation, pgx.Identifier{key.name}.Sanitize()),
 			})
 		}
 	}

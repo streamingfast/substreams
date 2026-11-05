@@ -1,7 +1,7 @@
 package db
 
 import (
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/streamingfast/logging"
 )
 

@@ -18,7 +18,7 @@ func TestPostgresRevert_UndoesABlockInReverseOrder(t *testing.T) {
 	require.NoError(t, err)
 	schema := dsn.Schema()
 
-	raw, err := sql.Open("postgres", dsn.ConnString())
+	raw, err := sql.Open("pgx", dsn.ConnString())
 	require.NoError(t, err)
 	defer raw.Close()
 	_, err = raw.Exec(fmt.Sprintf(`

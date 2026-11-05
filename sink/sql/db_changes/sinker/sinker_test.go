@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/logging"
 	sink "github.com/streamingfast/substreams/sink"
@@ -502,7 +502,7 @@ func TestSinker_WriterSessionKeepalive_Postgres(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	raw, err := sql.Open("postgres", mustDSN(t, dsnString).ConnString())
+	raw, err := sql.Open("pgx", mustDSN(t, dsnString).ConnString())
 	require.NoError(t, err)
 	defer raw.Close()
 	schema := fmt.Sprintf("keepalive_test_%d", time.Now().UnixNano())

@@ -23,7 +23,7 @@ import (
 
 // pgTestSchema creates a fresh schema with the cursors and history tables plus an `acc` table, and
 // returns the DSN pointing at it. The test is skipped unless PG_DSN is set.
-func pgTestSchema(t *testing.T) string {
+func pgTestSchema(t testing.TB) string {
 	t.Helper()
 	dsnString := os.Getenv("PG_DSN")
 	if dsnString == "" {
@@ -32,7 +32,7 @@ func pgTestSchema(t *testing.T) string {
 
 	dsn, err := ParseDSN(dsnString)
 	require.NoError(t, err)
-	raw, err := sql.Open("postgres", dsn.ConnString())
+	raw, err := sql.Open("pgx", dsn.ConnString())
 	require.NoError(t, err)
 	defer raw.Close()
 
@@ -40,7 +40,7 @@ func pgTestSchema(t *testing.T) string {
 	_, err = raw.Exec(fmt.Sprintf(`CREATE SCHEMA %s; CREATE TABLE %s.acc (id text PRIMARY KEY, n numeric NOT NULL DEFAULT 0)`, schema, schema))
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		raw, err := sql.Open("postgres", dsn.ConnString())
+		raw, err := sql.Open("pgx", dsn.ConnString())
 		if err == nil {
 			raw.Exec(fmt.Sprintf("DROP SCHEMA %s CASCADE", schema))
 			raw.Close()
@@ -53,7 +53,7 @@ func pgTestSchema(t *testing.T) string {
 	return scoped
 }
 
-func pgTestLoader(t *testing.T, dsnString string, loadTables bool) *Loader {
+func pgTestLoader(t testing.TB, dsnString string, loadTables bool) *Loader {
 	t.Helper()
 	dsn, err := ParseDSN(dsnString)
 	require.NoError(t, err)
@@ -262,7 +262,7 @@ func (p *commitReplyDropper) serve(client net.Conn) {
 		if err != nil {
 			return
 		}
-		if header[0] == 'Q' && bytes.HasPrefix(body, []byte("COMMIT")) && p.armed.CompareAndSwap(true, false) {
+		if header[0] == 'Q' && bytes.HasPrefix(bytes.ToUpper(body), []byte("COMMIT")) && p.armed.CompareAndSwap(true, false) {
 			dropping.Store(true)
 			server.Write(append(header, body...))
 			p.dropped.Add(1)

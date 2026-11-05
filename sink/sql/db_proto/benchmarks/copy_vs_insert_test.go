@@ -35,7 +35,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/postgres/pgcopy"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -81,10 +81,10 @@ func TestCopyVsInsert(t *testing.T) {
 			run:   func(ctx context.Context) error { return h.insertMultiRowBuilt(ctx, rows) },
 		},
 		{
-			name:  "insert-multirow-built-at-flush-libpq",
-			notes: "same, through database/sql + lib/pq, to size the driver's share",
+			name:  "insert-multirow-built-at-flush-database-sql",
+			notes: "same, through database/sql, to size its share",
 			bytes: art.multiRowBytes,
-			run:   func(ctx context.Context) error { return h.insertMultiRowBuiltLibpq(ctx, rows) },
+			run:   func(ctx context.Context) error { return h.insertMultiRowBuiltDatabaseSQL(ctx, rows) },
 		},
 		{
 			name:  "insert-multirow-prebuilt-from-disk",
@@ -172,7 +172,7 @@ func report(t *testing.T, variants []variant, best map[string]time.Duration, row
 type harness struct {
 	pool          *pgxpool.Pool // extended protocol, used for prepared inserts and COPY
 	simplePool    *pgxpool.Pool // simple protocol, used for prebuilt literal SQL
-	libpq         *sql.DB
+	sqlDB         *sql.DB
 	columns       []pgcopy.Column
 	binaryCopySQL string
 	csvCopySQL    string
@@ -208,9 +208,9 @@ func newHarness(t *testing.T, ctx context.Context) *harness {
 	require.NoError(t, err)
 	t.Cleanup(simplePool.Close)
 
-	libpqDB, err := sql.Open("postgres", dsn)
+	sqlDB, err := sql.Open("pgx", dsn)
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = libpqDB.Close() })
+	t.Cleanup(func() { _ = sqlDB.Close() })
 
 	_, err = pool.Exec(ctx, "CREATE SCHEMA IF NOT EXISTS "+benchSchema)
 	require.NoError(t, err)
@@ -244,7 +244,7 @@ func newHarness(t *testing.T, ctx context.Context) *harness {
 	return &harness{
 		pool:          pool,
 		simplePool:    simplePool,
-		libpq:         libpqDB,
+		sqlDB:         sqlDB,
 		columns:       all,
 		binaryCopySQL: pgcopy.CopySQL(benchSchema, benchTable, all),
 		csvCopySQL:    copyCSVSQL(all),
@@ -346,8 +346,8 @@ func (h *harness) insertMultiRowBuilt(ctx context.Context, rows []*row) error {
 	})
 }
 
-func (h *harness) insertMultiRowBuiltLibpq(ctx context.Context, rows []*row) error {
-	tx, err := h.libpq.BeginTx(ctx, nil)
+func (h *harness) insertMultiRowBuiltDatabaseSQL(ctx context.Context, rows []*row) error {
+	tx, err := h.sqlDB.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
 	}

@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/streamingfast/logging"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	sinksql "github.com/streamingfast/substreams/sink/sql"
 	db2 "github.com/streamingfast/substreams/sink/sql/db_changes/db"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
 
@@ -83,7 +83,7 @@ func SinkerSetup(
 
 // isDuplicateTableError checks if the error is a PostgreSQL duplicate table error
 func isDuplicateTableError(err error) bool {
-	var sqlError *pq.Error
+	var sqlError *pgconn.PgError
 	if !errors.As(err, &sqlError) {
 		return false
 	}

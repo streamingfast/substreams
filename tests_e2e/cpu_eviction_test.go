@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -24,20 +24,55 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// evictionQuotaCores is the CPU quota the fake cgroup advertises. Eight
-// concurrent dev-mode requests burn about 7.5 cores against it, so the evictor
-// sees a genuine overload built from real wasm execution — over the threshold
-// by enough to fire, but not so far that the batch has to take every request.
-// Machines with fewer cores get a quota scaled down by evictionQuotaCoreRatio,
-// see evictionQuota.
-const evictionQuotaCores = 6.0
+// evictionQuotaShare is the fraction of the CPU this machine can actually give
+// the test that the fake cgroup advertises as its quota. Eight concurrent
+// dev-mode requests burn close to everything they are offered, so against 60%
+// of it they sit around 150% of quota: far over the 90% threshold with room to
+// spare, but not so far that the batch has to take every request.
+const evictionQuotaShare = 0.6
 
-// evictionQuotaCoreRatio keeps the quota under what the machine can actually
-// burn: a 4-core CI runner can never reach 90% of a 6-core quota.
-const evictionQuotaCoreRatio = 0.7
+// evictionCalibration is how long measureAvailableCores spins to see what the
+// machine gives us right now.
+const evictionCalibration = 1500 * time.Millisecond
 
-func evictionQuota() float64 {
-	return min(evictionQuotaCores, evictionQuotaCoreRatio*float64(runtime.NumCPU()))
+// processCPUUsec is the CPU time (user + system) this process has consumed.
+func processCPUUsec() (uint64, error) {
+	var ru syscall.Rusage
+	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &ru); err != nil {
+		return 0, err
+	}
+	return uint64(ru.Utime.Sec)*1_000_000 + uint64(ru.Utime.Usec) +
+		uint64(ru.Stime.Sec)*1_000_000 + uint64(ru.Stime.Usec), nil
+}
+
+// measureAvailableCores spins `workers` busy goroutines and reports how many
+// cores of CPU the process really got. The overload is built from real wasm
+// execution, so the quota has to be sized against what the machine delivers
+// now, not what it has: a shared CI runner or a busy laptop hands a process far
+// fewer cores than runtime.NumCPU() says, and a quota fixed from NumCPU is then
+// unreachable and the evictor rightly never fires.
+func measureAvailableCores(t *testing.T, workers int) float64 {
+	t.Helper()
+
+	before, err := processCPUUsec()
+	require.NoError(t, err)
+	start := time.Now()
+
+	var stop atomic.Bool
+	var wg sync.WaitGroup
+	for range workers {
+		wg.Go(func() {
+			for !stop.Load() {
+			}
+		})
+	}
+	time.Sleep(evictionCalibration)
+	stop.Store(true)
+	wg.Wait()
+
+	after, err := processCPUUsec()
+	require.NoError(t, err)
+	return float64(after-before) / float64(time.Since(start).Microseconds())
 }
 
 // fakeCgroup writes cpu.max once and then rewrites cpu.stat from the process's
@@ -53,12 +88,10 @@ func fakeCgroup(t *testing.T, quotaCores float64) string {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "cpu.max"), []byte(fmt.Sprintf("%d %d\n", quota, period)), 0644))
 
 	writeStat := func() {
-		var ru syscall.Rusage
-		if err := syscall.Getrusage(syscall.RUSAGE_SELF, &ru); err != nil {
+		usec, err := processCPUUsec()
+		if err != nil {
 			return
 		}
-		usec := uint64(ru.Utime.Sec)*1_000_000 + uint64(ru.Utime.Usec) +
-			uint64(ru.Stime.Sec)*1_000_000 + uint64(ru.Stime.Usec)
 		os.WriteFile(filepath.Join(dir, "cpu.stat"), []byte(fmt.Sprintf("usage_usec %d\n", usec)), 0644)
 	}
 	writeStat()
@@ -154,9 +187,9 @@ func startTier1WithRetry(t *testing.T, ctx context.Context, config devenv.Tier1C
 }
 
 // TestCPUEviction_OverloadedPodShedsRequests drives the whole path with real
-// requests: the fake cgroup reports the process's own CPU against a 3-core
-// quota, a wave of dev-mode requests over a long block range pushes it past
-// the 90% threshold, and the evictor must go unready, drain, cancel a batch
+// requests: the fake cgroup reports the process's own CPU against a quota
+// sized to the CPU the machine really gives it, a wave of dev-mode requests
+// over a long block range pushes it past the 90% threshold, and the evictor must go unready, drain, cancel a batch
 // with Unavailable, and let the survivors keep streaming.
 func TestCPUEviction_OverloadedPodShedsRequests(t *testing.T) {
 	ctx := context.Background()
@@ -166,7 +199,13 @@ func TestCPUEviction_OverloadedPodShedsRequests(t *testing.T) {
 	require.NoError(t, err)
 	defer devenv.TerminateDummyBlockchain(ctx, container)
 
-	t.Setenv("SUBSTREAMS_CGROUP_DIR", fakeCgroup(t, evictionQuota()))
+	const devCount, liveCount = 8, 2
+
+	// Measured before anything else starts, so the spin has the process to itself.
+	availableCores := measureAvailableCores(t, devCount)
+	quotaCores := evictionQuotaShare * availableCores
+	t.Logf("machine gives the process %.2f cores, fake cgroup quota is %.2f", availableCores, quotaCores)
+	t.Setenv("SUBSTREAMS_CGROUP_DIR", fakeCgroup(t, quotaCores))
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
 	app1, endpoint := startTier1WithRetry(t, ctx, devenv.Tier1Config{
@@ -204,7 +243,6 @@ func TestCPUEviction_OverloadedPodShedsRequests(t *testing.T) {
 
 	// Dev mode runs every module of the chain on tier1 itself, so each request
 	// is a sustained wasm load on the pod under test rather than on tier2.
-	const devCount, liveCount = 8, 2
 	devCtx, cancelDev := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancelDev()
 	liveCtx, cancelLive := context.WithCancel(ctx)

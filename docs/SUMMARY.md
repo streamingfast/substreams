@@ -16,6 +16,7 @@
   * [on Injective](tutorials/cosmos-compatible/injective.md)
   * [on Stellar](tutorials/stellar.md)
   * [on World Chain](tutorials/world-chain.md)
+  * [on Elysium](tutorials/elysium.md)
 * [Consuming a Foundational Store](tutorials/consuming-foundational-store.md)
 
 ## How-To Guides

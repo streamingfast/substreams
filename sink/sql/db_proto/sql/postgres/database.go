@@ -217,6 +217,10 @@ func (d *Database) Open() error {
 	if err != nil {
 		return fmt.Errorf("parsing the connection string for binary COPY: %w", err)
 	}
+	poolConfig.ConnConfig, err = db.PostgresConnConfig(d.dsn)
+	if err != nil {
+		return fmt.Errorf("setting up the connections for binary COPY: %w", err)
+	}
 	// One applier goroutine COPYs one segment at a time, so the pgx default of four
 	// connections per core is a fleet of idle connections against the server.
 	poolConfig.MaxConns = maxCopyConnections

@@ -1,10 +1,13 @@
 package db
 
 import (
+	"cmp"
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"net/netip"
 	"os"
 	"reflect"
 	"sync"
@@ -148,32 +151,35 @@ func OpenDB(dsn *DSN) (*sql.DB, error) {
 	if dsn.Driver() != "postgres" {
 		return sql.Open(dsn.Driver(), dsn.ConnString())
 	}
-	config, err := postgresConnConfig(dsn)
+	config, err := PostgresConnConfig(dsn)
 	if err != nil {
 		return nil, err
 	}
 	return stdlib.OpenDB(*config), nil
 }
 
-// postgresConnConfig is how the sink connects to PostgreSQL:
+// PostgresConnConfig is how the sink connects to PostgreSQL:
 //
-//   - TLS is required unless the DSN, PGSSLMODE or a service says otherwise, never falling back to
-//     plain;
+//   - TLS is required unless the DSN or PGSSLMODE says otherwise, or a service turns it off, never
+//     falling back to plain;
 //   - statements are sent as plain SQL rather than prepared, as their values are in their text, in a
 //     session set up to read them the same whatever the server's or role's defaults;
 //   - a cancelled context sends the server a cancel request, leaving the connection and its session
 //     usable, which the writer lock lives in.
-func postgresConnConfig(dsn *DSN) (*pgx.ConnConfig, error) {
+func PostgresConnConfig(dsn *DSN) (*pgx.ConnConfig, error) {
 	connString := dsn.ConnString()
-	if dsn.Options.Get("sslmode") == "" && dsn.Options.Get("service") == "" && os.Getenv("PGSSLMODE") == "" && os.Getenv("PGSERVICE") == "" {
-		connString += " sslmode=require"
-	}
 	config, err := pgx.ParseConfig(connString)
 	if err != nil {
 		return nil, err
 	}
-	for _, option := range []string{"binary_parameters", "disable_prepared_binary_result", "sslinline", "ssl_min_protocol_version", "ssl_max_protocol_version", "load_balance_hosts", "hostaddr", "tz"} {
-		delete(config.RuntimeParams, option) // options of lib/pq, which the server would refuse
+	if dsn.Options.Get("sslmode") == "" && os.Getenv("PGSSLMODE") == "" && postgresFallsBackToPlain(config) {
+		config, err = pgx.ParseConfig(connString + " sslmode=require")
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := applyLibpqOptions(dsn, config); err != nil {
+		return nil, err
 	}
 	config.RuntimeParams["client_encoding"] = "UTF8"
 	config.RuntimeParams["datestyle"] = "ISO, MDY"
@@ -183,6 +189,110 @@ func postgresConnConfig(dsn *DSN) (*pgx.ConnConfig, error) {
 		return &pgconn.CancelRequestContextWatcherHandler{Conn: conn, DeadlineDelay: postgresCancelDeadline}
 	}
 	return config, nil
+}
+
+// postgresFallsBackToPlain reports whether config is sslmode=prefer, which pgx defaults to: each host
+// tried with TLS, then without.
+func postgresFallsBackToPlain(config *pgx.ConnConfig) bool {
+	previousTLS, previousHost := config.TLSConfig, config.Host
+	for _, fallback := range config.Fallbacks {
+		if previousTLS != nil && fallback.TLSConfig == nil && fallback.Host == previousHost {
+			return true
+		}
+		previousTLS, previousHost = fallback.TLSConfig, fallback.Host
+	}
+	return false
+}
+
+// applyLibpqOptions handles the DSN options lib/pq took and pgx doesn't know, which it would send
+// the server as settings to be refused. Those it can't do are an error rather than ignored.
+func applyLibpqOptions(dsn *DSN, config *pgx.ConnConfig) error {
+	take := func(option string) string {
+		value := config.RuntimeParams[option]
+		delete(config.RuntimeParams, option)
+		return value
+	}
+
+	// How lib/pq sent values, or in the others' case read and never used.
+	take("binary_parameters")
+	take("disable_prepared_binary_result")
+	take("tz")
+	take("geqo")
+	// pgx sets the session's time zone from PGTZ, lib/pq left it to the server.
+	if tz := os.Getenv("PGTZ"); tz != "" && dsn.Options.Get("timezone") == "" && config.RuntimeParams["timezone"] == tz {
+		take("timezone")
+	}
+
+	if name := take("fallback_application_name"); name != "" {
+		if _, set := config.RuntimeParams["application_name"]; !set {
+			config.RuntimeParams["application_name"] = name
+		}
+	}
+
+	minVersion, err := postgresTLSVersion("ssl_min_protocol_version", cmp.Or(take("ssl_min_protocol_version"), os.Getenv("SSLPGMINPROTOCOLVERSION")))
+	if err != nil {
+		return err
+	}
+	maxVersion, err := postgresTLSVersion("ssl_max_protocol_version", cmp.Or(take("ssl_max_protocol_version"), os.Getenv("SSLPGMAXPROTOCOLVERSION")))
+	if err != nil {
+		return err
+	}
+	tlsConfigs := []*tls.Config{config.TLSConfig}
+	for _, fallback := range config.Fallbacks {
+		tlsConfigs = append(tlsConfigs, fallback.TLSConfig)
+	}
+	for _, tlsConfig := range tlsConfigs {
+		if tlsConfig != nil {
+			tlsConfig.MinVersion = minVersion
+			tlsConfig.MaxVersion = maxVersion
+		}
+	}
+
+	if hostaddr := cmp.Or(take("hostaddr"), os.Getenv("PGHOSTADDR")); hostaddr != "" {
+		addr, err := netip.ParseAddr(hostaddr)
+		if err != nil {
+			return fmt.Errorf("hostaddr %q is not supported, only a single address: %w", hostaddr, err)
+		}
+		if network, _ := pgconn.NetworkAddress(config.Host, config.Port); network == "unix" {
+			return fmt.Errorf("hostaddr is not supported with a socket as host")
+		}
+		for _, fallback := range config.Fallbacks {
+			if fallback.Host != config.Host {
+				return fmt.Errorf("hostaddr is not supported with several hosts")
+			}
+		}
+		// The host name stays what TLS names, and checks the server against with verify-full.
+		config.LookupFunc = func(context.Context, string) ([]string, error) {
+			return []string{addr.String()}, nil
+		}
+	}
+
+	switch value := take("sslinline"); value {
+	case "", "0", "f", "F", "false", "FALSE", "False", "no", "off":
+	default:
+		return fmt.Errorf("the sslinline option is not supported, use files for sslcert, sslkey and sslrootcert")
+	}
+	if value := cmp.Or(take("load_balance_hosts"), os.Getenv("PGLOADBALANCEHOSTS")); value != "" && value != "disable" {
+		return fmt.Errorf("load_balance_hosts=%s is not supported", value)
+	}
+	return nil
+}
+
+// postgresTLSVersion gives the TLS version of a lib/pq option's value, 0 when it isn't set.
+func postgresTLSVersion(option, value string) (uint16, error) {
+	switch value {
+	case "":
+		return 0, nil
+	case "TLSv1.0":
+		return tls.VersionTLS10, nil
+	case "TLSv1.1":
+		return tls.VersionTLS11, nil
+	case "TLSv1.2":
+		return tls.VersionTLS12, nil
+	case "TLSv1.3":
+		return tls.VersionTLS13, nil
+	}
+	return 0, fmt.Errorf("invalid %s %q", option, value)
 }
 
 // postgresCancelDeadline is how long a cancelled query gets to stop before its connection is closed.

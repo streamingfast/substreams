@@ -441,6 +441,9 @@ func newSinkRunE(driver string) func(*cobra.Command, []string) error {
 }
 
 func runDatabaseChangesSink(cmd *cobra.Command, driver, manifestPath, outputModule, dsnString string) error {
+	if sflags.MustGetInt(cmd, "batch-block-flush-interval") <= 0 && sflags.MustGetInt(cmd, "batch-row-flush-interval") <= 0 {
+		return fmt.Errorf("--batch-block-flush-interval and --batch-row-flush-interval can't both be 0: the sink wouldn't flush while catching up")
+	}
 	sinkDBPreStart(cmd)
 
 	app := cli.NewApplication(cmd.Context())

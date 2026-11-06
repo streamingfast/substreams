@@ -69,6 +69,7 @@ Elysium is an EVM-compatible blockchain built on Arbitrum Nitro, which means:
 
 Elysium Substreams are available on the following endpoint:
 - **Elysium Mainnet**: `mainnet.elysium.streamingfast.io:443`
+- **Elysium Mainnet chain ID**: `99901`
 
 ### Dev Container Reference
 

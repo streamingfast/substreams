@@ -54,6 +54,20 @@ func TestParseDSN(t *testing.T) {
 			expectSchema:     "testdb",
 			expectPassword:   "password",
 		},
+		{
+			name:             "postgres password with reserved characters",
+			dns:              "psql://postgres:p%40:%2F%3F%23%25%20'%5C@localhost/db",
+			expectConnString: `host=localhost port=5432 dbname=db user=postgres password='p@:/?#% \'\\'`,
+			expectSchema:     "public",
+			expectPassword:   `p@:/?#% '\`,
+		},
+		{
+			name:             "clickhouse password with reserved characters",
+			dns:              "clickhouse://default:p%40:%2F%3F%23%25@host:9000/default",
+			expectConnString: "clickhouse://default:p%40%3A%2F%3F%23%25@host:9000/default",
+			expectSchema:     "default",
+			expectPassword:   "p@:/?#%",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -84,4 +98,29 @@ func TestDSNConnString_PostgresValues(t *testing.T) {
 	assert.Equal(t, "my db", config.Database)
 	assert.Equal(t, "Europe/London", config.RuntimeParams["timezone"])
 	assert.Equal(t, "-c search_path=x", config.RuntimeParams["options"])
+}
+
+func TestDSNConnString_PostgresRepeatedOption(t *testing.T) {
+	postgresTestEnv(t)
+	d, err := ParseDSN("psql://user:pass@localhost:5432/db?sslmode=disable&sslmode=require")
+	require.NoError(t, err)
+	assert.Equal(t, "host=localhost port=5432 dbname=db sslmode=disable sslmode=require user=user password=pass", d.ConnString())
+
+	config, err := pgx.ParseConfig(d.ConnString())
+	require.NoError(t, err)
+	assert.NotNil(t, config.TLSConfig, "the last sslmode wins")
+}
+
+func TestParseDSN_ErrorRedactsPassword(t *testing.T) {
+	for _, dsn := range []string{
+		"psql://user:s3cr/et@localhost:5432/db",
+		"psql://user:s3cr#et@localhost:5432/db",
+		"psql://user:s3cr%et@localhost:5432/db",
+		"clickhouse://user:s3cr?et@localhost:9000/db",
+	} {
+		_, err := ParseDSN(dsn)
+		require.Error(t, err, dsn)
+		assert.NotContains(t, err.Error(), "s3cr", dsn)
+		assert.Contains(t, err.Error(), "user:xxxxx@localhost", dsn)
+	}
 }

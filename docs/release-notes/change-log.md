@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Docker
 
 - Upgrade packages (including `apt`, now 2.8.4) when building the `substreams` Docker image to clear a Docker Scout HIGH CVE inherited from the Ubuntu 24.04 base image.
+- Bump `github.com/andybalholm/brotli` to 1.2.7 and `github.com/klauspost/compress` to 1.20.2 to clear a Docker Scout
+  CRITICAL and a HIGH CVE.
 
 ### Server
 
@@ -23,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - `substreams auth` now writes the selected API key to `.substreams.env` as `SUBSTREAMS_API_KEY` instead of exchanging it for a JWT, which expired and was never refreshed. `substreams auth --paste` now only accepts an API key (a JWT is rejected; export `SUBSTREAMS_API_TOKEN` yourself for advanced use).
 - Add an [Authentication Reference](../references/authentication.md) (API key vs short-lived JWT) and a guide to [migrate from `SUBSTREAMS_API_TOKEN` to `SUBSTREAMS_API_KEY`](../references/migrating-to-api-key.md).
+- `substreams registry publish` no longer logs the registry API key at debug level.
 - Remove the unused Substreams-powered subgraph code generator (it was no longer registered under `substreams codegen`). The `SUBSTREAMS_AUTH_ISSUE_URL` environment variable is no longer used.
 
 ### Sink
@@ -32,6 +35,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `timezone=Europe/London` were wrong, and a password with a space made the DSN fail to parse.
 - SQL sink (from-proto, ClickHouse): fix a DSN with `secure=true` never connecting. The dial retried
   forever, because ch-go only accepts a `*net.Dialer` once TLS is on and the byte counter was passed as the dialer.
+- SQL sink: a DSN that fails to parse no longer prints the password in the error. The error now says to percent-encode
+  reserved characters in the user name and password.
+- SQL sink: add `--password-envvar` to `substreams sink postgres` and `substreams sink clickhouse`. When the DSN has no
+  password, the sink reads it from that environment variable (`POSTGRES_PASSWORD` and `CLICKHOUSE_PASSWORD` by default)
+  and percent-encodes it into the DSN, so it can contain any character.
+- SQL sink (ClickHouse, DatabaseChanges): a password percent-encoded in the DSN now reaches the database intact. A
+  password with `/`, `?`, `#` or `%` broke the connection string.
+- Sinks: the `sinker from CLI` log line lists only the names of the `-H` headers, not their values, which can carry
+  credentials.
+- Webhook sink: mask the password of the webhook and undo URLs in logs, errors and the termination log. A URL that
+  does not parse is no longer quoted in the error.
 - SQL sink (DatabaseChanges): stop formatting each block's whole output as text to check that it isn't empty, which took
   over a third of the sink's CPU on a busy module.
 - SQL sink (DatabaseChanges, PostgreSQL): send a flush's statements through a pipeline instead of one round trip each, in

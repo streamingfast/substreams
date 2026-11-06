@@ -122,6 +122,13 @@ func mmapInitialSizeForLimit(totalSizeLimit uint64) int {
 	const floor = defaultInitialMmapSize
 	const maxReservation = 8 << 30 // 8 GiB
 
+	// Clamp before the ~1.5x multiply below: a totalSizeLimit close to the uint64 max
+	// (e.g. an unvalidated StoreSizeLimit from a request) would otherwise overflow
+	// want and wrap around to an arbitrary, possibly tiny, reservation.
+	if totalSizeLimit > maxReservation {
+		return maxReservation
+	}
+
 	want := totalSizeLimit + totalSizeLimit/2 // ~1.5x
 	if want < floor {
 		want = floor
@@ -173,6 +180,37 @@ func (c *Config) ModuleInitialBlock() uint64 {
 
 func (c *Config) NewFullKV(logger *zap.Logger) *FullKV {
 	return &FullKV{baseStore: c.newBaseStore(logger), loadedFrom: "N/A"}
+}
+
+// squasherMaxInFlightSnapshots is the memory backend's MaxInFlightSnapshots for a
+// squasher-created store: generous enough that it never binds tighter than the
+// squasher's own upload concurrency bound (see orchestrator/stage's squasherUploadConcurrency).
+const squasherMaxInFlightSnapshots = 8
+
+// NewSquasherFullKV is NewFullKV for a store the local squasher merges into and saves from
+// concurrently: a segment's merge may start while the previous segment's save is still
+// uploading. It opts the backend into whatever concurrent-write-safe snapshot mode it has
+// (a single long-lived bbolt read transaction for mmap, a higher in-flight bound for
+// memory) instead of the default exclusive write-gate. Safe to use for any store, since a
+// caller that never saves while mutating sees identical behavior either way — but only the
+// squasher actually needs it, so only it asks for it.
+func (c *Config) NewSquasherFullKV(logger *zap.Logger) *FullKV {
+	return &FullKV{baseStore: c.newBaseStoreWithBackend(logger, c.squasherBackendConfig()), loadedFrom: "N/A"}
+}
+
+// squasherBackendConfig mirrors newBaseStore's backend selection, additionally marking the
+// result for NewSquasherFullKV's concurrent merge-while-save use.
+func (c *Config) squasherBackendConfig() KVImplBackendConfig {
+	backend := c.backend
+	if backend == "" {
+		backend = string(getKVImplTypeFromEnv())
+	}
+	if backend == "memory" {
+		return &MemoryBackendConfig{MaxInFlightSnapshots: squasherMaxInFlightSnapshots}
+	}
+	mmapCfg := c.mmapBackendConfig()
+	mmapCfg.LongLivedSnapshot = true
+	return mmapCfg
 }
 
 func (c *Config) ExistsFullKV(ctx context.Context, upTo uint64) (bool, error) {

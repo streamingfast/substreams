@@ -114,17 +114,23 @@ func TestPostgresConnConfig_Service(t *testing.T) {
 }
 
 // A service with a root certificate and no sslmode verifies the server, as sslmode=require does.
-func TestPostgresConnConfig_ServiceRootCert(t *testing.T) {
-	postgresTestEnv(t)
+// writeTestRootCert writes a self-signed CA certificate in dir and returns its path.
+func writeTestRootCert(t *testing.T, dir string) string {
+	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	template := &x509.Certificate{SerialNumber: big.NewInt(1), IsCA: true, BasicConstraintsValid: true}
 	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
 	require.NoError(t, err)
+	path := filepath.Join(dir, "root.crt")
+	require.NoError(t, os.WriteFile(path, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600))
+	return path
+}
 
+func TestPostgresConnConfig_ServiceRootCert(t *testing.T) {
+	postgresTestEnv(t)
 	dir := t.TempDir()
-	rootCert := filepath.Join(dir, "root.crt")
-	require.NoError(t, os.WriteFile(rootCert, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600))
+	rootCert := writeTestRootCert(t, dir)
 	file := filepath.Join(dir, "services.conf")
 	require.NoError(t, os.WriteFile(file, []byte("[verified]\nsslrootcert="+rootCert+"\n"), 0o600))
 	t.Setenv("PGSERVICEFILE", file)

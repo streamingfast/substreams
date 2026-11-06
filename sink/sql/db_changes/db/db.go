@@ -61,6 +61,9 @@ type Loader struct {
 
 	batchOrdinal uint64 // Counter for ordinals within the current batch, resets on flush
 
+	// detached holds the changes of a background flush, apart from those being added.
+	detached *OrderedMap[string, *OrderedMap[string, *Operation]]
+
 	// expectedCursor is the stored cursor of this sink's module as this loader last read or wrote
 	// it, nil until SetExpectedCursor. Flushes and reverts first check the stored cursor still has this
 	// value (see checkCursor).

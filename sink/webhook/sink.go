@@ -381,7 +381,7 @@ func (s *Sink) deliveryFailed(pending *pendingDelivery, err error) error {
 
 	var deliveryErr *DeliveryError
 	if !errors.As(err, &deliveryErr) {
-		deliveryErr = &DeliveryError{URL: s.urlFor(pending), BlockNumber: pending.BlockNumber, Attempts: 1, Err: err}
+		deliveryErr = &DeliveryError{URL: RedactURL(s.urlFor(pending)), BlockNumber: pending.BlockNumber, Attempts: 1, Err: err}
 	}
 	kind := pending.Kind
 	if kind == "" {

@@ -11,6 +11,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Docker
+
+- Upgrade packages (including `apt`, now 2.8.4) when building the `substreams` Docker image to clear a Docker Scout HIGH CVE inherited from the Ubuntu 24.04 base image.
+- Bump `github.com/andybalholm/brotli` to 1.2.7 and `github.com/klauspost/compress` to 1.20.2 to clear a Docker Scout
+  CRITICAL and a HIGH CVE.
+
 ### Server
 
 - Log `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` on the `incoming Substreams Blocks request` and `incoming Substreams Estimate request` log lines when the auth plugin provides them (`x-auth-method`, `x-auth-jwt-lifetime-bucket`, `x-auth-jwt-iat`, `x-auth-jwt-exp`). Nothing changes without the plugin.
@@ -19,12 +25,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - `substreams auth` now writes the selected API key to `.substreams.env` as `SUBSTREAMS_API_KEY` instead of exchanging it for a JWT, which expired and was never refreshed. `substreams auth --paste` now only accepts an API key (a JWT is rejected; export `SUBSTREAMS_API_TOKEN` yourself for advanced use).
 - Add an [Authentication Reference](../references/authentication.md) (API key vs short-lived JWT) and a guide to [migrate from `SUBSTREAMS_API_TOKEN` to `SUBSTREAMS_API_KEY`](../references/migrating-to-api-key.md).
+- `substreams registry publish` no longer logs the registry API key at debug level.
 - Remove the unused Substreams-powered subgraph code generator (it was no longer registered under `substreams codegen`). The `SUBSTREAMS_AUTH_ISSUE_URL` environment variable is no longer used.
 
 ### Sink
 
+- SQL sink (PostgreSQL): DSN values with characters like `/` or a space now reach the database as given. They were URL
+  encoded into a connection string that doesn't decode them, so `sslrootcert=/etc/ssl/ca.pem` or
+  `timezone=Europe/London` were wrong, and a password with a space made the DSN fail to parse.
+- SQL sink: a DSN that fails to parse no longer prints the password in the error. The error now says to percent-encode
+  reserved characters in the user name and password.
+- SQL sink: add `--password-envvar` to `substreams sink postgres` and `substreams sink clickhouse`. When the DSN has no
+  password, the sink reads it from that environment variable (`POSTGRES_PASSWORD` and `CLICKHOUSE_PASSWORD` by default)
+  and percent-encodes it into the DSN, so it can contain any character.
+- SQL sink (ClickHouse, DatabaseChanges): a password percent-encoded in the DSN now reaches the database intact. A
+  password with `/`, `?`, `#` or `%` broke the connection string.
+- Sinks: the `sinker from CLI` log line lists only the names of the `-H` headers, not their values, which can carry
+  credentials.
+- Webhook sink: mask the password of the webhook and undo URLs in logs, errors and the termination log. A URL that
+  does not parse is no longer quoted in the error.
 - SQL sink (DatabaseChanges): stop formatting each block's whole output as text to check that it isn't empty, which took
   over a third of the sink's CPU on a busy module.
+- SQL sink (DatabaseChanges, PostgreSQL): send a flush's statements through a pipeline instead of one round trip each, in
+  the same order and transaction, so a flush waits far less on the network. Each is still a statement of its own for the
+  server. With about 1 ms of latency to the database, `BenchmarkPostgresFlush` goes from 707 to 54,440 rows/s on inserts.
+  This times the flush only, so a full run gains less. `tx_query_execution_duration` reports one `batch` type instead of
+  `normal` and `undo`.
+- SQL sink (PostgreSQL): connect through pgx rather than lib/pq, which the proto sink already used for binary COPY.
+  Connections behave as before: TLS stays required unless configured otherwise, and sessions use the same date style,
+  encoding and string settings. lib/pq's DSN options still work, except an enabled `sslinline`,
+  `load_balance_hosts=random` and a list of `hostaddr` values, which are now refused at startup.
 - SQL sink (DatabaseChanges): fix changes to rows with a composite primary key being applied to the wrong row when a
   key value contains `/`. Within a batch, keys like (`a/b`, `c`) and (`a`, `b/c`) were taken for the same row, so the
   second change was merged into the first row's operation (or rejected as a duplicate insert) and never written to

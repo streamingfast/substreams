@@ -1,7 +1,10 @@
 package db
 
 import (
+	"net/url"
 	"testing"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,6 +54,20 @@ func TestParseDSN(t *testing.T) {
 			expectSchema:     "testdb",
 			expectPassword:   "password",
 		},
+		{
+			name:             "postgres password with reserved characters",
+			dns:              "psql://postgres:p%40:%2F%3F%23%25%20'%5C@localhost/db",
+			expectConnString: `host=localhost port=5432 dbname=db user=postgres password='p@:/?#% \'\\'`,
+			expectSchema:     "public",
+			expectPassword:   `p@:/?#% '\`,
+		},
+		{
+			name:             "clickhouse password with reserved characters",
+			dns:              "clickhouse://default:p%40:%2F%3F%23%25@host:9000/default",
+			expectConnString: "clickhouse://default:p%40%3A%2F%3F%23%25@host:9000/default",
+			expectSchema:     "default",
+			expectPassword:   "p@:/?#%",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -66,4 +83,44 @@ func TestParseDSN(t *testing.T) {
 		})
 	}
 
+}
+
+// Values reach PostgreSQL as given in the DSN, whatever characters they hold.
+func TestDSNConnString_PostgresValues(t *testing.T) {
+	rootCert := writeTestRootCert(t, t.TempDir())
+	d, err := ParseDSN(`psql://user:p%40ss%20w'rd@localhost:5432/my%20db?sslmode=verify-ca&sslrootcert=` + url.QueryEscape(rootCert) + `&timezone=Europe/London&options=-c%20search_path%3Dx`)
+	require.NoError(t, err)
+	config, err := pgx.ParseConfig(d.ConnString())
+	require.NoError(t, err, "the root certificate's path is read as given")
+	assert.NotNil(t, config.TLSConfig.VerifyPeerCertificate)
+
+	assert.Equal(t, "p@ss w'rd", config.Password)
+	assert.Equal(t, "my db", config.Database)
+	assert.Equal(t, "Europe/London", config.RuntimeParams["timezone"])
+	assert.Equal(t, "-c search_path=x", config.RuntimeParams["options"])
+}
+
+func TestDSNConnString_PostgresRepeatedOption(t *testing.T) {
+	postgresTestEnv(t)
+	d, err := ParseDSN("psql://user:pass@localhost:5432/db?sslmode=disable&sslmode=require")
+	require.NoError(t, err)
+	assert.Equal(t, "host=localhost port=5432 dbname=db sslmode=disable sslmode=require user=user password=pass", d.ConnString())
+
+	config, err := pgx.ParseConfig(d.ConnString())
+	require.NoError(t, err)
+	assert.NotNil(t, config.TLSConfig, "the last sslmode wins")
+}
+
+func TestParseDSN_ErrorRedactsPassword(t *testing.T) {
+	for _, dsn := range []string{
+		"psql://user:s3cr/et@localhost:5432/db",
+		"psql://user:s3cr#et@localhost:5432/db",
+		"psql://user:s3cr%et@localhost:5432/db",
+		"clickhouse://user:s3cr?et@localhost:9000/db",
+	} {
+		_, err := ParseDSN(dsn)
+		require.Error(t, err, dsn)
+		assert.NotContains(t, err.Error(), "s3cr", dsn)
+		assert.Contains(t, err.Error(), "user:xxxxx@localhost", dsn)
+	}
 }

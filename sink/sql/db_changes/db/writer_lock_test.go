@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgconn"
 	sink "github.com/streamingfast/substreams/sink"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -105,10 +105,10 @@ func TestIsCancellation(t *testing.T) {
 	assert.True(t, IsCancellation(context.Canceled))
 	assert.True(t, IsCancellation(fmt.Errorf("flush: %w", context.DeadlineExceeded)))
 	assert.True(t, IsCancellation(fmt.Errorf("commit: %w", sql.ErrTxDone)))
-	assert.True(t, IsCancellation(fmt.Errorf("dialect flush: %w", &pq.Error{Code: "57014", Message: "canceling statement due to user request"})))
+	assert.True(t, IsCancellation(fmt.Errorf("dialect flush: %w", &pgconn.PgError{Code: "57014", Message: "canceling statement due to user request"})))
 
 	assert.False(t, IsCancellation(fmt.Errorf("flush: %w", ErrCursorConflict)))
-	assert.False(t, IsCancellation(&pq.Error{Code: "23505", Message: "duplicate key value violates unique constraint"}))
+	assert.False(t, IsCancellation(&pgconn.PgError{Code: "23505", Message: "duplicate key value violates unique constraint"}))
 	assert.False(t, IsCancellation(io.EOF))
 }
 

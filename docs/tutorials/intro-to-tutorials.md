@@ -14,3 +14,5 @@ If your blockchain is not supported, please ask in Discord. Then, consult the re
 - [Tron](./tron.md)
 - [Injective](./cosmos-compatible/injective.md)
 - [Stellar](./stellar.md)
+- [World Chain](./world-chain.md)
+- [Elysium](./elysium.md)

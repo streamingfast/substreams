@@ -3,8 +3,10 @@ package db
 import (
 	"fmt"
 	"iter"
+	"maps"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -121,16 +123,32 @@ func (c *DSN) ConnString() string {
 
 		return baseURL
 	}
-	// PostgreSQL connection string uses space-separated options
-	options := c.Options.EncodeWithSeparator(" ")
-	out := fmt.Sprintf("host=%s port=%d dbname=%s %s", c.Host, c.Port, c.Database, options)
+	// PostgreSQL's keyword/value form: values are quoted where needed, not URL encoded, which it
+	// would not decode.
+	database, err := url.PathUnescape(c.Database)
+	if err != nil {
+		database = c.Database
+	}
+	parts := []string{"host=" + keywordValue(c.Host), fmt.Sprintf("port=%d", c.Port), "dbname=" + keywordValue(database)}
+	for _, key := range slices.Sorted(maps.Keys(c.Options)) {
+		parts = append(parts, key+"="+keywordValue(c.Options.Get(key)))
+	}
 	if c.Username != "" {
-		out = out + " user=" + c.Username
+		parts = append(parts, "user="+keywordValue(c.Username))
 	}
 	if c.Password != "" {
-		out = out + " password=" + c.Password
+		parts = append(parts, "password="+keywordValue(c.Password))
 	}
-	return out
+	return strings.Join(parts, " ")
+}
+
+// keywordValue writes value for a keyword/value connection string, quoted when it is empty or
+// holds a space, a quote or a backslash.
+func keywordValue(value string) string {
+	if value != "" && !strings.ContainsAny(value, " \t\n\r'\\") {
+		return value
+	}
+	return "'" + strings.NewReplacer(`\`, `\\`, `'`, `\'`).Replace(value) + "'"
 }
 
 func (c *DSN) Schema() string {

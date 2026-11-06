@@ -1,7 +1,10 @@
 package db
 
 import (
+	"net/url"
 	"testing"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,4 +69,19 @@ func TestParseDSN(t *testing.T) {
 		})
 	}
 
+}
+
+// Values reach PostgreSQL as given in the DSN, whatever characters they hold.
+func TestDSNConnString_PostgresValues(t *testing.T) {
+	rootCert := writeTestRootCert(t, t.TempDir())
+	d, err := ParseDSN(`psql://user:p%40ss%20w'rd@localhost:5432/my%20db?sslmode=verify-ca&sslrootcert=` + url.QueryEscape(rootCert) + `&timezone=Europe/London&options=-c%20search_path%3Dx`)
+	require.NoError(t, err)
+	config, err := pgx.ParseConfig(d.ConnString())
+	require.NoError(t, err, "the root certificate's path is read as given")
+	assert.NotNil(t, config.TLSConfig.VerifyPeerCertificate)
+
+	assert.Equal(t, "p@ss w'rd", config.Password)
+	assert.Equal(t, "my db", config.Database)
+	assert.Equal(t, "Europe/London", config.RuntimeParams["timezone"])
+	assert.Equal(t, "-c search_path=x", config.RuntimeParams["options"])
 }

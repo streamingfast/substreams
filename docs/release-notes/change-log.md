@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Docker
 
 - Upgrade packages (including `apt`, now 2.8.4) when building the `substreams` Docker image to clear a Docker Scout HIGH CVE inherited from the Ubuntu 24.04 base image.
+- Bump `github.com/andybalholm/brotli` to 1.2.7 and `github.com/klauspost/compress` to 1.20.2 to clear a Docker Scout
+  CRITICAL and a HIGH CVE.
 
 ### Server
 

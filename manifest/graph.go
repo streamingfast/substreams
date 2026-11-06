@@ -1,8 +1,10 @@
 package manifest
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -17,7 +19,7 @@ type ModuleGraph struct {
 	*graph.Mutable
 
 	currentHashesCache map[string][]byte // moduleName -> moduleHash
-	
+
 	modules         []*pbsubstreams.Module
 	moduleIndex     map[string]int
 	indexIndex      map[int]*pbsubstreams.Module
@@ -296,8 +298,8 @@ func (g *ModuleGraph) ParentsOf(moduleName string) ([]*pbsubstreams.Module, erro
 		}
 	}
 
-	sort.Slice(res, func(i, j int) bool {
-		return g.inputOrderIndex[moduleName][res[i].Name] < g.inputOrderIndex[moduleName][res[j].Name]
+	slices.SortFunc(res, func(a, b *pbsubstreams.Module) int {
+		return cmp.Compare(g.inputOrderIndex[moduleName][a.Name], g.inputOrderIndex[moduleName][b.Name])
 	})
 
 	return res, nil
@@ -344,8 +346,8 @@ func (g *ModuleGraph) ChildrenOf(moduleName string) ([]*pbsubstreams.Module, err
 		topologicalIndex[node.Name] = i
 	}
 
-	sort.Slice(res, func(i, j int) bool {
-		return topologicalIndex[res[i].Name] > topologicalIndex[res[j].Name]
+	slices.SortFunc(res, func(a, b *pbsubstreams.Module) int {
+		return cmp.Compare(topologicalIndex[b.Name], topologicalIndex[a.Name])
 	})
 
 	return res, nil
@@ -400,8 +402,8 @@ func (g *ModuleGraph) StoresDownTo(moduleName string) ([]*pbsubstreams.Module, e
 		}
 	}
 
-	sort.Slice(res, func(i, j int) bool {
-		return topologicalIndex[res[i].Name] > topologicalIndex[res[j].Name]
+	slices.SortFunc(res, func(a, b *pbsubstreams.Module) int {
+		return cmp.Compare(topologicalIndex[b.Name], topologicalIndex[a.Name])
 	})
 
 	return res, nil
@@ -432,10 +434,8 @@ func (g *ModuleGraph) GroupedAncestorStores(moduleName string) ([][]*pbsubstream
 		result = append(result, stores)
 	}
 
-	sort.Slice(result, func(i, j int) bool {
-		di := distanceIndex[result[i][0]]
-		dj := distanceIndex[result[i][0]]
-		return di > dj
+	slices.SortFunc(result, func(a, b []*pbsubstreams.Module) int {
+		return cmp.Compare(distanceIndex[b[0]], distanceIndex[a[0]])
 	})
 
 	return result, nil
@@ -477,8 +477,8 @@ func (g *ModuleGraph) ModulesDownTo(moduleName string) ([]*pbsubstreams.Module, 
 		}
 	}
 
-	sort.Slice(res, func(i, j int) bool {
-		return topologicalIndex[res[i].Name] > topologicalIndex[res[j].Name]
+	slices.SortFunc(res, func(a, b *pbsubstreams.Module) int {
+		return cmp.Compare(topologicalIndex[b.Name], topologicalIndex[a.Name])
 	})
 
 	return res, nil
@@ -638,8 +638,8 @@ func (m ModuleMarshaler) MarshalJSON() ([]byte, error) {
 func SortModuleNamesByGraphTopology(mods []string, g *ModuleGraph) []string {
 	g.TopologicalSort()
 
-	sort.Slice(mods, func(i, j int) bool {
-		return g.moduleIndex[mods[i]] < g.moduleIndex[mods[j]]
+	slices.SortFunc(mods, func(a, b string) int {
+		return cmp.Compare(g.moduleIndex[a], g.moduleIndex[b])
 	})
 
 	return mods

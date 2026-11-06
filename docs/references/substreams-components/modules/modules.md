@@ -10,12 +10,10 @@ In simple terms, a Substreams module is a Rust function that receives an input a
 
 ```rust
 fn get_my_block(blk: Block) -> Result<MyBlock, substreams::errors::Error> {
-    let header = blk.header.as_ref().unwrap();
-
     Ok(MyBlock {
         number: blk.number,
         hash: Hex::encode(&blk.hash),
-        parent_hash: Hex::encode(&header.parent_hash),
+        parent_hash: Hex::encode(&blk.header.parent_hash),
     })
 }
 ```

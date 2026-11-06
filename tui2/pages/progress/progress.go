@@ -1,8 +1,9 @@
 package progress
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -76,15 +77,18 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case *pbsubstreamsrpc.ModulesProgress:
 		newBars := make([]*ranges.Bar, len(msg.Stages))
 
-		sort.Slice(msg.RunningJobs, func(i, j int) bool {
-			if msg.RunningJobs[i].DurationMs == 0 {
-				return false
+		slices.SortFunc(msg.RunningJobs, func(a, b *pbsubstreamsrpc.Job) int {
+			if a.DurationMs == 0 {
+				if b.DurationMs == 0 {
+					return 0
+				}
+				return 1
 			}
-			if msg.RunningJobs[j].DurationMs == 0 {
-				return true
+			if b.DurationMs == 0 {
+				return -1
 			}
 
-			return msg.RunningJobs[i].ProgressBlocks*100000/msg.RunningJobs[i].DurationMs < msg.RunningJobs[j].ProgressBlocks*100000/msg.RunningJobs[j].DurationMs
+			return cmp.Compare(a.ProgressBlocks*100000/a.DurationMs, b.ProgressBlocks*100000/b.DurationMs)
 		})
 		var newSlowestJobs []string
 
@@ -102,8 +106,11 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		var newSlowestModules []string
-		sort.Slice(msg.ModulesStats, func(i, j int) bool {
-			return msg.ModulesStats[i].TotalProcessingTimeMs/(msg.ModulesStats[i].TotalProcessedBlockCount+1) > msg.ModulesStats[j].TotalProcessingTimeMs/(msg.ModulesStats[j].TotalProcessedBlockCount+1)
+		slices.SortFunc(msg.ModulesStats, func(a, b *pbsubstreamsrpc.ModuleStats) int {
+			return cmp.Compare(
+				b.TotalProcessingTimeMs/(b.TotalProcessedBlockCount+1),
+				a.TotalProcessingTimeMs/(a.TotalProcessedBlockCount+1),
+			)
 		})
 		var moduleNameLen int
 		for _, mod := range msg.ModulesStats {
@@ -162,7 +169,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			br = append(br, incompleteRanges[i]...)
 
-			sort.Slice(br, func(i, j int) bool { return br[i].Start < br[j].Start })
+			slices.SortFunc(br, func(a, b *ranges.BlockRange) int { return cmp.Compare(a.Start, b.Start) })
 			newBar := p.bars.NewBar(displayedName, br, displayedModules)
 			newBars[i] = newBar
 		}

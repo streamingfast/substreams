@@ -26,6 +26,23 @@ pub extern "C" fn map_decode_proto_only(blk_ptr: *mut u8, blk_len: usize) {
     let _blk: Block = substreams::proto::decode_ptr(blk_ptr, blk_len).unwrap();
 }
 
+/// Decodes the block and counts receipt-level logs across all successful transactions,
+/// with no hardcoded contract/topic filtering (unlike `map_block` below). Used as a
+/// clean, unbiased decode+iterate baseline.
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub extern "C" fn map_count_logs(blk_ptr: *mut u8, blk_len: usize) {
+    let blk: Block = substreams::proto::decode_ptr(blk_ptr, blk_len).unwrap();
+    let count: u64 = blk
+        .transaction_traces
+        .iter()
+        .filter(|trx| trx.status == TransactionTraceStatus::Succeeded as i32)
+        .filter_map(|trx| trx.receipt.as_ref())
+        .map(|receipt| receipt.logs.len() as u64)
+        .sum();
+    substreams::output_raw(count.to_le_bytes().to_vec());
+}
+
 #[substreams::handlers::map]
 fn map_block(blk: Block) -> Result<DatabaseChanges, Error> {
     let mut changes = DatabaseChanges {
@@ -33,7 +50,12 @@ fn map_block(blk: Block) -> Result<DatabaseChanges, Error> {
     };
 
     let block_number_str = blk.header.as_ref().unwrap().number.to_string();
-    let block_timestamp_str = blk.timestamp_seconds();
+    let block_timestamp_str = blk
+        .header
+        .as_ref()
+        .and_then(|header| header.timestamp.as_ref())
+        .map(|ts| ts.seconds.to_string())
+        .unwrap_or_default();
 
     for trx in blk.transaction_traces {
         if trx.status != TransactionTraceStatus::Succeeded as i32 {

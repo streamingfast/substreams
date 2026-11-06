@@ -38,8 +38,18 @@ func TestNewService(runtimeConfig config.RuntimeConfig, linearHandoffBlockNum ui
 	}
 }
 
+// TestWaitCacheMarkers waits for the cache marker writes of every request served so far, which
+// outlive the request on purpose.
+func (s *Tier1Service) TestWaitCacheMarkers() {
+	s.cacheMarkerWrites.Wait()
+}
+
+func (s *Tier1Service) TestAllowPrunedChain() {
+	s.tier2RequestParameters.AllowPrunedChain = true
+}
+
 func (s *Tier1Service) TestBlocks(ctx context.Context, isSubRequest bool, request *pbsubstreamsrpc.Request, respFunc substreams.ResponseFunc) error {
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock, s.tier2RequestParameters.AllowPrunedChain)
 	if err != nil {
 		return stream.NewErrInvalidArg("%s", err.Error())
 	}

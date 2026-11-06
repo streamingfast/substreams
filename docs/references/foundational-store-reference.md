@@ -123,6 +123,9 @@ message SinkEntries {
 ### API Operations
 
 The Foundational Store provides gRPC APIs for data retrieval with block-aware querying.
+Remote-feed ingest additionally exposes `Feed.Set` to write entries and `Feed.Delete` to
+hard-delete keys (missing keys are ignored). See the
+[Remote Feed Hosted Store Guide](../how-to-guides/hosted-services/hosted-store-remote-feed.md).
 
 See [Consuming a Foundational Store](../tutorials/consuming-foundational-store.md) for detailed API usage, response handling, and code examples.
 
@@ -174,6 +177,9 @@ Comprehensive API documentation is available in the proto files:
 
 ## Related Resources
 
+- [Hosted Services](../how-to-guides/hosted-services/hosted-services.md) - Managed sinks and stores StreamingFast runs for you
+- [Remote Feed Hosted Store Guide](../how-to-guides/hosted-services/hosted-store-remote-feed.md) - Write to and read from a StreamingFast-managed hosted store over gRPC, without running your own server
+- [Substreams Feed Hosted Store Guide](../how-to-guides/hosted-services/hosted-store-substreams-feed.md) - Have a Substreams package populate a StreamingFast-managed hosted store from the chain
 - [Hosting a Foundational Store](foundational-stores/hosting-foundational-stores.md) - Complete guide for setting up and running a Foundational Store server
 - [Consuming a Foundational Store](../tutorials/consuming-foundational-store.md) - Guide for querying Foundational Stores in Substreams modules
 - [Foundational Store Examples](../how-to-guides/composing-substreams/foundational-stores/foundational-stores.md) - Chain-specific foundational store implementations

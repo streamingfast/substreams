@@ -1,13 +1,15 @@
 package execout
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"iter"
 	"path"
-	"sort"
+	"slices"
+	"strconv"
 
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
@@ -54,6 +56,7 @@ func OpenFileReader(ctx context.Context, store dstore.Store, logger *zap.Logger,
 type FileWriter interface {
 	SetItem(clock *pbsubstreams.Clock, data []byte) error
 	Close() error
+	Wait()
 	ModuleName() string
 	Filename() string
 	Range() *block.Range
@@ -66,6 +69,8 @@ type fileWriter struct {
 	orderedFlagWritten bool
 	writeError         chan error
 	done               chan struct{}
+	payloadBytes       uint64 // uncompressed size of the payloads written so far
+	itemCount          uint64 // number of items written so far
 }
 
 func (fw *fileWriter) Range() *block.Range {
@@ -86,7 +91,7 @@ func NewFileWriter(ctx context.Context, store dstore.Store, logger *zap.Logger, 
 	}
 
 	filename := fw.Filename()
-	fw.logger.Info("begin writing execution output file", zap.String("filename", filename))
+	fw.logger.Debug("begin writing execution output file", zap.String("filename", filename))
 	r, w := io.Pipe()
 	fw.writer = w
 	fw.writeError = make(chan error, 1)
@@ -157,6 +162,8 @@ func (fw *fileWriter) SetItem(clock *pbsubstreams.Clock, data []byte) error {
 	}
 
 	fw.lastWrittenItem = item
+	fw.payloadBytes += uint64(len(cp))
+	fw.itemCount++
 	return nil
 }
 
@@ -272,8 +279,8 @@ func rewriteAsOrdered(ctx context.Context, r io.ReadCloser, readBytes []byte, st
 	}
 	items := o.Items
 
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].BlockNum < items[j].BlockNum
+	slices.SortFunc(items, func(a, b *pboutput.Item) int {
+		return cmp.Compare(a.BlockNum, b.BlockNum)
 	})
 
 	store.SetOverwrite(true)
@@ -300,7 +307,45 @@ func (fw *fileWriter) Close() error {
 		return fmt.Errorf("closing file %s: %w", fw.Filename(), err)
 	}
 	close(fw.done)
-	return <-fw.writeError // error at the other end of the pipe
+	if err := <-fw.writeError; err != nil { // error at the other end of the pipe
+		return err
+	}
+	fw.setDataSizeMetadata()
+	return nil
+}
+
+// Wait blocks until the write to the store has ended: after Close, or once the context the
+// file was created with is cancelled.
+func (fw *fileWriter) Wait() {
+	<-fw.writeError
+}
+
+// setDataSizeMetadata records the uncompressed payload size of the file, and how many items
+// it holds, as object metadata, so that a reader interested only in what a segment represents
+// (the cost estimator) can get both without downloading and decompressing the file. The item
+// count is what a consumer receives as messages, which on a module gated by a block index is
+// far below the number of blocks the segment covers.
+//
+// Best-effort and detached: the segment is already written and valid without it, not every
+// dstore backend supports metadata at all, and on the backends where setting it means
+// rewriting the object it is skipped entirely (see metadataRewriteSchemes). A reader that
+// finds no metadata falls back to reading the file.
+func (fw *fileWriter) setDataSizeMetadata() {
+	objStore, filename, size, items, logger := fw.store, fw.Filename(), fw.payloadBytes, fw.itemCount, fw.logger
+	if baseURL := objStore.BaseURL(); baseURL != nil && metadataRewriteSchemes[baseURL.Scheme] {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), setMetadataTimeout)
+		defer cancel()
+		metadata := map[string]string{
+			MetadataDataSize:  strconv.FormatUint(size, 10),
+			MetadataItemCount: strconv.FormatUint(items, 10),
+		}
+		if err := objStore.SetMetadata(ctx, filename, metadata); err != nil {
+			logger.Debug("cannot set datasize metadata on execution output file", zap.String("filename", filename), zap.Error(err))
+		}
+	}()
 }
 
 func (c *File) String() string {

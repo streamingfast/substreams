@@ -50,6 +50,19 @@ func (s *Stores) SetStoreMap(storeMap store.Map) {
 	s.StoreMap = storeMap
 }
 
+func (s *Stores) Close() {
+	if s.StoreMap == nil {
+		return
+	}
+	for _, st := range s.StoreMap.All() {
+		if closer, ok := st.(interface{ Close() error }); ok {
+			if err := closer.Close(); err != nil {
+				s.logger.Warn("failed to close store", zap.String("store", st.Name()), zap.Error(err))
+			}
+		}
+	}
+}
+
 func (s *Stores) resetStores() {
 	for _, s := range s.StoreMap.All() {
 		if resetableStore, ok := s.(store.Resettable); ok {
@@ -76,7 +89,7 @@ func (s *Stores) flushStores(ctx context.Context, executionStages exec.Execution
 func (s *Stores) saveStoresSnapshots(ctx context.Context, stage int, boundaryBlock uint64) (err error) {
 	for mod := range s.storesToWrite {
 		store := s.StoreMap[mod]
-		s.logger.Info("flushing store at boundary", zap.Uint64("boundary", boundaryBlock), zap.String("store", mod), zap.Int("stage", stage))
+		s.logger.Debug("flushing store at boundary", zap.Uint64("boundary", boundaryBlock), zap.String("store", mod), zap.Int("stage", stage))
 		// TODO when partials are generic again, we can also check if PartialKV exists and skip if it does.
 		existsFullKv, _ := s.configs[mod].ExistsFullKV(ctx, boundaryBlock)
 		if existsFullKv {

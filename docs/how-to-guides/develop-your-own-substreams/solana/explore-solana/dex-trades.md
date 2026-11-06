@@ -79,41 +79,33 @@ substreams gui -e mainnet.sol.streamingfast.io:443 \
 fn process_block(block: Block) -> Result<Output, substreams::errors::Error> {
     let slot = block.slot;
     let parent_slot = block.parent_slot;
-    let timestamp = block.block_time.as_ref();
     let mut data: Vec<TradeData> = vec![]; // 1.
-    if timestamp.is_some() {
-        let timestamp = timestamp.unwrap().timestamp;
-        for trx in block.transactions_owned() { // 2.
-            let accounts = trx.resolved_accounts_as_strings(); // 3.
-            if let Some(transaction) = trx.transaction {
-                let meta = trx.meta.unwrap();
-                let pre_balances = meta.pre_balances;
-                let post_balances = meta.post_balances;
-                let pre_token_balances = meta.pre_token_balances;
-                let post_token_balances = meta.post_token_balances;
+    let timestamp = block.block_time.timestamp;
+    for trx in block.transactions_owned() { // 2.
+        let accounts = trx.resolved_accounts_as_strings(); // 3.
+        let meta = trx.meta;
+        let pre_token_balances = meta.pre_token_balances;
+        let post_token_balances = meta.post_token_balances;
+        let msg = trx.transaction.message;
 
-                let msg = transaction.message.unwrap();
+        for (idx, inst) in msg.instructions.into_iter().enumerate() { // 4.
+            let inner_instructions: Vec<InnerInstructions> =
+                filter_inner_instructions(&meta.inner_instructions, idx as u32); // 5.
 
-                for (idx, inst) in msg.instructions.into_iter().enumerate() { // 4.
-                    let inner_instructions: Vec<InnerInstructions> =
-                        filter_inner_instructions(&meta.inner_instructions, idx as u32); // 5.
+            let program = &accounts[inst.program_id_index as usize]; // 6.
+            let trade_data = get_trade_instruction( // 7.
+                program,
+                inst.data,
+                &inst.accounts,
+                &accounts,
+                &pre_token_balances,
+                &post_token_balances,
+                &"".to_string(),
+                false,
+                &inner_instructions,
+            );
 
-                    let program = &accounts[inst.program_id_index as usize]; // 6.
-                    let trade_data = get_trade_instruction( // 7.
-                        program,
-                        inst.data,
-                        &inst.accounts,
-                        &accounts,
-                        &pre_token_balances,
-                        &post_token_balances,
-                        &"".to_string(),
-                        false,
-                        &inner_instructions,
-                    );
-
-                    // ...code omitted...
-                }
-            }
+            // ...code omitted...
         }
     }
 }

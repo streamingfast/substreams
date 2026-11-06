@@ -1,8 +1,12 @@
 package service
 
 import (
+	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/streamingfast/substreams/squash"
+	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/wasm"
 )
 
@@ -32,7 +36,9 @@ func WithBlockExecutionTimeout(timeout time.Duration) Option {
 	}
 }
 
-// Tier2 will completely bail out if a segment execution takes longer than the this.
+// Tier2 will completely bail out if a segment execution takes longer than the this. This is an
+// absolute backstop: a segment that keeps making progress is normally bounded by
+// [WithSegmentStallTimeout] instead, so this should stay generous.
 func WithSegmentExecutionTimeout(timeout time.Duration) Option {
 	return func(a anyTierService) {
 		switch s := a.(type) {
@@ -40,6 +46,21 @@ func WithSegmentExecutionTimeout(timeout time.Duration) Option {
 			// not used
 		case *Tier2Service:
 			s.segmentExecutionTimeout = timeout
+		}
+	}
+}
+
+// Tier2 will bail out if a segment stops processing blocks for longer than this. Unlike
+// [WithSegmentExecutionTimeout] the deadline resets on every block processed, so a slow but
+// advancing segment is left alone and only a wedged one is killed. Keep it well above
+// [WithBlockExecutionTimeout], which already bounds a single block.
+func WithSegmentStallTimeout(timeout time.Duration) Option {
+	return func(a anyTierService) {
+		switch s := a.(type) {
+		case *Tier1Service:
+			// not used
+		case *Tier2Service:
+			s.segmentStallTimeout = timeout
 		}
 	}
 }
@@ -84,13 +105,64 @@ func WithReadinessFunc(f func(bool)) Option {
 	}
 }
 
-func WithFoundationalStoreEndpoints(endpoints map[string]string) Option {
+func WithStoresScratchSpace(path string) Option {
 	return func(a anyTierService) {
 		switch s := a.(type) {
 		case *Tier1Service:
-			// not used
+			s.runtimeConfig.StoresScratchSpace = path
+			deleteLeftoverStoreFilesAtStartup(path)
 		case *Tier2Service:
-			s.foundationalEndpoints = endpoints
+			s.storesScratchSpace = path
+			deleteLeftoverStoreFilesAtStartup(path)
+		}
+	}
+}
+
+// deleteLeftoverStoreFilesAtStartup deletes mmap store (.db) files left in the
+// scratch dir by a previous run. Only safe at startup, before any request runs.
+func deleteLeftoverStoreFilesAtStartup(dir string) {
+	matches, _ := filepath.Glob(filepath.Join(dir, "substreams-store-*.db"))
+	for _, f := range matches {
+		os.Remove(f)
+	}
+}
+
+// WithStoreSizeLimit sets the per-store size limit on tier1's own (linear)
+// pipeline. Tier2 receives this limit per-request via ProcessRangeRequest.
+func WithStoreSizeLimit(limit uint64) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.runtimeConfig.StoreSizeLimit = limit
+		}
+	}
+}
+
+func WithSquasher(c squash.Client) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.squasher = c
+		}
+	}
+}
+
+// WithRemoteSquashQuietPeriod sets how long tier1 squashes locally after the
+// remote squasher stops answering, before one run tries it again. Zero keeps
+// DefaultRemoteSquashQuietPeriod. A negative duration is rejected at startup.
+func WithRemoteSquashQuietPeriod(d time.Duration) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.remoteSquashQuietPeriod = d
+		}
+	}
+}
+
+func WithStoresBackend(backend string) Option {
+	return func(a anyTierService) {
+		switch s := a.(type) {
+		case *Tier1Service:
+			s.runtimeConfig.StoresBackend = backend
+		case *Tier2Service:
+			s.storesBackend = backend
 		}
 	}
 }
@@ -102,6 +174,28 @@ func WithLiveBackFillerFinalBlockDelay(delay uint64) Option {
 	return func(a anyTierService) {
 		if s, ok := a.(*Tier1Service); ok {
 			s.liveBackFillerFinalBlockDelay = delay
+		}
+	}
+}
+
+// WithMaxRequestDuration gracefully ends a tier1 request once it has run for
+// the given duration, quick-saving its stores so the client resumes quickly
+// on reconnection. Zero disables the limit.
+func WithMaxRequestDuration(d time.Duration) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.maxRequestDuration = d
+		}
+	}
+}
+
+// WithExecOutPrefetch bounds how far ahead a production-mode request downloads
+// cached execution output files while streaming them to the client. A zero
+// depth or budget turns prefetching off.
+func WithExecOutPrefetch(cfg execout.PrefetchConfig) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.execOutPrefetch = cfg
 		}
 	}
 }

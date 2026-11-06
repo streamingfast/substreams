@@ -432,7 +432,9 @@ func TestStore_Merge(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			for k, v := range test.prev.kv {
+			prevSnapshot, err := saveToMap(test.prev.kvImpl.Save())
+			require.NoError(t, err)
+			for k, v := range prevSnapshot {
 				if test.latest.valueType == manifest.OutputValueTypeBigDecimal {
 					var actual, expected float64
 					if test.prev.UpdatePolicy() == pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM {
@@ -464,7 +466,7 @@ func TestStore_Merge(t *testing.T) {
 
 					assert.InDelta(t, actual, expected, 0.01)
 				} else {
-					expected := string(test.prev.kv[k])
+					expected := string(prevSnapshot[k])
 					actual := string(v)
 					assert.Equal(t, expected, actual)
 				}
@@ -475,9 +477,50 @@ func TestStore_Merge(t *testing.T) {
 	}
 }
 
+func kvSizeBytes(kv KVImpl) (size uint64) {
+	_ = kv.Iter(func(key string, value []byte) error {
+		size += uint64(len(key) + len(value))
+		return nil
+	})
+	return size
+}
+
+func TestStore_Merge_TotalSizeBytes(t *testing.T) {
+	for _, policy := range []pbsubstreams.Module_KindStore_UpdatePolicy{
+		pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX,
+		pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN,
+	} {
+		t.Run(policy.String(), func(t *testing.T) {
+			prev := newStore(map[string][]byte{
+				"a": []byte("100.1"),
+			}, policy, manifest.OutputValueTypeBigDecimal)
+			prev.totalSizeBytes = kvSizeBytes(prev.kvImpl)
+
+			// first merge: "a" already exists, "b" is new
+			require.NoError(t, prev.Merge(newPartialStore(map[string][]byte{
+				"a": []byte("200.5"),
+				"b": []byte("50.2"),
+			}, policy, manifest.OutputValueTypeBigDecimal, nil)))
+			assert.Equal(t, kvSizeBytes(prev.kvImpl), prev.totalSizeBytes,
+				"totalSizeBytes must match actual content size after first merge")
+
+			// second merge: both keys already exist, values keep the same size
+			require.NoError(t, prev.Merge(newPartialStore(map[string][]byte{
+				"a": []byte("150.3"),
+				"b": []byte("70.4"),
+			}, policy, manifest.OutputValueTypeBigDecimal, nil)))
+			assert.Equal(t, kvSizeBytes(prev.kvImpl), prev.totalSizeBytes,
+				"totalSizeBytes must not grow when merged values do not change size")
+		})
+	}
+}
+
 func newPartialStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, deletedPrefixes []string) *PartialKV {
+	kvImpl := newMemoryKVImpl()
+	kvImpl.Load(mapToIter(kv))
+	
 	b := &baseStore{
-		kv: kv,
+		kvImpl: kvImpl,
 		Config: &Config{
 			updatePolicy: updatePolicy,
 			valueType:    valueType,
@@ -489,9 +532,12 @@ func newPartialStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_Kind
 }
 
 func newStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string) *FullKV {
+	kvImpl := newMemoryKVImpl()
+	kvImpl.Load(mapToIter(kv))
+	
 	b := &baseStore{
-		kv:    kv,
-		kvOps: &pbssinternal.Operations{},
+		kvImpl: kvImpl,
+		kvOps:  &pbssinternal.Operations{},
 		Config: &Config{
 			updatePolicy: updatePolicy,
 			valueType:    valueType,

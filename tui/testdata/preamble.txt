@@ -1,0 +1,4 @@
+Session  8bf2e35f5a387311a74c4d08f0678b52
+  Module  metadata_to_foundational_store · production · 2 stages
+  Chain   hoodi · head 3,412,884 · start 1,500,000 · 10 workers max
+  Work    2M prepare stores (1M cached)

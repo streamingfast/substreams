@@ -2,136 +2,180 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
+	"os/exec"
+	"regexp"
+	"runtime"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
+)
+
+const (
+	defaultPortalAPIURL = "https://admin.streamingfast.io"
+	localPortalAPIURL   = "http://localhost:9000"
+	defaultMarketURL    = "https://thegraph.market"
+	localMarketURL      = "http://localhost:3000"
+	deviceClientName    = "substreams CLI"
+	authEnvFilename     = ".substreams.env"
 )
 
 var authCmd = &cobra.Command{
-	Use:          "auth",
-	Short:        "Login command for Substreams development",
+	Use:   "auth",
+	Short: "Login for Substreams development",
+	Long: `Login to The Graph Market and retrieve an API key without copy/paste.
+
+The command opens a browser so you can pick an organization (if you have more
+than one) and an API key. The selected key is fetched over the API and written
+to .substreams.env as SUBSTREAMS_API_KEY.
+
+Use --paste to enter an API key yourself.`,
 	RunE:         runAuthE,
 	SilenceUsage: true,
 }
 
 func init() {
+	authCmd.Flags().Bool("paste", false, "Paste an API key instead of picking one in the browser")
 	rootCmd.AddCommand(authCmd)
 }
 
 func runAuthE(cmd *cobra.Command, args []string) error {
-	localDevelopment := os.Getenv("LOCAL_DEVELOPMENT")
+	if sflags.MustGetBool(cmd, "paste") {
+		apiKey, err := runPasteAuth()
+		if err != nil {
+			return err
+		}
+		return writeAuthCredentials(apiKey)
+	}
 
-	baseURL := "https://thegraph.market"
-	authBaseURL := "https://auth.thegraph.market"
+	key, err := runCliAPIKeyAuth(cmd.Context(), newPortalClient(portalAPIBaseURL()), os.Stdout, tryOpenURL)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return fmt.Errorf("login cancelled")
+		}
+		return err
+	}
 
-	if localDevelopment == "true" {
-		baseURL = "http://localhost:3000"
+	return writeAuthCredentials(key)
+}
+
+func runPasteAuth() (string, error) {
+	baseURL := defaultMarketURL
+	if os.Getenv("LOCAL_DEVELOPMENT") == "true" {
+		baseURL = localMarketURL
 	}
 
 	signupURL := baseURL + "/auth/signup"
 
 	fmt.Println("Authenticate with The Graph Market to access Substreams endpoints.")
 	fmt.Println()
-	fmt.Println("If you don't have an account yet, register and paste back your API key here:")
+	fmt.Println("If you don't have an account yet, register and create an API key here:")
 	fmt.Println("    " + cli.PurpleStyle.Render(signupURL))
 	fmt.Println()
-	fmt.Println("If you already have an account, follow this link to generate a JWT token:")
-	fmt.Println("    " + cli.PurpleStyle.Render(baseURL+"/auth/substreams-devenv"))
-	fmt.Println("")
 
-	var token string
+	var apiKey string
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
 				EchoMode(huh.EchoModePassword).
-				Title("Paste your JWT token or API key here:").
+				Title("Paste your API key here:").
 				Inline(true).
-				Value(&token).
-				Validate(func(s string) error {
-					if s == "" {
-						return errors.New("token cannot be empty")
-					}
-					return nil
-				}),
+				Value(&apiKey).
+				Validate(validateAPIKey),
 		),
 	)
 
 	if err := form.Run(); err != nil {
-		return fmt.Errorf("error running form: %w", err)
+		return "", fmt.Errorf("error running form: %w", err)
 	}
 
-	if strings.HasPrefix(token, "server_") {
-		fmt.Println("Detected API key, exchanging for JWT token...")
-		jwtToken, err := exchangeAPIKeyForJWT(token, authBaseURL)
-		if err != nil {
-			return fmt.Errorf("exchanging API key for JWT token: %w", err)
-		}
-		token = jwtToken
-		fmt.Println("Successfully obtained JWT token.")
-		fmt.Println()
-	}
+	return apiKey, nil
+}
 
+// validateAPIKey rejects empty input and JWTs, which are not API keys and would be
+// rejected by the server when sent as the `x-api-key` header.
+func validateAPIKey(value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return errors.New("API key cannot be empty")
+	}
+	if strings.HasPrefix(value, "eyJ") {
+		return errors.New("this looks like a JWT, not an API key; to use a JWT, export SUBSTREAMS_API_TOKEN yourself")
+	}
+	return nil
+}
+
+func writeAuthCredentials(apiKey string) error {
 	fmt.Println("Writing `./.substreams.env`.  NOTE: Add it to `.gitignore`.")
-	fmt.Println("")
+	fmt.Println()
 
-	err := os.WriteFile(".substreams.env", []byte(fmt.Sprintf("export SUBSTREAMS_API_TOKEN=%s\n", token)), 0644)
-	if err != nil {
+	if err := writeAuthEnvFile(authEnvFilename, apiKey); err != nil {
 		return fmt.Errorf("writing .substreams.env file: %w", err)
 	}
 
 	fmt.Println("Load credentials in current terminal with the following command:")
-	fmt.Println("")
+	fmt.Println()
 	fmt.Println(cli.PurpleStyle.Render("       . ./.substreams.env"))
 	fmt.Println()
 
 	return nil
 }
 
-func exchangeAPIKeyForJWT(apiKey string, authBaseURL string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	data := fmt.Sprintf(`{"api_key":"%s"}`, apiKey)
-	body := strings.NewReader(data)
-
-	request, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/v1/auth/issue", authBaseURL), body)
-	if err != nil {
-		return "", fmt.Errorf("creating HTTP request: %w", err)
+func writeAuthEnvFile(path string, apiKey string) error {
+	apiKey = strings.TrimSpace(apiKey)
+	if apiKey == "" {
+		return errors.New("no API key to write")
 	}
-	request.Header.Set("Content-Type", "application/json")
-
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return "", fmt.Errorf("HTTP POST request: %w", err)
+	content := fmt.Sprintf("export SUBSTREAMS_API_KEY=%s\n", apiKey)
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		return err
 	}
-	defer response.Body.Close()
-
-	fullBody, err := io.ReadAll(response.Body)
-	if err != nil {
-		return "", fmt.Errorf("reading response body: %w", err)
-	}
-
-	if response.StatusCode != 200 {
-		return "", fmt.Errorf("request failed with code %d: %s", response.StatusCode, fullBody)
-	}
-
-	var authResp authIssueResponse
-	if err := json.Unmarshal(fullBody, &authResp); err != nil {
-		return "", fmt.Errorf("unmarshalling response %q: %w", fullBody, err)
-	}
-
-	return authResp.Token, nil
+	// WriteFile only applies the mode on create; re-login must tighten an existing file.
+	return os.Chmod(path, 0o600)
 }
 
-type authIssueResponse struct {
-	Token string `json:"token"`
+func portalAPIBaseURL() string {
+	if u := strings.TrimSpace(os.Getenv("SUBSTREAMS_PORTAL_API")); u != "" {
+		return strings.TrimRight(u, "/")
+	}
+	if os.Getenv("LOCAL_DEVELOPMENT") == "true" {
+		return localPortalAPIURL
+	}
+	return defaultPortalAPIURL
+}
+
+func tryOpenURL(rawURL string) error {
+	if !isHTTPURL(rawURL) {
+		return fmt.Errorf("refusing to open non-http(s) URL")
+	}
+	var name string
+	var args []string
+	switch runtime.GOOS {
+	case "darwin":
+		name, args = "open", []string{rawURL}
+	case "windows":
+		name, args = "rundll32", []string{"url.dll,FileProtocolHandler", rawURL}
+	default:
+		name, args = "xdg-open", []string{rawURL}
+	}
+	return exec.Command(name, args...).Start()
+}
+
+var (
+	serverKeyPattern       = regexp.MustCompile(`server_[A-Za-z0-9]+`)
+	apiKeyJSONPattern      = regexp.MustCompile(`"api_key"\s*:\s*"[^"]*"`)
+	deviceCodeJSONPattern  = regexp.MustCompile(`"device_code"\s*:\s*"[^"]*"`)
+	deviceCodeCamelPattern = regexp.MustCompile(`"deviceCode"\s*:\s*"[^"]*"`)
+)
+
+func redactSecrets(s string) string {
+	s = apiKeyJSONPattern.ReplaceAllString(s, `"api_key":"[redacted]"`)
+	s = deviceCodeJSONPattern.ReplaceAllString(s, `"device_code":"[redacted]"`)
+	s = deviceCodeCamelPattern.ReplaceAllString(s, `"deviceCode":"[redacted]"`)
+	return serverKeyPattern.ReplaceAllString(s, "server_[redacted]")
 }

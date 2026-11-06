@@ -121,6 +121,8 @@ func moduleRunE(cmd *cobra.Command, args []string) error {
 			stateStore,
 			nil,
 			0,
+			"",
+			"",
 		)
 		cli.NoError(err, "unable to create store config")
 

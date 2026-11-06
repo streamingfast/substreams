@@ -51,9 +51,15 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+// inFlightProgressInterval is how often tier2 reports what it is doing while a block is still
+// being processed. Frequent enough that a stuck external call shows up in tier1's progress log
+// well before the segment times out, cheap enough to be irrelevant next to the block loop.
+var inFlightProgressInterval = 10 * time.Second
+
 var slowQueryNotificationFrequency = 30 * time.Second
 var slowQueryNotificationThreshold = 300 * time.Second
 var ErrRequestActiveForTooLong = errors.New("request active for too long")
+var ErrRequestStalled = errors.New("request stalled, no block progress")
 
 // sendHostnameHeader mirrors SUBSTREAMS_SEND_HOSTNAME, read once at startup
 // instead of on every request (updateStreamHeadersHostname runs per ProcessRange).
@@ -88,17 +94,18 @@ type Tier2Service struct {
 
 	// You can call this function to switch the parent app to be ready or not ready influencing the health check,
 	// it's provided by [app.Tier1App] and tied to the health check endpoint.
-	appSetIsReadyState         func(isReady bool)
-	currentConcurrentRequests  int64
-	maxConcurrentRequests      uint64
-	moduleExecutionTracing     bool
-	connectionCountMutex       sync.RWMutex
-	blockExecutionTimeout      time.Duration
-	segmentExecutionTimeout    time.Duration
-	foundationalEndpoints      map[string]string
-	HostedStoreRegistryAddress string
+	appSetIsReadyState        func(isReady bool)
+	currentConcurrentRequests int64
+	maxConcurrentRequests     uint64
+	moduleExecutionTracing    bool
+	connectionCountMutex      sync.RWMutex
+	blockExecutionTimeout     time.Duration
+	segmentExecutionTimeout   time.Duration
+	segmentStallTimeout       time.Duration
 
 	checkPendingShutdown func() bool
+	storesScratchSpace   string
+	storesBackend        string
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
 
@@ -121,14 +128,13 @@ func NewTier2(
 		tracer:                  tracing.GetTracer(),
 		logger:                  logger,
 		blockExecutionTimeout:   3 * time.Minute,
-		segmentExecutionTimeout: 60 * time.Minute,
+		segmentExecutionTimeout: 4 * time.Hour,
+		segmentStallTimeout:     10 * time.Minute,
 
 		simulateOverloaded: atomic.NewBool(false),
 
 		activeRequests: active_requests.NewActiveRequestsManager(logger),
 	}
-
-	setSubstreamsStoreSizeLimitFromEnv(logger)
 
 	if debugAPIAddress := os.Getenv("SUBSTREAMS_TIER2_DEBUG_API_ADDR"); debugAPIAddress != "" {
 		debugAPI := debugapi.New(
@@ -236,6 +242,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	fields := []zap.Field{
 		zap.Uint64("segment_size", request.SegmentSize),
+		zap.Uint64("merged_blocks_bundle_size", request.MergedBlocksBundleSizeOrDefault()),
 		zap.Uint32("stage", request.Stage),
 		zap.String("output_module", request.OutputModule),
 		zap.Uint64("first_streamable_block", request.FirstStreamableBlock),
@@ -266,7 +273,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	if s.isOverloaded() {
 		err := status.Error(codes.ResourceExhausted, "service currently overloaded")
 		fields = append(fields, zap.Error(err))
-		logger.Info("refusing Substreams ProcessRange request", fields...)
+		logger.Debug("refusing Substreams ProcessRange request", fields...)
 		return err
 	}
 
@@ -290,7 +297,8 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	if request.Modules == nil {
 		err := status.Error(codes.InvalidArgument, "missing modules in request")
 		fields = append(fields, zap.Error(err))
-		logger.Info("refusing Substreams ProcessRange request", fields...)
+		logger.Debug("refusing Substreams ProcessRange request", fields...)
+		return err
 	}
 	moduleNames := make([]string, len(request.Modules.Modules))
 	for i := 0; i < len(moduleNames); i++ {
@@ -301,15 +309,15 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	if err := ValidateTier2Request(request); err != nil {
 		err = status.Errorf(codes.InvalidArgument, "validate request: %s", err)
 		fields = append(fields, zap.Error(err))
-		logger.Info("refusing Substreams ProcessRange request", fields...)
+		logger.Debug("refusing Substreams ProcessRange request", fields...)
 		return err
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock) //production-mode flag is irrelevant here because it isn't used to calculate the hashes
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock, request.AllowPrunedChain) //production-mode flag is irrelevant here because it isn't used to calculate the hashes
 	if err != nil {
 		err = bsstream.NewErrInvalidArg("%s", err.Error())
 		fields = append(fields, zap.Error(err))
-		logger.Info("refusing Substreams ProcessRange request", fields...)
+		logger.Debug("refusing Substreams ProcessRange request", fields...)
 		return err
 	}
 	outputModuleHash := execGraph.ModuleHashes()[request.OutputModule]
@@ -337,6 +345,8 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		request.SegmentNumber,
 		request.SegmentSize,
 		request.Stage,
+		true, // tier2 jobs only exist for production-mode work
+		reqStats,
 	)
 
 	defer func() {
@@ -384,7 +394,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return err
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock, request.AllowPrunedChain)
 	if err != nil {
 		return stream.NewErrInvalidArg("%s", err.Error())
 	}
@@ -415,7 +425,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	}
 
 	storeSizeLimit := reqctx.StoreSizeLimit(ctx)
-	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, storeSizeLimit)
+	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, storeSizeLimit, s.storesScratchSpace, s.storesBackend)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -426,7 +436,19 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("configuring indexes: %w", err)
 	}
 
-	executionPlan, err := GetExecutionPlan(ctx, logger, execGraph, request.Stage, startBlock, stopBlock, request.OutputModule, execOutputConfigs, indexConfigs, storeConfigs)
+	// The exec-out writers write from goroutines that end only once their file is closed or
+	// planCtx is cancelled: cancel and wait for them so that no write outlives this call.
+	planCtx, cancelPlan := context.WithCancel(ctx)
+	var executionPlan *ExecutionPlan
+	defer func() {
+		cancelPlan()
+		if executionPlan != nil {
+			for _, w := range executionPlan.ExecoutWriters {
+				w.Wait()
+			}
+		}
+	}()
+	executionPlan, err = GetExecutionPlan(planCtx, logger, execGraph, request.Stage, startBlock, stopBlock, request.OutputModule, execOutputConfigs, indexConfigs, storeConfigs)
 	if err != nil {
 		return fmt.Errorf("creating execution plan: %w", err)
 	}
@@ -462,7 +484,14 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		logger.Info("no modules required to run, skipping")
 		return nil
 	}
+
+	allExcluded, err := allModulesExcludedByBlockIndex(ctx, execGraph, request.Stage, executionPlan)
+	if err != nil {
+		return fmt.Errorf("checking block index exclusion: %w", err)
+	}
+
 	stores := pipeline.NewStores(ctx, storeConfigs, request.SegmentSize, requestDetails.ResolvedStartBlockNum, stopBlock, true, executionPlan.StoresToWrite)
+	defer stores.Close()
 
 	// this engine will keep the ExistingExecOuts to optimize the execution (for inputs from modules that skip execution)
 	execOutputCacheEngine, err := cache.NewEngine(ctx, executionPlan.ExecoutWriters, request.BlockType, executionPlan.ExistingExecOuts, executionPlan.IndexWriters)
@@ -475,15 +504,21 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	now := time.Now()
 	go func() {
+		reqStats := reqctx.ReqStats(ctx)
+		watchdog := newSegmentWatchdog(now, reqStats.GetBlocksProcessed(), s.segmentStallTimeout, s.segmentExecutionTimeout)
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-time.After(slowQueryNotificationFrequency):
-				if s.segmentExecutionTimeout != 0 && time.Since(now) > s.segmentExecutionTimeout {
-					cancelCause(connect.NewError(connect.CodeDeadlineExceeded, ErrRequestActiveForTooLong))
+				tick := time.Now()
+				if err := watchdog.check(tick, reqStats.GetBlocksProcessed()); err != nil {
+					cancelCause(err)
+					continue
 				}
-				if time.Since(now) > slowQueryNotificationThreshold {
+
+				if tick.Sub(now) > slowQueryNotificationThreshold {
 
 					modStats := reqctx.ReqStats(ctx).AggregatedModulesStats()
 					modStrings := make([]string, len(modStats))
@@ -512,7 +547,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 						userID = fmt.Sprintf("user_id:%s,", auth.UserID())
 					}
 					sort.Strings(modStrings)
-					logger.Info("request active for a long time", zap.Duration("duration", time.Since(now)), zap.Strings("modules", modStrings), zap.Uint64("processed_blocks", reqctx.ReqStats(ctx).GetBlocksProcessed()), zap.String("user_id", userID))
+					logger.Info("request active for a long time", zap.Duration("duration", tick.Sub(now)), zap.Strings("modules", modStrings), zap.Uint64("processed_blocks", watchdog.processedBlocks), zap.Duration("since_last_progress", watchdog.sinceLastProgress(tick)), zap.String("user_id", userID))
 				}
 			}
 		}
@@ -541,9 +576,27 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		request.FoundationalStoreEndpoints,
 		0,
 		false,
-		s.HostedStoreRegistryAddress,
 		opts...,
 	)
+
+	// Keep reporting while a block is being processed, not only once it completes: a module
+	// blocked on a retrying external call would otherwise stay silent for the whole stall,
+	// and tier1 would show a job running for minutes with no external call metrics at all.
+	go func() {
+		ticker := time.NewTicker(inFlightProgressInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := pipe.SendProgressSnapshot(); err != nil {
+					logger.Debug("cannot send in-flight progress snapshot", zap.Error(err))
+					return
+				}
+			}
+		}
+	}()
 
 	logger.Debug("initializing tier2 pipeline",
 		zap.Uint64("request_start_block", requestDetails.ResolvedStartBlockNum),
@@ -555,43 +608,20 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("error during pipeline init: %w", err)
 	}
 
+	if allExcluded {
+		logger.Info("all executors are excluded by block index. Skipping execution of segment")
+		if err := pipe.InitTier2StoresForSkippedSegment(ctx); err != nil {
+			return fmt.Errorf("error building pipeline: %w", err)
+		}
+		return pipe.OnStreamTerminated(ctx, io.EOF)
+	}
+
 	if err := pipe.InitTier2Stores(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
 	if err := pipe.BuildModuleExecutors(ctx); err != nil {
 		return fmt.Errorf("error building module executors: %w", err)
-	}
-
-	allExecutorsExcludedByBlockIndex := true
-excludable:
-	for _, stage := range pipe.StagedModuleExecutors {
-		for _, executor := range stage {
-			switch executor := executor.(type) {
-			case *exec.MapperModuleExecutor:
-				if executionPlan.ExistingExecOuts[executor.Name()] != nil {
-					continue
-				}
-			case *exec.IndexModuleExecutor:
-				if executionPlan.ExistingIndices[executor.Name()] != nil {
-					continue
-				}
-			case *exec.StoreModuleExecutor:
-				if executionPlan.ExistingExecOuts[executor.Name()] != nil {
-					if _, ok := executionPlan.StoresToWrite[executor.Name()]; !ok {
-						continue
-					}
-				}
-			}
-			if !executor.BlockIndex().ExcludesAllBlocks() {
-				allExecutorsExcludedByBlockIndex = false
-				break excludable
-			}
-		}
-	}
-	if allExecutorsExcludedByBlockIndex {
-		logger.Info("all executors are excluded by block index. Skipping execution of segment")
-		return pipe.OnStreamTerminated(ctx, io.EOF)
 	}
 
 	var streamErr error
@@ -625,7 +655,8 @@ excludable:
 		return pipe.OnStreamTerminated(ctx, streamErr)
 	}
 	sf := &StreamFactory{
-		mergedBlocksStore: mergedBlocksStore,
+		mergedBlocksStore:      mergedBlocksStore,
+		mergedBlocksBundleSize: request.MergedBlocksBundleSizeOrDefault(),
 	}
 	streamFactoryFunc := sf.New
 
@@ -653,7 +684,7 @@ excludable:
 	streamErr = blockStream.Run(ctx)
 	span.EndWithErr(&streamErr)
 
-	if errors.Is(context.Canceled, streamErr) {
+	if errors.Is(streamErr, context.Canceled) {
 		streamErr = context.Cause(ctx)
 	}
 
@@ -718,17 +749,24 @@ func canSkipBlockSource(existingExecOuts map[string]execout.FileReader, required
 }
 
 func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbssinternal.Substreams_ProcessRangeServer) substreams.ResponseFunc {
-	var userID, apiKeyID, ip string
+	var userID, apiKeyID string
 	if auth := dauth.FromContext(ctx); auth != nil {
 		userID = auth.UserID()
 		apiKeyID = auth.APIKeyID()
-		ip = auth.RealIP()
-		logger.Info("auth information available in tier2 response handler", zap.String("user_id", userID), zap.String("key_id", apiKeyID), zap.String("ip_address", ip))
-	} else {
-		logger.Warn("no auth information available in tier2 response handler")
 	}
 
+	// Progress snapshots are emitted from a ticker goroutine while the block loop keeps
+	// sending, and a gRPC stream does not tolerate concurrent Send calls.
+	var mut sync.Mutex
+
 	return func(respAny substreams.ResponseFromAnyTier) error {
+		mut.Lock()
+		defer mut.Unlock()
+
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		resp := respAny.(*pbssinternal.ProcessRangeResponse)
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err), zap.String("user_id", userID), zap.String("key_id", apiKeyID), zap.Error(err))
@@ -779,6 +817,12 @@ func toGRPCError(ctx context.Context, err error) error {
 		return grpcError.Err()
 	}
 
+	// A snapshot pruned under a running request: retrying the job cannot help, the
+	// request has to be restarted so that tier1 picks a new resume point.
+	if errors.Is(err, store.ErrSnapshotMissing) {
+		return status.Error(codes.FailedPrecondition, err.Error()+"; restart the request")
+	}
+
 	// GRPC to connect error
 	connectError := &connect.Error{}
 	if errors.As(err, &connectError) {
@@ -799,7 +843,7 @@ func toGRPCError(ctx context.Context, err error) error {
 	if errors.Is(err, context.Canceled) {
 		if context.Cause(ctx) != nil {
 			err = context.Cause(ctx)
-			if err == errShuttingDown {
+			if errors.Is(err, errShuttingDown) {
 				return status.Error(codes.Unavailable, err.Error())
 			}
 			return toGRPCError(context.TODO(), err) // get error parsing from above for the error encapsulated in the cause
@@ -810,7 +854,7 @@ func toGRPCError(ctx context.Context, err error) error {
 		return status.Error(codes.DeadlineExceeded, err.Error())
 	}
 	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-		return status.Error(codes.InvalidArgument, fmt.Sprintf("%s (deterministic error)", err.Error()))
+		return status.Error(codes.InvalidArgument, fmt.Sprintf("%s (new deterministic error)", err.Error()))
 	}
 
 	var errInvalidArg *stream.ErrInvalidArg
@@ -828,6 +872,44 @@ type ExecutionPlan struct {
 	RequiredModules  map[string]*pbsubstreams.Module
 	StoresToWrite    map[string]struct{}
 	Skippable        bool
+}
+
+// allModulesExcludedByBlockIndex reports whether every module up to the requested stage is
+// already known -- from a cached, empty block index -- to match no block in this segment.
+// When true, tier2 can skip loading dependency stores and compiling WASM modules entirely:
+// OnStreamTerminated still writes the same (empty) exec-out, index and partial-store files a
+// normal run would produce for a segment with zero matching blocks.
+//
+// It resolves each module's block index with pipeline.ModuleBlockIndex, as BuildModuleExecutors
+// does, without needing the stores or WASM modules that function builds along the way.
+func allModulesExcludedByBlockIndex(ctx context.Context, execGraph *exec.Graph, stage uint32, executionPlan *ExecutionPlan) (bool, error) {
+	for _, module := range execGraph.UsedModulesUpToStage(int(stage)) {
+		switch module.ModuleKind() {
+		case pbsubstreams.ModuleKindMap:
+			if executionPlan.ExistingExecOuts[module.Name] != nil {
+				continue
+			}
+		case pbsubstreams.ModuleKindStore:
+			if executionPlan.ExistingExecOuts[module.Name] != nil {
+				if _, ok := executionPlan.StoresToWrite[module.Name]; !ok {
+					continue
+				}
+			}
+		case pbsubstreams.ModuleKindBlockIndex:
+			if executionPlan.ExistingIndices[module.Name] != nil {
+				continue
+			}
+		}
+
+		blockIndex, err := pipeline.ModuleBlockIndex(ctx, module, executionPlan.ExistingIndices)
+		if err != nil {
+			return false, err
+		}
+		if !blockIndex.ExcludesAllBlocks() {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func GetExecutionPlan(
@@ -863,8 +945,13 @@ func GetExecutionPlan(
 		}
 	}
 
+	// existingExecOuts is written by the loop below while the cleanup goroutine
+	// iterates over it on context cancellation: guard all accesses with a mutex.
+	var existingExecOutsLock sync.Mutex
 	go func() {
 		<-ctx.Done()
+		existingExecOutsLock.Lock()
+		defer existingExecOutsLock.Unlock()
 		for _, eo := range existingExecOuts {
 			if err := eo.Close(); err != nil {
 				logger.Info("error closing reader", zap.String("filename", eo.Filename()), zap.Error(err))
@@ -872,6 +959,12 @@ func GetExecutionPlan(
 		}
 		// Writers don't need to be closed, canceling the context is enough
 	}()
+
+	setExistingExecOut := func(name string, file execout.FileReader) {
+		existingExecOutsLock.Lock()
+		defer existingExecOutsLock.Unlock()
+		existingExecOuts[name] = file
+	}
 
 	for _, mod := range usedModules {
 		if mod.InitialBlock >= stopBlock {
@@ -911,7 +1004,7 @@ func GetExecutionPlan(
 				requiredModules[name] = usedModules[name]
 				break
 			}
-			existingExecOuts[name] = file
+			setExistingExecOut(name, file)
 
 		case pbsubstreams.ModuleKindStore:
 			file, readErr := c.OpenFileReader(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
@@ -921,7 +1014,7 @@ func GetExecutionPlan(
 				}
 				requiredModules[name] = usedModules[name]
 			} else {
-				existingExecOuts[name] = file
+				setExistingExecOut(name, file)
 			}
 
 			// if either full or partial kv exists, we can skip the module

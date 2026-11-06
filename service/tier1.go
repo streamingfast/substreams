@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -25,6 +26,7 @@ import (
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dmetrics"
+	"github.com/streamingfast/dregistry"
 	"github.com/streamingfast/dsession"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
@@ -33,6 +35,7 @@ import (
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/debugapi"
+	"github.com/streamingfast/substreams/foundational_store"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
@@ -47,6 +50,7 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/active_requests"
 	"github.com/streamingfast/substreams/service/config"
+	"github.com/streamingfast/substreams/squash"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
@@ -61,8 +65,34 @@ import (
 var errShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 var fallbackDuration time.Duration
 var useBlockNumberDuration time.Duration
+var deterministicErrorMaxAge = time.Hour
+
+// DefaultRemoteSquashQuietPeriod is how long tier1 squashes locally after the
+// remote squasher stops answering, before one run tries it again. A configured
+// quiet period of zero selects this.
+const DefaultRemoteSquashQuietPeriod = 5 * time.Minute
+
+// ResolveRemoteSquashQuietPeriod returns d, or DefaultRemoteSquashQuietPeriod
+// when d is zero. A negative duration is rejected.
+func ResolveRemoteSquashQuietPeriod(d time.Duration) (time.Duration, error) {
+	if d < 0 {
+		return 0, fmt.Errorf("remote squash quiet period must not be negative, got %s", d)
+	}
+	if d == 0 {
+		return DefaultRemoteSquashQuietPeriod, nil
+	}
+	return d, nil
+}
 
 func init() {
+	if v := os.Getenv(EnvDeterministicErrorMaxAge); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			panic(fmt.Errorf("invalid value for env var %s: %w", EnvDeterministicErrorMaxAge, err))
+		}
+		deterministicErrorMaxAge = d
+	}
+
 	envEthCallFallbackToLatestDuration := os.Getenv(EnvEthCallFallbackToLatestDuration)
 	if envEthCallFallbackToLatestDuration != "" {
 		d, err := time.ParseDuration(envEthCallFallbackToLatestDuration)
@@ -86,6 +116,8 @@ func init() {
 type Tier1Service struct {
 	*shutter.Shutter
 	activeRequestsWG sync.WaitGroup
+	// cacheMarkerWrites tracks the detached package and last_used writes.
+	cacheMarkerWrites sync.WaitGroup
 
 	blockType             string
 	wasmExtensions        map[string]map[string]wasm.WASMExtension
@@ -99,25 +131,43 @@ type Tier1Service struct {
 
 	// You can call this function to switch the parent app to be ready or not ready influencing the health check,
 	// it's provided by [app.Tier1App] and tied to the health check endpoint.
-	appSetIsReadyState  func(isReady bool)
+	appSetIsReadyState func(isReady bool)
+	// readinessLock serializes the readiness reads and writes of refreshReadiness,
+	// which the request path and the CPU evictor both drive.
+	readinessLock       sync.Mutex
 	getRecentFinalBlock func() (uint64, error)
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
 
-	enforceCompression         bool
-	activeRequestsSoftLimit    int
-	activeRequestsHardLimit    int
-	tier2RequestParameters     reqctx.Tier2RequestParameters
-	foundationalEndpoints      map[string]string
-	hostedStoreRegistryAddress string
-	sessionPool                dsession.SessionPool
-	activeRequestsManager      *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
-	execOutMessageBufferSize   int
+	enforceCompression       bool
+	activeRequestsSoftLimit  int
+	activeRequestsHardLimit  int
+	tier2RequestParameters   reqctx.Tier2RequestParameters
+	foundationalEndpoints    map[string]string
+	storeResolver            dregistry.Resolver
+	sessionPool              dsession.SessionPool
+	activeRequestsManager    *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
+	evictor                  *active_requests.Evictor               // nil unless CPU eviction is enabled and cgroup CPU signals are readable
+	execOutMessageBufferSize int
+	execOutPrefetch          execout.PrefetchConfig
 
 	// liveBackFillerFinalBlockDelay overrides the default 120-block delay the
 	// live backfiller waits past a segment end before concluding merged blocks
 	// are safely written. 0 means use the default.
 	liveBackFillerFinalBlockDelay uint64
+
+	// maxRequestDuration, if non-zero, is how long a request may run before
+	// it is gracefully ended the same way as on shutdown (stores quick-saved,
+	// client told to reconnect).
+	maxRequestDuration time.Duration
+
+	squasher squash.Client
+	// remoteSquashQuietPeriod is how long a down remote is left alone. Zero
+	// means DefaultRemoteSquashQuietPeriod; set by WithRemoteSquashQuietPeriod.
+	remoteSquashQuietPeriod time.Duration
+	// remoteSquashAvailability is shared by every request. Nil when no remote
+	// squasher is configured.
+	remoteSquashAvailability *reqctx.RemoteAvailability
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -184,6 +234,7 @@ func NewTier1(
 	enforceCompression bool,
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
+	evictorConfig active_requests.EvictorConfig,
 	sharedCacheSize uint64,
 	outputBufferSize uint64,
 	sessionPool dsession.SessionPool,
@@ -209,12 +260,11 @@ func NewTier1(
 	)
 
 	sf := &StreamFactory{
-		mergedBlocksStore: mergedBlocksStore,
-		forkedBlocksStore: forkedBlocksStore,
-		hub:               hub,
+		mergedBlocksStore:      mergedBlocksStore,
+		forkedBlocksStore:      forkedBlocksStore,
+		hub:                    hub,
+		mergedBlocksBundleSize: tier2RequestParameters.MergedBlocksBundleSize,
 	}
-
-	setSubstreamsStoreSizeLimitFromEnv(logger)
 
 	var err error
 	if blockType == "" {
@@ -227,30 +277,63 @@ func NewTier1(
 	tier2RequestParameters.BlockType = blockType
 	tier2RequestParameters.StateBundleSize = runtimeConfig.SegmentSize
 
-	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
+	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil), zap.Uint64("merged_blocks_bundle_size", tier2RequestParameters.MergedBlocksBundleSize))
+
+	storeResolver, err := foundational_store.NewResolver(foundationalEndpoints, hostedStoreRegistryAddress, logger)
+	if err != nil {
+		return nil, fmt.Errorf("foundational store resolver: %w", err)
+	}
+
+	var cursorResolverOptions []bstream.FileSourceOption
+	if tier2RequestParameters.MergedBlocksBundleSize != 0 {
+		cursorResolverOptions = append(cursorResolverOptions, bstream.FileSourceWithBundleSize(tier2RequestParameters.MergedBlocksBundleSize))
+	}
 
 	s := &Tier1Service{
-		Shutter:                    shutter.New(),
-		runtimeConfig:              runtimeConfig,
-		blockType:                  blockType,
-		tracer:                     tracing.GetTracer(),
-		resolveCursor:              pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
-		logger:                     logger,
-		appSetIsReadyState:         appSetIsReadyState,
-		tier2RequestParameters:     tier2RequestParameters,
-		blockExecutionTimeout:      3 * time.Minute,
-		enforceCompression:         enforceCompression,
-		activeRequestsSoftLimit:    activeRequestsSoftLimit,
-		activeRequestsHardLimit:    activeRequestsHardLimit,
-		foundationalEndpoints:      foundationalEndpoints,
-		hostedStoreRegistryAddress: hostedStoreRegistryAddress,
-		sessionPool:                sessionPool,
-		activeRequestsManager:      active_requests.NewActiveRequestsManager(logger),
-		execOutMessageBufferSize:   int(outputBufferSize),
+		Shutter:                  shutter.New(),
+		runtimeConfig:            runtimeConfig,
+		blockType:                blockType,
+		tracer:                   tracing.GetTracer(),
+		resolveCursor:            pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore, cursorResolverOptions...),
+		logger:                   logger,
+		appSetIsReadyState:       appSetIsReadyState,
+		tier2RequestParameters:   tier2RequestParameters,
+		blockExecutionTimeout:    3 * time.Minute,
+		enforceCompression:       enforceCompression,
+		activeRequestsSoftLimit:  activeRequestsSoftLimit,
+		activeRequestsHardLimit:  activeRequestsHardLimit,
+		foundationalEndpoints:    foundationalEndpoints,
+		storeResolver:            storeResolver, // control-plane client is process-wide
+		sessionPool:              sessionPool,
+		activeRequestsManager:    active_requests.NewActiveRequestsManager(logger),
+		execOutMessageBufferSize: int(outputBufferSize),
 	}
 	s.OnTerminating(func(_ error) {
 		s.activeRequestsWG.Wait()
 	})
+
+	if evictorConfig.Mode != active_requests.EvictionOff {
+		if evictorConfig.NominalCapacity == 0 {
+			evictorConfig.NominalCapacity = float64(activeRequestsSoftLimit)
+		}
+		if reader, err := active_requests.NewCPUReader(evictorConfig.QuotaCoresOverride); err != nil {
+			logger.Warn("CPU eviction disabled: cannot read cgroup CPU signals", zap.Error(err))
+		} else if reader.QuotaCores() == 0 {
+			logger.Warn("CPU eviction disabled: no CPU quota set on the cgroup, set QuotaCoresOverride to pick the budget yourself")
+		} else {
+			if limit := reader.CgroupQuotaCores(); limit > 0 && reader.QuotaCores() > limit {
+				logger.Warn("CPU quota override is above the cgroup limit: the kernel throttles the pod before the evictor fires",
+					zap.Float64("quota_cores", reader.QuotaCores()),
+					zap.Float64("cgroup_limit_cores", limit),
+				)
+			}
+			evictor := active_requests.NewEvictor(evictorConfig, s.activeRequestsManager, reader, logger)
+			evictor.OnEvaluate(s.refreshReadiness)
+			evictor.CountActiveRequestsWith(s.getActiveRequestCount)
+			s.evictor = evictor
+			go evictor.Run(s.Terminating())
+		}
+	}
 
 	metrics.Tier1ActiveRequestsHardLimit.SetFloat64(float64(activeRequestsHardLimit))
 
@@ -317,6 +400,15 @@ func NewTier1(
 
 	for _, opt := range opts {
 		opt(s)
+	}
+
+	quiet, err := ResolveRemoteSquashQuietPeriod(s.remoteSquashQuietPeriod)
+	if err != nil {
+		return nil, err
+	}
+	if s.squasher != nil {
+		logger.Info("remote squasher configured", zap.Duration("quiet_period", quiet))
+		s.remoteSquashAvailability = reqctx.NewRemoteAvailability(quiet, nil)
 	}
 
 	return s, nil
@@ -405,6 +497,8 @@ func (s *Tier1Service) BlocksAny(
 				zap.String("cache_tag", cacheTag),
 			)
 		}
+
+		fields = append(fields, auth.AuthLogFields()...)
 	}
 
 	stat := s.getOverloadedStatus()
@@ -425,7 +519,7 @@ func (s *Tier1Service) BlocksAny(
 		return nil, err
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock, s.tier2RequestParameters.AllowPrunedChain)
 	if err != nil {
 		err := connect.NewError(connect.CodeInvalidArgument, err)
 		fields = append(fields, zap.Error(err))
@@ -520,10 +614,7 @@ func (s *Tier1Service) BlocksAny(
 	metrics.Tier1ActiveRequests.Inc()
 	defer func() {
 		metrics.Tier1ActiveRequests.Dec()
-
-		if status := s.getOverloadedStatus(); status.canAcceptUpcomingRequests() {
-			s.appSetIsReadyState(true)
-		}
+		s.refreshReadiness()
 	}()
 
 	// On app shutdown, we cancel the running '.blocks()' command,
@@ -590,15 +681,31 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 	return nil
 }
 
+// cacheMarkerWriteTimeout bounds the detached package and last_used writes so they
+// can never outlive a request by more than this.
+const cacheMarkerWriteTimeout = 30 * time.Second
+
+// lastUsedFilename names the usage marker written in every module's cache folder:
+// `last_used` for unauthenticated requests, `last_used_<plan>` (lowercase) otherwise.
+// `firecore tools substreams purge` reads the plan back from that name to apply a
+// retention per plan.
+func lastUsedFilename(planTier string) string {
+	if planTier == "" {
+		return "last_used"
+	}
+	return "last_used_" + strings.ToLower(planTier)
+}
+
 func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph, cacheStore dstore.Store) error {
+	filename := lastUsedFilename(reqctx.Details(ctx).PlanTier)
 	for _, module := range execGraph.UsedModules() {
 		moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes()[module.Name])
 		if err != nil {
 			return fmt.Errorf("getting substore: %w", err)
 		}
 		moduleStore.SetOverwrite(true)
-		if err := moduleStore.WriteObject(ctx, "last_used", strings.NewReader(time.Now().Format("2006-01-02"))); err != nil {
-			return fmt.Errorf("writing last_used file")
+		if err := moduleStore.WriteObject(ctx, filename, strings.NewReader(time.Now().Format("2006-01-02"))); err != nil {
+			return fmt.Errorf("writing %s file", filename)
 		}
 	}
 	return nil
@@ -619,14 +726,18 @@ func (s *Tier1Service) blocks(
 	execOutMessageBufferSize int,
 ) (err error) {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
-	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
-		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
-	} else if request.StartBlockNum < 0 && request.StopBlockNum > 0 {
-		if int64(request.StopBlockNum)+int64(request.StartBlockNum) < int64(chainFirstStreamableBlock) {
+	// A cursor replaces the start block, so only a request without one is checked here;
+	// the block a cursor resolves to is checked below.
+	if request.StartCursor == "" {
+		if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
+			return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain, this endpoint has no blocks below it)", request.StartBlockNum, chainFirstStreamableBlock)
+		} else if request.StartBlockNum < 0 && request.StopBlockNum > 0 {
+			if int64(request.StopBlockNum)+int64(request.StartBlockNum) < int64(chainFirstStreamableBlock) {
+				request.StartBlockNum = int64(chainFirstStreamableBlock)
+			}
+		} else if request.StartBlockNum == 0 {
 			request.StartBlockNum = int64(chainFirstStreamableBlock)
 		}
-	} else if request.StartBlockNum == 0 {
-		request.StartBlockNum = int64(chainFirstStreamableBlock)
 	}
 
 	logger := reqctx.Logger(ctx)
@@ -638,8 +749,24 @@ func (s *Tier1Service) blocks(
 		return err
 	}
 
+	if request.StartCursor != "" && requestDetails.ResolvedStartBlockNum < chainFirstStreamableBlock {
+		return bsstream.NewErrInvalidArg("invalid start cursor: it resolves to block %d, must be >= %d (the first streamable block of the chain, this endpoint has no blocks below it)", requestDetails.ResolvedStartBlockNum, chainFirstStreamableBlock)
+	}
+
 	if request.StopBlockNum != 0 {
 		if requestDetails.ResolvedStartBlockNum == request.StopBlockNum {
+			// The stop block is exclusive, so a resolved start block equal to it means the
+			// requested range is empty. When the start was resolved from a cursor, the stream
+			// has already reached its stop block: complete cleanly (client receives EOF) instead
+			// of surfacing a fatal InvalidArgument for what is really a finished stream. This
+			// typically happens when a transient disconnect makes the client reconnect with a
+			// cursor sitting on the last block of the range.
+			if request.StartCursor != "" {
+				logger.Info("stream already complete: cursor resolved at the stop block, nothing left to stream",
+					append(logFields, zap.Uint64("stop_block", request.StopBlockNum), zap.Uint64("resolved_start_block", requestDetails.ResolvedStartBlockNum))...)
+				return nil
+			}
+
 			err := bsstream.NewErrInvalidArg("start block and stop block are the same: %d and %d", requestDetails.ResolvedStartBlockNum, request.StopBlockNum)
 			logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
 			return err
@@ -665,9 +792,12 @@ func (s *Tier1Service) blocks(
 		}
 	}
 
-	parallelJobs, parallelExecutors := reqctx.GetEffectiveHeaderValues(ctx, header, s.runtimeConfig.DefaultParallelSubrequests, reqctx.DefaultMaxStageLayerParallelExecutorCount)
-	requestDetails.MaxParallelJobs = parallelJobs
-	requestDetails.MaxStageLayerParallelExecutor = parallelExecutors
+	parallelism := reqctx.GetEffectiveHeaderValues(ctx, header, s.runtimeConfig.DefaultParallelSubrequests, reqctx.DefaultMaxStageLayerParallelExecutorCount)
+	requestDetails.MaxParallelJobs = parallelism.Workers
+	requestDetails.MaxStageLayerParallelExecutor = parallelism.StageLayerExecutors
+	requestDetails.PlanTier = parallelism.PlanTier
+	reqStats.SetWorkerCounts(parallelism.RequestedWorkers, parallelism.GrantedWorkers, parallelism.Workers)
+	logFields = append(logFields, zap.Object("parallelism", parallelism))
 
 	ctx = reqctx.WithRequest(ctx, requestDetails)
 	if s.runtimeConfig.ModuleExecutionTracing {
@@ -725,25 +855,35 @@ func (s *Tier1Service) blocks(
 		cacheStore = cloned
 	}
 
-	if err := s.writePackage(ctx, request, execGraph, cacheStore); err != nil {
-		logger.Warn("cannot write package", zap.Error(err))
-	}
-
-	if err := s.writeLastUsed(ctx, execGraph, cacheStore); err != nil {
-		logger.Warn("cannot write 'last_used' file", zap.Error(err))
-	}
+	// Both writes are best effort and nothing in this request reads them back, so
+	// they run detached from the request: neither its start nor its exit waits for
+	// them, and a client that disconnects early still leaves its usage marker
+	// behind. The timeout is the only bound on how long they may run.
+	s.cacheMarkerWrites.Add(1)
+	go func() {
+		defer s.cacheMarkerWrites.Done()
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cacheMarkerWriteTimeout)
+		defer cancel()
+		if err := s.writePackage(ctx, request, execGraph, cacheStore); err != nil {
+			logger.Warn("cannot write package", zap.Error(err))
+		}
+		if err := s.writeLastUsed(ctx, execGraph, cacheStore); err != nil {
+			logger.Warn("cannot write 'last_used' file", zap.Error(err))
+		}
+	}()
 
 	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), segmentSize, chainFirstStreamableBlock, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, quickSaveStore, execGraph.Stores(), execGraph.ModuleHashes(), chainFirstStreamableBlock, 0)
+	storeConfigs, err := store.NewConfigMap(cacheStore, quickSaveStore, execGraph.Stores(), execGraph.ModuleHashes(), chainFirstStreamableBlock, s.runtimeConfig.StoreSizeLimit, s.runtimeConfig.StoresScratchSpace, s.runtimeConfig.StoresBackend)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
 	stores := pipeline.NewStores(ctx, storeConfigs, segmentSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false, nil)
+	defer stores.Close() // releases mmap-backed store files once the request ends
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, nil, s.blockType, nil, nil) // we don't read or write ExecOuts on tier1
 	if err != nil {
@@ -767,6 +907,30 @@ func (s *Tier1Service) blocks(
 	if s.getHeadBlock != nil {
 		opts = append(opts, pipeline.WithHeadBlockGetter(s.getHeadBlock))
 	}
+	opts = append(opts, pipeline.WithExecOutPrefetch(s.execOutPrefetch))
+	if requestDetails.ProductionMode && s.getRecentFinalBlock != nil {
+		opts = append(opts, pipeline.WithFinalBlockLagCheck(s.getRecentFinalBlock, requestDetails.LinearHandoffBlockNum))
+	}
+
+	if s.squasher != nil {
+		ctx = reqctx.WithRemoteSquasher(ctx, &reqctx.RemoteSquasher{
+			Client:         s.squasher,
+			StateStoreURL:  s.tier2RequestParameters.StateStoreURL,
+			CacheTag:       cacheTag,
+			StoreSizeLimit: s.runtimeConfig.StoreSizeLimit,
+			Availability:   s.remoteSquashAvailability,
+		})
+	}
+
+	ctx, resolvedEndpoints, err := s.resolveFoundationalStores(ctx, execGraph, reqStats)
+	if err != nil {
+		return err
+	}
+
+	var deadline time.Time
+	if s.maxRequestDuration != 0 {
+		deadline = time.Now().Add(s.maxRequestDuration)
+	}
 
 	pipe := pipeline.New(
 		ctx,
@@ -782,13 +946,10 @@ func (s *Tier1Service) blocks(
 		s.runtimeConfig.WorkerPoolFactory,
 		respFunc,
 		s.blockExecutionTimeout,
-		func() bool {
-			return s.IsTerminating() // pipeline starts draining when the service is actually terminating, (after the global shutdown-signal-delay)
-		},
-		s.foundationalEndpoints,
+		s.pendingShutdownCheck(deadline, logger),
+		resolvedEndpoints,
 		execOutMessageBufferSize,
 		supportBuffering,
-		s.hostedStoreRegistryAddress,
 		opts...,
 	)
 
@@ -815,10 +976,23 @@ func (s *Tier1Service) blocks(
 		requestDetails.LinearHandoffBlockNum,
 		requestDetails.StopBlockNum,
 		scheduleStores,
+		execGraph.HasStoresBelowFirstStreamableBlock(),
 	)
 	if err != nil {
 		return stream.NewErrInvalidArg("%s", err.Error())
 	}
+
+	// The number of segments to backprocess bounds how many workers can ever be busy at
+	// once: asking for 300 workers on a request that only has 12 segments of work left
+	// will never use more than 12 of them.
+	var parallelSegmentCount int
+	if segmenter := reqPlan.BackprocessSegmenter(); segmenter != nil {
+		parallelSegmentCount = segmenter.Count()
+	}
+	logFields = append(logFields,
+		zap.Int("parallel_segment_count", parallelSegmentCount),
+		zap.Int("stage_count", len(execGraph.StagedUsedModules())),
+	)
 
 	if s.sessionPool != nil {
 		auth := dauth.FromContext(ctx)
@@ -867,6 +1041,8 @@ func (s *Tier1Service) blocks(
 			0, // not used on tier1
 			0,
 			0,
+			requestDetails.ProductionMode,
+			reqStats,
 		)
 		defer func() {
 			s.activeRequestsManager.Remove(activeReqHandler)
@@ -883,6 +1059,13 @@ func (s *Tier1Service) blocks(
 	}
 
 	logger.Info("incoming Substreams Blocks request", logFields...)
+
+	// Periodic snapshot of what this request is doing, so a slow substreams can be
+	// diagnosed from the logs alone, without waiting for the final stats line.
+	reqStats.RecordResolvedStartBlock(requestDetails.ResolvedStartBlockNum)
+	progressCtx, cancelProgressLog := context.WithCancel(ctx)
+	defer cancelProgressLog()
+	go metrics.NewProgressLogger(reqStats, logger).Run(progressCtx)
 
 	defer func() {
 		switch {
@@ -916,6 +1099,20 @@ func (s *Tier1Service) blocks(
 		return pipe.OnStreamTerminated(ctx, io.EOF)
 	}
 
+	if requestDetails.ProductionMode && !loadedFromQuicksave && reqPlan.RequiresParallelProcessing() {
+		if lastFinalBlock, err := s.getRecentFinalBlock(); err != nil {
+			logger.Warn("cannot get last final block to check linear handoff lag", zap.Error(err))
+		} else if target, tooFarBehind := pipeline.LinearHandoffLagTarget(requestDetails.LinearHandoffBlockNum, request.StopBlockNum, lastFinalBlock, segmentSize, pipeline.MaxLinearHandoffLagSegments); tooFarBehind {
+			logger.Info("linear handoff block is too far behind the last final block, disconnecting client so it back-processes the gap on reconnection",
+				zap.Uint64("handoff_block", requestDetails.LinearHandoffBlockNum),
+				zap.Uint64("new_handoff_block", target),
+				zap.Uint64("last_final_block", lastFinalBlock),
+				zap.Uint64("max_lag_segments", pipeline.MaxLinearHandoffLagSegments),
+			)
+			return pipe.OnStreamTerminated(ctx, connect.NewError(connect.CodeUnavailable, pipeline.ErrBackprocessEndedTooFarBehind))
+		}
+	}
+
 	var streamErr error
 	cursor := requestDetails.ResolvedCursor
 	var processBlocksBeforeCursor bool
@@ -935,22 +1132,26 @@ func (s *Tier1Service) blocks(
 
 	var wrappedPipe bstream.Handler
 	if requestDetails.ProductionMode {
-		liveBackFiller := NewLiveBackFiller(ctx, pipe, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
-		if s.liveBackFillerFinalBlockDelay != 0 {
-			liveBackFiller.finalBlockDelay = s.liveBackFillerFinalBlockDelay
+		finalBlockDelay := s.liveBackFillerFinalBlockDelay
+		if finalBlockDelay == 0 {
+			// the merged file containing a segment end is only written once the
+			// chain has moved a full bundle past its base, so the default delay
+			// must scale with the merged-blocks bundle size
+			finalBlockDelay = max(defaultFinalBlockDelay, s.tier2RequestParameters.MergedBlocksBundleSize+20)
 		}
+
+		liveBackFiller := NewLiveBackFiller(ctx, pipe, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
+		liveBackFiller.finalBlockDelay = finalBlockDelay
 
 		// In noop mode, the pipe handler is overwritten by a NoopHandler which produces no outputs.
 		if request.NoopMode {
 			noopHandler := NewNoopHandler(respFunc)
 			liveBackFiller = NewLiveBackFiller(ctx, noopHandler, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
-			if s.liveBackFillerFinalBlockDelay != 0 {
-				liveBackFiller.finalBlockDelay = s.liveBackFillerFinalBlockDelay
-			}
+			liveBackFiller.finalBlockDelay = finalBlockDelay
 		}
 
 		if requestDetails.FromQuickload {
-			if err := configureLiveBackFillerFromQuickload(ctx, segmentSize, requestDetails.LinearHandoffBlockNum, execGraph.UsedStoreModules(), storeConfigs, liveBackFiller); err != nil {
+			if err := configureLiveBackFillerFromQuickload(ctx, segmentSize, requestDetails.LinearHandoffBlockNum, chainFirstStreamableBlock, execGraph.UsedStoreModules(), storeConfigs, liveBackFiller); err != nil {
 				return err
 			}
 		}
@@ -976,6 +1177,22 @@ func (s *Tier1Service) blocks(
 	)
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)
+	}
+
+	if !deadline.IsZero() && cancelRunning != nil {
+		// The pipeline checks the deadline on every block, but on a slow chain the next
+		// block can be far away, so also end the stream as soon as the deadline passes.
+		go func() {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Until(deadline)):
+			}
+			if err := pipe.Drain("max request duration reached"); err != nil {
+				logger.Warn("draining pipeline on max request duration", zap.Error(err))
+			}
+			cancelRunning(errShuttingDown)
+		}()
 	}
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/pipeline/blocks_stream")
@@ -1016,12 +1233,39 @@ func (s *Tier1Service) blocks(
 	return pipe.OnStreamTerminated(ctx, streamErr)
 }
 
+// pendingShutdownCheck returns the function the pipeline polls to know when to
+// drain: when the service is actually terminating (after the global
+// shutdown-signal-delay), or when the request deadline has passed. A zero
+// deadline means no limit.
+func (s *Tier1Service) pendingShutdownCheck(deadline time.Time, logger *zap.Logger) func() bool {
+	if deadline.IsZero() {
+		return s.IsTerminating
+	}
+
+	var logOnce sync.Once
+	return func() bool {
+		if s.IsTerminating() {
+			return true
+		}
+		if time.Now().Before(deadline) {
+			return false
+		}
+		logOnce.Do(func() {
+			logger.Info("request reached max request duration, ending it gracefully", zap.Duration("max_request_duration", s.maxRequestDuration))
+		})
+		return true
+	}
+}
+
 // configureLiveBackFillerFromQuickload will ensure that any used store
-func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint64, linearHandoffBlockNum uint64, usedStores []*pbsubstreams.Module, storeConfigs store.ConfigMap, liveBackFiller *LiveBackFiller) error {
+func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint64, linearHandoffBlockNum uint64, firstStreamableBlock uint64, usedStores []*pbsubstreams.Module, storeConfigs store.ConfigMap, liveBackFiller *LiveBackFiller) error {
 	backfillFromIndex := linearHandoffBlockNum / segmentSize
+	// The first segment holding no block below the first streamable block: a job on a lower
+	// one would read blocks that no longer exist, and a failed job stops the back filler.
+	firstStreamableIndex := (firstStreamableBlock + segmentSize - 1) / segmentSize
 
 	for _, mod := range usedStores {
-		lowestIndex := mod.InitialBlock / segmentSize
+		lowestIndex := max(mod.InitialBlock/segmentSize, firstStreamableIndex)
 		for i := 0; backfillFromIndex > lowestIndex; i++ {
 
 			listUpTo := backfillFromIndex * segmentSize
@@ -1038,8 +1282,8 @@ func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint6
 			if err != nil {
 				return err
 			}
-			if files != nil {
-				backfillFromIndex = files[len(files)-1].Range.ExclusiveEndBlock / segmentSize
+			if end, found := lastLoadableSnapshotEnd(files, storeConfigs[mod.Name].ModuleInitialBlock()); found {
+				backfillFromIndex = end / segmentSize
 				break
 			}
 		}
@@ -1047,6 +1291,17 @@ func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint6
 
 	}
 	return nil
+}
+
+// lastLoadableSnapshotEnd returns the end block of the last file in files, skipping full KVs
+// named after another initial block than the store's, which cannot be loaded.
+func lastLoadableSnapshotEnd(files []*store.FileInfo, moduleInitialBlock uint64) (uint64, bool) {
+	for _, file := range slices.Backward(files) {
+		if file.Partial || file.Range.StartBlock == moduleInitialBlock {
+			return file.Range.ExclusiveEndBlock, true
+		}
+	}
+	return 0, false
 }
 
 func tier1ResponseHandler(
@@ -1059,12 +1314,6 @@ func tier1ResponseHandler(
 	debugOutputForModules []string,
 	supportBuffering bool,
 ) substreams.ResponseFunc {
-	auth := dauth.FromContext(ctx)
-	organizationID := auth.OrganizationID()
-	apiKeyID := auth.APIKeyID()
-	userMeta := auth.Meta()
-	ip := auth.RealIP()
-
 	outputModuleHash := reqctx.OutputModuleHash(ctx)
 
 	endpoint := "sf.substreams.rpc.v2/Blocks"
@@ -1093,6 +1342,7 @@ func tier1ResponseHandler(
 		}
 
 		isData := false
+		blockCount := 0
 		var lastSentClock *pbsubstreams.Clock
 
 		switch r := respAny.(type) {
@@ -1100,6 +1350,7 @@ func tier1ResponseHandler(
 			d := r.GetBlockScopedData()
 			if d != nil {
 				isData = true
+				blockCount = 1
 				lastSentClock = d.Clock
 				filterData(d, noop, debugOutputs)
 				if supportBuffering {
@@ -1113,6 +1364,7 @@ func tier1ResponseHandler(
 			for _, d := range r.GetBlockScopedDatas().Items {
 				if d != nil {
 					isData = true
+					blockCount++
 					lastSentClock = d.Clock
 					filterData(d, noop, debugOutputs)
 				}
@@ -1122,19 +1374,24 @@ func tier1ResponseHandler(
 		egressBytes := proto.Size(respAny.(proto.Message))
 		begin := time.Now()
 		if err := streamSrv.SendMsg(respAny); err != nil {
-			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", organizationID), zap.String("api_key_id", apiKeyID), zap.Error(err))
+			auth := dauth.FromContext(ctx)
+			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", auth.OrganizationID()), zap.String("api_key_id", auth.APIKeyID()), zap.Error(err))
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 		stats.RecordReadTime(begin)
 
 		if isData {
+			// Only data messages are timed for the progress log: this isolates how long the
+			// consumer takes to accept one payload, which is what tells a slow client apart
+			// from a slow pipeline.
+			stats.RecordBlockSent(time.Since(begin), blockCount)
 			stats.RecordDataSent()
 			stats.RecordLastBlockSent(lastSentClock)
 		}
 		stats.RecordEgress(egressBytes)
 		metering.AddEgressBytes(ctx, egressBytes)
 
-		metericsSender.Send(ctx, organizationID, apiKeyID, ip, userMeta, outputModuleHash, endpoint)
+		metericsSender.Send(ctx, outputModuleHash, endpoint)
 		return nil
 	}
 }
@@ -1184,23 +1441,36 @@ func (s *Tier1Service) containsDeterministicError(ctx context.Context, startBloc
 	return nil
 }
 
-func parseFilename(in string) (blockNum uint64, moduleExtendedHash string, err error) {
+// parseFilename parses an error filename of the form:
+//
+//	errors.<blockNum:10>.<moduleExtendedHash>.<unixTimestamp>
+//
+// Older formats without a timestamp (or without an extended hash) are still parsed; a
+// zero timestamp signals a legacy error that the caller should discard.
+func parseFilename(in string) (blockNum uint64, moduleExtendedHash string, timestamp time.Time, err error) {
 	in = strings.TrimPrefix(in, "errors.")
 
 	if len(in) < 10 {
-		return 0, "", err
+		return 0, "", time.Time{}, err
 	}
 
 	blockNumStr := in[:10]
 	blockNum, err = strconv.ParseUint(blockNumStr, 10, 64)
 	if err != nil {
-		return 0, "", err
+		return 0, "", time.Time{}, err
 	}
 
 	if len(in) > 10 {
-		moduleExtendedHash = in[11:] // ignore the '.' between blocknum and moduleExtendedHash
+		rest := in[11:] // ignore the '.' between blocknum and the rest
+		parts := strings.Split(rest, ".")
+		moduleExtendedHash = parts[0]
+		if len(parts) > 1 {
+			if sec, parseErr := strconv.ParseInt(parts[1], 10, 64); parseErr == nil {
+				timestamp = time.Unix(sec, 0)
+			}
+		}
 	}
-	return blockNum, moduleExtendedHash, nil
+	return blockNum, moduleExtendedHash, timestamp, nil
 }
 
 func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, moduleName, extendedHash string, startBlock, endBlock uint64, isStore bool, logger *zap.Logger) error {
@@ -1213,7 +1483,7 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 
 	moduleStore.WalkFrom(ctx, "errors.", startFile, func(filename string) (err error) {
 
-		blockNum, parsedExtendedHash, err := parseFilename(filename)
+		blockNum, parsedExtendedHash, timestamp, err := parseFilename(filename)
 		if err != nil {
 			logger.Warn("checking for errors: invalid filename", zap.String("filename", filename), zap.Error(err))
 			return nil
@@ -1227,6 +1497,19 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 
 		if parsedExtendedHash != extendedHash {
 			logger.Info("ignoring error on another version of the same module", zap.String("filename", filename), zap.String("parsedExtendedHash", parsedExtendedHash), zap.String("extendedHash", extendedHash))
+			return nil
+		}
+
+		// Errors without a timestamp (legacy format) or older than the configured max age
+		// are discarded so execution is retried.
+		if timestamp.IsZero() {
+			logger.Info("deleting old deterministic error without timestamp", zap.String("filename", filename))
+			moduleStore.DeleteObject(ctx, filename)
+			return nil
+		}
+		if age := time.Since(timestamp); age > deterministicErrorMaxAge {
+			logger.Info("deleting expired deterministic error", zap.String("filename", filename), zap.Duration("age", age), zap.Duration("max_age", deterministicErrorMaxAge))
+			moduleStore.DeleteObject(ctx, filename)
 			return nil
 		}
 
@@ -1246,7 +1529,7 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 			return nil
 		}
 
-		lastError = fmt.Errorf("error from block %d in module %s: %s", blockNum, moduleName, string(cnt))
+		lastError = fmt.Errorf("error from block %d in module %s (deterministic error, cached for %d seconds): %s", blockNum, moduleName, int(time.Since(timestamp).Seconds()), string(cnt))
 		return nil
 	})
 
@@ -1254,6 +1537,67 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 		return lastError
 	}
 	return lastError
+}
+
+// Per-identifier bound so a hung control-plane RPC cannot stall request setup
+// for the lifetime of the stream.
+var foundationalStoreResolveTimeout = 10 * time.Second
+
+// resolveFoundationalStores looks up every foundational-store identifier in the
+// request on tier1 and puts the concrete endpoints on the tier2 parameters.
+// Workers then just dial those addresses; they do not talk to the control plane.
+func (s *Tier1Service) resolveFoundationalStores(ctx context.Context, execGraph *exec.Graph, reqStats *metrics.Stats) (context.Context, map[string]string, error) {
+	identifiers := foundationalStoreIdentifiers(execGraph)
+	resolved := make(map[string]string, len(identifiers))
+	for _, identifier := range identifiers {
+		start := time.Now()
+		endpoint, err := resolveFoundationalStore(ctx, s.storeResolver, identifier)
+		elapsed := time.Since(start)
+		address := foundational_store.EncodeEndpoint(endpoint)
+		if reqStats != nil {
+			reqStats.RecordFoundationalStoreResolve(identifier, address, elapsed, err)
+		} else {
+			metrics.RecordFoundationalStoreResolution(err == nil, elapsed)
+		}
+		if err != nil {
+			return ctx, nil, fmt.Errorf("failed to resolve foundational store %q: %w", identifier, err)
+		}
+		resolved[identifier] = address
+	}
+
+	if params, ok := reqctx.GetTier2RequestParameters(ctx); ok {
+		params.FoundationalStoreEndpoints = resolved
+		ctx = reqctx.WithTier2RequestParameters(ctx, params)
+	}
+	return ctx, resolved, nil
+}
+
+func resolveFoundationalStore(ctx context.Context, resolver dregistry.Resolver, identifier string) (*dregistry.Endpoint, error) {
+	resolveCtx, cancel := context.WithTimeoutCause(ctx, foundationalStoreResolveTimeout, fmt.Errorf("foundational store resolve timeout after %s", foundationalStoreResolveTimeout))
+	defer cancel()
+	return resolver.Resolve(resolveCtx, identifier)
+}
+
+func foundationalStoreIdentifiers(execGraph *exec.Graph) []string {
+	if execGraph == nil {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	var out []string
+	for _, module := range execGraph.UsedModules() {
+		for _, input := range module.Inputs {
+			fs := input.GetFoundationalStore()
+			if fs == nil {
+				continue
+			}
+			if _, ok := seen[fs.Identifier]; ok {
+				continue
+			}
+			seen[fs.Identifier] = struct{}{}
+			out = append(out, fs.Identifier)
+		}
+	}
+	return out
 }
 
 func setupRequestStats(ctx context.Context, outputModuleName, outputModuleHash string, execGraph *exec.Graph, productionMode, tier2 bool) (context.Context, *metrics.Stats) {
@@ -1275,20 +1619,27 @@ type overloadingStatus struct {
 	activeRequestCount int
 	softLimit          int
 	hardLimit          int
+	// cpuOverloaded is set while the CPU evictor considers the pod overloaded,
+	// independently of the request-count limits
+	cpuOverloaded bool
 }
 
 // softLimitWouldBeReached returns true if the soft limit would be reached if one more request was added.
 func (s *overloadingStatus) softLimitWouldBeReached() bool {
-	return s.softLimit > 0 && s.activeRequestCount+1 >= s.softLimit
+	return s.cpuOverloaded || (s.softLimit > 0 && s.activeRequestCount+1 >= s.softLimit)
 }
 
 // hardLimitReached returns true if the hard limit is actually reached from the active request count.
 func (s *overloadingStatus) hardLimitReached() bool {
-	return s.hardLimit > 0 && s.activeRequestCount >= s.hardLimit
+	return s.cpuOverloaded || (s.hardLimit > 0 && s.activeRequestCount >= s.hardLimit)
 }
 
 // canAcceptUpcomingRequests returns true if the service can accept upcoming new requests.
 func (s *overloadingStatus) canAcceptUpcomingRequests() bool {
+	if s.cpuOverloaded {
+		return false
+	}
+
 	if s.softLimit <= 0 && s.hardLimit <= 0 {
 		return true
 	}
@@ -1305,18 +1656,28 @@ func (s *overloadingStatus) canAcceptUpcomingRequests() bool {
 }
 
 func (s *Tier1Service) getOverloadedStatus() (status overloadingStatus) {
-	// Never overloaded if both soft & hard limit are 0, -1 or anything less
+	status.cpuOverloaded = s.evictor != nil && s.evictor.IsOverloaded()
+
+	// request-count limits only apply when either soft or hard limit is > 0
 	if s.activeRequestsSoftLimit <= 0 && s.activeRequestsHardLimit <= 0 {
-		return
+		return status
 	}
 
-	activeRequestCount := s.getActiveRequestCount()
+	status.activeRequestCount = s.getActiveRequestCount()
+	status.softLimit = s.activeRequestsSoftLimit
+	status.hardLimit = s.activeRequestsHardLimit
+	return status
+}
 
-	return overloadingStatus{
-		activeRequestCount: activeRequestCount,
-		softLimit:          s.activeRequestsSoftLimit,
-		hardLimit:          s.activeRequestsHardLimit,
-	}
+// refreshReadiness re-derives the readiness flag from the current overload
+// status. The lock covers the read and the write together, so two callers
+// evaluating at once cannot apply their answers out of order and leave the flag
+// disagreeing with the status.
+func (s *Tier1Service) refreshReadiness() {
+	s.readinessLock.Lock()
+	defer s.readinessLock.Unlock()
+	status := s.getOverloadedStatus()
+	s.appSetIsReadyState(status.canAcceptUpcomingRequests())
 }
 
 func (s *Tier1Service) listActiveRecords() string {

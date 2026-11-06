@@ -15,6 +15,7 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/logging"
+	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -68,6 +69,19 @@ func (p *Pipeline) ProcessFromExecOutput(
 
 func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err error) {
 	ctx := p.ctx
+
+	p.blockMu.Lock()
+	defer p.blockMu.Unlock()
+	if p.drained {
+		return ErrShuttingDown
+	}
+
+	if !p.processingBlocksSet {
+		p.processingBlocksSet = true
+		if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
+			reqHandler.SetProcessingBlocks()
+		}
+	}
 
 	metrics.BlockBeginProcess.Inc()
 	defer metrics.BlockEndProcess.Inc()
@@ -155,14 +169,14 @@ func (p *Pipeline) processBlock(
 	case bstream.StepUndoPartial:
 		if reqctx.PartialBlocks(ctx) {
 			p.blockStepMap[bstream.StepUndoPartial]++
-			if err := p.handleStepUndoPartial(cursor); err != nil {
+			if err := p.handleStepUndoPartial(ctx, cursor); err != nil {
 				return err
 			}
 		}
 
 	case bstream.StepUndo:
 		p.blockStepMap[bstream.StepUndo]++
-		if err := p.handleStepUndo(clock, cursor, reorgJunctionBlock); err != nil {
+		if err := p.handleStepUndo(ctx, clock, cursor, reorgJunctionBlock); err != nil {
 			return fmt.Errorf("step undo: %w", err)
 		}
 	case bstream.StepStalled:
@@ -172,6 +186,13 @@ func (p *Pipeline) processBlock(
 		}
 	case bstream.StepNew:
 		p.blockStepMap[bstream.StepNew]++
+		if p.blockStepMap[bstream.StepNew] == 1 {
+			// StepNew blocks only come from the hub: the request left the
+			// file-based catchup section and is now streaming live.
+			if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
+				reqHandler.SetLive()
+			}
+		}
 
 		// legacy metering
 		//todo: (deprecated)
@@ -247,8 +268,41 @@ func (p *Pipeline) undoPartialStates() error {
 	return nil
 }
 
+// undoWarnThreshold is the number of reverted blocks above which an undo signal is logged as a warning.
+const undoWarnThreshold = 5
+
+var undoWarnMessage = fmt.Sprintf("sending undo signal reverting more than %d blocks", undoWarnThreshold)
+
+// reportUndoSignal observes the distance of an undo signal sent to the user and warns when it
+// reverts more than 'undoWarnThreshold' blocks. The 'requestCursor' is only set when the undo
+// signal is caused by the cursor of an incoming request pointing to a block that was reorged out.
+func reportUndoSignal(ctx context.Context, source string, headBlockNum, lastValidBlockNum uint64, requestCursor string) {
+	var distance uint64
+	if headBlockNum > lastValidBlockNum {
+		distance = headBlockNum - lastValidBlockNum
+	}
+	metrics.UndoSignalDistance.ObserveFloat64(float64(distance), source)
+
+	if distance <= undoWarnThreshold {
+		return
+	}
+
+	fields := []zap.Field{
+		zap.String("trace_id", tracing.GetTraceID(ctx).String()),
+		zap.String("source", source),
+		zap.Uint64("head", headBlockNum),
+		zap.Uint64("revert_up_to", lastValidBlockNum),
+		zap.Uint64("distance", distance),
+	}
+	if requestCursor != "" {
+		fields = append(fields, zap.String("cursor", requestCursor))
+	}
+
+	reqctx.Logger(ctx).Warn(undoWarnMessage, fields...)
+}
+
 // handleUndo reverts a block's outputs and sends an undo signal to the user.
-func (p *Pipeline) handleUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
+func (p *Pipeline) handleUndo(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
 	if err := p.forkHandler.handleUndo(clock); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
 	}
@@ -269,6 +323,9 @@ func (p *Pipeline) handleUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor,
 
 	p.lastProcessedBlockRef = reorgJunctionBlock
 	p.lastCursor = targetCursor
+
+	reportUndoSignal(ctx, "reorg", clock.Number, reorgJunctionBlock.Num(), "")
+
 	return p.respFunc(
 		&pbsubstreamsrpc.Response{
 			Message: &pbsubstreamsrpc.Response_BlockUndoSignal{
@@ -282,7 +339,7 @@ func (p *Pipeline) handleUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor,
 
 // handleStepUndo handles a regular undo step: undoes any pending partial states,
 // then reverts the block and sends an undo signal to the user.
-func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
+func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
 
 	if p.previousLastPartialBlock != nil && p.previousLastPartialBlock.Num() > reorgJunctionBlock.Num() {
 		p.previousLastPartialBlock = nil // remove assumptions about an 'undone' previous partial block
@@ -290,13 +347,20 @@ func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cur
 	if err := p.undoPartialStates(); err != nil {
 		return err
 	}
-	return p.handleUndo(clock, cursor, reorgJunctionBlock)
+	return p.handleUndo(ctx, clock, cursor, reorgJunctionBlock)
 }
 
 // handleStepUndoPartial handles an undo specifically for partial blocks.
 // It undoes partial states and sends an undo signal to the user.
-func (p *Pipeline) handleStepUndoPartial(cursor *bstream.Cursor) error {
+func (p *Pipeline) handleStepUndoPartial(ctx context.Context, cursor *bstream.Cursor) error {
 	if p.partialProcessingState == nil {
+		return nil
+	}
+
+	if len(p.partialProcessingState.processedPartials) == 0 {
+		// no output was sent for this block: the client has nothing to undo, and an undo
+		// signal here would name a block it never received
+		p.partialProcessingState = nil
 		return nil
 	}
 
@@ -318,7 +382,7 @@ func (p *Pipeline) handleStepUndoPartial(cursor *bstream.Cursor) error {
 		return err
 	}
 
-	return p.handleUndo(clock, targetCursor, reorgJunctionBlock)
+	return p.handleUndo(ctx, clock, targetCursor, reorgJunctionBlock)
 }
 
 func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
@@ -328,10 +392,52 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 		return fmt.Errorf("exec output cache: handle final: %w", err)
 	}
 	p.forkHandler.removeReversibleOutput(clock.Id)
-	return nil
+	return p.checkFinalBlockLag(clock.Number)
+}
+
+// checkFinalBlockLag runs once per segment. Block numbers can be skipped, so the boundary is
+// detected by a change of segment rather than by a block number divisible by the segment size.
+func (p *Pipeline) checkFinalBlockLag(blockNum uint64) error {
+	if p.getRecentFinalBlock == nil {
+		return nil
+	}
+	segment := blockNum / p.stateBundleSize
+	if segment <= p.lastLagCheckSegment {
+		return nil
+	}
+	p.lastLagCheckSegment = segment
+
+	logger := reqctx.Logger(p.ctx)
+	lastFinalBlock, err := p.getRecentFinalBlock()
+	if err != nil {
+		logger.Warn("cannot get last final block to check final block lag", zap.Error(err))
+		return nil
+	}
+
+	target, tooFarBehind := LinearHandoffLagTarget(segment*p.stateBundleSize, reqctx.Details(p.ctx).StopBlockNum, lastFinalBlock, p.stateBundleSize, MaxLinearHandoffLagSegments)
+	if !tooFarBehind {
+		return nil
+	}
+	logger.Info("final block is too far behind the last final block, disconnecting client so it back-processes the gap on reconnection",
+		zap.Uint64("final_block", blockNum),
+		zap.Uint64("new_handoff_block", target),
+		zap.Uint64("last_final_block", lastFinalBlock),
+		zap.Uint64("max_lag_segments", MaxLinearHandoffLagSegments),
+	)
+	return ErrStreamFellTooFarBehind
 }
 
 func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, parentBlock bstream.BlockRef, idx int32, isLast bool) (err error) {
+	if p.isTier1 && p.checkPendingShutdown() {
+		// same as handleStepNew: end the stream so the client reconnects elsewhere. Going silent
+		// instead would leave the stream open, sending nothing but an undo signal at every block
+		// boundary until the process exits.
+		if err := p.quickSaveStores(ctx, "shutting down"); err != nil {
+			return err
+		}
+		return ErrShuttingDown
+	}
+
 	if p.lastProcessedBlockRef != nil && clock.Number <= p.lastProcessedBlockRef.Num() {
 		// this can happen if we got the full block and used it as the 'last partial block'
 		return nil
@@ -346,7 +452,7 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 			p.partialProcessingState.highestIndex = idx
 		} else {
 			reqctx.Logger(ctx).Warn("received partial after another non-last partial with different block numbers (without step_Undo) -- this should not happen unless you are running a chain with partial blocks AND skipped blocks", zap.Uint64("received", clock.Number), zap.Uint64("expected", p.partialProcessingState.num))
-			if err := p.handleStepUndoPartial(cursor); err != nil {
+			if err := p.handleStepUndoPartial(ctx, cursor); err != nil {
 				return err
 			}
 			// partialProcessingState is now nil, a new sequence starts below
@@ -373,7 +479,7 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 		// it is a different version of the block (a reorg happening inside partial blocks).
 		// Undo the partials sent so far.
 		parentRef := p.partialProcessingState.previousBlockRef // same block number: same parent
-		if err := p.handleStepUndoPartial(cursor); err != nil {
+		if err := p.handleStepUndoPartial(ctx, cursor); err != nil {
 			return err
 		}
 		if !isLast {
@@ -391,9 +497,6 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 
 	reqDetails := reqctx.Details(ctx)
 	if isBlockOverStopBlock(clock.Number, reqDetails.StopBlockNum) {
-		return nil
-	}
-	if p.isTier1 && p.checkPendingShutdown() {
 		return nil
 	}
 	if p.pendingUndoMessage != nil && p.gate.shouldSendOutputs() {
@@ -460,6 +563,20 @@ func normalizeModuleOutput(in *pbsubstreamsrpc.MapModuleOutput, outputModule str
 	return in
 }
 
+// Drain waits for the block being processed (if any) to finish, quick-saves the stores
+// and makes every later ProcessBlock call return ErrShuttingDown. It lets the caller end
+// the stream on a timer without waiting for the next block, which can take a long time
+// on slow chains. The caller is expected to cancel the stream right after.
+func (p *Pipeline) Drain(reason string) error {
+	p.blockMu.Lock()
+	defer p.blockMu.Unlock()
+	if p.drained {
+		return nil
+	}
+	p.drained = true
+	return p.quickSaveStores(p.ctx, reason)
+}
+
 // quickSaveStores writes the current store state to the temporary quicksave store so a
 // reconnecting client can resume without reprocessing. It is called both on graceful server
 // shutdown and on client disconnect. `reason` is only used for logging. It is idempotent: a
@@ -506,6 +623,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	}
 
 	p.insideReorgUpTo = nil
+	p.currentBlockNum.Store(clock.Number)
 	reqDetails := reqctx.Details(ctx)
 
 	if p.respFunc != nil {
@@ -583,7 +701,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 			}
 			logger.Info("receiving new block with an active partial state, but previousLastPartialBlock is not the same as the current block. Undoing partial state",
 				zap.String("previous last partial", prevLastPartial), zap.Stringer("current new block", clock))
-			if err := p.handleStepUndoPartial(cursor); err != nil {
+			if err := p.handleStepUndoPartial(ctx, cursor); err != nil {
 				return fmt.Errorf("failed to undo partial states: %w", err)
 			}
 		}
@@ -783,7 +901,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 			}
 
 			if errors.Is(recoveredErr, wasm.ErrWasmDeterministicExec) || errors.Is(recoveredErr, store.ErrStoreAboveMaxSize) {
-				p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, fmt.Errorf("%w (deterministic error)", recoveredErr))
+				p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, recoveredErr)
 				out.err = recoveredErr
 				return
 			}

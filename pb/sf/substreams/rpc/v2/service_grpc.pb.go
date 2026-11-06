@@ -26,7 +26,18 @@ const (
 // StreamClient is the client API for Stream service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Stream is the primary service for consuming Substreams data. It provides a real-time
+// and historical stream of blockchain blocks processed through Substreams modules.
 type StreamClient interface {
+	// Blocks streams processed blockchain data for the requested range, applying the specified
+	// Substreams modules. Responses include a one-time `SessionInit` message, optional progress
+	// updates during parallel processing, `BlockScopedData` messages for each processed block,
+	// `BlockUndoSignal` messages on chain reorganizations, and an `Error` fatal error notification.
+	//
+	// For reliable, exactly-once consumption, see `BlockScopedData.cursor` and
+	// `BlockUndoSignal.last_valid_cursor`: persisting and resuming from these cursors is the
+	// foundation of the "never miss a beat" guarantee.
 	Blocks(ctx context.Context, in *Request, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Response], error)
 }
 
@@ -60,7 +71,18 @@ type Stream_BlocksClient = grpc.ServerStreamingClient[Response]
 // StreamServer is the server API for Stream service.
 // All implementations should embed UnimplementedStreamServer
 // for forward compatibility.
+//
+// Stream is the primary service for consuming Substreams data. It provides a real-time
+// and historical stream of blockchain blocks processed through Substreams modules.
 type StreamServer interface {
+	// Blocks streams processed blockchain data for the requested range, applying the specified
+	// Substreams modules. Responses include a one-time `SessionInit` message, optional progress
+	// updates during parallel processing, `BlockScopedData` messages for each processed block,
+	// `BlockUndoSignal` messages on chain reorganizations, and an `Error` fatal error notification.
+	//
+	// For reliable, exactly-once consumption, see `BlockScopedData.cursor` and
+	// `BlockUndoSignal.last_valid_cursor`: persisting and resuming from these cursors is the
+	// foundation of the "never miss a beat" guarantee.
 	Blocks(*Request, grpc.ServerStreamingServer[Response]) error
 }
 
@@ -129,7 +151,12 @@ const (
 // EndpointInfoClient is the client API for EndpointInfo service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// EndpointInfo provides metadata about the Substreams endpoint, including supported chains
+// and protocol capabilities.
 type EndpointInfoClient interface {
+	// Info returns metadata about the endpoint such as the supported chain(s) and which
+	// Substreams protocol versions are available.
 	Info(ctx context.Context, in *v2.InfoRequest, opts ...grpc.CallOption) (*v2.InfoResponse, error)
 }
 
@@ -154,7 +181,12 @@ func (c *endpointInfoClient) Info(ctx context.Context, in *v2.InfoRequest, opts 
 // EndpointInfoServer is the server API for EndpointInfo service.
 // All implementations should embed UnimplementedEndpointInfoServer
 // for forward compatibility.
+//
+// EndpointInfo provides metadata about the Substreams endpoint, including supported chains
+// and protocol capabilities.
 type EndpointInfoServer interface {
+	// Info returns metadata about the endpoint such as the supported chain(s) and which
+	// Substreams protocol versions are available.
 	Info(context.Context, *v2.InfoRequest) (*v2.InfoResponse, error)
 }
 

@@ -71,42 +71,39 @@ pub fn map_solana_token_events(params: String, block: Block) -> Result<Output, E
     let parameters = parse_parameters(params)?;
 
     let mut output = Output::default(); // 1.
-    let timestamp = block.block_time.as_ref().unwrap().timestamp;
+    let timestamp = block.block_time.timestamp;
 
     for confirmed_trx in block.transactions_owned() { // 2.
         let accounts = confirmed_trx.resolved_accounts_as_strings(); // 3.
 
-        if let Some(trx) = confirmed_trx.transaction { // 4.
-            let trx_hash = bs58::encode(&trx.signatures[0]).into_string();
-            let msg = trx.message.unwrap(); // 5.
-            let meta = confirmed_trx.meta.as_ref().unwrap(); // 6.
+        let trx = &confirmed_trx.transaction; // 4.
+        let trx_hash = bs58::encode(&trx.signatures[0]).into_string();
+        let msg = &trx.message;
+        let meta = &confirmed_trx.meta;
 
-            for (i, compiled_instruction) in msg.instructions.iter().enumerate() { // 7.
-                utils::process_compiled_instruction( // 8.
-                    &mut output,
-                    timestamp,
-                    &trx_hash,
-                    meta,
-                    i as u32,
-                    compiled_instruction,
-                    &accounts,
-                    &parameters
-                );
-            }
+        for (i, compiled_instruction) in msg.instructions.iter().enumerate() { // 5.
+            utils::process_compiled_instruction( // 6.
+                &mut output,
+                timestamp,
+                &trx_hash,
+                meta,
+                i as u32,
+                compiled_instruction,
+                &accounts,
+                &parameters
+            );
         }
     }
 
-    Ok(output) // 9.
+    Ok(output) // 7.
 }
 ```
 1. Create an `Output` object, which is the container of all the events extracted.
 2. Iterate over the confirmed transactions of the block.
 3. Get the accounts of the transaction. The `resolved_accounts()` method contains also accounts stored in the [Address Lookup Tables](https://docs.solana.com/developing/lookup-tables).
-4. _Unwrap_ the transaction if it is available.
-5. _Unwrap_ the transaction message.
-6. _Unwrap_ the transaction metadata.
-7. Iterate over the instructions contained within the transaction.
-8. For every instruction, call the `process_compiled_instruction(...)` function to process the instruction further.
+4. Read the transaction, its message and its metadata. These are `MessageField` values, so they read directly without unwrapping.
+5. Iterate over the instructions contained within the transaction.
+6. For every instruction, call the `process_compiled_instruction(...)` function to process the instruction further.
 
 - The `process_compiled_instruction(...)` function is defined in the `util.rs` file.
 

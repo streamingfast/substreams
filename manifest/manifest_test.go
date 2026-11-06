@@ -366,6 +366,78 @@ func TestInputParseFoundationalStore(t *testing.T) {
 			},
 			expectError: "expected package@version",
 		},
+		{
+			name:  "org reference without version",
+			input: Input{FoundationalStore: "acme/token-balances"},
+		},
+		{
+			name:  "org reference with version",
+			input: Input{FoundationalStore: "acme/token-balances@v0.1.0"},
+		},
+		{
+			name:  "org reference with digits",
+			input: Input{FoundationalStore: "0x1/store-2"},
+		},
+		{
+			name:        "org reference with empty version",
+			input:       Input{FoundationalStore: "acme/token-balances@"},
+			expectError: "omit the version or use a specific semver",
+		},
+		{
+			name:        "org reference at latest",
+			input:       Input{FoundationalStore: "acme/token-balances@latest"},
+			expectError: "omit the version or use a specific semver",
+		},
+		{
+			name:        "org reference with bad version",
+			input:       Input{FoundationalStore: "acme/token-balances@0.1.0"},
+			expectError: "not valid Semver",
+		},
+		{
+			name:        "org reference with uppercase",
+			input:       Input{FoundationalStore: "Acme/token-balances"},
+			expectError: "expected <org-slug>/<deployment-name>",
+		},
+		{
+			name:        "org reference with underscore",
+			input:       Input{FoundationalStore: "acme/token_balances"},
+			expectError: "expected <org-slug>/<deployment-name>",
+		},
+		{
+			name:        "org reference with double hyphen",
+			input:       Input{FoundationalStore: "acme/token--balances"},
+			expectError: "expected <org-slug>/<deployment-name>",
+		},
+		{
+			name:        "org reference with missing name",
+			input:       Input{FoundationalStore: "acme/"},
+			expectError: "expected <org-slug>/<deployment-name>",
+		},
+		{
+			name:        "org reference with extra segment",
+			input:       Input{FoundationalStore: "acme/a/b"},
+			expectError: "expected <org-slug>/<deployment-name>",
+		},
+		{
+			name:        "org reference with short slug",
+			input:       Input{FoundationalStore: "a/token-balances"},
+			expectError: "must be 2 to 39 characters",
+		},
+		{
+			name:        "org reference with long slug",
+			input:       Input{FoundationalStore: strings.Repeat("a", 40) + "/token-balances"},
+			expectError: "must be 2 to 39 characters",
+		},
+		{
+			name:        "org reference with long name",
+			input:       Input{FoundationalStore: "acme/" + strings.Repeat("a", 64)},
+			expectError: "must be at most 63 characters",
+		},
+		{
+			name:        "grpc url is rejected as an org reference",
+			input:       Input{FoundationalStore: "grpc://host:9000/x"},
+			expectError: "expected <org-slug>/<deployment-name>",
+		},
 	}
 
 	for _, tt := range tests {

@@ -23,9 +23,11 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/encoding"
 	_ "google.golang.org/grpc/experimental"
 )
@@ -44,6 +46,7 @@ func ListenTier1(
 	logger *zap.Logger,
 	healthCheck dgrpcserver.HealthCheck,
 	enforceCompression bool,
+	statusPage *StatusPage,
 ) (err error) {
 	grpcServer := grpcServer(svc, infoService, auth, healthCheck, enforceCompression, logger)
 	connectServer := connectServer(connectSvc, infoServiceConnect, auth, healthCheck, enforceCompression, logger)
@@ -71,14 +74,14 @@ func ListenTier1(
 
 	rootMux := http.NewServeMux()
 	rootMux.Handle("/healthz", grpcServer.HealthHandler())
-	rootMux.Handle("/", compressionHandler)
+	rootMux.Handle("/", statusPage.Handler(compressionHandler))
 
 	for _, addr := range listenAddresses {
 		go func() {
 			h2s := &http2.Server{
 				MaxConcurrentStreams: 1000,
 			}
-			handler := h2c.NewHandler(rootMux, h2s)
+			handler := h2c.NewHandler(drainRejectedRequestBody(rootMux), h2s)
 
 			if strings.Contains(addr, "*") {
 				cleanAddr := strings.ReplaceAll(addr, "*", "")
@@ -151,11 +154,17 @@ func ListenTier2(
 			grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider))),
 			grpc.MaxRecvMsgSize(1024*1024*1024),
 		),
-		// we get these errors when the tier1's dns loadbalancer selector checks availability, we want to ignore them.
+		// Health probes / LB selectors often open TCP and speak plain HTTP (or drop mid-handshake)
+		// against a TLS port; Go's http.Server logs those as ERROR. Suppress the known-benign ones.
 		dgrpcserver.WithSuppressHTTPError(
 			regexp.MustCompile(`TLS handshake error.*EOF`),
 			regexp.MustCompile(`TLS handshake error.*connection reset by peer`),
+			regexp.MustCompile(`TLS handshake error.*first record does not look like a TLS handshake`),
+			regexp.MustCompile(`http2: server: error reading preface.*connection reset by peer`),
 		),
+		// ResourceExhausted is routine admission-control backpressure on tier2, not worth Info
+		// on every refusal; everything else keeps dgrpc's normal-verbosity mapping.
+		dgrpcserver.WithCodeLevelFunc(tier2CodeLevel),
 	}
 	if enforceCompression {
 		options = append(options, dgrpcserver.WithEnforceCompression())
@@ -193,4 +202,20 @@ func ListenTier2(
 
 	return
 
+}
+
+// tier2CodeLevel mirrors dgrpc's normal-verbosity gRPC-code-to-zap-level mapping, except
+// codes.ResourceExhausted is demoted to Debug: on tier2 it signals routine admission-control
+// backpressure, not an abnormal condition worth Info on every refusal.
+func tier2CodeLevel(code codes.Code) zapcore.Level {
+	switch code {
+	case codes.ResourceExhausted:
+		return zap.DebugLevel
+	case codes.OK, codes.Canceled, codes.InvalidArgument, codes.NotFound, codes.PermissionDenied, codes.Unauthenticated:
+		return zap.DebugLevel
+	case codes.Unknown, codes.Unimplemented, codes.Internal, codes.DataLoss:
+		return zap.ErrorLevel
+	default:
+		return zap.InfoLevel
+	}
 }

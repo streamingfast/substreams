@@ -11,13 +11,13 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
+	"github.com/streamingfast/substreams/tools/devenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
 	"go.uber.org/zap"
 )
 
-const latestDummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:1cea671"
+const latestDummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:v1.7.8"
 
 func TestPartialBlocksSimple(t *testing.T) {
 	ctx := context.Background()
@@ -34,9 +34,9 @@ func TestPartialBlocksSimple(t *testing.T) {
 	burst := 120
 
 	t.Logf("Starting container with image: %s and burst %d", image, burst)
-	container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks", burst)
+	container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, "--with-flash-blocks", burst, 120, false)
 	require.NoError(t, err)
-	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
+	defer devenv.TerminateDummyBlockchain(ctx, container)
 
 	// Log container details for debugging
 	if container != nil {
@@ -56,7 +56,7 @@ func TestPartialBlocksSimple(t *testing.T) {
 	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
 
 	defer func() {
-		container.Terminate(ctx, testcontainers.StopTimeout(0))
+		devenv.TerminateDummyBlockchain(ctx, container)
 		// ensure we close this well, for next tests
 		app.Shutdown(nil)
 		app2.Shutdown(nil)
@@ -146,6 +146,12 @@ func TestPartialBlocksSimple(t *testing.T) {
 
 }
 
+// partialStoresBurst is the genesis burst of TestPartialBlocksWithStores. Its requests start 30
+// blocks past it, about 5s at 330 blocks a minute: blocks the chain produces before tier1 is up
+// and the request is live arrive as full blocks without partials, so a range starting right at
+// the burst gets fewer partials the slower the machine starts the stack.
+const partialStoresBurst = 300
+
 func TestPartialBlocksWithStores(t *testing.T) {
 	testCases := []struct {
 		name           string
@@ -157,16 +163,16 @@ func TestPartialBlocksWithStores(t *testing.T) {
 	}{
 		{
 			name:           "dev with stores",
-			startBlock:     300,
-			stopBlock:      330,
+			startBlock:     partialStoresBurst + 30,
+			stopBlock:      partialStoresBurst + 60,
 			productionMode: false,
 			spkgFile:       "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
 			outputModule:   "map_tx_counter_summary",
 		},
 		{
 			name:           "prod with stores",
-			startBlock:     300,
-			stopBlock:      330,
+			startBlock:     partialStoresBurst + 30,
+			stopBlock:      partialStoresBurst + 60,
 			productionMode: true,
 			spkgFile:       "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
 			outputModule:   "map_tx_counter_summary",
@@ -185,12 +191,12 @@ func TestPartialBlocksWithStores(t *testing.T) {
 
 			// launch dummy blockchain container with flash blocks enabled
 			image := latestDummyBlockchainImage
-			burst := int(tc.startBlock)
+			burst := partialStoresBurst
 
 			t.Logf("Starting container with image: %s and burst %d", image, burst)
-			container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, "--with-flash-blocks --with-reorgs", burst, 330)
+			container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, "--with-flash-blocks --with-reorgs", burst, 330, false)
 			require.NoError(t, err)
-			defer container.Terminate(ctx, testcontainers.StopTimeout(0))
+			defer devenv.TerminateDummyBlockchain(ctx, container)
 
 			// Log container details for debugging
 			if container != nil {
@@ -211,7 +217,7 @@ func TestPartialBlocksWithStores(t *testing.T) {
 
 			defer func() {
 				fmt.Println("Terminating container...")
-				container.Terminate(ctx, testcontainers.StopTimeout(0))
+				devenv.TerminateDummyBlockchain(ctx, container)
 				// ensure we close this well, for next tests
 				app.Shutdown(nil)
 				app2.Shutdown(nil)
@@ -357,7 +363,7 @@ func TestPartialBlocksReorgs(t *testing.T) {
 			burst := 0
 
 			t.Logf("Starting container with image: %s and burst %d", image, burst)
-			container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks --with-skipped-blocks=false --with-reorgs --block-rate=220", burst)
+			container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, "--with-flash-blocks --with-skipped-blocks=false --with-reorgs --block-rate=220", burst, 120, false)
 			require.NoError(t, err)
 
 			// Log container details for debugging
@@ -378,7 +384,7 @@ func TestPartialBlocksReorgs(t *testing.T) {
 			app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
 
 			defer func() {
-				container.Terminate(ctx, testcontainers.StopTimeout(0))
+				devenv.TerminateDummyBlockchain(ctx, container)
 				// ensure we close this well, for next tests
 				app.Shutdown(nil)
 				app2.Shutdown(nil)

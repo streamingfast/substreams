@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package sf.substreams.squasher.v1;
+
+import "sf/substreams/v1/modules.proto";
+
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/squasher/v1;pbsquasher";
+
+// Squasher merges store partials into full KV snapshots. Tier1 calls it and
+// waits until the destination full KV is on disk.
+service Squasher {
+  // Squash covers every range in order for one store module. The server keeps
+  // the full KV hot, copies over empty partials, and merges the rest. The RPC
+  // returns after the last full KV is on disk.
+  rpc Squash(SquashRequest) returns (SquashResponse);
+}
+
+message Range {
+  uint64 start_block = 1;
+  uint64 exclusive_end_block = 2;
+}
+
+message SquashRequest {
+  string module_name = 1;
+  string module_hash = 2;
+  uint64 module_initial_block = 3;
+  sf.substreams.v1.Module.KindStore.UpdatePolicy update_policy = 4;
+  string value_type = 5;
+
+  // Object-store URL of the module state root (the same value ProcessRangeRequest.state_store uses).
+  string state_store = 6;
+  // Cache tag already resolved by tier1 (auth override included). Empty means the store root itself.
+  string state_store_default_tag = 7;
+
+  // Legacy single-segment form. Used only when `ranges` is empty: the full KV
+  // currently ending at start_block is the merge base for this one partial.
+  uint64 start_block = 8;
+  uint64 exclusive_end_block = 9;
+
+  // If non-zero, overrides the default store size limit (in bytes) for this merge.
+  uint64 store_size_limit = 10;
+
+  // Contiguous segments of one store module, in order. When non-empty this is
+  // the squash run and fields 8/9 are ignored.
+  repeated Range ranges = 11;
+}
+
+message SquashResponse {
+  uint64 exclusive_end_block = 1;
+  uint64 store_size_bytes = 2;
+  // True when a full KV already existed at exclusive_end_block and was loaded instead of merging.
+  bool loaded_existing_full_kv = 3;
+}

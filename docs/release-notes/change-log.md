@@ -11,13 +11,1125 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Docker
+
+- Upgrade packages (including `apt`, now 2.8.4) when building the `substreams` Docker image to clear a Docker Scout HIGH CVE inherited from the Ubuntu 24.04 base image.
+- Bump `github.com/andybalholm/brotli` to 1.2.7 and `github.com/klauspost/compress` to 1.20.2 to clear a Docker Scout
+  CRITICAL and a HIGH CVE.
+
+### Server
+
+- Log `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` on the `incoming Substreams Blocks request` and `incoming Substreams Estimate request` log lines when the auth plugin provides them (`x-auth-method`, `x-auth-jwt-lifetime-bucket`, `x-auth-jwt-iat`, `x-auth-jwt-exp`). Nothing changes without the plugin.
+
+### CLI
+
+- `substreams auth` now writes the selected API key to `.substreams.env` as `SUBSTREAMS_API_KEY` instead of exchanging it for a JWT, which expired and was never refreshed. `substreams auth --paste` now only accepts an API key (a JWT is rejected; export `SUBSTREAMS_API_TOKEN` yourself for advanced use).
+- Add an [Authentication Reference](../references/authentication.md) (API key vs short-lived JWT) and a guide to [migrate from `SUBSTREAMS_API_TOKEN` to `SUBSTREAMS_API_KEY`](../references/migrating-to-api-key.md).
+- `substreams registry publish` no longer logs the registry API key at debug level.
+- Remove the unused Substreams-powered subgraph code generator (it was no longer registered under `substreams codegen`). The `SUBSTREAMS_AUTH_ISSUE_URL` environment variable is no longer used.
+
+### Sink
+
+- SQL sink (PostgreSQL): DSN values with characters like `/` or a space now reach the database as given. They were URL
+  encoded into a connection string that doesn't decode them, so `sslrootcert=/etc/ssl/ca.pem` or
+  `timezone=Europe/London` were wrong, and a password with a space made the DSN fail to parse.
+- SQL sink: a DSN that fails to parse no longer prints the password in the error. The error now says to percent-encode
+  reserved characters in the user name and password.
+- SQL sink: add `--password-envvar` to `substreams sink postgres` and `substreams sink clickhouse`. When the DSN has no
+  password, the sink reads it from that environment variable (`POSTGRES_PASSWORD` and `CLICKHOUSE_PASSWORD` by default)
+  and percent-encodes it into the DSN, so it can contain any character.
+- SQL sink (ClickHouse, DatabaseChanges): a password percent-encoded in the DSN now reaches the database intact. A
+  password with `/`, `?`, `#` or `%` broke the connection string.
+- Sinks: the `sinker from CLI` log line lists only the names of the `-H` headers, not their values, which can carry
+  credentials.
+- Webhook sink: mask the password of the webhook and undo URLs in logs, errors and the termination log. A URL that
+  does not parse is no longer quoted in the error.
+- SQL sink (DatabaseChanges): stop formatting each block's whole output as text to check that it isn't empty, which took
+  over a third of the sink's CPU on a busy module.
+- SQL sink (DatabaseChanges, PostgreSQL): send a flush's statements through a pipeline instead of one round trip each, in
+  the same order and transaction, so a flush waits far less on the network. Each is still a statement of its own for the
+  server. With about 1 ms of latency to the database, `BenchmarkPostgresFlush` goes from 707 to 54,440 rows/s on inserts.
+  This times the flush only, so a full run gains less. `tx_query_execution_duration` reports one `batch` type instead of
+  `normal` and `undo`.
+- SQL sink (PostgreSQL): connect through pgx rather than lib/pq, which the proto sink already used for binary COPY.
+  Connections behave as before: TLS stays required unless configured otherwise, and sessions use the same date style,
+  encoding and string settings. lib/pq's DSN options still work, except an enabled `sslinline`,
+  `load_balance_hosts=random` and a list of `hostaddr` values, which are now refused at startup.
+- SQL sink (DatabaseChanges): fix changes to rows with a composite primary key being applied to the wrong row when a
+  key value contains `/`. Within a batch, keys like (`a/b`, `c`) and (`a`, `b/c`) were taken for the same row, so the
+  second change was merged into the first row's operation (or rejected as a duplicate insert) and never written to
+  its own row.
+- SQL sink (DatabaseChanges): an invalid `UpdateOp` sequence on one field within a batch (for example `ADD` after
+  `MAX`) now stops the sink with an error. Upserts and updates used to ignore it, so the change was silently dropped,
+  along with any other fields of that change not merged yet.
+- SQL sink (DatabaseChanges, PostgreSQL): undo a block's changes last to first on a reorg. The order within a block was
+  left to the database, so undoing a child row inserted after its parent in one block could fail on a foreign key and
+  stop the sink.
+- SQL sink (DatabaseChanges, ClickHouse): write the cursor before a flush returns. It was sent as an asynchronous
+  insert not waited for, so a restart soon after a flush could read the previous cursor and write blocks again, and a
+  server crash could lose the cursor of a flush taken as done.
+- SQL sink (DatabaseChanges): report how long the cursor write takes. The flush debug log gains `cursor_took`, and
+  `substreams_sink_sql_tx_query_execution_duration` gains a `cursor` series. ClickHouse table inserts now feed its
+  `normal` series too, which was only filled for PostgreSQL.
+- SQL sink (DatabaseChanges): count live flushes skipped because the average flush outlasts the time between blocks.
+  The periodic stats log shows `live_flush_skipped` once any is skipped, and
+  `substreams_sink_postgres_live_flush_skipped_count` exposes it as a metric.
+
+## v1.26.0
+
+### Server
+
+- Tier2 skips loading dependency stores and compiling WASM modules for a segment once its
+  cached block index proves every module excludes all of the segment's blocks. It still writes
+  the same (empty) output files as before.
+
+- Bumped `dauth`: with continuous authentication, each continuous `Authenticate` response now refreshes the stream's trusted headers, and metering reads them on every event (#980). A stream whose first authentication returned no identity is metered with it from the next continuous call on.
+- Add `Tier1Config.AllowPrunedChain`, forwarded to tier2. It lets
+  requests keep running Substreams whose modules (mappers and stores) start before the chain's first streamable block,
+  after that block was raised (the chain was pruned). Those modules run from the first streamable block on,
+  and their stores resume from the snapshots taken before the pruning, which keep their original names
+  (ex: `0400100000-0350000000.kv`). A request is refused when a store has no snapshot at the first streamable block
+  to resume from, and the error says which store and how to fix it.
+  When it is enabled, a request using a store without an initial block is refused: such a store would be rebuilt from the new
+  first streamable block each time it is raised, while cached outputs still reflect its older state. Every store must
+  set an initial block, at or above the first streamable block.
+
+- Fix requests failing with `snapshot "…" does not exist` after the chain's first streamable block was raised, for
+  stores without an initial block. Their snapshots written before are named after the previous first streamable block
+  and were counted as present, then failed to load. They are now ignored and the store is rebuilt.
+
+- Fix dev-mode requests reading blocks below the first streamable block when that block is not a multiple of the
+  segment size: the linear handoff was rounded down below it. It now stays at or above the first streamable block.
+
+- Fix requests with a cursor being refused with `invalid start block …, must be >= …` when their start block is below
+  the first streamable block: the cursor replaces the start block, so the block it resolves to is what is checked now.
+
+- Fix the live back filler (started after a quickload) stopping for the rest of the request when it rewound below the
+  first streamable block, or to a snapshot named after another initial block: its first job failed. It now starts at
+  or above the first streamable block and skips those snapshots.
+
+- Fix wasm calls that fail because the host ran out of file descriptors or memory (e.g. `Too many open files` while
+  creating an instance) being reported as deterministic errors, which returned `InvalidArgument` and were cached for 1h.
+  They now return `Internal`, and the shared cache runs the call again instead of handing the same error to every
+  stream on that block. A store backend failure is no longer kept in the shared cache either.
+
+- Fix tier1 leaking a gRPC connection each time a job failed to reach a tier2. The error now also says what failed
+  instead of just `connection refused`.
+
+- Production-mode requests disconnected for being more than 2 segments behind the last final block no longer get
+  the `endpoint is shutting down, please reconnect` error. They get `back-processing ended too far behind the last
+  final block of the chain, please reconnect to process the gap in parallel` when back-processing finishes, and
+  `stream fell too far behind the last final block of the chain, please reconnect to process the gap in parallel`
+  while streaming final blocks. Both are still `Unavailable`.
+
+### Sink
+
+- Sinks: the `substreams stream stats` log line reports backprocessing progress again until the sink is live, as a
+  `backprocessing_progress` object with the same figures as the `substreams run` progress view: overall percentage,
+  rate, ETA, running jobs, blocks to process and blocks cached, and for each stage its percentage, first block,
+  squashed-up-to block, jobs and segments waiting to be squashed. It replaces the `progress_block_rate`,
+  `progress_last_block`, `progress_running_jobs` and `progress_total_processed_blocks` fields, which were only logged
+  once the first block of data had arrived.
+- SQL sink (DatabaseChanges): fix undo leaving changes from orphaned blocks in the database. Changes to the same
+  row in different reversible blocks of one batch were merged into one operation recorded under a single block, so
+  undoing the later block missed them (permanently for `ADD` fields), and pending changes survived an undo. They are
+  now kept as separate operations within the batch, and an undo drops the pending changes of reverted blocks and
+  writes the rest with the cursor. Batching is unchanged.
+- SQL sink (DatabaseChanges, PostgreSQL): once the sink has read or written its cursor, each flush and revert
+  transaction starts by locking its cursor row and checking it still holds the cursor the sink last read or wrote.
+  Otherwise nothing is written and the sink stops with `the stored cursor is not the one this sink last read or wrote`,
+  to be restarted from the stored cursor. This stops a second sink of the same module writing to the same database, a
+  sink writing on top of a database that lost commits (restore, failover with asynchronous replication), and a flush
+  retry applying a batch twice after a commit whose reply was lost (`ADD` fields were doubled). A conflict is not
+  retried. Other cursor rows are not checked, and the cursor update stays the last statement of the transaction.
+- SQL sink (DatabaseChanges, PostgreSQL): add `--standby-lock` to run standby sinks. A sink takes a session advisory
+  lock on the cursors table before streaming and writes through that session; the others wait, checking every
+  `--standby-lock-poll-interval`, and the first to see the lock released takes over from the stored cursor. A sink
+  whose locked session is gone stops instead of retrying its flush, and standbys serve the metrics endpoint while they
+  wait. The active sink queries its locked session every `--standby-lock-poll-interval` while not flushing, so a proxy
+  or `idle_session_timeout` doesn't end it during long stretches without writes (no failover ping-pong on sparse data).
+  See [Standby Sinks](../references/sql/standby-sinks.md).
+- SQL sink (DatabaseChanges): add `--stall-timeout`, which stops the sink when the stream delivers no block or undo for
+  that long once live (blocks held by an undo buffer count). On PostgreSQL a flush now honours its context, so the stop
+  cancels a database call in progress (the transaction rolls back); ClickHouse flushes still always run to the end.
+  The sink library's new `Sinker.LastBlockMessageAt` reports when the stream last delivered a block or undo.
+- SQL sink (DatabaseChanges): an undo whose transaction fails is now rolled back.
+- Sink library: a handler error is never taken for the end of the stream anymore. One wrapping `io.EOF` (a lost database
+  connection, say) used to end the run successfully, as if the stop block was reached, so a live sink exited with
+  status 0. When the handler fails while the sinker is stopping, the completion handler no longer runs on top of the
+  block it did not finish (the failure is taken as caused by the stop and not reported). The completion handler
+  now gets the cursor of the last block the handler accepted rather than of the last block received, which with
+  `--undo-buffer-size` was ahead of the blocks still in the buffer (`Sinker.LastReceivedCursor` still gives the
+  latter).
+- Sink library: add `Sinker.AwaitRun(ctx)`, which waits for `Run` to return and gives its first failure. A stop
+  terminates the sinker right away while `Run` still finishes its completion handler, so a caller about to exit can
+  wait for it there, and get a failure that the termination error, set by the stop, cannot carry.
+- SQL sink (DatabaseChanges): fix the final flush when the stream ends (stopped, or at the stop block) treating the
+  stream's latest block as final. It pruned the undo history of blocks that were still reversible, so a reorg across
+  a sink restart left orphaned rows, and with `--undo-buffer-size` it saved a cursor past the blocks still in the
+  buffer, which were then skipped. It now writes the handled blocks with the last handled block's cursor and the
+  stream's final block height, and writes nothing if a block failed to be handled. The CLI now waits (up to 45 s) for
+  that last flush before exiting: on Kubernetes, raise the pod's `terminationGracePeriodSeconds` above it (30 s by
+  default), otherwise a pod killed first re-processes the blocks since the last stored cursor on restart.
+- Add `substreams sink pubsub`, which publishes any module output to a Google Cloud Pub/Sub topic as the
+  webhook sink's batch JSON: `{"manifest": {...}, "blocks": [{"clock": {...}, "data": {...}}]}`. While
+  Substreams is not live, `--pubsub-batch-max-blocks` groups blocks into one message. A live block is
+  published in that same JSON with only that block. `--pubsub-undo` publishes reorg notifications on that
+  topic, and message ordering uses the module name as the ordering key. A publish that still fails after
+  retries stops the process with status 75 and keeps the payload for the next start.
+  `--pubsub-on-failure=skip` is the opt-in that drops a block and continues.
+- Publish a module that emits `sf.substreams.sink.pubsub.v1.Publish` in the `substreams-sink-pubsub`
+  format: one Pub/Sub message per `Publish.Message`, with that message's bytes and attributes, attribute
+  `Cursor`, and an ordering key of the zero-padded block number and message index. A reorg on that module
+  is published with attributes `LastValidBlock`, `Step=Undo`, and `Cursor`. Any other module is published
+  as the webhook sink's batch JSON.
+- Fix `substreams sink pubsub` panicking when a block has no module output, including under
+  `--noop-mode`.
+- Count a Pub/Sub message in the sink totals only after it is published.
+
+### CLI
+
+- `substreams pack` writes map entries in key order, so packing the same inputs twice gives a byte-identical
+  `.spkg`. Before, a package with a multi-entry map, such as `networks`, got a different digest from one pack to
+  the next.
+- Commands that take a package (`substreams run`, `gui`, `info`, ...) accept an organization package reference
+  `<org>/<package>@<version>`, fetched from the registry's `/v1/packages/<org>/<package>/<version>`. Without a
+  version, or with `@latest`, they fetch the package's latest release. An existing file or directory of the
+  same name is still read locally; prefix a path with `./` to keep it local in any case.
+- Manifest `imports` accept `<org>/<package>@<version>`. An organization package import needs a specific
+  version: `<org>/<package>` and `<org>/<package>@latest` are refused, as `<package>@latest` already is.
+- Manifest: a `foundational-store:` input accepts a hosted store named by its organization,
+  `<org-slug>/<deployment-name>`, with an optional `@<version>`. The server resolves the name to the
+  organization's live store on every run. A deployment id or `<package>@<version>` works as before.
+
+### Dependencies
+
+- `golang.org/x/net` is at v0.60.0, which clears CVE-2026-78663 (CRITICAL) and CVE-2026-78669, CVE-2026-78660 and
+  CVE-2026-78659 (HIGH), all HTTP/2 issues reported by Docker Scout against the image.
+- Bumped OpenTelemetry to v1.47.0 and `github.com/streamingfast/dhttp` to v0.2.0 to fix known vulnerabilities.
+- Bumped `github.com/yuin/goldmark` to v1.7.17 to fix an XSS (GO-2026-5320) in the CLI's markdown rendering.
+- Bumped `github.com/go-jose/go-jose/v4` to v4.1.6 to fix CVE-2026-116587 (HIGH, inefficient algorithmic complexity).
+- Go 1.27 or newer is now required to build.
+- `github.com/go-jose/go-jose/v4` is at v4.1.6, which clears CVE-2026-116587 (HIGH), reported by Docker Scout against the image.
+
+## v1.25.0
+
+### Docs
+
+- Document the per-store size limit on StreamingFast-hosted endpoints is now 3.5GiB (up from 1GiB), following
+  the move to the mmap stores backend. The binary default remains 1GiB, overridable with the tier1
+  `--substreams-tier1-store-size-limit` flag.
+
+### Server
+
+- Tier1 accepts a forkable hub from the process through `Tier1Modules.ForkableHub` instead of building its own, so an app running next to tier1 (firehose in `firecore`) can share it and hold live blocks in memory once. `NewLiveHub` builds that hub and `HubKeepFinalBlocks` gives how many final blocks it keeps.
+
+- Tier1 now handles Ethereum partial blocks about 20x faster, with almost no allocations. It reads the
+  transaction traces straight from the encoded block and drops the ones already sent by copying bytes,
+  instead of decoding and re-encoding the whole block for every partial.
+
+- Add the `external_calls_<kind>` metering metrics (for example `external_calls_eth_call`), counting the calls
+  made by WASM extensions. A batch counts for as many calls as it contains. Extensions report them with
+  `metering.AddExternalCalls`.
+
+### CLI
+
+- **Breaking for Rust modules**: `substreams build` and `substreams protogen` generate buffa bindings for a
+  project whose `Cargo.toml` depends on `buffa`, using `buf.build/anthropics/buffa:v0.9.2`. This pairs with
+  `substreams` 0.8.0, which replaced [prost](https://github.com/tokio-rs/prost) with
+  [buffa](https://github.com/anthropics/buffa) as its protobuf implementation. See
+  [Migrating from prost to buffa](../references/migrating-to-buffa.md).
+
+  A project that depends on `prost`, or that names neither implementation, gets
+  `buf.build/community/neoeinstein-prost` output. Generating buffa bindings for code written against prost
+  does not compile, so buffa is used only where the manifest asks for it. Add `buffa` to `[dependencies]`
+  before building against `substreams` 0.8.0.
+
+  The on-the-wire protobuf encoding is unchanged. Existing packages keep streaming, cached module outputs
+  stay valid, and sinks read the same bytes.
+
+- `substreams build` and `substreams protogen` warn when an existing `buf.gen.yaml` generates for a different
+  protobuf implementation than `Cargo.toml` depends on, a combination that does not compile.
+
+- `substreams build` and `substreams protogen` write the `mod.rs` tying buffa's generated files together,
+  which no buffa plugin produces, where `buf.gen.yaml` generates them. A prost project is unaffected: the
+  `prost-crate` plugin writes its own. The file starts with `// @generated by substreams`, and one without
+  that line is left alone, so a hand-written `mod.rs` is never overwritten; a `mod.rs` that has gone missing
+  is written back without regenerating the bindings.
+
+- Fixed `substreams build` and `substreams protogen` skipping generation as already up to date when the code on
+  disk was generated for a different target. The cache key now covers the `buf.gen.yaml` plugins and their
+  `out:` paths, so repointing it at another plugin regenerates instead of leaving stale code in place, and a
+  project whose `buf.gen.yaml` was deleted, which is what the stack-mismatch warning above tells the reader to
+  do, always regenerates. The search for a `buf.gen.yaml` now stops at the repository root, so a project nested
+  in a repository that configures `buf` for something else at its root is no longer generated with that
+  configuration.
+
+- Fixed `substreams build` and `substreams protogen` failing with two definitions of the same type when a
+  package carries its own copy of a protobuf that later became a system one. System protobufs are now matched
+  by the fully qualified types they declare rather than by file name, and the package's copy is the one that
+  stays, since it is what its modules were built against. `substreams-sink-sql`'s `services.proto` holds the
+  messages this project now ships as `deprecated.proto`.
+
+- `substreams protogen --output-path` now overrides the output directory only when it is given on the
+  command line. Without it, an existing `buf.gen.yaml` that generates somewhere other than `src/pb` is
+  followed, so `mod.rs` lands beside the files it includes instead of in a directory those files were
+  never written to. The `out:` path written into a generated `buf.gen.yaml` is now resolved relative to
+  that file rather than to the manifest, which is the same directory in a project whose `buf.gen.yaml`
+  sits beside its manifest.
+
+### Dependencies
+
+- Bumped `github.com/streamingfast/bstream` to pick up two fixes: a stream can skip the partial blocks of a
+  forkable hub it shares with another app, and `blockstream` detects a dead relayer in about 40s instead of
+  5 minutes.
+
+## v1.24.0
+
+### Sink
+
+- Add authentication to `substreams sink webhook` calls. The value of the environment variable named by
+  `--webhook-auth-header-value-envvar` is sent in the header named by `--webhook-auth-header-name`
+  (`Authorization` by default), and the secret named by `--webhook-signing-secret-envvar` signs every body
+  with HMAC-SHA256 in the `X-Substreams-Signature` header as `t=<unix seconds>,v1=<hex>` over `<t>.<body>`.
+  Receivers can verify with `webhook.VerifySignature`. Once every retry has failed, `Client.Call` returns a
+  `*webhook.DeliveryError` carrying the last HTTP status and the attempt count.
+
+- `substreams sink webhook` no longer follows redirects. A 3xx response is a failed delivery and is not retried,
+  so the auth header and the body never reach another host. Point `<url>` at the final address.
+
+- `substreams sink webhook` now reuses its connection between calls instead of opening a new one, with a new
+  TLS handshake, for every block. A failed call's error now includes the start of the receiver's response
+  body. Connecting to the receiver times out after 5s instead of 30s, and idle connections are closed after
+  30s so they are not reused after a load balancer has dropped them.
+
+- Add `--webhook-on-failure=exit` to `substreams sink webhook`. Once every retry for a block has failed the
+  sink keeps that block in `<state-file>.pending`, writes a JSON reason (URL, block, status, attempts,
+  `first_attempt_at`) to `--webhook-termination-log` when that file exists, and exits with status 75. The next
+  start delivers the pending block before it opens a Substreams stream, so retrying against a dead endpoint costs
+  no egress. The default `skip` keeps the old behaviour of dropping the block. A changed URL or secret resets
+  `first_attempt_at`. A kill in the middle of a call leaves no pending file: the cursor was not saved, so the
+  stream re-sends that block. The sink now also exposes `substreams_sink_webhook_last_delivered_block`, the
+  last delivered block.
+
+- Rename the `substreams sink webhook` metrics `webhook_calls` and `webhook_bytes_sent` to
+  `substreams_sink_webhook_calls` and `substreams_sink_webhook_bytes_sent`.
+
+- Sinks running with `--undo-buffer-size` now receive an undo signal that reaches below the buffer when the buffer
+  has emitted nothing yet, which is what a restart from a cursor sitting on a fork produces. Before, the buffer
+  swallowed it and the handler never rolled back blocks the previous run had emitted.
+
+- Add `--webhook-undo-url` to `substreams sink webhook`. When set, every undo signal is POSTed there as
+  `{"lastValidBlock": {"number", "id"}, "manifest": {"moduleName"}}` so the receiver can drop the blocks above
+  the last valid one before the replacements arrive. The notification carries the same auth header and
+  signature as blocks and follows the same retry, `--webhook-on-failure` and pending-file rules, except that
+  `--webhook-on-failure=skip` never drops one: it is retried until it goes through, and no replacement block is
+  sent before then. Without it the cursor still moves back and only the replacement blocks are delivered, as
+  before. Pair with `--undo-buffer-size` to hold back a few blocks and absorb shallow reorganizations without
+  any notification.
+
+- Add `--webhook-batch-max-blocks=N` to `substreams sink webhook`. Every call then carries up to N blocks in a
+  batch shape, `{"manifest": {...}, "blocks": [{"clock", "data"}, ...]}`, a batch of one included. A batch is sent
+  when it is full, when `--webhook-batch-max-wait` (1s) has passed and the next block arrives, when the chain is
+  live, before an undo notification, and when the stream ends. On an undo, the blocks of the open batch above
+  the last valid block are dropped unsent. `--webhook-batch-max-bytes` caps the size of a batch body (no limit
+  by default); a block larger than the cap is sent alone. A failed batch is kept and resumed as one payload.
+  Switching batching on or off while the sink is stopped discards a pending payload of the other shape; its blocks
+  come back through the stream. Default is off, one block per call as before.
+
+### Server
+
+- Fix tier1 requests rejected before their body is read (authentication, compression enforcement) sometimes
+  failing at a load balancer with HTTP 502 or `INTERNAL` instead of returning their error.
+
+- Demoted the tier2 "refusing Substreams ProcessRange request" log from `Info` to `Debug`. It was the
+  single largest source of Cloud Logging volume on `substreams-workers` under backpressure; the
+  `substreams_tier2_rejected_request_counter` metric (by reason) already tracks refusal rate without it.
+
+- Demoted tier2's gRPC "finished streaming call with code ResourceExhausted" completion log from `Info`
+  to `Debug`, using the newly added `dgrpc` `server.WithCodeLevelFunc` override. It was the second largest
+  source of Cloud Logging volume on `substreams-workers`, logged on every backpressure refusal alongside
+  the line above.
+
+- Fixed a tier1 panic (`INTERNAL: runtime error: invalid memory address or nil pointer dereference`) on a
+  production-mode request starting past the chain's final block, when that final block falls within the
+  first segment of the request's stores. The linear handoff then lands exactly on the stores' initial
+  block, leaving no segment to backprocess.
+
+### Tools
+
+- `substreams tools devenv` now waits for the dummy chain to finish its genesis burst before starting tier1.
+  The relayer can start serving mid-burst, and tier1 then planned requests against a chain a few blocks high.
+
+### Dependencies
+
+- Bumped `github.com/streamingfast/firehose-networks` to v0.3.0.
+- Bumped `github.com/streamingfast/dgrpc` to pick up `server.WithCodeLevelFunc`.
+- Bumped `github.com/streamingfast/dummy-blockchain` to v1.7.8, and `substreams tools devenv` now defaults to the
+  `ghcr.io/streamingfast/dummy-blockchain:v1.7.8` image. Its relayer no longer sometimes drops a block around
+  the chain's forks, which could make tier1 exit with `received 5 consecutive unlinkable blocks`.
+- Bumped `github.com/streamingfast/bstream` to pick up the forkable hub fixes: tier1 no longer exits with
+  `received 5 consecutive unlinkable blocks` or `cannot link block after reconnection` when it starts while
+  the merger is deleting the one-block files of a bundle it just merged.
+
+## v1.23.0
+
+### CLI
+
+- Fixed: `substreams registry login` failed with `no such file or directory` when `~/.config/substreams`
+  did not exist yet. The directory is now created before the token is written, and the token file is
+  written with mode `0600` instead of `0644` (an existing file is tightened on re-login).
+
+- A manifest can now import `sf/substreams/sink/sql/schema/v1/schema.proto` without
+  vendoring a copy of it. The file is a system protobuf, but `protoparse` needs the
+  source on disk to honour its extensions, so an import previously failed with
+  `no such file`. It is now served from an embedded copy, the same way
+  `sf/substreams/options.proto` already was.
+
+### Docs
+
+- Add a Solana how-to on versioned transactions (v0 and v1): what the new `version`,
+  `versioned`, and `transaction_config` fields are, and when a Substreams package
+  needs to rebuild against `substreams-solana` v0.15.1+ to read them.
+- Document `Feed.Delete` on the Remote Feed Hosted Store guide: remote-feed clients can
+  hard-delete a batch of keys over gRPC. Missing keys are ignored; later reads return
+  `NOT_FOUND`, not a tombstone.
+  
+- Add a Hosted Services how-to that describes Hosted Sinks and Hosted Stores, with
+  separate Remote Feed and Substreams Feed hosted-store guides. Move the Hosted
+  Sinks how-to under Hosted Services.
+
+### Server
+
+- Added `MaxRequestDuration` to the tier1 config. When non-zero, a request that has run for that long
+  is ended the same way as on shutdown: its stores are quick-saved (when a quicksave store is set) and
+  the client gets an `Unavailable` error telling it to reconnect. Set it a bit under the stream
+  duration limit of the load balancer in front of tier1, so the request ends cleanly before the load
+  balancer cuts it.
+
+- The `grpc://` / `grpcs://` squasher plugin now lives in this module at
+  `github.com/streamingfast/substreams/squash/grpc`. Firehose-core and chain
+  binaries can import that package and call `Register()` instead of depending
+  on the private `github.com/streamingfast/substreams-squasher` module.
+
+- Tier1 store merging is selected with a plugin DSN, like auth. Empty or `local://`
+  keeps today's in-process squasher. `grpc://` / `grpcs://` are registered by
+  `github.com/streamingfast/substreams/squash/grpc`.
+  When a remote is set, each squash run is one RPC per store module covering every
+  claimed segment, so empty-partial copies and merges happen on the squasher and
+  tier1 does not read store files. The call is a single attempt; transport retries
+  belong to the squasher client. If the remote is unreachable, the run is squashed
+  locally and later runs stay local until an attempt succeeds. That wait defaults
+  to 5 minutes (`Tier1Config.RemoteSquashQuietPeriod`); zero keeps the default. A
+  live remote that returns an application error still fails the request.
+
+- Production-mode requests are disconnected with the same `Unavailable` "endpoint is shutting down, please reconnect" error as a tier1 restart when they are more than
+  2 segments behind the last final block (rounded down to a segment), either when back-processing finishes or, checked
+  at every segment boundary, while streaming final blocks. Clients reconnecting from their
+  cursor then back-process the gap in parallel instead of processing it linearly on tier1. Set
+  `SUBSTREAMS_MAX_LINEAR_HANDOFF_LAG_SEGMENTS` to change the number of segments.
+
+- CPU eviction: new `CPUEviction.Order` config (parse it with `active_requests.ParseEvictionOrder`, e.g.
+  `dev,prod-cached,prod-catchup`) lists the request classes eviction may cancel, least important first. A
+  class left out is never cancelled. The default is `dev,prod-cached,prod-catchup`: live production requests
+  are no longer cancelled unless `prod-live` is added to the order.
+  A new `prod-cached` class covers production requests that only stream outputs cached by tier2 and have
+  not processed a block on tier1. They run no wasm there, so `MinBurnCores` does not apply to them, and
+  since their CPU cost is unknown, a round of eviction stops right after cancelling one of them.
+
+- Per-store lines are now logged at `Debug` instead of `Info`: `using mmap KV store`,
+  `using in-memory KV store`, `flushing store at boundary`, `merged partial into full store`,
+  `deleting partial store`. They fired for every store opened by tier1 and tier2 and for
+  every squash. `squashing time metrics` stays at `Info` as the squash progress signal.
+
+- The tier1 block hub logs `processing block` at `Debug`, except for one line every 10 seconds
+  kept at `Info` to show progress; on flash-block chains it fired several times per block.
+  `linking live block using one blocks` moves up to `Info`, so a one-block store lookup after
+  an unlinkable live block shows in production logs.
+  
+- Tier1 no longer logs `all stores completed, marking stores sync completed` and
+  `waiting for output stream to complete, stores ready` after every tier2 job on requests without stores.
+  It also no longer schedules an extra job lookup each time.
+
+- `substreams-tier1` now asks the relayer for every block from its own LIB when it connects
+  or reconnects, instead of the last 2 blocks. A gap left by a disconnect is filled from the
+  relayer's memory, and only the part older than what the relayer holds is read from the
+  one-block store. On fast chains a tier1 that fell a few seconds behind used to fill the
+  whole gap from the one-block store, long enough for the relayer to drop it again.
+  
+- Fix partial-blocks (flashblocks) streams on a tier1 that is shutting down. The stream now
+  ends with `Unavailable` like a full-block stream does, so the client reconnects elsewhere.
+  It used to stay open but silent, then sent an undo signal at each block boundary naming a
+  block the client had never received.
+  
+- Never send an undo signal for partial-block state whose outputs were never sent.
+
+- `substreams-tier1` now squashes store partials in runs. When a segment is ready to be merged, every
+  following segment whose partial is already there is merged by the same command, up to 1000 segments or 30 s
+  of work, instead of one segment per command. Each command waits for a round trip through the scheduler loop,
+  which also borrows a worker for every job it schedules. On a busy backprocessing request that round trip took
+  3 to 5 s, so squashing was capped at about 15 segments per minute even when a merge took 0.3 s, and it fell
+  tens of thousands of segments behind the tier2 jobs.
+
+- `substreams-tier1` squash runs now copy the previous full store over segments whose partials are all empty,
+  instead of merging and saving each of them: an empty partial leaves the store unchanged. A run lists the sizes
+  of its partials in one go, reads the first decompressed byte of the small ones only, so a large partial is
+  never downloaded, then copies the last written full store to every consecutive empty segment, 32 at a time,
+  server-side on object stores that support it. On a store most segments never touch, a run of 1000 segments
+  goes from about 190 s to a few seconds. A module's first segment and segments shorter than the store interval
+  still go through the regular squash, and so do the segments of a copy that fails.
+
+- `substreams-tier1` no longer releases the squasher's cached stores while a squash is still running. When the
+  scheduler stopped early (a tier2 job failed, or the pod was shutting down), the stores were closed under the
+  in-flight merge, which could panic the process or write an empty full store to storage. Closing now cancels
+  the squash, which stops at its next segment, and waits for it to finish.
+
+- `substreams-tier1` scheduling no longer slows down as a large backprocessing range progresses. Picking the next
+  tier2 job walked every segment between the squasher and the job frontier on every call, re-checking
+  dependencies that could not have changed, so a run over N segments cost O(N²) in scheduling. The scheduler now
+  keeps, per stage, the lowest segment that may still be pending and the highest segment completed so far, and
+  only looks at the handful of segments those point at. On a 3-stage graph with 4 workers and a squasher three
+  times slower than the jobs, scheduling 8000 segments went from 1.18 s to 2.7 ms, and now grows linearly with
+  the range. Job order is unchanged.
+
+- `substreams-tier1` now downloads the next cached execution output files while it streams the current one to a
+  production-mode client. Before, each 1000-block segment was opened, decompressed and sent before the next one
+  was even requested from the object store, so every segment paid a full store round trip on the critical path.
+  Prefetching is bounded per request by `Tier1Config.ExecOutPrefetch`: at most `Depth` segments ahead (default
+  and hard cap 4) holding at most `BudgetBytes` of decompressed data (default 64 MiB). No size is ever asked of
+  the store: the decompressed size of the last downloaded segment is the estimate for the next ones, and as many
+  download at once as estimate-sized files fit in the budget, each allowed to read an even share of it, so
+  in-flight reads never add up to more than the budget. A file bigger than its share is left to the walker and
+  the estimate is raised, so a chain going from quiet to busy shrinks the concurrency instead of overshooting.
+  A file bigger than the whole budget turns prefetching off for the rest of the request. Missing files are left
+  to the walker's existing retry loop, and the prefetcher stops looking ahead until the walker reaches them.
+  Setting either bound to zero turns prefetching off.
+
+- `substreams-tier1` now sends each batch of cached execution output on a separate goroutine, so decoding the next
+  batch overlaps with compressing and writing the current one. Before, the walker built a batch, sent it, and only
+  then started decoding the next, so the client-facing write sat on the critical path of every batch. At most one
+  batch is being built while one is sent, and a segment is only reported done once every batch is out, so message
+  order is unchanged.
+
+- `substreams-tier1` no longer copies each cached execution output payload once more while decoding it: the item
+  now aliases the buffer it was read into instead of copying out of it.
+
+- `substreams-tier1` now writes the `substreams.spkg` and `last_used` cache markers in the background instead of
+  before the pipeline starts, so those object store round trips no longer delay the first block sent. They run
+  detached from the request on their own context with a 30 second timeout: the request neither starts nor exits
+  waiting for them, and a client that disconnects early still leaves its usage marker behind.
+
+- `substreams-tier1` can now evict requests when its CPU is saturated. When its own cgroup reports CPU usage above
+  90% of quota for 15 seconds, the pod advertises itself unready to the load balancer, refuses new requests, waits
+  for the balancer to drain, then cancels enough of the heaviest requests with `Unavailable` to bring usage back
+  under 75% of quota, so their clients reconnect to a less busy pod. Order: dev-mode requests first, then production
+  requests on live blocks, then production requests still catching up from files. 
+  Off by default; enable and tune it through the tier1 app's `CPUEviction` config 
+  modes: `observe` (log only), `dev-only`, `full`
+  Needs cgroup v2 CPU accounting. A pod whose cgroup carries no CPU limit (`cpu.max` reads `max`) has no quota to
+  measure usage against and leaves the evictor off; set `CPUEviction.QuotaCoresOverride` to name the budget yourself.
+  New metrics: `substreams_tier1_cpu_*` gauges and `substreams_tier1_evicted_requests_counter`.
+
+- New `substreams_tier1_effective_active_requests` gauge, meant to replace `substreams_active_requests` as the
+  horizontal autoscaler input on tier1: the higher of the plain active-request count and the number of requests the
+  CPU budget is being spent at (`nominal_capacity * cpu_usage_ratio / cpu_eviction_target_ratio`). A pod full of
+  expensive requests, or one holding its CPU down by eviction, reports itself at capacity, so the autoscaler will
+  add more pods. Its active-request count is the one admission uses, so it includes requests still setting up and
+  never reads below `substreams_active_requests`. `CPUEviction.NominalCapacity` should be set to the autoscaler's
+  per-pod request target; it defaults to the active-requests soft limit.
+
+- Trimmed tier2's per-segment logging: a large backfill fans out into tens of thousands of `ProcessRange` calls,
+  and each one was logging ~10 `Info` lines with no steady-state diagnostic value, which could spike a pod's log
+  volume by an order of magnitude. Removed the duplicate auth-info log in the tier2 response handler (already
+  logged once per segment on the incoming request), and demoted the store-size and exec-output-file-open logs to
+  `Debug`. Also suppressed the benign `http2: server: error reading preface ...: connection reset by peer` error
+  logged whenever a client drops a connection mid-handshake against the plaintext/h2c tier2 port, mirroring the
+  existing TLS-handshake suppressions. The bigger source of the same spike was `dmetering`'s per-request event
+  emitter, opened and torn down on every `ProcessRange` call; its 4 shutdown-lifecycle logs are now `Debug` too
+  (bumped to `github.com/streamingfast/dmetering@v0.0.0-20260901152443-1ff4cd0d617d`).
+
+- Jobs of a tier1 request now reach the tier2 fleet in the order the client will read their output, instead of
+  racing each other for whatever instance has room. A job asks a per-request launch queue for its turn before every
+  request it sends to a tier2, first attempt and retries alike, and leaves the queue the moment a tier2 takes it. The
+  queue holds the jobs waiting to get in, ordered by lowest segment first and, within a segment, by highest stage.
+  Only the first 20% of that queue may dial at all, at least two jobs and at most 15; the ones behind them send
+  nothing until a job ahead gets in and moves the window up. So with 10 workers and every job turned away, the two
+  lowest segments redial every 100ms while the other eight stay silent, and a job the scheduler creates late for a
+  low segment goes to the front of the queue and dials right away. A job with nothing queued ahead of it dials
+  immediately, so a fleet with room is paced no differently than before. Without this, the segment the client reads
+  first was no more likely to land than one it would only read minutes later, and a whole request could idle behind
+  a single unlucky low segment.
+
+- A tier2 job that fails is no longer retried on a growing 1s-to-5s backoff of its own. Every reason to dial again
+  now goes through the same queue, so retries keep the request's reading order: a job that could not get in at all
+  (`ResourceExhausted: service currently overloaded`, a refused connection, `Unavailable: no healthy upstream`)
+  waits 100ms, and a job that got in and then failed waits 5 seconds once — if a tier2 then turns it away for
+  capacity, it is back on the 100ms delay with its failure already counted. The counters that end a hopeless request
+  are unchanged: five failures, or two execution timeouts, and neither is charged for a job that never got in.
+  Tunable with `SUBSTREAMS_WORKER_LAUNCH_WINDOW_PERCENT` (default 20), `SUBSTREAMS_WORKER_LAUNCH_WINDOW_MAX`
+  (default 15), `SUBSTREAMS_WORKER_OVERLOADED_RETRY_DELAY` (default 100ms, was 300ms),
+  `SUBSTREAMS_WORKER_FAILED_RETRY_DELAY` (default 5s) and
+  `SUBSTREAMS_WORKER_OVERLOADED_RETRY_JITTER` (default 100ms, added to a wait so jobs turned away at the same instant
+  do not redial in lockstep).
+
+- Jobs are now scheduled up to twice the request's worker count ahead of the blocks the client is reading, instead of
+  1.5 times, so a client that reads slowly still keeps the workers busy.
+
+- Store snapshots (fullKV files) can now be pruned to save disk space: tier1 no longer assumes that a fullKV at block
+  `x` implies that every earlier fullKV still exists. At request start it walks backwards from the first segment
+  needing work, in growing listing windows, until it finds the last block where every store module still has a
+  snapshot, and rebuilds the stores from there. Only snapshots actually seen are reused, and a job is only scheduled
+  once the previous segment of every lower stage is done, so a pruned file is never read.
+
+- A store snapshot deleted while a request that still needs it is running now fails that request with `FailedPrecondition: ... does not exist (it may have been pruned); restart the request` instead of retrying the tier2 job forever. Likewise, a mapper output file deleted after its job completed is re-produced after 30 seconds instead of being waited on forever, and a scheduler deadlock on partials left by an interrupted run (a unit shadowed under one merging a partial from disk) is fixed.
+
+- The initial store lookup no longer falls back to listing a store's whole history when its last snapshot is far
+  behind: it lists at most a handful of bounded windows.
+
+- Progress messages are sent far less often. The cadence now widens with the age of the request — every second for
+  the first minute, every 10 seconds up to 5 minutes, every 30 seconds up to 10 minutes, then every minute — and it
+  applies to the linear phase too, which previously sent one every 200ms. Progress messages count as egress like any
+  other response, so a long-running or live request paid for a steady stream of them.
+
+- `Request.progress_messages_interval_ms` is now honoured: it was validated and then ignored. Setting it pins the
+  progress cadence for the whole request instead of using the ramp above; the 500ms minimum is unchanged.
+
+- `substreams-tier1` now names the usage marker it writes in every module cache folder after the request's plan tier: `last_used_<plan>` (lowercase, e.g. `last_used_pro`), still plain `last_used` when unauthenticated. `firecore tools substreams purge` reads the plan back from that name to apply a retention per plan.
+
+### Tools
+
+- `substreams tools prometheus-exporter` now says *why* an endpoint is down. Every failure is classified into a
+  `reason` -- `invalid_config`, `connect_failed`, `connect_timeout`, `invalid_request`, `request_timeout`,
+  `stream_error`, `stale_block`, `invalid_response` or `no_data` -- exposed on the new
+  `substreams_healthcheck_failure_count{reason,grpc_code}` counter and included in the logs. An alert firing on
+  `substreams_healthcheck_status` no longer requires guessing whether the endpoint was unreachable, unauthenticated,
+  overloaded or merely late. A dial that fails outright is reported as `connect_failed`, carrying the dial
+  error where gRPC exposes it (`connection refused`); a hostname that does not resolve surfaces as the balancer's
+  own `no children to pick from`, since it replaces the resolver error. `connect_timeout` is reserved for a
+  connection that is merely slow to come up and never failed a dial.
+
+- Connection establishment gets its own budget, `--connect-timeout` (default 10s), separate from `--timeout`, which
+  now covers the `Blocks` request alone. gRPC dials lazily, so DNS, TLS and load-balancer resolution used to be
+  charged to the request timeout and a slow connection was reported as an endpoint failure -- this is what produced
+  the `received context error while waiting for new LB policy update: context deadline exceeded` errors. The exporter
+  now waits for the channel to be `READY` before issuing the request, and reports the two phases separately as
+  `substreams_healthcheck_connect_duration_ms` and `substreams_healthcheck_stream_duration_ms`.
+  `substreams_healthcheck_duration_ms` keeps its previous meaning of the two combined.
+
+- Every failed poll is logged, not just the transition into `unavailable`. An endpoint that fails repeatedly, or one
+  that flaps between two Prometheus scrapes, previously produced a single line and then nothing. Failure logs carry
+  the reason, the gRPC code, both durations and the consecutive failure count; the recovery log carries how long the
+  endpoint was down and how many polls failed meanwhile. A block age crossing half of `--max-freshness` is reported
+  too, so an alert on `substreams_healthcheck_block_age_ms` is no longer silent. That one is edge-triggered and only
+  after three consecutive polls agree, so a chain whose block interval straddles the threshold stays quiet.
+
+- New `substreams_healthcheck_consecutive_failures` gauge, meant to be alerted on instead of
+  `substreams_healthcheck_status` when single-poll hiccups should be ignored.
+
+- `substreams_healthcheck_block_age_ms` is reset to `NaN` when a poll returns no block, instead of keeping the age of
+  the last block ever seen -- which silently under-reported staleness for as long as an endpoint stayed broken.
+
+- Fixed: endpoints configured with different sets of query-parameter labels (e.g. one with `?namespace=x&region=y`
+  and one with only `?namespace=z`) made the exporter panic on inconsistent label cardinality. Missing labels are now
+  filled with an empty value.
+
+- **Breaking** The exporter now speaks `sf.substreams.rpc.v4.Stream/Blocks` only. The v3-to-v2 fallback is gone --
+  it closed the connection and then kept reading from it, double-counting the failure -- and
+  `--force-protocol-version` accepts only `4` (or `0`), the flag being kept for the protocol versions to come. An
+  invalid value used to be parsed and then silently ignored, it is now rejected at startup, so an invocation passing
+  `--force-protocol-version 2` or `3` must drop the flag.
+
+### Dependencies
+
+- `google.golang.org/grpc` is at `v1.85.0-dev.0.20260825072537-93e31b48545e`. That clears
+  GHSA-vp52-pcj8-j9qc and CVE-2026-84445 (an xDS server panics on a request with neither
+  `:authority` nor `Host`). v1.84.0 is still inside the range Docker Scout reports, which
+  failed the image build.
+
+### Tests
+
+- The `tests_e2e/dummy` directory gains a `substreams.clickhouse.yaml` sibling manifest
+  packing `e2e_clickhouse`, whose `map_events_clickhouse` module emits
+  `test.clickhouse.Events`. That message carries the `(schema.table)` ClickHouse
+  annotations, so the package sinks with `substreams sink clickhouse` without further
+  setup. Kept out of `substreams.yaml` and given its own message so the annotations do
+  not change the module hashes of the existing e2e modules.
+
+- The `tests_e2e/dummy` package gains three modules for exercising Hosted Stores against a
+  staging environment. `map_hosted_store_feed`, packed into `e2e-v0.3.0.spkg`, emits
+  `SinkEntries` and can be given to a Substreams Feed Hosted Store as its output module; it
+  writes a `block:<height>` key plus a `latest` key that moves every block. The two readers
+  get a manifest each -- `substreams.substreams-feed.yaml` and `substreams.remote-feed.yaml`
+  -- taking their store id from `$SUBSTREAMS_FEED_STORE_ID` or `$REMOTE_FEED_STORE_ID`, so
+  each is run straight from its yaml rather than packed. `hosted-store.sh` seeds a Remote
+  Feed store and marks it ready over gRPC via `buf curl`.
+
+- The dummy package's descriptor sets are pinned to a buf commit. Unpinned sets resolve to
+  latest, which disables the `substreams build` protobuf cache and regenerates the bindings
+  on every build.
+
+## v1.22.0
+
+### Sink
+
+- Fixed: `substreams sink postgres|clickhouse` in Relational Mappings Mode now waits for the sink to shut down before
+  the process exits. On SIGINT or SIGTERM it returned immediately, so the run's final statistics were lost and — worse
+  — the open spool segment was never sealed, and every block it held was streamed, and paid for, again on the next
+  start. Interrupting a backfill is the normal way one ends, so this affected most runs.
+
+- The periodic statistics now report what the local spool is doing: segments committed and their rate, rows and bytes
+  applied, how long one commit takes, how much of the disk budget is in use, how long the stream has been held waiting
+  for the database, and what share of its time the applier spends working rather than waiting. That last one is what
+  says whether the database or the stream is the limit — a gap on its own never did.
+
+- Fixed: time the sink spends held by a full spool is reported on its own rather than
+  counted as block processing. It happens inside the per-block timer, so a database that
+  cannot keep up used to inflate `Block Processing Duration` and deflate the wait between
+  blocks — saying the sink was busy when it was blocked. The statistics line gains
+  `Held By Database` when there is any.
+
+- Fixed: the statistics windows are no longer appended to and read from two goroutines
+  without synchronisation.
+
+- Spool recovery reports itself while it runs. Replaying the segments a killed backfill left behind happens at startup,
+  before anything else logs, and takes as long as it takes to COPY them; it previously said nothing until it had
+  finished, which read as a hang.
+
+- Statistics panel: durations are reported per 100 blocks rather than as a per-block mean in fractions of a
+  microsecond, and two rows are named for what they measure — `Entities Insert Duration` is now `Message Walk
+  Duration`, and `Block Insert Duration` reads `Spool Write Duration` while a spool is open, since nothing is inserted
+  into a database on that path. The `Flush duration` row is fed by what the applier committed when spooling, where it
+  previously timed a call that returns before anything is written and so reported zero.
+
+- Added: `substreams sink protojson --compression` to write output files compressed with `zstd` or `gzip`, appending the matching `.zst` or `.gz` extension to each file. Defaults to no compression.
+
+- Fixed: **BREAKING** `substreams sink postgres` in Relational Mappings Mode stores `bytes` fields as binary in their
+  `BYTEA` columns. Under the default `--bytes-encoding=raw` they were corrupted: a 7-byte value became the 14
+  characters of its base64 form including quotes, or of its hex form with `--no-constraints`. The same confusion stored
+  repeated scalar elements with their SQL quotes (`'alpha'` rather than `alpha`). Nothing failed loudly — the rows were
+  there and every query against those columns matched nothing. Databases populated by an affected version need the
+  affected range re-synced, and anything downstream built against the corrupted form breaks.
+
+- Fixed: **BREAKING** `substreams sink postgres` in Relational Mappings Mode no longer doubles backslashes when
+  rendering string literals. With `standard_conforming_strings` on — the server default since PostgreSQL 9.1 — the
+  INSERT paths stored two backslashes where the value had one, affecting `string` columns, enum names and every
+  JSON-rendered message column (protojson output is backslash-heavy). New rows store the value verbatim, so a database
+  populated by an affected version holds the doubled form below the resume point and the correct form above it, and a
+  consumer written to un-escape the old form breaks at that boundary. Re-sync the affected range to converge on one
+  form.
+
+- **BREAKING** Timestamp columns written through binary COPY — the default write mode on PostgreSQL — keep their full
+  microsecond precision. Previous versions rendered timestamps as RFC3339 and truncated them to the whole second, and
+  the rendered `batch-insert` / `row-insert` modes still do. Rows written before the upgrade (or through a rendered
+  mode) are second-precision while COPY-written rows are not, so equality joins or comparisons against pre-existing
+  rows on a `TIMESTAMP` column can stop matching on sub-second values.
+
+- **automatic postgres index**: **BREAKING** Added an automatic index on `_block_number_` for every postgres table
+  (Relational Mappings Mode) for undo performance. It is built when the sink starts — `CREATE INDEX CONCURRENTLY`, one
+  table at a time — including on a pre-existing database populated by an earlier version, so the first start after the
+  upgrade builds the indexes over the existing data before streaming, and a failed build stops the sink. Pass
+  `--disable-block-number-index` to keep the previous behavior of not having these indexes.
+  **Running this new version on a db populated by an earlier version will create the indexes on startup**
+
+- **spool**: Major speed improvement (+10x) for Relational Mappings Mode (`substreams sink postgres` and `substreams sink clickhouse`):
+  rows are now written to disk (spool) first and loaded them from a background goroutine, one segment at a time. 
+  The stream no longer waits on the database (up to the size of the spool directory).
+  Each write mode spools directly in the format it sends: binary COPY files, rendered SQL tuples per table, an interleaved
+  log replayed in walk order for `row-insert`, typed values on ClickHouse. 
+    - `--spool-dir` (default `./localdata/spool`) is where they land
+    - `--spool-max-size` (8GiB) limits the size on disk (pushing back to the stream)
+    - `--spool-max-idle` (10s) commits the open segment when the stream goes quiet for that duration
+    - `--db-write-target-duration` (3s) says how long one commit to DB should take, adjusted so segment size adjusted dynamically
+    - `--db-write-max-size` (512MiB) limits the size of each commit to DB
+
+- **write-mode**: (postgres) in Relational Mappings Mode new flag 
+   - `--write-mode`: 
+     - `copy`: binary COPY)
+     - `batch-insert`: one multi-row INSERT per table
+     - `row-insert`: one prepared INSERT per row
+     - `auto`: try to use `copy` if available, otherwise `batch-insert` or `row-insert` depending on the schema
+   
+- **hyperpb**: Relational Mappings Mode now parses block payloads with [hyperpb](https://buf.build/go/hyperpb) instead of
+  `dynamicpb`. Both are driven by the module descriptor and read through `protoreflect`, so rows are identical, but
+  hyperpb compiles the descriptor once and parses into an arena: 18x on the parse, one allocation per block instead of
+  thousands.  Unmarshalling is now done on a worker pool instead of one at a time at flush.  Defaults to one worker per core less one,
+  capped at 8; `SinkerFactoryOptions.DecodeWorkers` overrides.
+
+- **constraints**: Relational Mappings Mode now loads without database constraints and creates them afterwards:
+-   - `--apply-constraints`: 
+      - `auto` (default) creates them when the stream reaches chain HEAD
+      - `manual` never creates them
+      - `always` creates them before the load (inducing 27x slower load time on postgres)
+  Manual creation is done with : `substreams sink postgres constraints apply <manifest>`, which can be tweaked with:
+  `--constraints-parallelism`, `--constraints-work-mem`.
+  Both automatic and manual creation can be controlled with `--disable-foreign-keys`, `--disable-primary-keys=<tables|all>`, `--disable-unique-constraints=<tables|all>`.
+
+- **automatic clickhouse schema**: `substreams sink clickhouse` now accepts a package whose output proto carries no schema annotations.
+  Both `setup` and the run refused it outright ("clickhouse table options for table X don't have any 'order_by_fields'"), they now default to:
+  `ORDER BY (_block_number_, _row_id_)`, `PRIMARY KEY (_block_number_)`, `PARTITION BY (toYYYYMM(_block_timestamp_))`.
+  `_row_id_` is a column automatically generated with the row number for a given block.
+  A database whose tables disagree with the package is now refused at start rather than
+  written into, since `CREATE TABLE IF NOT EXISTS` would have kept the old table and written into the wrong columns.
+
+- Flags are grouped in "Relational Mappings Mode" VS "Database Changes Mode" in `--help` and invalid flags for one mode are now rejected by the other.
+  A Database Changes Mode Substreams owns its SQL schema, so `sink postgres constraints` refuses it.
+
+- Removed flag `--live-block-time-delta` is no longer accepted by `substreams sink postgres` and `substreams sink clickhouse`. The
+  SQL sink installs the cursor-based liveness checker itself, based on the type of message received from the stream.
+
+- Fixed: Relational Mappings Mode now writes the blocks up to the stop block (previously, last segment was left out.) 
+- `substreams sink postgres` in Relational Mappings Mode now performs UNDO on a reorg even without database constraints.
+- Fixed: Relational Mappings Mode no longer crashes on a module whose output carries an `enum` field. Covers plain, `repeated`, `inline` and key fields.
+
+### Observability
+
+- RPC: `ModulesProgress.stages` entries now expose per-stage squash visibility, so a client can tell "segment produced"
+  apart from "segment actually usable". `Stage` gained `ready_up_to_exclusive` (field 3), the chain block number,
+  exclusive, up to which the stage is immediately usable, and `squash_wait_segment_count` (field 4), the number of
+  segments whose partial exists but has not been squashed in yet. `completed_ranges` counts a segment as soon as its
+  partial is produced, so a stage could render 100% covered with substantial work outstanding — and since squashing
+  runs on tier1 it schedules no job and advances no `processed_blocks`, leaving the request looking frozen at 100% with
+  a rate of zero. For a stage with no store module the two notions coincide and the count stays 0. A stage that has not
+  started reports where its modules begin, floored at the chain's first streamable block, so 0 means "nothing usable
+  yet" and is not a sentinel for "unknown".
+
+- RPC: `SessionInit` gained `segment_block_count` (field 11), the width in blocks of one parallel segment, constant for
+  the session. Without it a client could not turn `Stage.squash_wait_segment_count` into blocks: it could only be
+  inferred from `Job.stop_block - Job.start_block`, unavailable exactly when needed since no job runs while tier1
+  squashes. It is an upper bound — the first and last segment of a run are narrower.
+
+- Server: tier1 request logs now explain how many parallel workers a request got, and why; asking for 300 and getting
+  15 previously left no trace. `incoming Substreams Blocks request` gained a `parallelism` object
+  (`requested_workers`, `granted_workers`, effective `workers`, `workers_source`, `plan_tier`, `stage_layer_executors`)
+  plus `parallel_segment_count` and `stage_count`. `substreams request stats` gained a tier1-only `workers` object
+  (`requested`, `granted`, `effective`, `peak`, `pool_exhausted_count`, `pool_rampup_deferred_count`): a high
+  `pool_exhausted_count` with `peak` well below `effective` means the shared pool ran dry, previously visible only at
+  debug level. The periodic `substreams request progress` gained its own `workers` object (`requested`, `granted`,
+  `effective`, `running`, `idle`, `pool_exhausted_5m`) so the question can be answered while the request still runs,
+  with a hint naming the three ceilings that cause it — tier2 fleet full, organization quota, per-session cap — since
+  the pool reports a single error for all three.
+
+- Sink: the Relational Mappings Mode periodic stats report how far the download is ahead of the database:
+  `downloaded_through`, `applied_through`, `blocks_ahead`, `blocks_buffered`, `peak_blocks_ahead`. Substreams
+  throughput is paid for, so a run should be limited by the stream and not by the database. Once the buffer stops
+  looking like a working set the line is logged at warning level: `database is falling behind the stream, the buffer is
+  over half of what it was given`. With a spool that threshold is a share of `--spool-max-size`, since a block count
+  says nothing once rows are on disk — the sparse start of a large backfill used to warn continuously; without a spool
+  the blocks are in memory and their count is what is reported.
+
+- `Sinker.PrintStats` collapses to a single `📊 Usage Report: no data received` line when a request produced nothing.
+  Affects `substreams run`, `substreams sink webhook` and `substreams sink noop`.
+
+- The gRPC User-Agent of a SQL sink run now names the engine as well as the mode: `sink_from_proto_pg`,
+  `sink_from_proto_ch`, `sink_database_changes_pg`, `sink_database_changes_ch`.
+
+- WASM: new `context` host module giving modules an intrinsic they can call at any point during execution: `context::clock(output_ptr)` writes the block clock as an encoded `sf.substreams.v1.Clock`. It writes a `{ptr, len}` pair at `output_ptr`, the same convention the `state` getters use, and is available on the `wasmtime` and `wazero` runtimes (not on the JavaScript/v8 one). Until now the clock was only reachable by declaring `source: sf.substreams.v1.Clock` as a module input. Ergonomic Rust bindings will follow in `substreams-rs`; until then a module declares the import itself with `#[link(wasm_import_module = "context")]`. `context` joins `env`, `state` and `logger` as a namespace WASM extensions cannot register into.
+
+### CLI
+
+- Changed: `substreams auth` opens a browser so you can pick an organization (if you have more than one) and
+  an API key. The CLI retrieves the selected key over the API — no copy/paste — exchanges it for a JWT, and
+  writes `.substreams.env` (mode 0600, including when the file already exists). The previous paste-a-JWT-or-API-key
+  flow is `--paste`. Login polling keeps going through transport errors, timeouts, and 5xx until the device-code
+  deadline, and fails fast without a usable `http`/`https` verification URL. With `LOCAL_DEVELOPMENT=true`,
+  JWT issue uses the local issuer; if that issuer is unavailable the API key is stored instead of failing.
+
+- `substreams estimate` asks the endpoint for the estimate instead of sampling from the client. The endpoint runs the
+  sample on its own workers and only reports the measured sizes, so the estimation costs processed blocks and no
+  egress, it accounts for what the endpoint's cache already holds, and it works with modules that have stores. The
+  sampled fraction is set with `--sample-percentage` (default 1%).
+
+- Added `substreams estimate-local`, which is the previous `substreams estimate`: sampling done by the client, for
+  endpoints without remote estimation. It keeps `--samples` and `--parallel-requests`, and its limitations
+  (single-stage modules only, and the sampled blocks are streamed back so the estimation itself costs egress).
+
+- `substreams run` reports backprocessing as progress and rates instead of a list of block ranges. A four-line session
+  header (trace ID, module, chain, work to do including what was already cached) is printed once and stays in the
+  scrollback, followed by a compact live block: overall percentage, blocks per second, ETA, running jobs against the
+  worker limit, one bar per stage with its job count and oldest job age, and an `out` row tracking the output frontier
+  towards the requested start block. Percentages come from work counts the server already reported in `SessionInit` and
+  never displayed, with in-flight job progress added so bars advance continuously. A run whose stores are fully cached
+  says so in one line instead of rendering an empty skeleton.
+
+  Stage progress is measured from `Stage.ready_up_to_exclusive` rather than `completed_ranges`, so a stage no longer
+  renders 100% while tier1 is still squashing — that state is now named on the row as `squashing N segments`. The
+  squashed frontier also fixes the bar's low end: it is the lowest *contiguous* block across the stage's modules, so
+  ranges beyond a gap no longer count and a stage that has not started reports where it begins instead of being
+  invisible.
+
+  `Slowest modules` is kept as its own section, ranked across all stages, showing a recent (30s) and a lifetime
+  per-block cost tagged with the stage; modules under 10ms per block no longer earn a line. Removed: `Longest-running
+  jobs` (a fixed 5s threshold that flickered on healthy runs where jobs take 5 to 8 seconds — job age is now always on
+  the stage rows), the `Progress messages received` counter, and the `m` key toggling bar vs block-range rendering.
+
+- `substreams run` output on failure is no longer one undivided wall of text: session header, progress block, usage
+  report and error are separated, the progress block is closed with `Backprocessing  aborted` rather than trailing off
+  at `starting…`, and a request refused for exceeding `--limit-processed-blocks` reports the figures from session init
+  and names the fix:
+
+  ```
+  Error: --limit-processed-blocks is set to 10,000, but this request needs to process 3,394,913 blocks (3,394,000 of them to prepare the stores): raise it with --limit-processed-blocks 3400000, or remove the guard entirely with --limit-processed-blocks 0
+  ```
+
+- Fixed: `substreams run` needed two Ctrl-C to stop while the progress view was on screen. The view puts the terminal
+  in raw mode, so the first Ctrl-C arrived as a key press: the UI quit but the request kept streaming. The key press
+  now cancels the request directly.
+
+- Fixed: `substreams run` never printed the `Backprocessing history up to requested target block` line, nor the head
+  block, stage count and cached-blocks summary the non-TTY output has always shown — the line was guarded on a field
+  nothing ever set and rendered as blank lines.
+
+- Fixed: `substreams run` wrote human-readable messages to standard output, so its output could not be piped into `jq`
+  or any other consumer without filtering. The `Completed successfully` line, the signal-received notice, the
+  `cursor`/`clock` output mode banners, the message-wrapping error and the `.substreams.env` loader messages now go to
+  standard error, leaving only the module data on standard output. Scripts detecting success by grepping stdout for
+  `Completed successfully` must check the exit code instead.
+
+- Added Ethereum Hoodi testnet (`hoodi`) StreamingFast endpoints (`hoodi.eth.streamingfast.io:443`).
+
+- A packed `.spkg` now records the initial block of *every* module under *every* network it declares, along with the
+  effective params of every module accepting them, instead of only the values explicitly written in the manifest's
+  `networks:` section. A consumer such as substreams.dev can describe what the package does on each of its networks
+  without reimplementing the module-graph derivation. For a 20-module package supporting 10 networks this adds roughly
+  3 KB.
+
+- Fixed: switching networks on a packed `.spkg` no longer leaves modules that inherit their initial block pinned to the
+  network that was active when the package was packed. Only modules named explicitly under `networks:` were being
+  overridden, and the derivation that would have updated the others had already been baked in at pack time, so a package
+  packed on `mainnet` and run with `--network sepolia` silently kept `mainnet` start blocks for every derived module.
+  Packages published before this release need to be repacked from source: the information needed to correct them is not
+  recoverable from the artifact.
+
+- `substreams pack`, `substreams registry publish` and `substreams registry verify` warn when a network name is not a
+  known Firehose network registry ID or alias, or when it is an alias resolving to several networks — consumers cannot
+  map such a name onto a real chain. It stays a warning, never an error, so private and unlisted chains keep publishing.
+
+- `substreams info` gained `--network`, to inspect a package as any of the networks it declares rather than only its
+  default one, and `--expand-networks`, to list the initial block and params of every module under every network. The
+  `Networks` section is summarized to one line per network by default, since a package supporting many networks now
+  carries an entry per module per network.
+
+### Server
+
+- Added `sf.substreams.rpc.v4.Estimator/Estimate` on `substreams-tier1`: a cost estimate for a request, without ever
+  sending the data. Given a package, an output module, a block range and a sampling percentage (default 1%), it reports
+  how many blocks the real request would have to process (stage multiplier included, cached segments excluded) and the
+  estimated uncompressed egress for the range. The egress figure is measured: the sample is actually executed on tier2
+  workers, then only the *size* of the resulting output cache is read back — from the object store's metadata when it is
+  there, so the data itself is never downloaded. A module graph with stores is only estimated over a range whose store
+  snapshots the endpoint already holds; anything else is refused, naming the part of the range that could be estimated
+  instead, since building the missing stores is the very cost being reported.
+
+  The egress figure covers the whole `BlockScopedData` a client receives, not just the module payload: the module name,
+  output type URL, clock, cursor and final block height are sent with every message and dominate the egress of a module
+  whose per-message output is small. That overhead is counted once per message rather than once per block, so a module
+  gated by a block index — which only runs, and is only sent, on matching blocks — is not charged for the blocks it
+  skips. Each sample is extrapolated over the slice of the range it stands for, at the average of the rates measured at
+  that slice's two ends, and the reported total is the sum of those slices, so a range whose activity varies is no
+  longer flattened into a single average.
+
+  When the module graph is gated by a block filter, the block count is measured too: each sample job reports the blocks
+  it was actually run on, and that share is extrapolated over the range the same way, so the report no longer bills a
+  filtered module for the blocks its index skips.
+
+  The blocks left to process are counted after the estimate itself: the sample jobs fill the output cache, so a request
+  issued right after finds those segments there. The "if nothing was cached" figure is unaffected.
+
+- `substreams-tier2` records the uncompressed size of each execution output file it writes as `datasize` object
+  metadata, and how many items it holds as `itemcount`, so what a segment represents can be known without downloading
+  it: the item count is the number of `BlockScopedData` messages a consumer of that segment receives, which on a module
+  gated by a block index is far below the number of blocks the segment covers. Skipped on object stores where setting
+  metadata means rewriting the object (S3), which falls back to reading the file when the figures are needed.
+
+- Foundational-store endpoint resolution no longer imports the private `services-control-plane` module. The public
+  `dregistry` plugin chain (JSON map → control-plane `sf.registry.v1` → identifier passthrough) replaces the inline
+  client. Existing `FoundationalStoresConfigPath` and `HostedStoreRegistryAddress` flags are unchanged on tier1; they
+  are composed into that chain internally. Tier1 resolves identifiers once per request and sends the concrete endpoints
+  to tier2, so workers look up that static map and do not dial the control plane. Store dials now honor the registry's TLS flag instead of guessing
+  from `:443`. Resolution success and failure are recorded on the request progress log and as Prometheus metrics.
+  Each identifier lookup times out after 10 seconds so a hung control-plane RPC cannot stall request setup.
+
+- `substreams-tier1` restarts when its block hub can no longer link incoming live blocks, instead of hanging every
+  request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be
+  linked, and the head-block metrics keep tracking the live source, so the process looked healthy throughout.
+
+- `substreams-tier1` no longer hangs when a request has a cursor that the hub declines (unknown hash). Instead of failing
+  back to a file source that waits for merged-blocks to cover that number, it now immediately sends an undo-to-LIB. 
+
+### Library
+
+- **Breaking** Renamed the misspelled `foudational_store` package to `foundational_store`.
+
+- **Breaking** `sql.Database.WalkMessageDescriptorAndInsert`, `WalkMessageDescriptorAndInsertInto`,
+  `BaseDatabase.WalkMessageDescriptorAndInsertWithDialect` and `sql.Dialect.AppendInlineFieldValues` take a
+  `protoreflect.Message` where they took a `*dynamicpb.Message`, which is what lets the caller choose the parser.
+
+### Tools
+
+- `substreams tools devenv` boots a complete local stack — a dummy blockchain in a container plus a tier1 and a tier2
+  built from the current source tree — prints the endpoint and stays up until interrupted. Requires Docker. `--burst`
+  sets how many blocks exist at genesis and `--bundle-size` the segment size, which together decide how much parallel
+  work a request has; the state store lives under `--data-dir`, so deleting it is what gives a cold backprocess again.
+  The command waits for the merger to catch up with the burst before starting tier1, which bootstraps its block hub
+  from merged blocks. The end-to-end tests share this setup code. Running the tiers in-process pulls in wasmtime, whose
+  bindings are cgo-only, so the command is built only with cgo enabled — a local `go build` or `go install`, not the
+  released static Docker image, which has no Docker daemon of its own anyway.
+
+- `substreams tools extract-proto [<manifest> [<module>]]` writes a module's output protobuf definition back out. With
+  `--sql` it comes annotated for the SQL sink's Relational Mappings Mode — every message and field carrying its option
+  commented out — and the annotations file is written beside it so the result parses as-is, which is what
+  `--proto-file-override` needs. Starting from an unannotated package was otherwise a matter of finding the right proto
+  and extension names by hand.
+
+### Dependencies
+
+- Bumped notably `github.com/ClickHouse/clickhouse-go/v2` to v2.48.0, `github.com/AfterShip/clickhouse-sql-parser` to
+  v0.5.5, `google.golang.org/grpc` to v1.83.2 and the OpenTelemetry SDK to v1.45.0.
+
+- `google.golang.org/grpc` is at v1.83.2, which clears CVE-2026-84304 and CVE-2026-84445, and
+  `golang.org/x/crypto` is at v0.56.0, which clears CVE-2026-78662 and CVE-2026-56855, all reported as HIGH against the
+  published `ghcr.io/streamingfast/substreams` image.
+
+- `golang.org/x/mod` is at v0.40.0, which clears CVE-2026-56864 and CVE-2026-56865, both reported as HIGH against the
+  published `ghcr.io/streamingfast/substreams` image.
+
+### Summary of changed flags and subcommands
+
+#### ADDED (relational-mappings `run` unless noted)
+--write-mode                  auto|copy|batch-insert|row-insert; auto = copy on PG, batch-insert on CH
+--decode-workers              0 = auto (min(8, cores-1))
+--decode-batch-size           0 = auto (4x workers); successor of --block-batch-size
+--db-write-target-duration    3s; sizes each DB commit by measured duration
+--db-write-max-size           512MiB; segment size ceiling
+--spool-dir                   ./localdata/spool; spool ON by default, "" rejected
+--spool-max-size              8GiB; local-disk budget, backpressures stream
+--spool-max-idle              10s; idle seal, 0 disables
+--apply-constraints           auto|manual|always (run, setup, constraints apply); auto = build at HEAD
+--disable-foreign-keys        per-table list or 'all'
+--disable-primary-keys        per-table list or 'all'
+--disable-unique-constraints  per-table list or 'all'
+--disable-block-number-index  default false: _block_number_ index built at every startup
+--constraints-parallelism     1 (constraints apply|drop)
+--constraints-work-mem        "" = server default (constraints apply|drop)
+(new subcommands: constraints apply / constraints drop; setup gains optional [module] arg)
+
+#### DEPRECATED (warn, still honored)
+--no-constraints              -> the three --disable-* flags; hard error on DatabaseChanges module
+--block-batch-size            -> --decode-batch-size; removed from setup entirely = unknown flag
+--constraints-per-transaction -> --constraints-parallelism (born deprecated)
+
+#### REMOVED (hard 'unknown flag')
+--live-block-time-delta       both engines; hits DatabaseChanges users too
+
+#### CHANGED BEHAVIOR (same names)
+setup                         no longer creates constraints by default; needs --apply-constraints=always
+cross-mode flags              wrong-mode flags now hard-error at startup (develop warned/ignored)
+clickhouse state flags        --cursor-file-path etc. now also on setup; defaults unchanged
+
+## v1.21.0
+
+> **Note** The standalone `substreams-sink-sql` binary is now part of the `substreams` CLI, as `substreams sink postgres` and `substreams sink clickhouse`. Existing databases keep working: cursor tables and schemas are unchanged, so the CLI resumes exactly where the standalone binary left off. The DSN and block range move from positional arguments to `--dsn` (or `SUBSTREAMS_SINK_DSN`) and `-s`/`-t`, and operators switch the Docker image from `ghcr.io/streamingfast/substreams-sink-sql` to `ghcr.io/streamingfast/substreams`. See the [migration guide](https://docs.substreams.dev/how-to-guides/sinks/sql/migration) for the full command, flag, cursor and operator mapping.
+
+### Added
+
+- CLI: `substreams-sink-sql` is now part of the `substreams` CLI: `substreams sink postgres {setup,generate-csv,inject-csv,tools}` and `substreams sink clickhouse {setup,tools}`, where the engine command itself runs the sink. Both the sink and `setup` auto-detect the mode from the output module's type (`DatabaseChanges` → `schema.sql`, any other proto → relational mappings). See the [migration guide](https://docs.substreams.dev/how-to-guides/sinks/sql/migration) for the full command, flag, and operator (Docker image) mapping.
+
+- Server: tier1 emits a periodic `substreams request progress` log per request (after 1 minute, then every 5 minutes) meant to answer "why is my substreams slow?" while the request is still running: phase, per-stage module and job progress, external call cost, last job error, and time spent blocked writing to the consumer. It ends with a short `hints` list naming the likely bottleneck when one is detected. Rates and deltas are suffixed `_5m` and cover a fixed trailing 5 minutes whatever the emission interval is; cadence is tunable with `SUBSTREAMS_PROGRESS_LOG_FIRST_DELAY` and `SUBSTREAMS_PROGRESS_LOG_INTERVAL`.
+
+- Server: tier2 reports its progress every 10 seconds while a block is being processed, instead of only once the block completes, and `ExternalCallMetric` gained `failed_count`, `in_flight_count`, `oldest_in_flight_ms` and `oldest_in_flight_block`. An `eth_call` retrying against an unreachable endpoint is a single wasm extension call that can last minutes: it used to be completely invisible to tier1 until the segment timed out.
+
+- Server: new `substreams_undo_signal_distance_blocks` prometheus histogram, observing how many blocks each `BlockUndoSignal` sent to clients reverts, labeled by `source` (`reorg` when a fork is seen while streaming, `cursor_resolution` when the cursor of an incoming request points to a block that was reorged out). Its `_count` gives the total number of undo signals sent; subtracting the `le="5"` bucket from it gives the number of large ones. Undo signals reverting more than 5 blocks are also logged as a warning with `trace_id`, `head`, `revert_up_to`, `distance` and, on the `cursor_resolution` path, the client `cursor`.
+
+- CLI: new `substreams tools simulate-slow-reader <manifest> [<module>] --delay <duration>` command, consuming a substreams slowly enough to exert real back-pressure on the server, to exercise the "consumer is the bottleneck" reporting.
+
 ### Changed
 
+- Sink: **Breaking** the `handleSessionInit` callback passed to `sink.NewSinkerFullHandlers` and `sink.NewSinkerFullHandlersWithPartial` now receives a `*pbsubstreamsrpcv3.Request` instead of a `*pbsubstreamsrpc.Request` (`rpc/v2`), matching both the `SinkerSessionInitHandler` interface and the request the sinker actually sends. The two disagreed, so the sinker's type assertion never matched and the callback was never invoked — no behavior can depend on it today.
+
+  Callers passing `nil` are unaffected. Callers passing a callback get a compile error and should switch the parameter type; the only field that moved is `req.Modules`, now reachable as `req.Package.Modules`. Callers implementing `SinkerSessionInitHandler` directly on their own handler type were already writing the `rpc/v3` signature and are unaffected.
+
+- Sink: **Breaking** the `handleError` callback passed to `sink.NewSinkerFullHandlers` and `sink.NewSinkerFullHandlersWithPartial` now receives an `error` instead of a `*pbsubstreamsrpc.Error`, matching the `SinkerErrorHandler` interface. Same as above, the callback was never invoked before this fix. It is called for stream errors the sinker is about to retry, not on `io.EOF` nor on fatal errors.
+
+- Server: tier2 now aborts a segment when it **stops making progress** rather than when it exceeds a fixed time budget. A new stall timeout (10 minutes by default, `WithSegmentStallTimeout`) resets on every block processed, and the pre-existing segment execution timeout (`WithSegmentExecutionTimeout`) is kept only as an absolute backstop, its default raised from 60 minutes to 4 hours.
+
+  The old fixed budget was fatal to expensive-but-healthy workloads: a segment making thousands of `eth_call` per block could take slightly longer than 60 minutes while still advancing block by block, get killed, and — since a killed segment is never cached — have its retry redo the same work and hit the same wall. Such a request could never complete, no matter how many times it reconnected. A stalled segment is still killed promptly, and since a single block is already bounded by the block execution timeout (3 minutes by default), the stall timeout cannot be tripped by one legitimately slow block.
+
+  The `request active for a long time` log gained a `since_last_progress` field, and a segment killed for stalling now reports `request stalled, no block progress` instead of `request active for too long`.
+
+### Fixed
+
+- CLI: `substreams run` in TUI output mode was stuck on `Connecting...` and never displayed the trace ID. The session-init callback signature had drifted from the `SinkerSessionInitHandler` interface, so the sinker's type assertion failed and the session never reached the UI at all. The per-stage progress section (stage modules, completed ranges and the `m` bar mode) was hidden by the same bug and is displayed again.
+
+- CLI: `substreams run` with a non-TUI output mode (`--output json`, `jsonl`, ...) was not printing the `TraceID:`, `Server HEAD block:` and stage/blocks-to-process summary lines anymore, for the same reason as above.
+
+- CLI: `substreams run` in TUI output mode kept advertising `Connected` with a stale trace ID while the sinker was retrying a severed stream. It now falls back to `Connecting...` and picks up the new trace ID of the re-established session.
+
+- CLI: manifests with a `sink:` config of type `sf.substreams.sink.sql.v1.Service` or `sf.substreams.sink.sql.service.v1.Service` now parse — the SQL sink protos are bundled in the CLI's system descriptors.
+
+- SQL sink: `tools cursor delete <module_hash>` now deletes only the given module's cursor (the standalone binary deleted all of them due to a bug).
+
+- SQL sink: a bounded run (`--stop-block` set) never flushed the final batch to the database — the range-completion check treated the exclusive stop block as unreached (`last block == stop-1`). Bounded backfills now flush and store their cursor. The bug also exists in the standalone `substreams-sink-sql` binary when built against recent sink library versions.
+
+- Server: tier2 no longer logs `tls: first record does not look like a TLS handshake` errors from plain-HTTP health probes / load balancers hitting a TLS port (same suppress list as the existing EOF and connection-reset handshake noise).
+- Server: a tier1 shutdown happening while a request was still in its parallel backprocessing phase was reported to the client as `Internal` instead of `Unavailable`. The `endpoint is shutting down, please reconnect` error is wrapped several times on its way up from the scheduler (`error during init_stores_and_backprocess: run_parallel_process failed: parallel processing run: scheduler run: ...`) and was matched with a pointer comparison, so it never took the `Unavailable` path. Clients now see the correct reconnect signal during a tier1 rollout.
+
+## 1.20.3
+
+### Added
+
+- Server: new Prometheus metrics for external calls made by WASM extensions (e.g. `eth_call`), making it possible to spot slow calls clogging a tier:
+
+  - `substreams_tier1_wasm_extension_call_counter{extension,outcome}` and `substreams_tier1_wasm_extension_call_duration_seconds{extension,outcome}`
+  - `substreams_tier2_wasm_extension_call_counter{extension,outcome}` and `substreams_tier2_wasm_extension_call_duration_seconds{extension,outcome}`
+
+  `extension` is the extension being called (e.g. `eth:call`) and `outcome` is `success` or `error`. The duration histogram extends the default buckets with a 30s and 60s tail so that slow calls and timeouts remain distinguishable.
+
+- Server: the `substreams request stats` log gained a `wasm_ext_call_metrics` field (per extension) and a `wasm_ext_call_metrics_by_module` field (per module and extension), each breaking down external calls (e.g. `eth_call`) with `count`, `total_ms`, `avg_ms` and `max_ms`. Only modules that actually made a call appear, so both are empty when nothing called out. The pre-existing `module_wasm_ext_duration` merges every extension into a single duration and is unchanged. `max_ms` covers the calls made locally by the process emitting the log; calls made by tier2 jobs are reported back as a count and a total, and each tier2 logs its own `max_ms`.
+
+### Fixed
+
+- Server: WASM extension calls (e.g. `eth_call`) that returned an error were never closed in the request stats, leaking an in-process entry that kept inflating the reported external call duration for the remaining lifetime of the request. Both the `wazero` and `wasmtime` runtimes are fixed.
+
+- Server: external call metrics (e.g. `eth_call` count and duration) gathered on the shared-cache execution path were silently discarded, so modules executed through that path reported no external call activity at all.
+
+## v1.20.2
+
+### Added
+
+- Manifest: environment variable expansion (`$VAR` / `${VAR}`) is now supported in the `foundational-store` module input, allowing a manifest to be authored with a placeholder (e.g. `foundational-store: $DEPLOYMENT_ID`) that is resolved at pack/load time. The generated `.spkg` always embeds the resolved value.
+
+### Changed
+
+- Manifest: environment variable expansion in `imports` and `protobuf.importPaths` now errors out when a referenced variable is undefined, instead of silently substituting an empty string.
+
+### Fixed
+
+- Server: fixed a per-request stats leak causing long-lived live streams to progressively burn more CPU per block and eventually fall behind the chain until reconnect.
+
+## v1.20.1
+
+### Fixed
+
+- Server: linear quickload resume now emits `SessionInit` (trace id) and starts keepalives before the store decode streams, instead of after. A large or remote quicksave could previously stream for a long time with zero client output; the quickload-success path also never emitted a `SessionInit` at all.
+
+## v1.20.0
+
+### Changed
+
+- Server: the store size limit override is now configured by a tier1 flag (`Tier1Config.StoreSizeLimit`, exposed as `--substreams-tier1-store-size-limit`) instead of the `SUBSTREAMS_STORE_SIZE_LIMIT` environment variable, which has been removed. The value is forwarded from tier1 to tier2 on every subrequest via the existing `ProcessRangeRequest.store_size_limit` field, so it no longer needs to be set on tier2. `0` keeps the default of 1GiB.
 - Server: store quicksave/quickload now run up to 8 stores concurrently instead of one at a time, cutting shutdown/resume latency for pipelines with many stores.
 - Server: quicksave now streams the store lazily and unsorted (one KV entry at a time as the upload consumes it, without sorting keys), instead of buffering the whole serialized store and paying an O(n log n) key sort plus key-slice allocation up front. This lowers both peak memory and save time for large stores (millions of keys). Quickload is order-independent, and the on-disk format is unchanged (byte-compatible protobuf), so no migration is required.
 - Server: tier1 store loading at request start now loads up to 8 stores concurrently (both the size probe and the download/decode), instead of one at a time.
 
 ### Added
+
+- Server: new opt-in mmap (bbolt-backed) store backend, selectable via `--substreams-stores-backend=mmap` (default `memory`). It keeps FullKV store data in a memory-mapped file so cold pages are reclaimable by the kernel under memory pressure, instead of pinning everything on the non-reclaimable Go heap — this addresses production OOMs with large or highly concurrent stores. The in-memory backend remains the default and is byte-for-byte unchanged; mmap is validated to produce identical output. **The scratch-space directory holding the bbolt files (`StoresScratchSpace`, default "{sf-data-dir}/substreams/stores-scratch") must live on a local NVMe SSD**: the store is continuously read from and written to through the mmap, and the kernel pages it straight to that file, so a slow or network-backed disk turns store operations into an I/O bottleneck and negates the benefit. Do not point it at network/EBS-class storage.
+
+- Server: cached deterministic errors now expire. Each error file carries a write timestamp in its name (`errors.<block>.<hash>.<unix>`), and on read tier1 discards any error older than `SUBSTREAMS_DETERMINISTIC_ERROR_MAX_AGE` (Go duration, default `1h`), retrying execution. Legacy error files without a timestamp are deleted on read.
+
+- Server: new `ProcessRangeRequest.merged_blocks_bundle_size` field (internal tier1→tier2 protocol) carrying the number of blocks per merged-blocks file. `0` (older tier1s) means the historical default of `100`. Tier2 applies the value per-request, so a single tier2 can serve chains with different merged-blocks sizes. **Upgrade all tier2s before setting a non-100 value on any tier1**: older tier2s ignore the field and would read the store with a bundle size of 100 (jobs stall on missing file names).
+- Server: new `Tier1Config.MergedBlocksBundleSize` (default `100`), used by tier1's own merged-blocks reads, cursor resolution, final-block rounding and forwarded to tier2 on every subrequest. The hub's kept final blocks and the live backfiller delay now scale with the bundle size.
+- `substreams tools tier2call`: new `--merged-blocks-bundle-size` flag (default `0` = server default).
 
 - Server: store quicksave now also triggers on client disconnect (context canceled), not only on graceful server shutdown, so a reconnecting client can resume without reprocessing. Only applies to production-mode requests.
 - Server: the `substreams request stats` log now includes the last block sent to the client (`last_sent_block_num`, `last_sent_block_id`, `last_sent_block_time`).
@@ -25,9 +1137,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Server: canceled store loads now abort promptly instead of reading the entire (multi-GB) store file into the heap before returning. A tier2 store `Load` now checks the request context while streaming entries, so a canceled/disconnected request stops hydrating immediately. Also `memoryKVImpl.Close()` now drops its backing map (was a no-op), and the post-load `SetMetadata` goroutine no longer captures the whole loaded store (only the object store, filename and metadata) and runs under a bounded 30s timeout — together these stop a finished/canceled request from transiently pinning gigabytes of store data.
+- Server: a Blocks request whose start block resolves (from a cursor) to exactly the exclusive stop block now completes cleanly instead of returning `InvalidArgument: start block and stop block are the same`. The range is empty (stop is exclusive), so the stream is already done; this previously surfaced as a fatal, non-retryable error to clients that reconnected with a cursor sitting on the last block of the range after a transient disconnect. Raw (cursor-less) requests with `start == stop` still return the InvalidArgument as before.
+- Sink: when resuming from a cursor already at or past the stop block, the sinker now shuts down immediately instead of opening a stream to the server. The pre-flight check previously compared the cursor against `adjustedEndBlock()` (stop block inflated by the partial-blocks buffer capacity), so a cursor sitting in the `[stopBlock-1, stopBlock+bufferCap-1)` window was let through and issued a useless request; it now compares against the raw exclusive `StopBlock`.
+- Server: client disconnects (`context canceled`) on a tier1 Blocks stream are no longer logged as `WARNING`/`ERROR`. `toGrpcTier1Error` returned a `connect` error for the canceled case (unlike every other branch, which returns a gRPC `status` error), so the caller's `status.Code()` resolved to `Unknown` — logging the request completion as a WARN and the gRPC middleware call as an ERROR with `code Unknown`. It now returns `codes.Canceled`, so the disconnect is logged at Debug/Info as intended.
+- Server: bumped `dstore`, which now sends S3 request checksums only when the target requires them, fixing uploads/downloads against S3-compatible stores that reject the newer default checksum headers.
 - Server: the quicksave block count now counts settled blocks (normal or last-partial) instead of skipping partials entirely, so quicksave arms correctly on flash-block chains. The minimum sent-block threshold before a quicksave triggers was raised from 25 to 50.
 - Server: `tier1` calls to hosted foundational stores now forward the `x-organization-id` identity header (alongside the existing trusted headers), so a store's internal trust-based listener can authorize the request without an end-user JWT. This fixes `Unauthenticated: required authorization token not found` errors when reading from hosted foundational stores resolved via the control-plane registry.
 - Server: foundational store calls that fail with authentication errors, organization id mismatch, or prolonged unreachability now bubble up to the user as a non-deterministic (uncached) error instead of retrying until the global deadline. Transient unavailability is still retried (~30s) to absorb blips and rolling restarts.
+- Server: a client cancellation (`context canceled`) while loading an execout file is now logged at INFO instead of ERROR in the execout walker.
+- CLI: `substreams info <shortname>` now fetches the package from the download endpoint (spkg.io) instead of the registry API host, fixing `package does not exist on the Substreams registry` for short-name lookups such as `substreams info common`.
 
 ## v1.19.0
 
@@ -184,7 +1303,7 @@ This release introduces significant performance optimizations to the Substreams 
 ## v1.17.8
 
 * Added experimental support for partial blocks (ex: Base's Flash Blocks) -- only supported on https://base-mainnet-flash.streamingfast.io endpoint
-* See [more details in the documentation](https://docs.substreams.dev/reference-material/flash-blocks)
+* See [more details in the documentation](https://docs.substreams.dev/reference-material/chain-support/flashblocks)
 
 ### CLI
 
@@ -1001,7 +2120,7 @@ This allows flexibility and getting anything from "skeleton" of a substreams for
 
 #### How to use `solana_program` or `alloy`/`ether-rs`
 
-Those libraries when used in a `wasm32-unknown-unknown` context creates in a bunch of [wasmbindgen](https://rustwasm.github.io/wasm-bindgen/) imports in the resulting Substreams Rust code, imports that led to runtime errors because Substreams engine didn't know about those special imports until today.
+Those libraries when used in a `wasm32-unknown-unknown` context creates in a bunch of [wasmbindgen](https://wasm-bindgen.github.io/wasm-bindgen/) imports in the resulting Substreams Rust code, imports that led to runtime errors because Substreams engine didn't know about those special imports until today.
 
 The Substreams engine is now able to "shims" those `wasmbindgen` imports enabling you to run code that depends libraries like `solana_program` and `alloy/ether-rs` which are known to pull those `wasmbindgen` imports. This is going to work as long as you do not actually call those special imports. Normal usage of those libraries don't accidentally call those methods normally. If they are called, the WASM module will fail at runtime and stall the Substreams module from going forward.
 

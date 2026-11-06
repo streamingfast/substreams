@@ -14,11 +14,12 @@ import (
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/pipeline/exec"
+	"github.com/streamingfast/substreams/reqctx"
 )
 
 func TestNewStages(t *testing.T) {
 	//seg := block.NewSegmenter(10, 5, 75)
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 75, 75, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 75, 75, true, false)
 	assert.NoError(t, err)
 
 	stages := NewStages(
@@ -51,7 +52,7 @@ func TestNewStagesDepsInFuture(t *testing.T) {
 		5,    // resolvedStartBlock
 		100,  // linearHandoffBlock
 		200,  // exclusiveEndBlock
-		true)
+		true, false)
 	assert.NoError(t, err)
 
 	stages := NewStages(
@@ -93,7 +94,7 @@ func unit(seg, stage int) Unit {
 }
 
 func TestNewStageNextJobs(t *testing.T) {
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true, false)
 	assert.NoError(t, err)
 	assert.Equal(t, "interval=10, stores=[5, 50), map_write=[5, 50), map_read=[5, 50), linear=[nil)", reqPlan.String())
 	stages := NewStages(
@@ -274,6 +275,7 @@ func TestShadowSimple(t *testing.T) {
 		50,   //linearHandoffBlock
 		50,   //effectiveEndBlock
 		true, // scheduleStores
+		false,
 	)
 	assert.NoError(t, err)
 	assert.Equal(t, "interval=10, stores=[5, 50), map_write=[5, 50), map_read=[5, 50), linear=[nil)", reqPlan.String())
@@ -312,8 +314,49 @@ func TestShadowSimple(t *testing.T) {
 		M:S..`)
 }
 
+// A unit whose upper neighbour is merging a partial found on disk must not be shadowed:
+// no job will run for that upper unit, so nothing would ever un-shadow it and the stage
+// would wait forever.
+func TestShadowNotUnderMergeFromDisk(t *testing.T) {
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true, false)
+	assert.NoError(t, err)
+
+	stages := NewStages(
+		context.Background(),
+		exec.TestGraphStagedModules(5, 5, 5, 5, 5),
+		reqPlan,
+		nil,
+		nil,
+	)
+	stages.allocSegments(0)
+	stages.forceTransition(0, 0, UnitCompleted)
+	stages.forceTransition(0, 1, UnitPending)
+	stages.forceTransition(0, 2, UnitMerging)
+	stages.shadowableSegment = 0
+
+	stages.markShadowedUnits(0)
+	segmentStateEquals(t, stages, `
+		S:C
+		S:.
+		M:M`)
+
+	stages.forceTransition(0, 2, UnitPartialPresent)
+	stages.markShadowedUnits(0)
+	segmentStateEquals(t, stages, `
+		S:C
+		S:.
+		M:P`)
+
+	stages.forceTransition(0, 2, UnitPending)
+	stages.markShadowedUnits(0)
+	segmentStateEquals(t, stages, `
+		S:C
+		S:Z
+		M:.`)
+}
+
 func TestShadowStartAfter(t *testing.T) {
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 30, 90, 90, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 30, 90, 90, true, false)
 	assert.NoError(t, err)
 	assert.Equal(t, "interval=10, stores=[5, 90), map_write=[30, 90), map_read=[30, 90), linear=[nil)", reqPlan.String())
 
@@ -351,7 +394,7 @@ func TestShadowStartAfter(t *testing.T) {
 }
 
 func TestShadowStartAfter2(t *testing.T) {
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 40, 90, 90, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 40, 90, 90, true, false)
 	assert.NoError(t, err)
 	assert.Equal(t, "interval=10, stores=[5, 90), map_write=[40, 90), map_read=[40, 90), linear=[nil)", reqPlan.String())
 
@@ -587,6 +630,27 @@ func TestStages_dependenciesCompleted(t *testing.T) {
 			want: false,
 		},
 
+		// --- Completed parent whose previous segment is not done: its fullKV at the
+		// segment start block is not guaranteed to exist (snapshots may be pruned) ---
+		{
+			name: "stage 1 parent completed but previous segment parent pending",
+			s: makeDepsStages(0, 2, 0, []stageStates{
+				{UnitPending, UnitPending},
+				{UnitCompleted, UnitPending},
+			}),
+			unit: Unit{Segment: 1, Stage: 1},
+			want: false,
+		},
+		{
+			name: "stage 1 parent completed and previous segment parent noop",
+			s: makeDepsStages(0, 2, 0, []stageStates{
+				{UnitNoOp, UnitPending},
+				{UnitCompleted, UnitPending},
+			}),
+			unit: Unit{Segment: 1, Stage: 1},
+			want: true,
+		},
+
 		// --- Shadowed parent: allowed only when the previous segment's parent is done ---
 		{
 			name: "stage 1 parent shadowed prev-segment-parent completed",
@@ -693,4 +757,55 @@ func TestStages_dependenciesCompleted(t *testing.T) {
 			assert.Equal(t, tt.want, tt.s.dependenciesCompleted(tt.unit))
 		})
 	}
+}
+
+func TestReprocessMapSegment(t *testing.T) {
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true, false)
+	assert.NoError(t, err)
+	stages := NewStages(context.Background(), exec.TestGraphStagedModules(5, 5, 5, 5, 5), reqPlan, nil, nil)
+
+	stages.allocSegments(3)
+	stages.forceTransition(3, 2, UnitCompleted)
+	stages.nextJobCursor = 4
+
+	assert.True(t, stages.ReprocessMapSegment(3))
+	assert.Equal(t, UnitPending, stages.getState(Unit{Stage: 2, Segment: 3}))
+	assert.Equal(t, 3, stages.nextJobCursor)
+
+	assert.False(t, stages.ReprocessMapSegment(3), "already pending")
+	stages.forceTransition(3, 2, UnitScheduled)
+	assert.False(t, stages.ReprocessMapSegment(3), "job running")
+}
+
+func TestBlocksToProcessEmptyBackprocessRange(t *testing.T) {
+	// The chain's final block sits in the store's first segment, so the linear handoff lands
+	// exactly on the store's initial block: the stores are scheduled over the empty range
+	// [100, 100) and the global segmenter has no last index.
+	reqPlan, err := plan.BuildTier1RequestPlan(true,
+		100, // segmentInterval
+		100, // lowestInitialBlock
+		100, // lowestStoreInitialBlock
+		330, // resolvedStartBlock
+		100, // linearHandoffBlock
+		360, // exclusiveEndBlock
+		true, false)
+	require.NoError(t, err)
+	require.True(t, reqPlan.RequiresParallelProcessing())
+
+	ctx := reqctx.WithRequest(context.Background(), &reqctx.RequestDetails{
+		ResolvedStartBlockNum: 330,
+		LinearHandoffBlockNum: 100,
+		StopBlockNum:          360,
+	})
+	stages := NewStages(ctx, exec.TestGraphStagedModules(100, 100, 100, 100, 100), reqPlan, nil, nil)
+	require.Equal(t, -1, stages.globalSegmenter.LastIndex())
+
+	before, effectiveBefore, after, effectiveAfter := stages.BlocksToProcess(250)
+	// Pins current accounting: each store stage is counted up to the start segment (2 segments x 2
+	// store stages) even though the stores range is empty and [100, 330) is processed linearly, so
+	// those blocks also show up in `after`.
+	assert.Equal(t, uint64(400), before)
+	assert.Equal(t, uint64(400), effectiveBefore)
+	assert.Equal(t, uint64(260), after, "every block from the handoff to the stop block is processed linearly")
+	assert.Equal(t, uint64(260), effectiveAfter)
 }

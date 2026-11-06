@@ -6,6 +6,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/stretchr/testify/require"
+	"github.com/yourbasic/graph"
 
 	"github.com/stretchr/testify/assert"
 
@@ -103,6 +104,23 @@ func TestModuleGraph_GroupedAncestorStoresOf(t *testing.T) {
 	require.Nil(t, err)
 
 	require.Len(t, groupedAncestors, 3)
+
+	_, distances := graph.ShortestPaths(g, g.moduleIndex["G"])
+
+	prevDistance := int64(-1)
+	for _, group := range groupedAncestors {
+		require.NotEmpty(t, group)
+
+		groupDistance := distances[g.moduleIndex[group[0].Name]]
+		for _, mod := range group {
+			assert.Equal(t, groupDistance, distances[g.moduleIndex[mod.Name]], "modules within a group must share the same ancestor distance")
+		}
+
+		if prevDistance != -1 {
+			assert.Greater(t, prevDistance, groupDistance, "groups must be ordered by descending distance from the module")
+		}
+		prevDistance = groupDistance
+	}
 }
 
 func TestModuleGraph_ModulesDownTo(t *testing.T) {

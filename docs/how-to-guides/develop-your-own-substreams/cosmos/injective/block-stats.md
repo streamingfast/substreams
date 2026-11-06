@@ -107,8 +107,8 @@ use substreams::errors::Error;
 #[substreams::handlers::map]
 pub fn block_to_stats(block: Block) -> Result<BlockStats, Error> { // 3.
     let mut stats = BlockStats::default(); // 4.
-    let header =  block.header.as_ref().unwrap();
-    let last_block_id = header.last_block_id.as_ref().unwrap();
+    let header = &block.header;
+    let last_block_id = &header.last_block_id;
 
     stats.block_height = block.height as u64; // 5,
     stats.block_hash = hex::encode(block.hash);

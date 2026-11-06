@@ -127,19 +127,19 @@ func LoadSubstreamsAuthEnvFile(manifestPath string) {
 				if os.IsNotExist(err) {
 					return
 				} else {
-					fmt.Printf("Error reading stats on auth file: %v: %s\n", authFile, err.Error())
+					fmt.Fprintf(os.Stderr, "Error reading stats on auth file: %v: %s\n", authFile, err.Error())
 					return
 				}
 			}
 		} else {
-			fmt.Printf("Error reading stats on auth file: %v: %s\n", authFile, err.Error())
+			fmt.Fprintf(os.Stderr, "Error reading stats on auth file: %v: %s\n", authFile, err.Error())
 			return
 		}
 	}
 
 	cnt, err := os.ReadFile(authFile)
 	if err != nil {
-		fmt.Printf("Error reading auth file: %v: %s\n", authFile, err.Error())
+		fmt.Fprintf(os.Stderr, "Error reading auth file: %v: %s\n", authFile, err.Error())
 		return
 	}
 
@@ -154,7 +154,7 @@ func LoadSubstreamsAuthEnvFile(manifestPath string) {
 		if len(parts) == 2 {
 			key := strings.TrimSpace(parts[0])
 			value := strings.TrimSpace(parts[1])
-			fmt.Printf("Reading %s from %s\n", key, authFile)
+			fmt.Fprintf(os.Stderr, "Reading %s from %s\n", key, authFile)
 			os.Setenv(key, value)
 		}
 	}

@@ -3,28 +3,10 @@ package codegen
 type OutputType string
 
 const (
-	Subgraph OutputType = "subgraph"
-	Sql      OutputType = "sql"
+	Sql OutputType = "sql"
 )
 
 func (t OutputType) String() string {
-	return string(t)
-}
-
-type SubgraphType string
-
-var (
-	SubgraphBytes      SubgraphType = "Bytes"
-	SubgraphString     SubgraphType = "String"
-	SubgraphBoolean    SubgraphType = "Boolean"
-	SubgraphInt        SubgraphType = "Int"
-	SubgraphInt8       SubgraphType = "Int8"
-	SubgraphBigInt     SubgraphType = "BigInt"
-	SubgraphBigDecimal SubgraphType = "BigDecimal"
-	SubgraphTimestamp  SubgraphType = "Timestamp" // this is an alias for i64
-)
-
-func (t SubgraphType) String() string {
 	return string(t)
 }
 

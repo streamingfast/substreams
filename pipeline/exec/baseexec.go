@@ -10,6 +10,7 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/index"
+	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
 	ttrace "go.opentelemetry.io/otel/trace"
 )
@@ -115,6 +116,16 @@ func canSkipExecution(wasmArgumentValues map[string][]byte, hasSingleParams bool
 	return true
 }
 
+// isTransientExecError reports whether a wasm call failed because of the host
+// rather than the module's input: a store backend failure (disk full, mmap
+// grow/ENOMEM, I/O, closed db) or the host running out of file descriptors or
+// memory. Such an error must NOT be wrapped as ErrWasmDeterministicExec or kept
+// in the shared cache, or it would be served to every consumer instead of
+// being retried.
+func isTransientExecError(err error) bool {
+	return errors.Is(err, store.ErrStoreBackendFailure) || wasm.IsHostResourceError(err)
+}
+
 func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canSkipEmptyOutput bool, sharedCache *SharedCache, undoManager *UndoManager) (call *wasm.Call, err error) {
 	e.logs = nil
 	e.logsTruncated = false
@@ -163,6 +174,9 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 				return nil, fmt.Errorf("%w: block %d was reverted duing a reorg (UNDO) during an external call, please reconnect", ErrBlockUndo, clock.Number)
 			}
 			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w, %w", clock.Number, e.moduleName, err, ctxErr)
+		}
+		if isTransientExecError(err) {
+			return nil, fmt.Errorf("block %d: module %q: %w", clock.Number, e.moduleName, err)
 		}
 		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleName, wasm.ErrWasmDeterministicExec, err)
 	}

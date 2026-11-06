@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.26-bookworm AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-bookworm AS build
 
 WORKDIR /src
 
@@ -26,7 +26,9 @@ RUN --mount=target=. \
 FROM ubuntu:24.04
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
-      apt-get -y install -y ca-certificates libssl3
+      apt-get -y upgrade && \
+      apt-get -y install -y ca-certificates libssl3 && \
+      rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/substreams /app/substreams
 

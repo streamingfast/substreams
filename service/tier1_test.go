@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/shutter"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +25,9 @@ func createTestStoreConfig(name string, initialBlock uint64, mockStore dstore.St
 		"string",
 		mockStore,
 		nil, // quickSaveStore
-		0,   // storeSizeLimit: use global default
+		0,
+		"",
+		"",
 	)
 }
 
@@ -34,6 +38,7 @@ func TestConfigureLiveBackFillerFromQuickload(t *testing.T) {
 		name                   string
 		segmentSize            uint64
 		linearHandoffBlockNum  uint64
+		firstStreamableBlock   uint64
 		usedStores             []*pbsubstreams.Module
 		setupStoreFiles        func(dstore.Store)
 		expectedCurrentSegment uint64
@@ -62,8 +67,8 @@ func TestConfigureLiveBackFillerFromQuickload(t *testing.T) {
 				mockStore := ms.(*dstore.MockStore)
 				mockStore.WalkFunc = func(ctx context.Context, prefix string, f func(filename string) error) error {
 					files := []string{
-						"0000003000-0000002000.kv", // 2000-3000 range
-						"0000004000-0000003000.kv", // 3000-4000 range
+						"0000003000-0000002000.kv", // state at block 3000
+						"0000004000-0000002000.kv", // state at block 4000
 					}
 					for _, file := range files {
 						if err := f(file); err != nil {
@@ -74,6 +79,40 @@ func TestConfigureLiveBackFillerFromQuickload(t *testing.T) {
 				}
 			},
 			expectedCurrentSegment: 4, // 4000 / 1000 = 4
+		},
+		{
+			name:                  "store starting before the first streamable block, no snapshot",
+			segmentSize:           1000,
+			linearHandoffBlockNum: 5123,
+			firstStreamableBlock:  2500,
+			usedStores: []*pbsubstreams.Module{
+				{Name: "store1", InitialBlock: 2000},
+			},
+			setupStoreFiles:        func(ms dstore.Store) {},
+			expectedCurrentSegment: 3, // first segment holding no block below 2500
+		},
+		{
+			name:                  "snapshot named after another initial block",
+			segmentSize:           1000,
+			linearHandoffBlockNum: 5123,
+			usedStores: []*pbsubstreams.Module{
+				{Name: "store1", InitialBlock: 2000},
+			},
+			setupStoreFiles: func(ms dstore.Store) {
+				mockStore := ms.(*dstore.MockStore)
+				mockStore.WalkFunc = func(ctx context.Context, prefix string, f func(filename string) error) error {
+					for _, file := range []string{
+						"0000003000-0000002000.kv",
+						"0000004000-0000001000.kv", // cannot be loaded by a store starting at 2000
+					} {
+						if err := f(file); err != nil {
+							return err
+						}
+					}
+					return nil
+				}
+			},
+			expectedCurrentSegment: 3,
 		},
 		{
 			name:                   "no modules - no change",
@@ -123,6 +162,7 @@ func TestConfigureLiveBackFillerFromQuickload(t *testing.T) {
 				ctx,
 				tt.segmentSize,
 				tt.linearHandoffBlockNum,
+				tt.firstStreamableBlock,
 				tt.usedStores,
 				storeConfigs,
 				backFiller,
@@ -162,6 +202,7 @@ func TestConfigureLiveBackFillerFromQuickload_EdgeCases(t *testing.T) {
 			ctx,
 			1000,
 			5000,
+			0,
 			[]*pbsubstreams.Module{{Name: "store1", InitialBlock: 0}},
 			storeConfigs,
 			backFiller,
@@ -185,6 +226,7 @@ func TestConfigureLiveBackFillerFromQuickload_EdgeCases(t *testing.T) {
 			ctx,
 			1000000,
 			1000000000,
+			0,
 			[]*pbsubstreams.Module{{Name: "store1", InitialBlock: 0}},
 			storeConfigs,
 			backFiller,
@@ -212,6 +254,7 @@ func TestConfigureLiveBackFillerFromQuickload_EdgeCases(t *testing.T) {
 			ctx,
 			1000,
 			5000,
+			0,
 			[]*pbsubstreams.Module{{Name: "store1", InitialBlock: 3000}}, // lowestIndex = 3, higher than backfillFromIndex
 			storeConfigs,
 			backFiller,
@@ -221,5 +264,73 @@ func TestConfigureLiveBackFillerFromQuickload_EdgeCases(t *testing.T) {
 		// The Rewind should be called with 5 (backfillFromIndex), but since 5 > initialSegment (2),
 		// currentSegment should remain at the lower value
 		assert.Equal(t, initialSegment, backFiller.CurrentSegment())
+	})
+}
+
+func TestWithStoresBackend_BothTiersAligned(t *testing.T) {
+	scratch := t.TempDir() // WithStoresScratchSpace sweeps this dir; keep it real + empty
+
+	t.Run("tier1", func(t *testing.T) {
+		s := &Tier1Service{}
+		WithStoresBackend("mmap")(s)
+		WithStoresScratchSpace(scratch)(s)
+
+		assert.Equal(t, "mmap", s.runtimeConfig.StoresBackend, "tier1 must read backend from WithStoresBackend")
+		assert.Equal(t, scratch, s.runtimeConfig.StoresScratchSpace, "tier1 must read scratch space from WithStoresScratchSpace")
+	})
+
+	t.Run("tier2", func(t *testing.T) {
+		s := &Tier2Service{}
+		WithStoresBackend("mmap")(s)
+		WithStoresScratchSpace(scratch)(s)
+
+		assert.Equal(t, "mmap", s.storesBackend, "tier2 must read backend from WithStoresBackend")
+		assert.Equal(t, scratch, s.storesScratchSpace, "tier2 must read scratch space from WithStoresScratchSpace")
+	})
+
+	// Both tiers must resolve the SAME backend string identically — the whole
+	// point of the alignment. A future divergence (e.g. one tier ignoring the
+	// option) should fail here.
+	t.Run("tiers agree", func(t *testing.T) {
+		for _, backend := range []string{"memory", "mmap"} {
+			t1 := &Tier1Service{}
+			t2 := &Tier2Service{}
+			WithStoresBackend(backend)(t1)
+			WithStoresBackend(backend)(t2)
+			assert.Equal(t, t1.runtimeConfig.StoresBackend, t2.storesBackend,
+				"tier1 and tier2 must resolve backend %q to the same value", backend)
+		}
+	})
+}
+
+func TestLastUsedFilename(t *testing.T) {
+	assert.Equal(t, "last_used", lastUsedFilename(""))
+	assert.Equal(t, "last_used_pro", lastUsedFilename("PRO"))
+	assert.Equal(t, "last_used_enterprise", lastUsedFilename("ENTERPRISE"))
+}
+
+func TestPendingShutdownCheck(t *testing.T) {
+	t.Run("no max request duration follows service termination", func(t *testing.T) {
+		s := &Tier1Service{Shutter: shutter.New()}
+		check := s.pendingShutdownCheck(time.Time{}, zap.NewNop())
+		assert.False(t, check())
+		s.Shutdown(nil)
+		assert.True(t, check())
+	})
+
+	t.Run("max request duration drains once elapsed", func(t *testing.T) {
+		s := &Tier1Service{Shutter: shutter.New()}
+		check := s.pendingShutdownCheck(time.Now().Add(50*time.Millisecond), zap.NewNop())
+		assert.False(t, check())
+		time.Sleep(60 * time.Millisecond)
+		assert.True(t, check())
+	})
+
+	t.Run("max request duration still drains on service termination", func(t *testing.T) {
+		s := &Tier1Service{Shutter: shutter.New()}
+		check := s.pendingShutdownCheck(time.Now().Add(time.Hour), zap.NewNop())
+		assert.False(t, check())
+		s.Shutdown(nil)
+		assert.True(t, check())
 	})
 }

@@ -51,6 +51,8 @@ type testRun struct {
 	JobCallback            func(stage.Unit)
 	LinearHandoffBlockNum  uint64 // defaults to the request's StopBlock, so no linear handoff, only backprocessing
 	FirstStreamableBlock   uint64
+	StoreSizeLimit         uint64 // per-store size limit for tier1's linear pipeline; 0 uses the store default
+	AllowPrunedChain       bool
 	ProductionMode         bool
 	// PreWork can be done to perform tier2 work in advance, to simulate when
 	// pre-existing data is available in different conditions
@@ -165,6 +167,7 @@ func (f *testRun) run(t *testing.T, testName string) error {
 			testTempDir:            f.TempDir,
 			id:                     workerID.Inc(),
 			firstStreamableBlock:   f.FirstStreamableBlock,
+			allowPrunedChain:       f.AllowPrunedChain,
 		}
 	}
 
@@ -177,7 +180,7 @@ func (f *testRun) run(t *testing.T, testName string) error {
 		f.PreWork(t, f, workerPoolFactory)
 	}
 
-	if err := processRequest(t, ctx, request, workerPoolFactory, newBlockGenerator, responseCollector, false, f.BlockProcessedCallback, f.TempDir, f.ParallelSubrequests, f.LinearHandoffBlockNum); err != nil {
+	if err := processRequest(t, ctx, request, workerPoolFactory, newBlockGenerator, responseCollector, false, f.BlockProcessedCallback, f.TempDir, f.ParallelSubrequests, f.LinearHandoffBlockNum, f.StoreSizeLimit, f.AllowPrunedChain); err != nil {
 		return fmt.Errorf("running test: %w", err)
 	}
 
@@ -337,6 +340,8 @@ func processRequest(
 	testTempDir string,
 	parallelSubrequests uint64,
 	linearHandoffBlockNum uint64,
+	storeSizeLimit uint64,
+	allowPrunedChain bool,
 ) error {
 	t.Helper()
 
@@ -360,9 +365,15 @@ func processRequest(
 		DefaultCacheTag:            "tag",
 		MaxJobsAhead:               10,
 		WorkerPoolFactory:          workerPoolFactory,
+		StoreSizeLimit:             storeSizeLimit,
 	}
 
 	svc := service.TestNewService(runtimeConfig, linearHandoffBlockNum, tr.StreamFactory)
+	if allowPrunedChain {
+		svc.TestAllowPrunedChain()
+	}
+	// The test's temp dir is removed when it ends: no write may still be running then.
+	defer svc.TestWaitCacheMarkers()
 	return svc.TestBlocks(ctx, isSubRequest, request, responseCollector.Collect)
 }
 

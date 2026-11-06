@@ -26,13 +26,20 @@ const (
 // StreamClient is the client API for Stream service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Stream is the primary service for consuming Substreams data using the v3 API.
+// It extends the v2 API by accepting a full `.spkg` package instead of raw module
+// definitions, and adds support for parameter overrides and network selection applied
+// server-side. Responses are identical to those of the v2 API.
 type StreamClient interface {
-	// Request processing of blocks via substreams engine.
-	// Similar to `sf.substreams.rpc.v2.Stream/Blocks` request, but:
-	//   - the full spkg package is sent instead of just the modules
-	//   - 'params' and 'network' fields are sent to apply the user-defined params to the package server-side
+	// Blocks streams processed blockchain data for the requested range, applying the
+	// Substreams modules defined in the provided `.spkg` package. Parameter overrides
+	// (`params`) and network selection (`network`) are resolved server-side.
+	// Responses are identical to `sf.substreams.rpc.v2.Stream/Blocks`.
 	//
-	// Responses are identical to those of the v2 request.
+	// For reliable, exactly-once consumption, see `sf.substreams.rpc.v2.BlockScopedData.cursor`
+	// and `sf.substreams.rpc.v2.BlockUndoSignal.last_valid_cursor`: persisting and resuming
+	// from these cursors is the foundation of the "never miss a beat" guarantee.
 	Blocks(ctx context.Context, in *Request, opts ...grpc.CallOption) (grpc.ServerStreamingClient[v2.Response], error)
 }
 
@@ -66,13 +73,20 @@ type Stream_BlocksClient = grpc.ServerStreamingClient[v2.Response]
 // StreamServer is the server API for Stream service.
 // All implementations should embed UnimplementedStreamServer
 // for forward compatibility.
+//
+// Stream is the primary service for consuming Substreams data using the v3 API.
+// It extends the v2 API by accepting a full `.spkg` package instead of raw module
+// definitions, and adds support for parameter overrides and network selection applied
+// server-side. Responses are identical to those of the v2 API.
 type StreamServer interface {
-	// Request processing of blocks via substreams engine.
-	// Similar to `sf.substreams.rpc.v2.Stream/Blocks` request, but:
-	//   - the full spkg package is sent instead of just the modules
-	//   - 'params' and 'network' fields are sent to apply the user-defined params to the package server-side
+	// Blocks streams processed blockchain data for the requested range, applying the
+	// Substreams modules defined in the provided `.spkg` package. Parameter overrides
+	// (`params`) and network selection (`network`) are resolved server-side.
+	// Responses are identical to `sf.substreams.rpc.v2.Stream/Blocks`.
 	//
-	// Responses are identical to those of the v2 request.
+	// For reliable, exactly-once consumption, see `sf.substreams.rpc.v2.BlockScopedData.cursor`
+	// and `sf.substreams.rpc.v2.BlockUndoSignal.last_valid_cursor`: persisting and resuming
+	// from these cursors is the foundation of the "never miss a beat" guarantee.
 	Blocks(*Request, grpc.ServerStreamingServer[v2.Response]) error
 }
 

@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"iter"
 	"math"
 	"math/big"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/store/marshaller"
 
 	"github.com/shopspring/decimal"
 )
@@ -95,6 +97,50 @@ func loadStoreStream(ctx context.Context, store dstore.Store, filename string) (
 	})
 
 	return
+}
+
+// unmarshalIterInto streams entries from an UnmarshalIter call directly into the kvImpl.
+func unmarshalIterInto(ctx context.Context, impl KVImpl, um marshaller.StreamMarshaller, reader io.Reader, onTrailer func(deletePrefixes []string)) (uint64, error) {
+	var totalSizeBytes uint64
+
+	trailer, err := impl.Load(withCancelCheck(ctx, um.UnmarshalIter(reader, 10*1024*1024)))
+
+	if err != nil {
+		return 0, fmt.Errorf("kv load: %w", err)
+	}
+
+	if trailer != nil {
+		totalSizeBytes = trailer.TotalSizeBytes
+		if onTrailer != nil {
+			onTrailer(trailer.DeletePrefixes)
+		}
+	}
+
+	return totalSizeBytes, nil
+}
+
+// withCancelCheck wraps a store-entry iterator so a canceled/expired context
+// aborts the load promptly. Without it, Load reads the entire (multi-GB) store
+// file into the heap even for a request that is already dead, then returns
+// ctx.Err() only at the very end. The check is throttled to avoid a ctx.Err()
+// call on every single entry.
+func withCancelCheck(ctx context.Context, it iter.Seq2[marshaller.StoreDataEntry, error]) iter.Seq2[marshaller.StoreDataEntry, error] {
+	return func(yield func(marshaller.StoreDataEntry, error) bool) {
+		const checkEvery = 1024
+		n := 0
+		for entry, err := range it {
+			if n%checkEvery == 0 {
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					yield(marshaller.StoreDataEntry{}, ctxErr)
+					return
+				}
+			}
+			n++
+			if !yield(entry, err) {
+				return
+			}
+		}
+	}
 }
 
 // apparently this is faster than append() method

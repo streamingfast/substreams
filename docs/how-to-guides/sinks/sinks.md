@@ -1,14 +1,14 @@
 Once you find a package that fits your needs, you can choose how you want to consume the data. Sinks are integrations that allow you to send the extracted data to different destinations, such as a SQL database, or a file.
 
 {% hint style="info" %}
-**Tip**: Building a SQL sink? The [substreams-sql agent skill](../develop-your-own-substreams/generic/agent-skills.md) gives your AI coding assistant expert knowledge on database change (CDC) patterns, relational mappings, PostgreSQL, and ClickHouse schema design.
+**Tip**: Building a SQL sink? The [substreams-sql agent skill](../develop-your-own-substreams/generic/agent-skills.md) gives your AI coding assistant expert knowledge on Database Changes Mode (CDC) patterns, Relational Mappings Mode, PostgreSQL, and ClickHouse schema design.
 {% endhint %}
 
 {% hint style="info" %}
 **Note**: Some of the sinks are officially supported by StreamingFast (i.e. active support is provided), but other sinks are community-driven and support can’t be guaranteed.
 {% endhint %}
 
-- [Hosted Sinks](./hosted-sinks/hosted-sinks.md): Let StreamingFast run your sink for you — no infrastructure to manage.
+- [Hosted Sinks](../hosted-services/hosted-sinks.md): Let StreamingFast run your sink for you — no infrastructure to manage. See [Hosted Services](../hosted-services/hosted-services.md) for the full hosted offering, including Hosted Stores.
 - [SQL Database](./sql/sql.md): Send the data to a database.
 - [Direct Streaming](./stream/stream.md): Stream data directly from your application.
 - [PubSub](./pubsub.md): Send data to a PubSub topic.
@@ -20,12 +20,12 @@ Once you find a package that fits your needs, you can choose how you want to con
 
 | Name       | Support | Maintainer       | Source Code |
 |------------|---------|------------------|-------------|
-| SQL        | O       | StreamingFast    |[substreams-sink-sql](https://github.com/streamingfast/substreams-sink-sql)|
-| Go SDK     | O       | StreamingFast    |[substreams-sink](https://github.com/streamingfast/substreams-sink)|
-| Rust SDK   | O       | StreamingFast    |[substreams-sink-rust](https://github.com/streamingfast/substreams-sink-rust)|
+| SQL        | O       | StreamingFast    |[substreams sink postgres, substreams sink clickhouse](https://github.com/streamingfast/substreams/tree/develop/sink/sql)|
+| Go SDK     | O       | StreamingFast    |[substreams/sink](https://github.com/streamingfast/substreams/tree/develop/sink)|
+| Rust SDK   | O       | StreamingFast    |[substreams-sink-rust](https://github.com/streamingfast/substreams-sink-rust) (archived)|
 | JS SDK     | O       | StreamingFast    |[substreams-js](https://github.com/substreams-js/substreams-js)|
 | KV Store   | O       | StreamingFast    |[substreams-sink-kv](https://github.com/streamingfast/substreams-sink-kv)|
-| PubSub     | O       | StreamingFast    |[substreams-sink-pubsub](https://github.com/streamingfast/substreams-sink-pubsub)|
+| PubSub     | O       | StreamingFast    |[substreams sink pubsub](https://github.com/streamingfast/substreams/tree/develop/sink/pubsub), [substreams-sink-pubsub](https://github.com/streamingfast/substreams-sink-pubsub)|
 | ProtoJSON  | O       | StreamingFast    |[substreams-sink-protojson](https://github.com/streamingfast/substreams/tree/develop/sink/protojson)|
 | Webhook    | O       | StreamingFast    |[substreams-sink-webhook](https://github.com/streamingfast/substreams/tree/develop/sink/webhook)|
 | Noop       | O       | StreamingFast    |[substreams-sink-noop](https://github.com/streamingfast/substreams/tree/develop/sink/noop)|

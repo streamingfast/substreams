@@ -131,7 +131,7 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 		selectedModule = moduleNames[0]
 		fmt.Printf("\nThe substreams module %q will be used as output.\n\n", selectedModule)
 	} else {
-		selectedModule, err = createSelectForm(moduleNames, "Please select a mapper module to build the subgraph from:")
+		selectedModule, err = createSelectForm(moduleNames, "Please select a mapper module to build the project from:")
 		if err != nil {
 			return fmt.Errorf("creating request module form: %w", err)
 		}
@@ -180,7 +180,7 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 			labels = append(labels, label)
 		}
 
-		selectedNetwork, err := createSelectForm(labels, "Please select a network to build the subgraph from:")
+		selectedNetwork, err := createSelectForm(labels, "Please select a network to build the project from:")
 		if err != nil {
 			return fmt.Errorf("creating network form: %w", err)
 		}
@@ -199,22 +199,14 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 		return fmt.Errorf("building output entity: %w", err)
 	}
 
-	if outputType == Sql {
-		fmt.Println("Rendering project files for Substreams Sink SQL...")
-	} else {
-		fmt.Println("Rendering project files for Substreams-powered-subgraph...")
-	}
+	fmt.Println("Rendering project files for Substreams Sink SQL...")
 
 	projectFiles, err := project.Render(withDevEnv)
 	if err != nil {
 		return fmt.Errorf("rendering project files: %w", err)
 	}
 
-	saveDir := "subgraph"
-
-	if outputType == Sql {
-		saveDir = "sql"
-	}
+	saveDir := "sql"
 
 	if cwd, err := os.Getwd(); err == nil {
 		saveDir = filepath.Join(cwd, saveDir)

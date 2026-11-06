@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/storage/store"
 	"testing"
 
 	"github.com/streamingfast/substreams/wasm"
@@ -54,4 +55,17 @@ func TestToGRPCError_DeterministicIsInvalidArgument(t *testing.T) {
 	st, ok := status.FromError(grpcErr)
 	require.True(t, ok, "expected a gRPC status error")
 	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+// A store snapshot pruned while the request runs is not retryable at the job level:
+// tier1 must fail the request so the client restarts it with a fresh resume point.
+func TestToGRPCError_SnapshotMissingIsFailedPrecondition(t *testing.T) {
+	err := fmt.Errorf("error building pipeline: %w",
+		fmt.Errorf("subrequest stores setup failed: %w",
+			fmt.Errorf("load full store: load store stream: snapshot %q %w (it may have been pruned): not found", "0000000100-0000000000.kv", store.ErrSnapshotMissing)))
+
+	st, ok := status.FromError(toGRPCError(context.Background(), err))
+	require.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, st.Code())
+	assert.Contains(t, st.Message(), "restart the request")
 }

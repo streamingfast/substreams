@@ -52,6 +52,14 @@ var (
 
 // StreamClient is a client for the sf.substreams.rpc.v2.Stream service.
 type StreamClient interface {
+	// Blocks streams processed blockchain data for the requested range, applying the specified
+	// Substreams modules. Responses include a one-time `SessionInit` message, optional progress
+	// updates during parallel processing, `BlockScopedData` messages for each processed block,
+	// `BlockUndoSignal` messages on chain reorganizations, and an `Error` fatal error notification.
+	//
+	// For reliable, exactly-once consumption, see `BlockScopedData.cursor` and
+	// `BlockUndoSignal.last_valid_cursor`: persisting and resuming from these cursors is the
+	// foundation of the "never miss a beat" guarantee.
 	Blocks(context.Context, *connect.Request[v2.Request]) (*connect.ServerStreamForClient[v2.Response], error)
 }
 
@@ -86,6 +94,14 @@ func (c *streamClient) Blocks(ctx context.Context, req *connect.Request[v2.Reque
 
 // StreamHandler is an implementation of the sf.substreams.rpc.v2.Stream service.
 type StreamHandler interface {
+	// Blocks streams processed blockchain data for the requested range, applying the specified
+	// Substreams modules. Responses include a one-time `SessionInit` message, optional progress
+	// updates during parallel processing, `BlockScopedData` messages for each processed block,
+	// `BlockUndoSignal` messages on chain reorganizations, and an `Error` fatal error notification.
+	//
+	// For reliable, exactly-once consumption, see `BlockScopedData.cursor` and
+	// `BlockUndoSignal.last_valid_cursor`: persisting and resuming from these cursors is the
+	// foundation of the "never miss a beat" guarantee.
 	Blocks(context.Context, *connect.Request[v2.Request], *connect.ServerStream[v2.Response]) error
 }
 
@@ -120,6 +136,8 @@ func (UnimplementedStreamHandler) Blocks(context.Context, *connect.Request[v2.Re
 
 // EndpointInfoClient is a client for the sf.substreams.rpc.v2.EndpointInfo service.
 type EndpointInfoClient interface {
+	// Info returns metadata about the endpoint such as the supported chain(s) and which
+	// Substreams protocol versions are available.
 	Info(context.Context, *connect.Request[v21.InfoRequest]) (*connect.Response[v21.InfoResponse], error)
 }
 
@@ -154,6 +172,8 @@ func (c *endpointInfoClient) Info(ctx context.Context, req *connect.Request[v21.
 
 // EndpointInfoHandler is an implementation of the sf.substreams.rpc.v2.EndpointInfo service.
 type EndpointInfoHandler interface {
+	// Info returns metadata about the endpoint such as the supported chain(s) and which
+	// Substreams protocol versions are available.
 	Info(context.Context, *connect.Request[v21.InfoRequest]) (*connect.Response[v21.InfoResponse], error)
 }
 

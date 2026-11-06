@@ -3,9 +3,9 @@ package main
 import (
 	"testing"
 
+	pbconvo "github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	pbconvo "github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1"
 )
 
 func TestProtocolOrderPreservation(t *testing.T) {

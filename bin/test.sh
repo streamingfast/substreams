@@ -18,10 +18,9 @@ main() {
   set -e
 
   go test ./... "$@"
-  # commented while they don't work on github for now
-  # pushd tests_e2e &> /dev/null
-  # go test ./... "$@"
-  # popd
+
+  # tests_e2e is its own Go module, so `go test ./...` above never reaches it. CI runs it
+  # as a separate job, see .github/workflows/e2e.yml.
 }
 
 usage_error() {

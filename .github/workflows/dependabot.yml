@@ -8,6 +8,7 @@ permissions:
 jobs:
   dependency-review:
     runs-on: ubuntu-latest
+    if: ${{ github.actor != 'dependabot[bot]' }}
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@v4

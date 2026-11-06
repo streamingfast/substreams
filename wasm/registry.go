@@ -34,6 +34,9 @@ func (r *Registry) registerWASMExtension(namespace string, importName string, ex
 	if namespace == "logger" {
 		panic("cannot extend 'logger' wasm namespace")
 	}
+	if namespace == "context" {
+		panic("cannot extend 'context' wasm namespace")
+	}
 
 	if r.Extensions == nil {
 		r.Extensions = map[string]map[string]WASMExtension{}

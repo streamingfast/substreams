@@ -64,7 +64,16 @@ func runRegistryLoginE(cmd *cobra.Command, args []string) error {
 }
 
 func writeRegistryToken(token string) error {
-	return os.WriteFile(registryTokenFilename, []byte(token), 0644)
+	if err := os.MkdirAll(filepath.Dir(registryTokenFilename), 0o700); err != nil {
+		return fmt.Errorf("creating registry token directory: %w", err)
+	}
+
+	if err := os.WriteFile(registryTokenFilename, []byte(token), 0o600); err != nil {
+		return fmt.Errorf("writing registry token file: %w", err)
+	}
+
+	// WriteFile only applies the mode on create; re-login must tighten an existing file.
+	return os.Chmod(registryTokenFilename, 0o600)
 }
 
 func checkFileExists(filePath string) bool {

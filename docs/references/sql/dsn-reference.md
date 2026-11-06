@@ -1,6 +1,6 @@
 # DSN Reference
 
-DSN stands for Data Source Name (or Database Source Name) and defines how to connect to your database. The `substreams-sink-sql` tool expects a URL input that specifies the driver, connection details, and options.
+DSN stands for Data Source Name (or Database Source Name) and defines how to connect to your database. The `substreams sink postgres` / `substreams sink clickhouse` commands expect a URL input (via the `--dsn` flag or the `SUBSTREAMS_SINK_DSN` environment variable) that specifies the driver, connection details, and options.
 
 ## General Format
 
@@ -81,8 +81,8 @@ clickhouse://myuser:mypassword@localhost:9000/mydatabase?compress=true&debug=tru
 |----------------|------|-------------|
 | **Unencrypted** | `9000` | Standard ClickHouse native protocol port |
 | **Encrypted (Cloud)** | `9440` | Native protocol SSL/TLS port for ClickHouse Cloud |
-| **HTTP** | `8123` | HTTP interface (not supported by substreams-sink-sql) |
-| **HTTPS** | `8443` | HTTPS interface (not supported by substreams-sink-sql) |
+| **HTTP** | `8123` | HTTP interface (not supported by the SQL sink) |
+| **HTTPS** | `8443` | HTTPS interface (not supported by the SQL sink) |
 
 ### Supported Options
 
@@ -112,8 +112,21 @@ export DB_USER="myuser"
 export DB_PASS="mypassword"
 export DSN="postgres://${DB_USER}:${DB_PASS}@localhost:5432/mydatabase"
 
-substreams-sink-sql from-proto $DSN ./substreams.yaml
+substreams sink postgres ./substreams.yaml --dsn $DSN
 ```
+
+Values are inserted as is, so a password with reserved characters (`/`, `?`, `#`, `%`, space) still needs URL encoding. Use `--password-envvar` instead to avoid that.
+
+## Password from an Environment Variable
+
+Leave the password out of the DSN and the sink reads it from the environment variable named by `--password-envvar`. The default is `POSTGRES_PASSWORD` for `substreams sink postgres` and `CLICKHOUSE_PASSWORD` for `substreams sink clickhouse`. The value is URL-encoded for you, so it can contain any character:
+
+```bash
+export CLICKHOUSE_PASSWORD='p@ss:w/rd#1'
+substreams sink clickhouse ./substreams.yaml --dsn "clickhouse://default@localhost:9000/default"
+```
+
+A password written in the DSN takes priority, and the sink logs a warning when the variable is ignored.
 
 ## Troubleshooting
 
@@ -128,7 +141,7 @@ substreams-sink-sql from-proto $DSN ./substreams.yaml
 - Check if `sslmode=disable` is needed for local development
 
 **Authentication failures:**
-- Ensure username and password are URL-encoded if they contain special characters
+- Ensure username and password are URL-encoded if they contain special characters, or pass the password with `--password-envvar`
 - Verify database user has appropriate permissions
 
 ### URL Encoding

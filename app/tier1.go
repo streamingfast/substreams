@@ -11,7 +11,6 @@ import (
 
 	connectrpc "connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/bstream/hub"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dauth"
@@ -26,6 +25,9 @@ import (
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
+	"github.com/streamingfast/substreams/service/active_requests"
+	"github.com/streamingfast/substreams/squash"
+	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/wasm"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	"github.com/streamingfast/substreams/wasm/wazero"
@@ -41,6 +43,12 @@ type Tier1Modules struct {
 	HeadBlockNumberMetric *dmetrics.HeadBlockNum
 	CheckPendingShutDown  func() bool
 	InfoServer            InfoServer
+
+	// Optional dependencies
+
+	// ForkableHub is a hub built with NewLiveHub that another app of the process
+	// owns, runs and feeds metrics from. When nil, tier1 builds and runs its own.
+	ForkableHub *hub.ForkableHub
 }
 
 type InfoServer interface {
@@ -51,11 +59,14 @@ type InfoServer interface {
 // returns config with default sane values
 func NewDefaultTier1Config() *Tier1Config {
 	return &Tier1Config{
-		SharedCacheSize:       15,
-		MaxSubrequests:        10,
-		StateBundleSize:       1000,
-		BlockExecutionTimeout: 1 * time.Minute,
-		OutputBufferSize:      100,
+		SharedCacheSize:         15,
+		MaxSubrequests:          10,
+		StateBundleSize:         1000,
+		MergedBlocksBundleSize:  bstream.DefaultMergedBlocksBundleSize,
+		BlockExecutionTimeout:   1 * time.Minute,
+		RemoteSquashQuietPeriod: service.DefaultRemoteSquashQuietPeriod,
+		OutputBufferSize:        100,
+		ExecOutPrefetch:         execout.PrefetchConfig{Depth: execout.MaxPrefetchDepth, BudgetBytes: 64 << 20},
 	}
 }
 
@@ -80,22 +91,55 @@ type Tier1Config struct {
 
 	TmpDir                  string
 	StateStoreURL           string
+	StoresScratchSpace      string
+	StoresBackend           string
 	QuickSaveStoreURL       string
 	StateStoreDefaultTag    string
 	BlockType               string
 	StateBundleSize         uint64
-	EnforceCompression      bool // refuse incoming requests that do not accept gzip compression (ConnectRPC or GRPC)
-	ActiveRequestsSoftLimit int  // maximum number of active requests a tier1 app can have with external clients before starting to advertise itself as unready in the health check
+	MergedBlocksBundleSize  uint64 // number of blocks per merged-blocks file in MergedBlocksStoreURL (0 means the default of 100)
+	EnforceCompression      bool   // refuse incoming requests that do not accept gzip compression (ConnectRPC or GRPC)
+	ActiveRequestsSoftLimit int    // maximum number of active requests a tier1 app can have with external clients before starting to advertise itself as unready in the health check
 
 	ActiveRequestsHardLimit int // maximum number of active requests a tier1 app can have with external clients, refuse with CodeUnavailable if reached
-	MaxSubrequests          uint64
-	SubrequestsEndpoint     string
-	SubrequestsInsecure     bool
-	SubrequestsPlaintext    bool
-	SubrequestsSecret       string
+
+	// CPUEviction configures the CPU-based request evictor; the zero value
+	// (mode off) disables it, unset tunables take their defaults.
+	CPUEviction active_requests.EvictorConfig
+
+	MaxSubrequests       uint64
+	SubrequestsEndpoint  string
+	SubrequestsInsecure  bool
+	SubrequestsPlaintext bool
+	SubrequestsSecret    string
+
+	// SquasherPlugin is a DSN selecting the store-merge implementation, the
+	// same shape as --common-auth-plugin. Empty or local:// keeps today's
+	// in-process squasher. grpc:// is registered by the squasher project.
+	SquasherPlugin string
+
+	// RemoteSquashQuietPeriod is how long tier1 squashes locally after the
+	// remote squasher stops answering, before one run tries it again. Zero
+	// keeps the default of 5 minutes. Negative is rejected.
+	RemoteSquashQuietPeriod time.Duration
 
 	SharedCacheSize  uint64
 	OutputBufferSize uint64 // Used to bundle execout messages within 'BlockScopedDatas' when using protocol V4
+
+	// ExecOutPrefetch bounds how far ahead a production-mode request downloads cached
+	// execution output files while streaming them: at most Depth segments (capped at
+	// execout.MaxPrefetchDepth), holding at most BudgetBytes of decompressed data per
+	// request. Zero disables prefetching.
+	ExecOutPrefetch execout.PrefetchConfig
+
+	// StoreSizeLimit, if non-zero, overrides the default store size limit (in bytes)
+	// used by tier2 stores. The value is forwarded to tier2 on each request.
+	StoreSizeLimit uint64
+
+	// AllowPrunedChain lets requests run modules whose initial block is below the first
+	// streamable block. They serve blocks from the first streamable block on, and their stores
+	// resume from snapshots taken before the chain was pruned. Forwarded to tier2 on each request.
+	AllowPrunedChain bool
 
 	WASMExtensions wasm.WASMExtensioner
 	Tracing        bool
@@ -104,6 +148,16 @@ type Tier1Config struct {
 	// live backfiller waits before concluding merged blocks are safely written.
 	// Leave at 0 to use the default.
 	LiveBackFillerFinalBlockDelay uint64
+
+	// MaxRequestDuration, if non-zero, gracefully ends requests that have run
+	// for that long (stores are quick-saved and the client is told to
+	// reconnect). Set it a bit under the stream duration limit of any load
+	// balancer in front of tier1.
+	MaxRequestDuration time.Duration
+
+	// StatusPageTemplateFile is a Go html/template file served to browsers
+	// hitting the root of the endpoint. Empty serves no status page.
+	StatusPageTemplateFile string
 }
 
 type Tier1App struct {
@@ -159,6 +213,17 @@ func (a *Tier1App) Run() error {
 		return fmt.Errorf("invalid app config: %w", err)
 	}
 
+	mergedBlocksBundleSize := a.config.MergedBlocksBundleSize
+	if mergedBlocksBundleSize == 0 {
+		mergedBlocksBundleSize = bstream.DefaultMergedBlocksBundleSize
+	}
+	if a.config.StateBundleSize%mergedBlocksBundleSize != 0 && mergedBlocksBundleSize%a.config.StateBundleSize != 0 {
+		a.logger.Warn("merged-blocks bundle size and state bundle size do not divide evenly, segment boundaries will not align with merged-blocks files",
+			zap.Uint64("merged_blocks_bundle_size", mergedBlocksBundleSize),
+			zap.Uint64("state_bundle_size", a.config.StateBundleSize),
+		)
+	}
+
 	mergedBlocksStore, err := dstore.NewDBinStore(a.config.MergedBlocksStoreURL)
 	if err != nil {
 		return fmt.Errorf("failed setting up block store from url %q: %w", a.config.MergedBlocksStoreURL, err)
@@ -191,30 +256,33 @@ func (a *Tier1App) Run() error {
 		}
 	}
 
-	withLive := a.config.BlockStreamAddr != ""
+	withLive := a.config.BlockStreamAddr != "" || a.modules.ForkableHub != nil
 
 	var forkableHub *hub.ForkableHub
 
 	if withLive {
-		liveSourceFactory := bstream.SourceFactory(func(h bstream.Handler) bstream.Source {
-			return blockstream.NewSource(
-				context.Background(),
-				a.config.BlockStreamAddr,
-				2,
-				bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+		ownHub := a.modules.ForkableHub == nil
+		if ownHub {
+			forkableHub = NewLiveHub(LiveHubConfig{
+				BlockStreamAddr:        a.config.BlockStreamAddr,
+				MergedBlocksBundleSize: mergedBlocksBundleSize,
+				OneBlocksStore:         oneBlocksStore,
+				Requester:              "substreams-tier1",
+				Logger:                 a.logger,
+				OnBlock: func(blk *pbbstream.Block) {
 					a.modules.HeadBlockNumberMetric.SetUint64(blk.Number)
 					a.modules.HeadTimeDriftMetric.SetBlockTime(blk.Time())
-					return h.ProcessBlock(blk, obj)
-				}),
-				blockstream.WithRequester("substreams-tier1"),
-				blockstream.WithPartialBlocks(),
-			)
-		})
-
-		forkableHub = hub.NewForkableHubWithOptions(liveSourceFactory, 200, oneBlocksStore, []hub.Option{hub.WithLogger(a.logger)})
+				},
+			})
+		} else {
+			a.logger.Info("using the forkable hub shared by the process")
+			forkableHub = a.modules.ForkableHub
+		}
 		forkableHub.OnTerminated(a.Shutdown)
 
-		go forkableHub.Run()
+		if ownHub {
+			go forkableHub.Run()
+		}
 	}
 
 	authType := client.None
@@ -243,8 +311,35 @@ func (a *Tier1App) Run() error {
 		opts = append(opts, service.WithBlockExecutionTimeout(a.config.BlockExecutionTimeout))
 	}
 
+	if a.config.MaxRequestDuration != 0 {
+		opts = append(opts, service.WithMaxRequestDuration(a.config.MaxRequestDuration))
+	}
 	if a.config.LiveBackFillerFinalBlockDelay != 0 {
 		opts = append(opts, service.WithLiveBackFillerFinalBlockDelay(a.config.LiveBackFillerFinalBlockDelay))
+	}
+
+	// Scratch space and store backend are passed as options (same as tier2) so
+	// both tiers are wired identically.
+	if a.config.StoresScratchSpace != "" {
+		opts = append(opts, service.WithStoresScratchSpace(a.config.StoresScratchSpace))
+	}
+	if a.config.StoresBackend != "" {
+		opts = append(opts, service.WithStoresBackend(a.config.StoresBackend))
+	}
+	if a.config.StoreSizeLimit != 0 {
+		opts = append(opts, service.WithStoreSizeLimit(a.config.StoreSizeLimit))
+	}
+	opts = append(opts, service.WithExecOutPrefetch(a.config.ExecOutPrefetch))
+	if a.config.SquasherPlugin != "" {
+		squasher, err := squash.New(a.config.SquasherPlugin, a.logger)
+		if err != nil {
+			return fmt.Errorf("unable to initialize squasher plugin: %w", err)
+		}
+		// local:// is registered and returns nil, which keeps in-process squashing.
+		if squasher != nil {
+			opts = append(opts, service.WithSquasher(squasher))
+			opts = append(opts, service.WithRemoteSquashQuietPeriod(a.config.RemoteSquashQuietPeriod))
+		}
 	}
 
 	if a.config.TmpDir != "" {
@@ -265,12 +360,14 @@ func (a *Tier1App) Run() error {
 		MeteringConfig:             a.config.MeteringConfig,
 		FirstStreamableBlock:       bstream.GetProtocolFirstStreamableBlock,
 		MergedBlockStoreURL:        a.config.MergedBlocksStoreURL,
+		MergedBlocksBundleSize:     mergedBlocksBundleSize,
 		StateStoreURL:              a.config.StateStoreURL,
 		StateBundleSize:            a.config.StateBundleSize,
 		StateStoreDefaultTag:       a.config.StateStoreDefaultTag,
 		WASMModules:                wasmModules,
 		FoundationalStoreEndpoints: foundationalStoreEndpoints,
-		HostedStoreRegistryAddress: a.config.HostedStoreRegistryAddress,
+		StoreSizeLimit:             a.config.StoreSizeLimit,
+		AllowPrunedChain:           a.config.AllowPrunedChain,
 	}
 
 	tier1Service, err := service.NewTier1(
@@ -291,6 +388,7 @@ func (a *Tier1App) Run() error {
 		a.config.EnforceCompression,
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
+		a.config.CPUEviction.WithDefaults(),
 		a.config.SharedCacheSize,
 		a.config.OutputBufferSize,
 		a.modules.SessionPool,
@@ -303,6 +401,11 @@ func (a *Tier1App) Run() error {
 	}
 
 	tier1ServiceConnect := service.NewService(tier1Service)
+
+	statusPage, err := service.NewStatusPage(a.config.StatusPageTemplateFile, a.statusPageInfoFunc(forkableHub), a.logger)
+	if err != nil {
+		return fmt.Errorf("setting up status page: %w", err)
+	}
 
 	a.OnTerminating(func(err error) {
 		metrics.AppReadinessTier1.SetNotReady()
@@ -345,11 +448,36 @@ func (a *Tier1App) Run() error {
 			a.logger.Error("no gRPC listen addresses provided")
 			return
 		}
-		err := service.ListenTier1(addresses, tier1Service, tier1ServiceConnect, infoServer, infoServerConnect, a.modules.Authenticator, a.logger, a.HealthCheck, a.config.EnforceCompression)
+		err := service.ListenTier1(addresses, tier1Service, tier1ServiceConnect, infoServer, infoServerConnect, a.modules.Authenticator, a.logger, a.HealthCheck, a.config.EnforceCompression, statusPage)
 		a.Shutdown(err)
 	}()
 
 	return nil
+}
+
+func (a *Tier1App) statusPageInfoFunc(forkableHub *hub.ForkableHub) service.StatusPageInfoFunc {
+	return func(ctx context.Context) *service.StatusPageInfo {
+		info := &service.StatusPageInfo{
+			Ready: a.IsReady(ctx),
+			Live:  forkableHub != nil,
+		}
+
+		if a.modules.InfoServer != nil {
+			if resp, err := a.modules.InfoServer.Info(ctx, &pbfirehose.InfoRequest{}); err == nil {
+				info.ChainName = resp.ChainName
+			}
+		}
+
+		if forkableHub != nil {
+			if num, id, blockTime, _, err := forkableHub.HeadInfo(); err == nil {
+				info.HeadBlockNum = num
+				info.HeadBlockID = id
+				info.HeadBlockTime = blockTime
+			}
+		}
+
+		return info
+	}
 }
 
 func (a *Tier1App) HealthCheck(ctx context.Context) (bool, interface{}, error) {
@@ -386,6 +514,12 @@ func (a *Tier1App) setIsReady(ready bool) {
 // Validate inspects itself to determine if the current config is valid according to
 // substreams rules.
 func (config *Tier1Config) Validate() error {
+	if _, err := service.ResolveRemoteSquashQuietPeriod(config.RemoteSquashQuietPeriod); err != nil {
+		return err
+	}
+	if config.MaxRequestDuration < 0 {
+		return fmt.Errorf("max request duration must not be negative, got %s", config.MaxRequestDuration)
+	}
 	return nil
 }
 

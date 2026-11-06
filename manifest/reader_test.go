@@ -372,11 +372,13 @@ func TestReader_Read(t *testing.T) {
 					"mainnet": {
 						InitialBlocks: map[string]uint64{
 							"mod1": 200,
+							"mod2": 200,
 						},
 					},
 					"sepolia": {
 						InitialBlocks: map[string]uint64{
 							"mod1": 400,
+							"mod2": 400,
 						},
 					},
 				},
@@ -409,11 +411,17 @@ func TestReader_Read(t *testing.T) {
 				Network: "mainnet",
 				Networks: map[string]*pbsubstreams.NetworkParams{
 					"mainnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 0,
+						},
 						Params: map[string]string{
 							"mod1": "val=toto",
 						},
 					},
 					"sepolia": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 0,
+						},
 						Params: map[string]string{
 							"mod1": "val=tata",
 						},
@@ -450,11 +458,17 @@ func TestReader_Read(t *testing.T) {
 				Network: "mainnet",
 				Networks: map[string]*pbsubstreams.NetworkParams{
 					"mainnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 0,
+						},
 						Params: map[string]string{
 							"mod1": "val=toto",
 						},
 					},
 					"sepolia": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 0,
+						},
 						Params: map[string]string{
 							"mod1": "val=tata",
 						},

@@ -8,6 +8,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/metrics"
@@ -28,6 +29,9 @@ const (
 	MeterProcessedBlocks         = "processed_blocks"
 
 	MeterWasmInputBytes = "wasm_input_bytes"
+
+	// MeterExternalCallsPrefix is followed by the kind of external call, ex: "external_calls_eth_call"
+	MeterExternalCallsPrefix = "external_calls_"
 
 	TotalReadBytes  = "total_read_bytes"
 	TotalWriteBytes = "total_write_bytes"
@@ -73,6 +77,17 @@ func AddProcessedBlocks(ctx context.Context, n int) {
 
 func AddWasmInputBytes(ctx context.Context, n int) {
 	dmetering.GetBytesMeter(ctx).CountInc(MeterWasmInputBytes, n)
+}
+
+// externalCallMeters holds the meter name of each kind of external call counted by this process.
+var externalCallMeters sync.Map
+
+// AddExternalCalls counts `n` calls of the given kind (ex: "eth_call") made by a wasm extension.
+// A batch counts for as many calls as it contains.
+func AddExternalCalls(ctx context.Context, kind string, n int) {
+	name := MeterExternalCallsPrefix + kind
+	externalCallMeters.LoadOrStore(name, struct{}{})
+	dmetering.GetBytesMeter(ctx).CountInc(name, n)
 }
 
 func GetTotalBytesRead(meter dmetering.Meter) uint64 {
@@ -135,7 +150,8 @@ func NewMetricsSender() *MetricsSender {
 	}
 }
 
-func (ms *MetricsSender) Send(ctx context.Context, organizationID, apiKeyID, ip, userMeta, outputModuleHash, endpoint string) {
+// Send reads the identity from ctx on every call, so headers refreshed mid-stream apply.
+func (ms *MetricsSender) Send(ctx context.Context, outputModuleHash, endpoint string) {
 	ms.Lock()
 	defer ms.Unlock()
 
@@ -165,27 +181,37 @@ func (ms *MetricsSender) Send(ctx context.Context, organizationID, apiKeyID, ip,
 	meter.CountInc(TotalReadBytes, int(totalReadBytes))
 	meter.CountInc(TotalWriteBytes, int(totalWriteBytes))
 
+	eventMetrics := map[string]float64{
+		MeterUncompressedEgressBytes:    float64(egressBytes),
+		"written_bytes":                 float64(bytesWritten),
+		"read_bytes":                    float64(bytesRead),
+		MeterWasmInputBytes:             float64(inputBytes),
+		MeterLiveUncompressedReadBytes:  float64(liveUncompressedReadBytes),
+		MeterFileUncompressedReadBytes:  float64(fileUncompressedReadBytes),
+		MeterFileCompressedReadBytes:    float64(fileCompressedReadBytes),
+		MeterFileUncompressedWriteBytes: float64(fileUncompressedWriteBytes),
+		MeterFileCompressedWriteBytes:   float64(fileCompressedWriteBytes),
+		MeterProcessedBlocks:            float64(processedBlocks),
+		"message_count":                 1,
+	}
+
+	externalCallMeters.Range(func(name, _ any) bool {
+		if count := meter.GetCountAndReset(name.(string)); count != 0 {
+			eventMetrics[name.(string)] = float64(count)
+		}
+		return true
+	})
+
+	auth := dauth.FromContext(ctx)
 	event := dmetering.Event{
-		OrganizationID:   organizationID,
-		ApiKeyID:         apiKeyID,
-		IpAddress:        ip,
-		Meta:             userMeta,
+		OrganizationID:   auth.OrganizationID(),
+		ApiKeyID:         auth.APIKeyID(),
+		IpAddress:        auth.RealIP(),
+		Meta:             auth.Meta(),
 		OutputModuleHash: outputModuleHash,
 
-		Endpoint: endpoint,
-		Metrics: map[string]float64{
-			MeterUncompressedEgressBytes:    float64(egressBytes),
-			"written_bytes":                 float64(bytesWritten),
-			"read_bytes":                    float64(bytesRead),
-			MeterWasmInputBytes:             float64(inputBytes),
-			MeterLiveUncompressedReadBytes:  float64(liveUncompressedReadBytes),
-			MeterFileUncompressedReadBytes:  float64(fileUncompressedReadBytes),
-			MeterFileCompressedReadBytes:    float64(fileCompressedReadBytes),
-			MeterFileUncompressedWriteBytes: float64(fileUncompressedWriteBytes),
-			MeterFileCompressedWriteBytes:   float64(fileCompressedWriteBytes),
-			MeterProcessedBlocks:            float64(processedBlocks),
-			"message_count":                 1,
-		},
+		Endpoint:  endpoint,
+		Metrics:   eventMetrics,
 		Timestamp: time.Now(),
 	}
 

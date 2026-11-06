@@ -1,9 +1,10 @@
 package state
 
 import (
+	"cmp"
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -19,9 +20,15 @@ func listSnapshots(ctx context.Context, storeConfig *store.Config, from, to uint
 	for _, file := range files {
 		if file.Partial {
 			out.Partials = append(out.Partials, file)
-		} else {
-			out.FullKVFiles = append(out.FullKVFiles, file)
+			continue
 		}
+		// A full KV is only loadable under the name built from the store's own initial block:
+		// files written under another one (ex: before the first streamable block was raised)
+		// would be counted as present but fail to load.
+		if file.Range.StartBlock != storeConfig.ModuleInitialBlock() {
+			continue
+		}
+		out.FullKVFiles = append(out.FullKVFiles, file)
 	}
 	out.Sort()
 	return out, nil
@@ -33,14 +40,11 @@ type storeSnapshots struct {
 }
 
 func (s *storeSnapshots) Sort() {
-	sort.SliceStable(s.FullKVFiles, func(i, j int) bool {
-		return s.FullKVFiles[i].Range.ExclusiveEndBlock < s.FullKVFiles[j].Range.ExclusiveEndBlock
+	slices.SortStableFunc(s.FullKVFiles, func(a, b *store.FileInfo) int {
+		return cmp.Compare(a.Range.ExclusiveEndBlock, b.Range.ExclusiveEndBlock)
 	})
-	sort.SliceStable(s.Partials, func(i, j int) bool {
-		left := s.Partials[i]
-		right := s.Partials[j]
-
-		return left.Range.StartBlock < right.Range.StartBlock
+	slices.SortStableFunc(s.Partials, func(a, b *store.FileInfo) int {
+		return cmp.Compare(a.Range.StartBlock, b.Range.StartBlock)
 	})
 }
 

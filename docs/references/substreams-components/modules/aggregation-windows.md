@@ -4,13 +4,13 @@ description: Building and freeing up aggregation windows
 
 # Building and freeing up aggregation windows
 
-Store module key-value storage can hold at most 1 GiB. It is usually enough if used correctly, but it is still a good idea (and sometimes even necessary) to free up unused keys. It is especially true for cases where you work with aggregation windows.
+Store module key-value storage can hold at most 3.5 GiB on StreamingFast-hosted endpoints (1 GiB by default on self-hosted nodes, configurable via the tier1 `--substreams-tier1-store-size-limit` flag). It is usually enough if used correctly, but it is still a good idea (and sometimes even necessary) to free up unused keys. It is especially true for cases where you work with aggregation windows.
 
 Consider this store module that aggregates hourly trade counter for each token:
 ```rust
 #[substreams::handlers::store]
 pub fn store_total_tx_counts(clock: Clock, events: Events, output: StoreAddBigInt) {
-    let timestamp_seconds = clock.timestamp.unwrap().seconds;
+    let timestamp_seconds = clock.timestamp.seconds;
     let hour_id = timestamp_seconds / 3600;
     let prev_hour_id = hour_id - 1;
 

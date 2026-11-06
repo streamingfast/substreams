@@ -157,6 +157,15 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 				return MsgFileReadTransientError{NextWait: computeNewWait(waitBefore, r.fileWalker.IsLocal), Error: err}
 			}
 
+			// Request cancelled by the user (or context cancelled): not a fatal error
+			if errors.Is(err, context.Canceled) || r.ctx.Err() != nil {
+				r.logger.Info("context cancelled during download",
+					zap.Int("segment", current),
+					zap.Error(err),
+				)
+				return loop.NewQuitMsg(err)
+			}
+
 			// Fatal error - fail the request
 			r.logger.Error("fatal error loading file",
 				zap.Int("segment", current),
@@ -240,8 +249,20 @@ func computeNewWait(previousWait time.Duration, storeIsLocal bool) time.Duration
 	return newWait
 }
 
-func (r *Walker) sendItems(reader execout.FileReader) error {
+func (r *Walker) sendItems(reader execout.FileReader) (err error) {
 	defer reader.Close()
+
+	// Sends run on their own goroutine so decoding the next batch overlaps with
+	// compressing and writing the current one. Closing waits for every batch to be
+	// sent before this segment is reported done.
+	out := newAsyncStream(r.streamOut)
+	defer func() {
+		closeErr := out.close()
+		if err == nil {
+			err = closeErr
+		}
+	}()
+
 	itemCount := 0
 	flushingDuration := time.Duration(0)
 	iterationStartTime := time.Now()
@@ -268,7 +289,7 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 				zap.Bool("keep", false),
 			)
 			if r.supportBuffering {
-				if err := r.buffer.Flush(r.streamOut); err != nil {
+				if err := r.buffer.Flush(out); err != nil {
 					return fmt.Errorf("flushing buffer on end block: %w", err)
 				}
 			}
@@ -281,14 +302,14 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 		}
 
 		if r.supportBuffering {
-			d, err := r.buffer.AppendAndFlushWhenNeeded(blockScopedData, len(item.Payload), r.streamOut)
+			d, err := r.buffer.AppendAndFlushWhenNeeded(blockScopedData, len(item.Payload), out)
 			if err != nil {
 				return fmt.Errorf("flushing buffer on 'should flush': %w", err)
 			}
 			flushingDuration += d
 		} else {
 			s := time.Now()
-			err := r.streamOut.BlockScopedData(blockScopedData)
+			err := out.BlockScopedData(blockScopedData)
 			if err != nil {
 				return fmt.Errorf("sending block scoped data: %w", err)
 			}
@@ -310,7 +331,7 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 
 	s := time.Now()
 	if r.supportBuffering {
-		if err := r.buffer.Flush(r.streamOut); err != nil {
+		if err := r.buffer.Flush(out); err != nil {
 			return fmt.Errorf("flushing buffer on end of iteration: %w", err)
 		}
 	}

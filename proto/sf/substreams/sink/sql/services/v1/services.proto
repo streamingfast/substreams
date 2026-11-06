@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package sf.substreams.sink.sql.service.v1;
+
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/services/v1;pbsql";
+
+import "sf/substreams/options.proto";
+
+message Service {
+  // Containing both create table statements and index creation statements.
+  string schema = 1 [ (sf.substreams.options).load_from_file = true ];
+  optional DBTConfig dbt_config = 2;
+  HasuraFrontend hasura_frontend = 4;
+  PostgraphileFrontend postgraphile_frontend = 5;
+
+  enum Engine {
+    unset = 0;
+    postgres = 1;
+    clickhouse = 2;
+  }
+
+  Engine engine = 7;
+
+  RESTFrontend rest_frontend = 8;
+
+}
+
+// https://www.getdbt.com/product/what-is-dbt
+message DBTConfig {
+   bytes files = 1  [ (sf.substreams.options).zip_from_folder = true ];
+   int32 run_interval_seconds = 2;
+   bool enabled = 3;
+}
+
+// https://hasura.io/docs/latest/index/
+message HasuraFrontend {
+    bool enabled = 1;
+}
+
+// https://www.graphile.org/postgraphile/
+message PostgraphileFrontend {
+    bool enabled = 1;
+}
+
+// https://github.com/sosedoff/pgweb
+message PGWebFrontend {
+    bool enabled = 1;
+}
+
+// https://github.com/semiotic-ai/sql-wrapper
+message RESTFrontend {
+    bool enabled = 1;
+}

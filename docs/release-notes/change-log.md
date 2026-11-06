@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Full KV store files are now saved with their size (`datasize`) in their metadata, so tier1 and tier2 no longer write the metadata back after loading them. They did on every load, which on S3 dstore implements as a copy of the whole file onto itself (adding a version on versioned buckets) and elsewhere as a metadata update. Files saved by earlier versions get their size written once, on their first load. As a result loading a snapshot no longer refreshes its modification time, so `prune-states --minimum-age` counts from when the snapshot was written, as its help describes; use `--truncate-below-block` to keep the snapshots near the head.
 - Log `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` on the `incoming Substreams Blocks request` and `incoming Substreams Estimate request` log lines when the auth plugin provides them (`x-auth-method`, `x-auth-jwt-lifetime-bucket`, `x-auth-jwt-iat`, `x-auth-jwt-exp`). Nothing changes without the plugin.
 
 ### CLI

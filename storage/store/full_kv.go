@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"strconv"
 	"time"
 
@@ -233,10 +234,14 @@ func (s *FullKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error) {
 	}
 	reader := s.marshaller.MarshalStreamSnapshot(snap, nil)
 
+	// The size is written with the file, so that loading it never has to write its metadata
+	// (see SetDataSizeDetached). It is the size of what is serialized as long as the store is
+	// not written to during Save, which its callers ensure.
 	fw := &fileWriter{
-		store:    s.objStore,
-		filename: file.Filename,
-		reader:   reader,
+		store:             s.objStore,
+		filename:          file.Filename,
+		reader:            reader,
+		metadataKeyValues: []string{"datasize", strconv.FormatUint(s.SizeBytes(), 10)},
 	}
 
 	s.logger.Debug("saving store",
@@ -279,6 +284,25 @@ func SetMetadataDetached(metaStore dstore.Store, filename, storeName string, met
 				zap.Error(err))
 		}
 	}()
+}
+
+// SetDataSizeDetached records the size of a loaded full KV file in its metadata, through
+// SetMetadataDetached, unless the metadata read before the load already holds that size. Files
+// are saved with their size (see Save), so this only writes for files saved before that, or
+// whose saved size is not the one they load with, once each: on S3 dstore implements a
+// metadata write as a copy of the whole object onto itself.
+func SetDataSizeDetached(metaStore dstore.Store, filename, storeName string, metadata map[string]string, size uint64, logger *zap.Logger) {
+	dataSize := strconv.FormatUint(size, 10)
+	if filename == "" || metadata["datasize"] == dataSize {
+		return // no file: a store starting at its initial block is not loaded from one
+	}
+
+	out := maps.Clone(metadata)
+	if out == nil {
+		out = make(map[string]string, 1)
+	}
+	out["datasize"] = dataSize
+	SetMetadataDetached(metaStore, filename, storeName, out, logger)
 }
 
 func (s *FullKV) GetSize(ctx context.Context, filename string) (compressedSize uint64, uncompressedSize *uint64, metadata map[string]string, err error) {

@@ -628,21 +628,14 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 				}
 				return fmt.Errorf("load full store %s (%s): %w", loadable.fullKVStore.Name(), loadable.fullKVStore.ModuleHash(), err)
 			}
-			//  add loaded file size to metadata
 			actualSize := loadable.fullKVStore.SizeBytes()
 			loadMu.Lock()
 			met := storesMetadata[loadable.fullKVStore.Name()]
-			if met == nil {
-				met = make(map[string]string)
-			}
-			if met["datasize"] == "" {
-				met["datasize"] = fmt.Sprintf("%d", actualSize)
-			}
 			actualRequestStoresSize += actualSize
 			loadMu.Unlock()
 			// Detached metadata write: does not retain fullKVStore or ride the
 			// request ctx (see store.SetMetadataDetached).
-			store.SetMetadataDetached(loadable.fullKVStore.Store(), loadable.fullKVStore.Filename(), loadable.fullKVStore.Name(), met, logger)
+			store.SetDataSizeDetached(loadable.fullKVStore.Store(), loadable.fullKVStore.Filename(), loadable.fullKVStore.Name(), met, actualSize, logger)
 			return nil
 		})
 	}

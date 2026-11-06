@@ -35,7 +35,7 @@ func saveStore(ctx context.Context, store dstore.Store, filename string, content
 	})
 }
 
-func saveStoreStream(ctx context.Context, store dstore.Store, filename string, reader io.Reader) (err error) {
+func saveStoreStream(ctx context.Context, store dstore.Store, filename string, reader io.Reader, metadataKeyValues ...string) (err error) {
 	if cloned, ok := store.(dstore.Clonable); ok {
 		store, err = cloned.Clone(ctx, metering.WithBytesMeteringOptions(dmetering.GetBytesMeter(ctx), reqctx.Logger(ctx))...)
 		if err != nil {
@@ -46,7 +46,7 @@ func saveStoreStream(ctx context.Context, store dstore.Store, filename string, r
 	}
 
 	// We cannot do a retry here, because the reader cannot be reset.
-	return store.WriteObject(ctx, filename, reader)
+	return store.WriteObject(ctx, filename, reader, metadataKeyValues...)
 }
 
 func loadStore(ctx context.Context, store dstore.Store, filename string) (out []byte, err error) {

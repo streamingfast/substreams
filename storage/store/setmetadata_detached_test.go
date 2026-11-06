@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"maps"
 	"testing"
 	"time"
 
@@ -61,4 +62,45 @@ func TestSetMetadataDetached_DoesNotBlockCaller(t *testing.T) {
 	require.Less(t, time.Since(start), time.Second, "helper must not block the caller on the metadata write")
 
 	close(release) // let the background goroutine finish cleanly
+}
+
+// TestSetDataSizeDetached checks that a full KV file's size is written to its metadata only
+// when the metadata read before the load does not hold the size it loaded with, without
+// changing the caller's map.
+func TestSetDataSizeDetached(t *testing.T) {
+	tests := []struct {
+		name          string
+		filename      string
+		metadata      map[string]string
+		expectedWrite map[string]string
+	}{
+		{"no file", "", nil, nil},
+		{"no metadata", "0000-0100.kv", nil, map[string]string{"datasize": "42"}},
+		{"metadata without the size", "0000-0100.kv", map[string]string{"other": "value"}, map[string]string{"other": "value", "datasize": "42"}},
+		{"metadata with an empty size", "0000-0100.kv", map[string]string{"datasize": ""}, map[string]string{"datasize": "42"}},
+		{"metadata holding another size", "0000-0100.kv", map[string]string{"datasize": "40", "other": "value"}, map[string]string{"datasize": "42", "other": "value"}},
+		{"metadata holding the size", "0000-0100.kv", map[string]string{"datasize": "42"}, nil},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			written := make(chan map[string]string, 1)
+			mock := dstore.NewMockStore(nil)
+			mock.SetMetadataFunc = func(_ context.Context, _ string, metadata map[string]string) error {
+				written <- metadata
+				return nil
+			}
+			original := maps.Clone(test.metadata)
+
+			SetDataSizeDetached(mock, test.filename, "store_x", test.metadata, 42, zap.NewNop())
+
+			select {
+			case metadata := <-written:
+				require.Equal(t, test.expectedWrite, metadata)
+			case <-time.After(200 * time.Millisecond):
+				require.Nil(t, test.expectedWrite, "SetMetadata was never called")
+			}
+			require.Equal(t, original, test.metadata, "the caller's metadata must not be changed")
+		})
+	}
 }

@@ -40,8 +40,14 @@ func (s *StoreModuleState) Name() string {
 	return s.name
 }
 
+// hasCachedStore tells whether getStore at exclusiveEndBlock returns the store kept in memory
+// instead of loading it from its file.
+func (s *StoreModuleState) hasCachedStore(exclusiveEndBlock uint64) bool {
+	return s.lastBlockInStore == exclusiveEndBlock && s.cachedStore != nil
+}
+
 func (s *StoreModuleState) estimateStoreSizeBytes(ctx context.Context, exclusiveEndBlock uint64) (uncompressedSizeBytes uint64, metadata map[string]string, err error) {
-	if s.lastBlockInStore == exclusiveEndBlock && s.cachedStore != nil {
+	if s.hasCachedStore(exclusiveEndBlock) {
 		return s.cachedStore.SizeBytes(), nil, nil
 	}
 
@@ -65,7 +71,7 @@ func (s *StoreModuleState) estimateStoreSizeBytes(ctx context.Context, exclusive
 }
 
 func (s *StoreModuleState) getStore(ctx context.Context, exclusiveEndBlock uint64) (*store.FullKV, error) {
-	if s.lastBlockInStore == exclusiveEndBlock && s.cachedStore != nil {
+	if s.hasCachedStore(exclusiveEndBlock) {
 		return s.cachedStore, nil
 	}
 	loadStore := s.storeConfig.NewFullKV(s.logger)

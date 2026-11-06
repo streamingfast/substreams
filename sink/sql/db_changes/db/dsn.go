@@ -134,8 +134,11 @@ func (c *DSN) ConnString() string {
 		database = c.Database
 	}
 	parts := []string{"host=" + keywordValue(c.Host), fmt.Sprintf("port=%d", c.Port), "dbname=" + keywordValue(database)}
+	// Every value of a repeated option is written in order, so the last one wins as in a URL.
 	for _, key := range slices.Sorted(maps.Keys(c.Options)) {
-		parts = append(parts, key+"="+keywordValue(c.Options.Get(key)))
+		for _, value := range c.Options[key] {
+			parts = append(parts, key+"="+keywordValue(value))
+		}
 	}
 	if c.Username != "" {
 		parts = append(parts, "user="+keywordValue(c.Username))

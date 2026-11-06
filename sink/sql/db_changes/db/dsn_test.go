@@ -100,6 +100,17 @@ func TestDSNConnString_PostgresValues(t *testing.T) {
 	assert.Equal(t, "-c search_path=x", config.RuntimeParams["options"])
 }
 
+func TestDSNConnString_PostgresRepeatedOption(t *testing.T) {
+	postgresTestEnv(t)
+	d, err := ParseDSN("psql://user:pass@localhost:5432/db?sslmode=disable&sslmode=require")
+	require.NoError(t, err)
+	assert.Equal(t, "host=localhost port=5432 dbname=db sslmode=disable sslmode=require user=user password=pass", d.ConnString())
+
+	config, err := pgx.ParseConfig(d.ConnString())
+	require.NoError(t, err)
+	assert.NotNil(t, config.TLSConfig, "the last sslmode wins")
+}
+
 func TestParseDSN_ErrorRedactsPassword(t *testing.T) {
 	for _, dsn := range []string{
 		"psql://user:s3cr/et@localhost:5432/db",

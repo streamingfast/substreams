@@ -230,6 +230,15 @@ func (d *BaseDatabase) walkMessageDescriptorAndInsert(dm protoreflect.Message, b
 		}
 		fv := dm.Get(fd)
 
+		// The schema has no column for a oneof member (schema/table.go processColumns): a
+		// set message member is a child table, the others contribute nothing to the row.
+		if fd.ContainingOneof() != nil && !fd.HasOptionalKeyword() {
+			if fd.Kind() == protoreflect.MessageKind && dm.Has(fd) && !isColumnMessage(fd) {
+				childs = append(childs, fv.Message())
+			}
+			continue
+		}
+
 		if fd.IsList() {
 			// Check if this is an array of messages or native values
 			list := fv.List()
@@ -330,6 +339,17 @@ func (d *BaseDatabase) walkMessageDescriptorAndInsert(dm protoreflect.Message, b
 	}
 
 	return totalSqlDuration, nil
+}
+
+// isColumnMessage reports whether a message field is stored as a column, a Timestamp or an
+// inline message, rather than as a child table.
+func isColumnMessage(fd protoreflect.FieldDescriptor) bool {
+	if fd.Message().FullName() == "google.protobuf.Timestamp" {
+		return true
+	}
+	fieldInfo := proto.FieldInfo(fd)
+
+	return fieldInfo != nil && fieldInfo.Inline
 }
 
 // ScalarFieldValue unwraps a non-message, non-list value for the inserters.

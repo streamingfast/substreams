@@ -49,7 +49,11 @@ type Database struct {
 	flusher      pgFlusher
 	// numericStrings is numericStringPositions for each table.
 	numericStrings map[string][]int
-	constraints    sql.ConstraintPolicy
+	// rowLayouts is rowLayout for each table.
+	rowLayouts map[string][]rowValue
+	// nulColumnsLogged holds the "table.column" names removeNulCharacters already logged.
+	nulColumnsLogged map[string]struct{}
+	constraints      sql.ConstraintPolicy
 
 	// writeMode is what the operator asked for; resolvedWriteMode is what Open settled on
 	// and is what the startup log reports.
@@ -191,21 +195,25 @@ func NewDatabase(schema *schema.Schema, dsn *db.DSN, moduleOutputType string, ro
 		return nil, fmt.Errorf("failed to create base database: %w", err)
 	}
 	numericStrings := map[string][]int{}
+	rowLayouts := map[string][]rowValue{}
 	for name, table := range schema.TableRegistry {
+		rowLayouts[name] = rowLayout(table)
 		if positions := numericStringPositions(table); len(positions) > 0 {
 			numericStrings[name] = positions
 		}
 	}
 
 	database := &Database{
-		numericStrings: numericStrings,
-		db:             sqlDB,
-		dsn:            dsn,
-		schema:         schema,
-		constraints:    constraints,
-		BaseDatabase:   baseDB,
-		dialect:        dialect,
-		logger:         logger,
+		numericStrings:   numericStrings,
+		rowLayouts:       rowLayouts,
+		nulColumnsLogged: map[string]struct{}{},
+		db:               sqlDB,
+		dsn:              dsn,
+		schema:           schema,
+		constraints:      constraints,
+		BaseDatabase:     baseDB,
+		dialect:          dialect,
+		logger:           logger,
 	}
 
 	return database, nil
@@ -926,6 +934,7 @@ func (d *Database) Insert(table string, values []any) error {
 			values[position] = emptyNumericStringsAsZero(values[position])
 		}
 	}
+	d.removeNulCharacters(table, values)
 
 	return d.inserter.insert(table, values, d)
 }

@@ -64,6 +64,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   seconds, as `copy` does, instead of being cut to the second. This applies to `_block_timestamp_` too.
 - SQL sink (from-proto, PostgreSQL): an empty `bytes` field is stored as an empty `BYTEA` by `copy` and `row-insert`
   too, instead of `NULL`, as `batch-insert` and the text bytes encodings already stored it.
+- SQL sink (from-proto, PostgreSQL): remove NUL characters (`\x00`) from strings, which PostgreSQL rejects in text and
+  JSON values, instead of stopping the sink. A warning names the table and column the first time each column has one.
+  See [Values PostgreSQL cannot store](../references/sql/proto-annotations.md#values-postgresql-cannot-store).
+- SQL sink (from-proto): fix rows failing to insert when the table's message has a scalar, Timestamp or inline field in a
+  `oneof`. The schema gives these no column but the row carried a value for them.
+- SQL sink (from-proto, ClickHouse): a string converted to a numeric type that is not a number or does not fit the
+  column now stops the sink with an error naming the table and column, instead of a panic. An empty one is stored as `0`
+  whether or not the field is `optional`, as the PostgreSQL sink stores it.
 - SQL sink (DatabaseChanges, PostgreSQL): undo a block's changes last to first on a reorg. The order within a block was
   left to the database, so undoing a child row inserted after its parent in one block could fail on a foreign key and
   stop the sink.

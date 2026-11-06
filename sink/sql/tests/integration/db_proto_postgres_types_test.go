@@ -114,7 +114,9 @@ func TestDbProtoPostgresTypes(t *testing.T) {
 
 // TestDbProtoPostgresRepeatedNumericStrings covers repeated string fields converted to a
 // NUMERIC[] column, including an empty element, which binary COPY stores as 0.
-func TestDbProtoPostgresRepeatedNumericStrings(t *testing.T) {
+// TestDbProtoPostgresValues covers values only the PostgreSQL sink has to adjust, repeated
+// numeric strings and strings with NUL characters, and a oneof, which has no column.
+func TestDbProtoPostgresValues(t *testing.T) {
 	outputMessageDescriptor := (*pbrelations.PostgresValuesOutput)(nil).ProtoReflect().Descriptor()
 
 	results := runPostgresWritePaths(t, pbrelations.File_test_relations_postgres_values_proto, outputMessageDescriptor, "postgres_values", func(t *testing.T) []any {
@@ -123,15 +125,24 @@ func TestDbProtoPostgresRepeatedNumericStrings(t *testing.T) {
 				Id:                      1,
 				RepeatedStr_2Uint256:    []string{"115792089237316195423570985008687907853269984665640564039457584007913129639935", "", "1"},
 				RepeatedStr_2Decimal128: []string{"12345.6789", ""},
+				Text:                    "a\x00b",
+				Texts:                   []string{"c\x00", "d"},
+				Note:                    &pbrelations.PostgresNote{Text: "e\x00f\\u0000"},
+				Notes:                   []*pbrelations.PostgresNote{{Text: "\x00"}},
+				Choice:                  &pbrelations.PostgresValues_ChoiceText{ChoiceText: "x"},
+				AfterChoice:             "after",
 			}}}, blockTimepb(t, "2025-01-01")),
 			blockScopedData(t, "2a", &pbrelations.PostgresValuesOutput{Values: []*pbrelations.PostgresValues{{
-				Id: 2,
+				Id:          2,
+				Choice:      &pbrelations.PostgresValues_ChoiceNumber{ChoiceNumber: 7},
+				AfterChoice: "after",
 			}}}, blockTimepb(t, "2025-01-02")),
 		}
 	})
 
-	require.Contains(t, results[0], `"repeated_str_2_uint256":[115792089237316195423570985008687907853269984665640564039457584007913129639935,0,1],"repeated_str_2_decimal128":[12345.6789,0.0000]`)
-	require.Contains(t, results[0], `"repeated_str_2_uint256":[],"repeated_str_2_decimal128":[]`)
+	require.Equal(t, `{"_block_number_":1,"_block_timestamp_":"2025-01-01T00:00:00","id":1,"repeated_str_2_uint256":[115792089237316195423570985008687907853269984665640564039457584007913129639935,0,1],"repeated_str_2_decimal128":[12345.6789,0.0000],"text":"ab","texts":["c","d"],"note":{"text": "ef\\u0000"},"notes":[{"text": ""}],"after_choice":"after"}
+{"_block_number_":2,"_block_timestamp_":"2025-01-02T00:00:00","id":2,"repeated_str_2_uint256":[],"repeated_str_2_decimal128":[],"text":"","texts":[],"note":null,"notes":null,"after_choice":"after"}
+`, results[0])
 }
 
 // runPostgresWritePaths sinks blocks 1 and 2 through each way rows reach PostgreSQL, requires

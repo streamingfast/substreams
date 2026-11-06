@@ -184,6 +184,15 @@ func ValueToString(value any, bytesEncoding bytes.Encoding) (s string) {
 			elements = append(elements, ValueToString(elem, bytesEncoding))
 		}
 		s = "array[" + strings.Join(elements, ",") + "]"
+	case postgresTextArray:
+		// Repeated inline messages: the same array text that COPY and row insert send.
+		if v == nil {
+			s = "NULL"
+			return
+		}
+		text, _ := v.Value()
+		s = quoteLiteral(text.(string))
+		return
 	case protoreflect.Message:
 		jsonBytes, err := protojson.Marshal(v.Interface())
 		if err != nil {

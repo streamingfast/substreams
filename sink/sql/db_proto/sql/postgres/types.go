@@ -3,6 +3,7 @@ package postgres
 import (
 	"encoding/hex"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -133,8 +134,40 @@ func quoteLiteral(v string) string {
 	return "'" + strings.ReplaceAll(v, "'", "''") + "'"
 }
 
+// pgFloatText is a float's text input form. NaN and the infinities are words, which as
+// SQL have to be quoted: bare, `NaN` parses as a column name.
+func pgFloatText(v float64, bitSize int) (text string, isWord bool) {
+	switch {
+	case math.IsNaN(v):
+		return "NaN", true
+	case math.IsInf(v, 1):
+		return "Infinity", true
+	case math.IsInf(v, -1):
+		return "-Infinity", true
+	}
+
+	return strconv.FormatFloat(v, 'f', -1, bitSize), false
+}
+
+func pgFloatLiteral(v float64, bitSize int) string {
+	text, isWord := pgFloatText(v, bitSize)
+	if isWord {
+		return "'" + text + "'"
+	}
+
+	return text
+}
+
+// pgTimestampText is a time's text input form for a TIMESTAMP column, in UTC and cut to the
+// column's microsecond precision the same way binary COPY cuts it.
+func pgTimestampText(t time.Time) string {
+	return t.UTC().Truncate(time.Microsecond).Format("2006-01-02 15:04:05.999999")
+}
+
 func ValueToString(value any, bytesEncoding bytes.Encoding) (s string) {
 	switch v := value.(type) {
+	case nil:
+		s = "NULL"
 	case string:
 		s = quoteLiteral(v)
 	case int64:
@@ -150,9 +183,9 @@ func ValueToString(value any, bytesEncoding bytes.Encoding) (s string) {
 	case uint:
 		s = strconv.FormatUint(uint64(v), 10)
 	case float64:
-		s = strconv.FormatFloat(v, 'f', -1, 64)
+		s = pgFloatLiteral(v, 64)
 	case float32:
-		s = strconv.FormatFloat(float64(v), 'f', -1, 32)
+		s = pgFloatLiteral(float64(v), 32)
 	case []uint8:
 		if bytesEncoding == bytes.EncodingRaw {
 			// bytea hex input format. Casting an E'<hex>' string instead would store the
@@ -170,20 +203,20 @@ func ValueToString(value any, bytesEncoding bytes.Encoding) (s string) {
 	case sql2.EnumValue:
 		s = quoteLiteral(v.String())
 	case time.Time:
-		s = "'" + v.Format(time.RFC3339) + "'"
+		s = "'" + pgTimestampText(v) + "'"
 	case *timestamppb.Timestamp:
-		s = "'" + v.AsTime().Format(time.RFC3339) + "'"
-	case []interface{}:
-		if len(v) == 0 {
-			s = "'{}'"
+		s = "'" + pgTimestampText(v.AsTime()) + "'"
+	case postgresTextArray:
+		if v == nil {
+			s = "NULL"
 			return
 		}
-
-		var elements []string
-		for _, elem := range v {
-			elements = append(elements, ValueToString(elem, bytesEncoding))
-		}
-		s = "array[" + strings.Join(elements, ",") + "]"
+		literal, _ := v.Value()
+		s = quoteLiteral(literal.(string))
+	case []interface{}:
+		// An untyped literal takes the column's type. An array[...] constructor takes its
+		// elements' instead, so array['1'] is text[] and an INSERT into numeric[] fails.
+		s = quoteLiteral(pgArrayLiteral(v, bytesEncoding))
 	case protoreflect.Message:
 		jsonBytes, err := protojson.Marshal(v.Interface())
 		if err != nil {

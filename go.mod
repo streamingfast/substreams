@@ -40,7 +40,7 @@ require (
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/jhump/protoreflect v1.14.0
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/klauspost/compress v1.20.1
+	github.com/klauspost/compress v1.20.2
 	github.com/klauspost/connect-compress/v2 v2.1.1
 	github.com/lithammer/dedent v1.1.0
 	github.com/mattn/go-isatty v0.0.24
@@ -141,7 +141,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator v0.54.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/alecthomas/chroma/v2 v2.20.0 // indirect
-	github.com/andybalholm/brotli v1.2.2 // indirect
+	github.com/andybalholm/brotli v1.2.7 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.41.7 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.10 // indirect

@@ -30,6 +30,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
+- SQL sink (DatabaseChanges): `--batch-row-flush-interval=0` now turns the row interval off, as its help says, leaving
+  `--batch-block-flush-interval` to decide. It used to flush after every block that had any row. Both set to 0 is
+  refused at startup, as the sink would not flush while catching up.
 - SQL sink (PostgreSQL): DSN values with characters like `/` or a space now reach the database as given. They were URL
   encoded into a connection string that doesn't decode them, so `sslrootcert=/etc/ssl/ca.pem` or
   `timezone=Europe/London` were wrong, and a password with a space made the DSN fail to parse.

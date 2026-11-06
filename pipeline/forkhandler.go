@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"slices"
 	"sync"
 
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -42,8 +43,8 @@ func (f *ForkHandler) joinReversibleOutputs(target *pbsubstreams.Clock, previous
 	defer f.mu.Unlock()
 
 	reversibleOutputs := f.reversibleOutputs[target.Id]
-	for i := len(previousClocks) - 1; i >= 0; i-- {
-		if clock := previousClocks[i]; clock != nil {
+	for _, v := range slices.Backward(previousClocks) {
+		if clock := v; clock != nil {
 			if outputs, found := f.reversibleOutputs[clock.Id]; found {
 				reversibleOutputs = append(reversibleOutputs, outputs...)
 				delete(f.reversibleOutputs, clock.Id)

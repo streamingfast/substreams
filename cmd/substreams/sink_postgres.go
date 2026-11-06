@@ -88,7 +88,7 @@ var sinkPostgresConstraintsDropCmd = &cobra.Command{
 
 func init() {
 	persistent := sinkPostgresCmd.PersistentFlags()
-	addDSNFlag(persistent)
+	addDSNFlag(persistent, "POSTGRES_PASSWORD")
 	addOperatorFlags(persistent)
 
 	addSinkRunFlags(sinkPostgresCmd.Flags(), sinkPostgresDriver)

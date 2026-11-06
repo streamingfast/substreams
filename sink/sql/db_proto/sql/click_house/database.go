@@ -4,11 +4,15 @@ import (
 	"cmp"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/ClickHouse/ch-go"
@@ -137,13 +141,15 @@ func newClient(dsn *db.DSN, logger *zap.Logger, counter *wireCounter) (*ch.Clien
 		Password:    dsn.Password,
 		DialTimeout: 30 * time.Second,
 	}
-	if counter != nil {
-		chOption.Dialer = counter
-	}
+	// Bounds the ClickHouse hello once connected; ch-go defaults to 5m.
+	chOption.HandshakeTimeout = 30 * time.Second
+	// Held aside from Options.TLS. ch.Dial type-asserts Dialer to *net.Dialer once
+	// TLS is set, and the byte counter is not a *net.Dialer.
+	var tlsConfig *tls.Config
 
 	for key, value := range dsn.Options.Iter() {
 		if key == "secure" && value == "true" {
-			chOption.TLS = &tls.Config{}
+			tlsConfig = &tls.Config{}
 			continue
 		}
 		if key == "username" {
@@ -160,15 +166,91 @@ func newClient(dsn *db.DSN, logger *zap.Logger, counter *wireCounter) (*ch.Clien
 		}
 	}
 
+	if tlsConfig == nil && counter != nil {
+		chOption.Dialer = counter
+	}
+
 	for {
-		client, err := ch.Dial(context.Background(), chOption)
+		var (
+			client *ch.Client
+			err    error
+		)
+		if tlsConfig != nil {
+			client, err = dialTLS(context.Background(), chOption, tlsConfig, counter)
+		} else {
+			client, err = ch.Dial(context.Background(), chOption)
+		}
 		if err != nil {
+			if isPermanentTLSError(err) {
+				return nil, fmt.Errorf("dialing clickhouse: %w", err)
+			}
 			logger.Warn("dialing clickhouse failed, will retry", zap.Error(err))
 			time.Sleep(time.Second)
 			continue
 		}
 		return client, nil
 	}
+}
+
+// isPermanentTLSError reports errors a retry cannot fix: the certificate does not verify for
+// this host, or the port does not speak TLS.
+func isPermanentTLSError(err error) bool {
+	var (
+		invalid  x509.CertificateInvalidError
+		unknown  x509.UnknownAuthorityError
+		hostname x509.HostnameError
+		record   tls.RecordHeaderError
+	)
+
+	return errors.As(err, &invalid) || errors.As(err, &unknown) || errors.As(err, &hostname) || errors.As(err, &record)
+}
+
+// dialTLS is ch.Dial for a TLS connection that still counts bytes. ch.Dial rejects any
+// Dialer that is not a *net.Dialer once TLS is set, so the raw TCP connection is dialed
+// (and counted) here, then wrapped by tls.Client before ch.Connect.
+func dialTLS(ctx context.Context, opt ch.Options, cfg *tls.Config, counter *wireCounter) (*ch.Client, error) {
+	if opt.Address == "" {
+		opt.Address = net.JoinHostPort("localhost", strconv.Itoa(ch.DefaultPort))
+	}
+	if opt.DialTimeout == 0 {
+		opt.DialTimeout = ch.DefaultDialTimeout
+	}
+
+	dialCtx, cancel := context.WithTimeout(ctx, opt.DialTimeout)
+	defer cancel()
+
+	var dialer ch.Dialer = &net.Dialer{Timeout: opt.DialTimeout}
+	if counter != nil {
+		dialer = counter
+	}
+
+	conn, err := dialer.DialContext(dialCtx, "tcp", opt.Address)
+	if err != nil {
+		return nil, fmt.Errorf("dial: %w", err)
+	}
+
+	cfg = cfg.Clone()
+	if cfg.ServerName == "" {
+		if host, _, splitErr := net.SplitHostPort(opt.Address); splitErr == nil {
+			cfg.ServerName = host
+		}
+	}
+
+	// The same budget covers the TLS handshake as the TCP dial; ch.Connect has its own
+	// HandshakeTimeout for the ClickHouse hello.
+	tlsConn := tls.Client(conn, cfg)
+	if err := tlsConn.HandshakeContext(dialCtx); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("tls handshake: %w", err)
+	}
+
+	client, err := ch.Connect(ctx, tlsConn, opt)
+	if err != nil {
+		_ = tlsConn.Close()
+		return nil, fmt.Errorf("connect: %w", err)
+	}
+
+	return client, nil
 }
 
 func (d *Database) client() (*ch.Client, error) {

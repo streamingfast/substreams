@@ -250,7 +250,14 @@ func (d *DialectClickHouse) AppendInlineFieldValues(fieldValues []any, fd protor
 	} else {
 		// Handle as nested column - extract each field as an array
 		fm := fv.Message()
-		nestedFields := fm.Descriptor().Fields()
+		nestedFields := fd.Message().Fields()
+		if !fm.IsValid() {
+			// Unset: no element, like an empty repeated inline field.
+			for j := 0; j < nestedFields.Len(); j++ {
+				fieldValues = append(fieldValues, []interface{}{})
+			}
+			return fieldValues, nil
+		}
 		for j := 0; j < nestedFields.Len(); j++ {
 			nestedFd := nestedFields.Get(j)
 			nestedValue := fm.Get(nestedFd)

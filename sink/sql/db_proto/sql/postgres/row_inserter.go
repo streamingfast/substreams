@@ -140,29 +140,8 @@ func (i *RowInserter) insert(table string, values []any, database *Database) err
 	stmt := i.insertStatements[table]
 	stmt = database.wrapInsertStatement(stmt)
 
-	t := i.database.dialect.TableRegistry[table]
-
-	fieldIndexOffset := 2
-	if t != nil && t.ChildOf != nil {
-		fieldIndexOffset = 3 //remove foreign key
-	}
-
 	for i, value := range values {
-
-		var column *schema.Column
-		fieldIndex := i - fieldIndexOffset //remove _block_number and _block_timestamp + foreign key
-
-		if t != nil && fieldIndex >= 0 {
-			column = t.Columns[fieldIndex]
-		}
-
 		switch v := value.(type) {
-		case string:
-			if column != nil && column.ConvertTo != nil && column.ConvertTo.Convertion != nil {
-				if v == "" {
-					values[i] = 0
-				}
-			}
 		case uint64:
 			values[i] = strconv.FormatUint(v, 10)
 		case []uint8:
@@ -176,11 +155,17 @@ func (i *RowInserter) insert(table string, values []any, database *Database) err
 			}
 			// Raw bytes target a BYTEA column and the driver binds []byte to it directly.
 			// Rendering a literal here would store that literal's characters instead.
+			// A nil slice would bind as NULL; the field is empty, not absent.
+			if v == nil {
+				values[i] = []byte{}
+			}
 		case sql2.EnumValue:
 			// The column is TEXT; bind the name rather than the wrapper.
 			values[i] = v.String()
+		case time.Time:
+			values[i] = pgTimestampText(v)
 		case *timestamppb.Timestamp:
-			values[i] = "'" + v.AsTime().Format(time.RFC3339) + "'"
+			values[i] = pgTimestampText(v.AsTime())
 		case []interface{}:
 			// These are bound as parameters, not interpolated, so the value must be the
 			// array's text *input* form: {"a","b"} with double quotes. ValueToString
@@ -246,10 +231,16 @@ func arrayElementText(value interface{}, bytesEncoding bytes.Encoding) string {
 		return `\x` + hex.EncodeToString(v)
 	case sql2.EnumValue:
 		return v.String()
+	case float64:
+		text, _ := pgFloatText(v, 64)
+		return text
+	case float32:
+		text, _ := pgFloatText(float64(v), 32)
+		return text
 	case time.Time:
-		return v.UTC().Format(time.RFC3339)
+		return pgTimestampText(v)
 	case *timestamppb.Timestamp:
-		return v.AsTime().UTC().Format(time.RFC3339)
+		return pgTimestampText(v.AsTime())
 	default:
 		return fmt.Sprint(v)
 	}

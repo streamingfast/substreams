@@ -36,7 +36,7 @@ var sinkClickhouseSetupCmd = &cobra.Command{
 
 func init() {
 	persistent := sinkClickhouseCmd.PersistentFlags()
-	addDSNFlag(persistent)
+	addDSNFlag(persistent, "CLICKHOUSE_PASSWORD")
 	addOperatorFlags(persistent)
 
 	addSinkRunFlags(sinkClickhouseCmd.Flags(), sinkClickhouseDriver)

@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/streamingfast/logging"
+	sink "github.com/streamingfast/substreams/sink"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -63,6 +64,13 @@ type Loader struct {
 
 	// detached holds the changes of a background flush, apart from those being added.
 	detached *OrderedMap[string, *OrderedMap[string, *Operation]]
+	// currentBlockNum is the block the changes being added come from (see SetCurrentBlock).
+	currentBlockNum uint64
+	// activeModuleHash and activeCursor are those of the running flush or revert.
+	activeModuleHash string
+	activeCursor     *sink.Cursor
+	// reverting is set while Revert runs (see ClickhouseDialect.resolveUncommitted).
+	reverting bool
 
 	// expectedCursor is the stored cursor of this sink's module as this loader last read or wrote
 	// it, nil until SetExpectedCursor. Flushes and reverts first check the stored cursor still has this
@@ -71,7 +79,8 @@ type Loader struct {
 
 	// writerConn, once the writer lock is held (see AcquireWriterLock), is the connection holding
 	// it. Cursor reads and every write go through it, so the lock covers them.
-	writerConn *sql.Conn
+	writerConn      *sql.Conn
+	clickhouseLease *clickhouseLease
 	// writerConnMu is held while a transaction or a result set is open on writerConn, so the
 	// keepalive (see KeepWriterSessionAlive) never runs inside a transaction or between the rows of
 	// a query (a connection refuses a query while another one's rows are being read).
@@ -128,12 +137,12 @@ func NewLoader(
 
 	if handleReorgs == nil {
 		// automatic detection
-		l.handleReorgs = !l.dialect.OnlyInserts()
+		l.handleReorgs = l.dialect.Capabilities().Reorgs
 	} else {
 		l.handleReorgs = *handleReorgs
 	}
 
-	if l.handleReorgs && l.dialect.OnlyInserts() {
+	if l.handleReorgs && !l.dialect.Capabilities().Reorgs {
 		return nil, fmt.Errorf("driver %s does not support reorg handling. You must use set a non-zero undo-buffer-size", sqlDB.Driver())
 	}
 
@@ -641,6 +650,12 @@ func (l *Loader) Setup(ctx context.Context, schemaName string, userSql string, w
 		return fmt.Errorf("setup history table: %w", err)
 	}
 
+	if d, ok := l.dialect.(*ClickhouseDialect); ok && d.isStateful() {
+		if _, err := l.ExecContext(ctx, d.getCreateJournalQuery()); err != nil {
+			return fmt.Errorf("setup journal table: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -651,7 +666,7 @@ func (l *Loader) setupCursorTable(ctx context.Context, schemaName string, withPo
 }
 
 func (l *Loader) setupHistoryTable(ctx context.Context, schemaName string, withPostgraphile bool) error {
-	if l.dialect.OnlyInserts() {
+	if !l.dialect.Capabilities().Reorgs {
 		return nil
 	}
 	query := l.dialect.GetCreateHistoryQuery(schemaName, withPostgraphile)
@@ -667,6 +682,11 @@ func (l *Loader) GetIdentifier() string {
 // GetIdentifier returns <database>/<schema> suitable for user presentation
 func (l *Loader) GetDSN() *DSN {
 	return l.dsn
+}
+
+// SetCurrentBlock sets the block the changes added next come from.
+func (l *Loader) SetCurrentBlock(blockNum uint64) {
+	l.currentBlockNum = blockNum
 }
 
 // NextBatchOrdinal returns the next ordinal for the current batch and increments the counter

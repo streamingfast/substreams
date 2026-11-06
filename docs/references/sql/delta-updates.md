@@ -2,7 +2,7 @@
 
 Delta updates allow you to perform atomic database operations like increments, decrements, and conditional updates directly at the database level, without needing to read existing values first.
 
-> **Note**: Delta updates are currently a **PostgreSQL-only feature**. ClickHouse support is not available at this time.
+> **Note**: On ClickHouse, delta updates need [ClickHouse Stateful Mode](clickhouse-stateful.md) (`--clickhouse-stateful`). Without it, the ClickHouse sink only inserts rows.
 
 ## Overview
 

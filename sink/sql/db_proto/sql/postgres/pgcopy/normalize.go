@@ -81,6 +81,10 @@ func normalize(oid uint32, value any, encoding sqlbytes.Encoding) (any, error) {
 		return v, nil
 
 	case []byte:
+		if v == nil {
+			// Empty bytes are nil in Go: written as an empty value, as the rendered modes do, not NULL.
+			v = []byte{}
+		}
 		encoded, err := encoding.EncodeBytes(v)
 		if err != nil {
 			return nil, fmt.Errorf("encoding bytes: %w", err)

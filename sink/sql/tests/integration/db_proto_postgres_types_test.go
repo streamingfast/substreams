@@ -71,7 +71,6 @@ func TestDbProtoPostgresTypes(t *testing.T) {
 	}
 	minimal := &pbrelations.TypesTest{
 		Id:                   2,
-		BytesField:           []byte{0x00},
 		StringField:          "",
 		TimestampField:       timestamppb.New(time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)),
 		Str_2Int128:          "0",

@@ -27,6 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
+- SQL sink (Protobuf, PostgreSQL): COPY writes an empty `bytes` field as an empty value rather than NULL, as batch
+  insert and row insert do.
 - SQL sink (DatabaseChanges): stop formatting each block's whole output as text to check that it isn't empty, which took
   over a third of the sink's CPU on a busy module.
 - SQL sink (DatabaseChanges, PostgreSQL): send a flush's statements through a pipeline instead of one round trip each, in

@@ -180,7 +180,7 @@ func (i *RowInserter) insert(table string, values []any, database *Database) err
 			// The column is TEXT; bind the name rather than the wrapper.
 			values[i] = v.String()
 		case *timestamppb.Timestamp:
-			values[i] = "'" + v.AsTime().Format(time.RFC3339) + "'"
+			values[i] = "'" + v.AsTime().Format(time.RFC3339Nano) + "'"
 		case []interface{}:
 			// These are bound as parameters, not interpolated, so the value must be the
 			// array's text *input* form: {"a","b"} with double quotes. ValueToString
@@ -247,9 +247,9 @@ func arrayElementText(value interface{}, bytesEncoding bytes.Encoding) string {
 	case sql2.EnumValue:
 		return v.String()
 	case time.Time:
-		return v.UTC().Format(time.RFC3339)
+		return v.UTC().Format(time.RFC3339Nano)
 	case *timestamppb.Timestamp:
-		return v.AsTime().UTC().Format(time.RFC3339)
+		return v.AsTime().UTC().Format(time.RFC3339Nano)
 	default:
 		return fmt.Sprint(v)
 	}

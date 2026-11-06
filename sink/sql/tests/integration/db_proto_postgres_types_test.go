@@ -53,7 +53,7 @@ func TestDbProtoPostgresTypes(t *testing.T) {
 		BytesField:            []byte{0x00, 0x01, 0xfe, 0xff, '\'', '\\'},
 		OptionalStringSet:     ptr(tricky),
 		OptionalInt32FieldSet: ptr(int32(7)),
-		TimestampField:        timestamppb.New(time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)),
+		TimestampField:        timestamppb.New(time.Date(2025, 1, 2, 3, 4, 5, 123456000, time.UTC)),
 		RepeatedInt32Field:    []int32{1, -2},
 		RepeatedInt64Field:    []int64{math.MaxInt64, math.MinInt64},
 		RepeatedUint32Field:   []uint32{math.MaxUint32},

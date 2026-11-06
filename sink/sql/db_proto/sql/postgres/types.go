@@ -170,9 +170,9 @@ func ValueToString(value any, bytesEncoding bytes.Encoding) (s string) {
 	case sql2.EnumValue:
 		s = quoteLiteral(v.String())
 	case time.Time:
-		s = "'" + v.Format(time.RFC3339) + "'"
+		s = "'" + v.Format(time.RFC3339Nano) + "'"
 	case *timestamppb.Timestamp:
-		s = "'" + v.AsTime().Format(time.RFC3339) + "'"
+		s = "'" + v.AsTime().Format(time.RFC3339Nano) + "'"
 	case []interface{}:
 		if len(v) == 0 {
 			s = "'{}'"

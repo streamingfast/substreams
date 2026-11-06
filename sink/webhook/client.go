@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -65,6 +66,7 @@ type Config struct {
 // HTTP status (0 when no response was received), how many attempts were made,
 // and the last underlying error.
 type DeliveryError struct {
+	// URL has its password masked, see RedactURL.
 	URL         string
 	BlockNumber uint64
 	StatusCode  int
@@ -77,6 +79,15 @@ func (e *DeliveryError) Error() string {
 }
 
 func (e *DeliveryError) Unwrap() error { return e.Err }
+
+// RedactURL masks the password of rawURL, for logs and errors.
+func RedactURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "<invalid URL>"
+	}
+	return u.Redacted()
+}
 
 // NewClient creates a new webhook client with retry configuration.
 func NewClient(config Config, logger *zap.Logger) *Client {
@@ -195,7 +206,8 @@ func VerifySignature(secret []byte, body []byte, header string) (time.Time, erro
 // It retries on network errors and server errors (5xx), but not on client errors (4xx).
 // The function respects context cancellation and implements proper error classification.
 // When every attempt fails the returned error is a *DeliveryError.
-func (c *Client) Call(ctx context.Context, url string, payload []byte, blockNumber uint64) error {
+func (c *Client) Call(ctx context.Context, rawURL string, payload []byte, blockNumber uint64) error {
+	redactedURL := RedactURL(rawURL)
 	attempts := 0
 	lastStatus := 0
 
@@ -203,9 +215,13 @@ func (c *Client) Call(ctx context.Context, url string, payload []byte, blockNumb
 		attempts++
 		lastStatus = 0
 
-		req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(payload))
+		req, err := http.NewRequestWithContext(ctx, "POST", rawURL, bytes.NewReader(payload))
 		if err != nil {
-			// Request creation errors are permanent (bad URL, etc.)
+			// The *url.Error is not wrapped: it quotes the URL, password included.
+			var urlErr *url.Error
+			if errors.As(err, &urlErr) {
+				return backoff.Permanent(fmt.Errorf("failed to create webhook request for block %d: the URL does not parse, percent-encode reserved characters in its user name and password", blockNumber))
+			}
 			return backoff.Permanent(fmt.Errorf("failed to create webhook request for block %d: %w", blockNumber, err))
 		}
 
@@ -262,12 +278,12 @@ func (c *Client) Call(ctx context.Context, url string, payload []byte, blockNumb
 			zap.Uint64("block", blockNumber),
 			zap.Int("attempts", attempts),
 			zap.Int("last_status", lastStatus),
-			zap.String("url", url))
-		return &DeliveryError{URL: url, BlockNumber: blockNumber, StatusCode: lastStatus, Attempts: attempts, Err: err}
+			zap.String("url", redactedURL))
+		return &DeliveryError{URL: redactedURL, BlockNumber: blockNumber, StatusCode: lastStatus, Attempts: attempts, Err: err}
 	}
 
 	c.logger.Info("webhook call successful",
 		zap.Uint64("block", blockNumber),
-		zap.String("url", url))
+		zap.String("url", redactedURL))
 	return nil
 }

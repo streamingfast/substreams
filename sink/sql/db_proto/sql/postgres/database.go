@@ -47,7 +47,9 @@ type Database struct {
 	dialect      *DialectPostgres
 	inserter     pgInserter
 	flusher      pgFlusher
-	constraints  sql.ConstraintPolicy
+	// numericStrings is numericStringPositions for each table.
+	numericStrings map[string][]int
+	constraints    sql.ConstraintPolicy
 
 	// writeMode is what the operator asked for; resolvedWriteMode is what Open settled on
 	// and is what the startup log reports.
@@ -188,14 +190,22 @@ func NewDatabase(schema *schema.Schema, dsn *db.DSN, moduleOutputType string, ro
 	if err != nil {
 		return nil, fmt.Errorf("failed to create base database: %w", err)
 	}
+	numericStrings := map[string][]int{}
+	for name, table := range schema.TableRegistry {
+		if positions := numericStringPositions(table); len(positions) > 0 {
+			numericStrings[name] = positions
+		}
+	}
+
 	database := &Database{
-		db:           sqlDB,
-		dsn:          dsn,
-		schema:       schema,
-		constraints:  constraints,
-		BaseDatabase: baseDB,
-		dialect:      dialect,
-		logger:       logger,
+		numericStrings: numericStrings,
+		db:             sqlDB,
+		dsn:            dsn,
+		schema:         schema,
+		constraints:    constraints,
+		BaseDatabase:   baseDB,
+		dialect:        dialect,
+		logger:         logger,
 	}
 
 	return database, nil
@@ -911,6 +921,12 @@ func (d *Database) wrapInsertStatement(stmt *pgsql.Stmt) *pgsql.Stmt {
 }
 
 func (d *Database) Insert(table string, values []any) error {
+	for _, position := range d.numericStrings[table] {
+		if position < len(values) {
+			values[position] = emptyNumericStringsAsZero(values[position])
+		}
+	}
+
 	return d.inserter.insert(table, values, d)
 }
 

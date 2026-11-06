@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+import "sf/substreams/sink/sql/schema/v1/schema.proto";
+
+package test.relations;
+option go_package = "test/relations";
+
+// Values that only the PostgreSQL sink can store. ClickHouse has no array column for a
+// numeric string conversion, so these are kept out of Output, which both sinks share.
+message PostgresValuesOutput {
+  repeated PostgresValues values = 1;
+}
+
+message PostgresValues {
+  option (schema.table) = {
+    name: "postgres_values"
+  };
+
+  uint64 id = 1 [(schema.field) = { primary_key: true }];
+  repeated string repeated_str_2_uint256 = 2 [(schema.field) = { convertTo: { uint256{} }}];
+  repeated string repeated_str_2_decimal128 = 3 [(schema.field) = { convertTo: { decimal128{ scale: 4 }}}];
+}

@@ -226,6 +226,9 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 				input.Append(t.AsTime())
 			} else if t, ok := value.(time.Time); ok {
 				input.Append(t)
+			} else if value == nil {
+				// An unset Timestamp field; DateTime is not nullable, so it takes the epoch.
+				input.Append(time.Unix(0, 0))
 			} else {
 				panic(fmt.Sprintf("unknown time base input type %T for column %s of table %s", input, column.Name, table))
 			}

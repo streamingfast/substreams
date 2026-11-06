@@ -30,6 +30,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - SQL sink (PostgreSQL): DSN values with characters like `/` or a space now reach the database as given. They were URL
   encoded into a connection string that doesn't decode them, so `sslrootcert=/etc/ssl/ca.pem` or
   `timezone=Europe/London` were wrong, and a password with a space made the DSN fail to parse.
+- SQL sink (from-proto, ClickHouse): fix a DSN with `secure=true` never connecting. The dial retried
+  forever, because ch-go only accepts a `*net.Dialer` once TLS is on and the byte counter was passed as the dialer.
 - SQL sink (DatabaseChanges): stop formatting each block's whole output as text to check that it isn't empty, which took
   over a third of the sink's CPU on a busy module.
 - SQL sink (DatabaseChanges, PostgreSQL): send a flush's statements through a pipeline instead of one round trip each, in

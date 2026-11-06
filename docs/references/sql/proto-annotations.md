@@ -103,6 +103,18 @@ String fields holding numeric values larger than native integer ranges can be co
 
 Typical uses: token amounts exceeding the uint64 range, high-precision decimal arithmetic, 256-bit hashes or identifiers stored as strings.
 
+An empty string in a converted field is stored as `0`. A string that is not a number, or does not fit the column, stops the sink with an error naming the table and column.
+
+### `oneof` fields
+
+A field inside a `oneof` has no column, unless it is declared `optional`. When the member that is set is a message, it is written as a child row, like a repeated message field.
+
+### Values PostgreSQL cannot store
+
+PostgreSQL does not accept the NUL character (`\x00`) in a text or JSON value. The PostgreSQL sink removes it from `string` fields, repeated `string` fields and inline messages before writing, and logs a warning naming the table and column the first time it does so for that column.
+
+The stored value is then not exactly what the module emitted: `"ab\x00c"` is stored as `"abc"`. Two strings that differ only by NUL characters become equal, so they can collide in a primary key or `unique` column. Use a `bytes` field for data that can contain NUL characters. ClickHouse stores strings as they are.
+
 ## ClickHouse-Specific Options
 
 ClickHouse tables accept a `clickhouse_table_options` annotation: `order_by_fields`, `partition_fields` and `index_fields`.

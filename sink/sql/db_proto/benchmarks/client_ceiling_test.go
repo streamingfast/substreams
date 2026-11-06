@@ -401,9 +401,6 @@ func buildTypesTestOutput(count int) *pbrelations.Output {
 				Str_2Uint256:          "115792089237316195423570985008687907853269984665640564039457584007913129639935",
 				Str_2Decimal128:       "1234.5678",
 				Str_2Decimal256:       "8765.4321",
-				// The inline nested fields (level1, list_of_level1) exist in the .proto
-				// but not in the checked-in relations.pb.go, so the inline-JSONB path is
-				// not covered here.
 			}},
 		}
 	}

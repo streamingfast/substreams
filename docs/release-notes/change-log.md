@@ -33,6 +33,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - SQL sink (PostgreSQL): DSN values with characters like `/` or a space now reach the database as given. They were URL
   encoded into a connection string that doesn't decode them, so `sslrootcert=/etc/ssl/ca.pem` or
   `timezone=Europe/London` were wrong, and a password with a space made the DSN fail to parse.
+- SQL sink (from-proto, ClickHouse): fix a DSN with `secure=true` never connecting. The dial retried
+  forever, because ch-go only accepts a `*net.Dialer` once TLS is on and the byte counter was passed as the dialer.
 - SQL sink: a DSN that fails to parse no longer prints the password in the error. The error now says to percent-encode
   reserved characters in the user name and password.
 - SQL sink: add `--password-envvar` to `substreams sink postgres` and `substreams sink clickhouse`. When the DSN has no

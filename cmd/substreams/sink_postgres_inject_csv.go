@@ -67,7 +67,7 @@ func sinkPostgresInjectCSVE(cmd *cobra.Command, args []string) error {
 
 	sqlDSN, err := db.ParseDSN(psqlDSN)
 	if err != nil {
-		return fmt.Errorf("invalid sql DSN %q: %w", psqlDSN, err)
+		return fmt.Errorf("invalid sql DSN: %w", err)
 	}
 
 	if sqlDSN.Driver() != "postgres" {

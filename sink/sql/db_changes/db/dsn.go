@@ -3,8 +3,10 @@ package db
 import (
 	"fmt"
 	"iter"
+	"maps"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -40,9 +42,10 @@ func ParseDSN(dsn string) (*DSN, error) {
 		return nil, fmt.Errorf("variables expansion failed: %w", err)
 	}
 
+	// The url.Parse error is not wrapped: it quotes the input, password included.
 	dsnURL, err := url.Parse(expanded)
 	if err != nil {
-		return nil, fmt.Errorf("invalid url: %w", err)
+		return nil, fmt.Errorf("invalid DSN %q: not a valid URL, percent-encode reserved characters in the user name and password (e.g. '/' as %%2F, '?' as %%3F, '#' as %%23, '%%' as %%25)", redactDSN(dsn))
 	}
 
 	driver, ok := driverMap[dsnURL.Scheme]
@@ -114,23 +117,65 @@ func (c *DSN) ConnString() string {
 		scheme := c.driver
 		host := c.Host
 
-		baseURL := fmt.Sprintf("%s://%s:%s@%s:%d/%s", scheme, c.Username, c.Password, host, c.Port, c.Database)
-		if len(c.Options) > 0 {
-			baseURL += "?" + c.Options.Encode()
+		u := url.URL{
+			Scheme:   scheme,
+			User:     url.UserPassword(c.Username, c.Password),
+			Host:     fmt.Sprintf("%s:%d", host, c.Port),
+			Path:     "/" + c.Database,
+			RawQuery: c.Options.Encode(),
 		}
 
-		return baseURL
+		return u.String()
 	}
-	// PostgreSQL connection string uses space-separated options
-	options := c.Options.EncodeWithSeparator(" ")
-	out := fmt.Sprintf("host=%s port=%d dbname=%s %s", c.Host, c.Port, c.Database, options)
+	// PostgreSQL's keyword/value form: values are quoted where needed, not URL encoded, which it
+	// would not decode.
+	database, err := url.PathUnescape(c.Database)
+	if err != nil {
+		database = c.Database
+	}
+	parts := []string{"host=" + keywordValue(c.Host), fmt.Sprintf("port=%d", c.Port), "dbname=" + keywordValue(database)}
+	// Every value of a repeated option is written in order, so the last one wins as in a URL.
+	for _, key := range slices.Sorted(maps.Keys(c.Options)) {
+		for _, value := range c.Options[key] {
+			parts = append(parts, key+"="+keywordValue(value))
+		}
+	}
 	if c.Username != "" {
-		out = out + " user=" + c.Username
+		parts = append(parts, "user="+keywordValue(c.Username))
 	}
 	if c.Password != "" {
-		out = out + " password=" + c.Password
+		parts = append(parts, "password="+keywordValue(c.Password))
 	}
-	return out
+	return strings.Join(parts, " ")
+}
+
+// keywordValue writes value for a keyword/value connection string, quoted when it is empty or
+// holds whitespace, a quote or a backslash.
+func keywordValue(value string) string {
+	if value != "" && !strings.ContainsAny(value, " \t\n\r\f\v'\\") {
+		return value
+	}
+	return "'" + strings.NewReplacer(`\`, `\\`, `'`, `\'`).Replace(value) + "'"
+}
+
+// redactDSN masks the password of a DSN that may not parse as a URL. It cuts at
+// the last '@', so it masks too much rather than too little when the query
+// also contains one.
+func redactDSN(dsn string) string {
+	schemeEnd := strings.Index(dsn, "://")
+	if schemeEnd < 0 {
+		return "<redacted>"
+	}
+	rest := dsn[schemeEnd+3:]
+	at := strings.LastIndex(rest, "@")
+	if at < 0 {
+		return dsn
+	}
+	userinfo := rest[:at]
+	if colon := strings.Index(userinfo, ":"); colon >= 0 {
+		userinfo = userinfo[:colon] + ":xxxxx"
+	}
+	return dsn[:schemeEnd+3] + userinfo + rest[at:]
 }
 
 func (c *DSN) Schema() string {

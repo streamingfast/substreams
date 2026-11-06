@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+- `substreams run` and `substreams gui` now offer to authenticate when they would reach a StreamingFast endpoint with no credentials: answering yes runs the `substreams auth` flow, writes `.substreams.env` and continues the run with the selected key. They only ask at a terminal, never for `--plaintext` or other endpoints, and an authentication failure in `substreams run` now ends with how to authenticate.
 - `substreams auth` now writes the selected API key to `.substreams.env` as `SUBSTREAMS_API_KEY` instead of exchanging it for a JWT, which expired and was never refreshed. `substreams auth --paste` now only accepts an API key (a JWT is rejected; export `SUBSTREAMS_API_TOKEN` yourself for advanced use).
 - Add an [Authentication Reference](../references/authentication.md) (API key vs short-lived JWT) and a guide to [migrate from `SUBSTREAMS_API_TOKEN` to `SUBSTREAMS_API_KEY`](../references/migrating-to-api-key.md).
 - `substreams registry publish` no longer logs the registry API key at debug level.

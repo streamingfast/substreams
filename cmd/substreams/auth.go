@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"regexp"
@@ -23,6 +24,8 @@ const (
 	localMarketURL      = "http://localhost:3000"
 	deviceClientName    = "substreams CLI"
 	authEnvFilename     = ".substreams.env"
+	// defaultAPIKeyEnvvar is the default of run's --api-key-envvar.
+	defaultAPIKeyEnvvar = "SUBSTREAMS_API_KEY"
 )
 
 var authCmd = &cobra.Command{
@@ -50,18 +53,37 @@ func runAuthE(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		return writeAuthCredentials(apiKey)
+		return writeAuthCredentialsAndHint(apiKey)
 	}
 
-	key, err := runCliAPIKeyAuth(cmd.Context(), newPortalClient(portalAPIBaseURL()), os.Stdout, tryOpenURL)
+	key, err := authenticateInteractively(cmd.Context(), os.Stdout)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			return fmt.Errorf("login cancelled")
-		}
 		return err
 	}
 
-	return writeAuthCredentials(key)
+	return writeAuthCredentialsAndHint(key)
+}
+
+func writeAuthCredentialsAndHint(apiKey string) error {
+	if err := writeAuthCredentials(os.Stdout, defaultAPIKeyEnvvar, apiKey); err != nil {
+		return err
+	}
+
+	fmt.Println("Load credentials in current terminal with the following command:")
+	fmt.Println()
+	fmt.Println(cli.PurpleStyle.Render("       . ./.substreams.env"))
+	fmt.Println()
+	return nil
+}
+
+// authenticateInteractively runs the browser key picker and returns the API key
+// selected there.
+func authenticateInteractively(ctx context.Context, out io.Writer) (string, error) {
+	key, err := runCliAPIKeyAuth(ctx, newPortalClient(portalAPIBaseURL()), out, tryOpenURL)
+	if errors.Is(err, context.Canceled) {
+		return "", fmt.Errorf("login cancelled")
+	}
+	return key, err
 }
 
 func runPasteAuth() (string, error) {
@@ -110,28 +132,28 @@ func validateAPIKey(value string) error {
 	return nil
 }
 
-func writeAuthCredentials(apiKey string) error {
-	fmt.Println("Writing `./.substreams.env`.  NOTE: Add it to `.gitignore`.")
-	fmt.Println()
+// writeAuthCredentials writes apiKey to ./.substreams.env under envvar, the
+// variable the run reading it looks the key up in.
+func writeAuthCredentials(out io.Writer, envvar string, apiKey string) error {
+	if _, err := os.Stat(authEnvFilename); err == nil {
+		fmt.Fprintln(out, "Replacing the existing `./.substreams.env`.  NOTE: Add it to `.gitignore`.")
+	} else {
+		fmt.Fprintln(out, "Writing `./.substreams.env`.  NOTE: Add it to `.gitignore`.")
+	}
+	fmt.Fprintln(out)
 
-	if err := writeAuthEnvFile(authEnvFilename, apiKey); err != nil {
+	if err := writeAuthEnvFile(authEnvFilename, envvar, apiKey); err != nil {
 		return fmt.Errorf("writing .substreams.env file: %w", err)
 	}
-
-	fmt.Println("Load credentials in current terminal with the following command:")
-	fmt.Println()
-	fmt.Println(cli.PurpleStyle.Render("       . ./.substreams.env"))
-	fmt.Println()
-
 	return nil
 }
 
-func writeAuthEnvFile(path string, apiKey string) error {
+func writeAuthEnvFile(path string, envvar string, apiKey string) error {
 	apiKey = strings.TrimSpace(apiKey)
 	if apiKey == "" {
 		return errors.New("no API key to write")
 	}
-	content := fmt.Sprintf("export SUBSTREAMS_API_KEY=%s\n", apiKey)
+	content := fmt.Sprintf("export %s=%s\n", envvar, apiKey)
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		return err
 	}

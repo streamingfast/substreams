@@ -89,9 +89,15 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 	sink.LoadSubstreamsAuthEnvFile(manifestPath)
 
 	// Use sink pattern to create configuration
-	sinkerConfig, err := sink.ConfigFromViper(cmd, sink.IgnoreOutputModuleType, manifestPath, outputModule, "substreams_gui", zlog, tracer)
+	sinkerConfig, err := sinkerConfigWithAuthPrompt(cmd, func() (*sink.SinkerConfig, error) {
+		config, err := sink.ConfigFromViper(cmd, sink.IgnoreOutputModuleType, manifestPath, outputModule, "substreams_gui", zlog, tracer)
+		if err != nil {
+			return nil, fmt.Errorf("creating sink config: %w", err)
+		}
+		return config, nil
+	})
 	if err != nil {
-		return fmt.Errorf("creating sink config: %w", err)
+		return err
 	}
 
 	// Override production mode from our GUI-specific flag

@@ -43,7 +43,7 @@ func TestWriteAuthEnvFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".substreams.env")
 
-	require.NoError(t, writeAuthEnvFile(path, "server_abc"))
+	require.NoError(t, writeAuthEnvFile(path, "SUBSTREAMS_API_KEY", "server_abc"))
 
 	info, err := os.Stat(path)
 	require.NoError(t, err)
@@ -59,7 +59,7 @@ func TestWriteAuthEnvFileChmodsExisting(t *testing.T) {
 	path := filepath.Join(dir, ".substreams.env")
 	require.NoError(t, os.WriteFile(path, []byte("export OLD=1\n"), 0o644))
 
-	require.NoError(t, writeAuthEnvFile(path, "server_abc"))
+	require.NoError(t, writeAuthEnvFile(path, "SUBSTREAMS_API_KEY", "server_abc"))
 
 	info, err := os.Stat(path)
 	require.NoError(t, err)
@@ -70,8 +70,17 @@ func TestWriteAuthEnvFileChmodsExisting(t *testing.T) {
 	assert.Equal(t, "export SUBSTREAMS_API_KEY=server_abc\n", string(got))
 }
 
+func TestWriteAuthEnvFileUsesTheGivenVariable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".substreams.env")
+	require.NoError(t, writeAuthEnvFile(path, "MY_KEY_VAR", "server_abc"))
+
+	got, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "export MY_KEY_VAR=server_abc\n", string(got))
+}
+
 func TestWriteAuthEnvFileRejectsEmpty(t *testing.T) {
-	require.Error(t, writeAuthEnvFile(filepath.Join(t.TempDir(), ".substreams.env"), " "))
+	require.Error(t, writeAuthEnvFile(filepath.Join(t.TempDir(), ".substreams.env"), "SUBSTREAMS_API_KEY", " "))
 }
 
 func TestValidateAPIKey(t *testing.T) {

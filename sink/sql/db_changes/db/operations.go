@@ -2,12 +2,14 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"math/big"
 	"reflect"
 	"regexp"
 	"strings"
 	"time"
+
+	shopspring "github.com/shopspring/decimal"
 )
 
 type TypeGetter func(tableName string, columnName string) (reflect.Type, error)
@@ -124,9 +126,11 @@ func (o *Operation) mergeData(newData map[string]FieldData) error {
 
 		case UpdateOpAdd:
 			// ADD: accumulate values (valid after SET or ADD)
-			existingDec, err1 := parseDecimal(existing.Value)
-			newDec, err2 := parseDecimal(fd.Value)
-			if err1 == nil && err2 == nil {
+			existingDec, newDec, numeric, err := parseDecimals(k, existing.Value, fd.Value)
+			if err != nil {
+				return err
+			}
+			if numeric {
 				o.data[k] = FieldData{
 					Value:    existingDec.Add(newDec).String(),
 					UpdateOp: existing.UpdateOp, // Keep existing op: SET stays SET, ADD stays ADD
@@ -138,11 +142,13 @@ func (o *Operation) mergeData(newData map[string]FieldData) error {
 
 		case UpdateOpMax:
 			// MAX: compute maximum (valid after SET or MAX)
-			existingDec, err1 := parseDecimal(existing.Value)
-			newDec, err2 := parseDecimal(fd.Value)
-			if err1 == nil && err2 == nil {
+			existingDec, newDec, numeric, err := parseDecimals(k, existing.Value, fd.Value)
+			if err != nil {
+				return err
+			}
+			if numeric {
 				maxVal := existingDec
-				if newDec.Cmp(existingDec.Rat) > 0 {
+				if newDec.Cmp(existingDec) > 0 {
 					maxVal = newDec
 				}
 				o.data[k] = FieldData{
@@ -156,11 +162,13 @@ func (o *Operation) mergeData(newData map[string]FieldData) error {
 
 		case UpdateOpMin:
 			// MIN: compute minimum (valid after SET or MIN)
-			existingDec, err1 := parseDecimal(existing.Value)
-			newDec, err2 := parseDecimal(fd.Value)
-			if err1 == nil && err2 == nil {
+			existingDec, newDec, numeric, err := parseDecimals(k, existing.Value, fd.Value)
+			if err != nil {
+				return err
+			}
+			if numeric {
 				minVal := existingDec
-				if newDec.Cmp(existingDec.Rat) < 0 {
+				if newDec.Cmp(existingDec) < 0 {
 					minVal = newDec
 				}
 				o.data[k] = FieldData{
@@ -238,53 +246,55 @@ func updateOpName(op UpdateOp) string {
 	}
 }
 
+// maxDecimalExponent bounds the exponent of a value written in scientific notation, so a value
+// like 1e99999999 cannot make a huge number.
+const maxDecimalExponent = 1000
+
+// errDecimalOutOfRange is a number too large or too small to work with (see maxDecimalExponent).
+var errDecimalOutOfRange = errors.New("number out of range")
+
 func parseDecimal(s string) (decimal, error) {
-	// Simple decimal parsing - just use big.Rat for precision
-	var d decimal
-	_, ok := d.SetString(s)
-	if !ok {
+	d, err := shopspring.NewFromString(s)
+	if err != nil {
 		return decimal{}, fmt.Errorf("invalid decimal: %s", s)
 	}
-	return d, nil
-}
-
-// decimal is a simple wrapper around big.Rat for delta accumulation
-type decimal struct {
-	*big.Rat
-}
-
-func (d *decimal) SetString(s string) (*decimal, bool) {
-	if d.Rat == nil {
-		d.Rat = new(big.Rat)
+	if d.Exponent() > maxDecimalExponent || d.Exponent() < -maxDecimalExponent {
+		return decimal{}, fmt.Errorf("%q: %w (exponent beyond +/-%d)", s, errDecimalOutOfRange, maxDecimalExponent)
 	}
-	_, ok := d.Rat.SetString(s)
-	return d, ok
+	return decimal{d}, nil
+}
+
+// parseDecimals reads the existing and the incoming value of a field to merge. numeric is false
+// when either is not a number, then the latest value wins; a number out of range is an error.
+func parseDecimals(field, existing, incoming string) (existingDec, incomingDec decimal, numeric bool, err error) {
+	existingDec, err1 := parseDecimal(existing)
+	incomingDec, err2 := parseDecimal(incoming)
+	for _, err := range []error{err1, err2} {
+		if errors.Is(err, errDecimalOutOfRange) {
+			return decimal{}, decimal{}, false, fmt.Errorf("merging field %q: %w", field, err)
+		}
+	}
+	return existingDec, incomingDec, err1 == nil && err2 == nil, nil
+}
+
+// decimal is an exact decimal number for delta accumulation, with its scale, like PostgreSQL's
+// numeric: sums are never rounded and keep the larger scale of their operands, so merging changes
+// within a batch gives what the database gives applying them one by one.
+type decimal struct {
+	shopspring.Decimal
 }
 
 func (d decimal) Add(other decimal) decimal {
-	result := new(big.Rat)
-	result.Add(d.Rat, other.Rat)
-	return decimal{result}
+	return decimal{d.Decimal.Add(other.Decimal)}
 }
 
-func (d decimal) Sub(other decimal) decimal {
-	result := new(big.Rat)
-	result.Sub(d.Rat, other.Rat)
-	return decimal{result}
+func (d decimal) Cmp(other decimal) int {
+	return d.Decimal.Cmp(other.Decimal)
 }
 
-func (d decimal) Neg() decimal {
-	result := new(big.Rat)
-	result.Neg(d.Rat)
-	return decimal{result}
-}
-
-func (d decimal) Sign() int {
-	return d.Rat.Sign()
-}
-
+// String writes the number with its scale, as PostgreSQL writes a numeric ("1.50", not "1.5").
 func (d decimal) String() string {
-	return d.Rat.FloatString(18)
+	return d.StringFixed(max(0, -d.Exponent()))
 }
 
 // mergeOperation merges another operation into this one, keeping the lowest ordinal

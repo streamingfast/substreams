@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+- Tier1: `Tier1Config.ReadinessMaxLatency`, when set, makes tier1 treat its live source as stalled while its live head block is older than it, or unknown. Tier1 then reports not ready, refuses requests that need blocks past its head with `Unavailable`, and ends the running ones with `Unavailable`, so clients reconnect to another tier1 (for example one more address behind the same DNS name). Requests ending below its head are not affected.
 - Log `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` on the `incoming Substreams Blocks request` and `incoming Substreams Estimate request` log lines when the auth plugin provides them (`x-auth-method`, `x-auth-jwt-lifetime-bucket`, `x-auth-jwt-iat`, `x-auth-jwt-exp`). Nothing changes without the plugin.
 
 ### CLI

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	gosync "sync/atomic"
 	"time"
 
 	connectrpc "connectrpc.com/connect"
@@ -88,6 +89,7 @@ type Tier1Config struct {
 	GRPCShutdownGracePeriod time.Duration // The duration we allow for gRPC connections to terminate gracefully prior forcing shutdown
 	ServiceDiscoveryURL     *url.URL
 	BlockExecutionTimeout   time.Duration
+	ReadinessMaxLatency     time.Duration // not ready while the live head is older, 0 disables
 
 	TmpDir                  string
 	StateStoreURL           string
@@ -166,6 +168,14 @@ type Tier1App struct {
 	modules *Tier1Modules
 	logger  *zap.Logger
 	isReady *atomic.Bool
+
+	// liveHead is nil when live streams are disabled.
+	liveHead gosync.Pointer[headInfoer]
+}
+
+// headInfoer is the part of hub.ForkableHub that readiness reads.
+type headInfoer interface {
+	HeadInfo() (headNum uint64, headID string, headTime time.Time, libNum uint64, err error)
 }
 
 func NewTier1(logger *zap.Logger, config *Tier1Config, modules *Tier1Modules) *Tier1App {
@@ -279,6 +289,8 @@ func (a *Tier1App) Run() error {
 			forkableHub = a.modules.ForkableHub
 		}
 		forkableHub.OnTerminated(a.Shutdown)
+		var liveHead headInfoer = forkableHub
+		a.liveHead.Store(&liveHead)
 
 		if ownHub {
 			go forkableHub.Run()
@@ -399,6 +411,9 @@ func (a *Tier1App) Run() error {
 	if err != nil {
 		return err
 	}
+	if a.config.ReadinessMaxLatency > 0 {
+		tier1Service.SetLiveStalled(a.liveHeadTooOld)
+	}
 
 	tier1ServiceConnect := service.NewService(tier1Service)
 
@@ -498,7 +513,30 @@ func (a *Tier1App) IsReady(ctx context.Context) bool {
 		return false
 	}
 
-	return a.isReady.Load()
+	if !a.isReady.Load() {
+		return false
+	}
+
+	if a.liveHeadTooOld() {
+		metrics.AppReadinessTier1.SetNotReady()
+		return false
+	}
+	metrics.AppReadinessTier1.SetReady()
+	return true
+}
+
+// liveHeadTooOld tells whether the live head is older than ReadinessMaxLatency, or unknown.
+func (a *Tier1App) liveHeadTooOld() bool {
+	liveHead := a.liveHead.Load()
+	if a.config.ReadinessMaxLatency <= 0 || liveHead == nil {
+		return false
+	}
+
+	_, _, headTime, _, err := (*liveHead).HeadInfo()
+	if err != nil {
+		return true
+	}
+	return time.Since(headTime) > a.config.ReadinessMaxLatency
 }
 
 func (a *Tier1App) setIsReady(ready bool) {

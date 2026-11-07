@@ -63,6 +63,10 @@ import (
 )
 
 var errShuttingDown = errors.New("endpoint is shutting down, please reconnect")
+var errLiveSourceStalled = errors.New("endpoint's live source has stalled, please reconnect")
+
+// liveStalledCheckInterval is how often a running live request checks liveStalled.
+var liveStalledCheckInterval = 2 * time.Second
 var fallbackDuration time.Duration
 var useBlockNumberDuration time.Duration
 var deterministicErrorMaxAge = time.Hour
@@ -138,6 +142,9 @@ type Tier1Service struct {
 	getRecentFinalBlock func() (uint64, error)
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
+	// liveStalled, when set, tells whether the live source has stalled: requests needing live
+	// blocks are then refused, and running ones ended, so clients reconnect to another tier1.
+	liveStalled func() bool
 
 	enforceCompression       bool
 	activeRequestsSoftLimit  int
@@ -439,7 +446,6 @@ func (s *Tier1Service) BlocksAny(
 	if s.IsTerminating() {
 		return nil, connect.NewError(connect.CodeUnavailable, errShuttingDown)
 	}
-
 	s.activeRequestsWG.Add(1)
 	defer func() {
 		if reason, countAsRejected := metrics.IsRejectedRequestError(err); countAsRejected {
@@ -448,6 +454,11 @@ func (s *Tier1Service) BlocksAny(
 		}
 		s.activeRequestsWG.Done()
 	}()
+
+	needsLive := s.liveStalled != nil && s.needsLiveBlocks(request)
+	if needsLive && s.liveStalled() {
+		return nil, connect.NewError(connect.CodeUnavailable, errLiveSourceStalled)
+	}
 
 	ctx = reqctx.WithPartialBlocks(ctx, request.PartialBlocks)
 
@@ -629,6 +640,9 @@ func (s *Tier1Service) BlocksAny(
 			cancelRunning(errShuttingDown)
 		}
 	}()
+	if needsLive {
+		go s.cancelWhenLiveStalls(runningContext, cancelRunning)
+	}
 
 	runningContext = reqctx.WithCancelFunc(runningContext, cancelRunning) // we pass this down so that the 'workerPool/requestPool' can cancel the running context
 
@@ -641,6 +655,43 @@ func (s *Tier1Service) BlocksAny(
 
 	logger.Debug("Blocks request completed without error")
 	return runningContext, nil
+}
+
+// SetLiveStalled sets the check telling whether the live source has stalled, see liveStalled.
+func (s *Tier1Service) SetLiveStalled(liveStalled func() bool) {
+	s.liveStalled = liveStalled
+}
+
+// cancelWhenLiveStalls cancels a running request with errLiveSourceStalled once liveStalled
+// reports the live source stalled, until ctx is done.
+func (s *Tier1Service) cancelWhenLiveStalls(ctx context.Context, cancel context.CancelCauseFunc) {
+	ticker := time.NewTicker(liveStalledCheckInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if s.liveStalled() {
+				cancel(errLiveSourceStalled)
+				return
+			}
+		}
+	}
+}
+
+// needsLiveBlocks tells whether the request reads past the head this tier1 has, its final
+// head for a final blocks only request.
+func (s *Tier1Service) needsLiveBlocks(request *pbsubstreamsrpc.Request) bool {
+	if request.StopBlockNum == 0 {
+		return true
+	}
+	getHead := s.getHeadBlock
+	if request.FinalBlocksOnly {
+		getHead = s.getRecentFinalBlock
+	}
+	head, err := getHead()
+	return err != nil || request.StopBlockNum > head
 }
 
 // writePackage writes the spkg to the module cache if it doesn't exist:

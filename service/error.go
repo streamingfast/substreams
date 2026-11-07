@@ -35,6 +35,12 @@ func toConnectError(ctx context.Context, err error) error {
 		return nil
 	}
 
+	// A request ended because the live source stalled is told to reconnect, whatever error
+	// the cancellation surfaced as on its way up.
+	if errors.Is(context.Cause(ctx), errLiveSourceStalled) {
+		return connect.NewError(connect.CodeUnavailable, errLiveSourceStalled)
+	}
+
 	if errors.Is(err, context.Canceled) {
 		if contextCause := context.Cause(ctx); contextCause != nil {
 			err = contextCause // unwrap errors in canceled contexts
@@ -132,6 +138,10 @@ func toConnectError(ctx context.Context, err error) error {
 func toGrpcTier1Error(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
+	}
+
+	if errors.Is(context.Cause(ctx), errLiveSourceStalled) {
+		return status.Error(codes.Unavailable, errLiveSourceStalled.Error())
 	}
 
 	if errors.Is(err, context.Canceled) {

@@ -18,8 +18,11 @@ import (
 // Counting at the connection means it also covers the cursor writes, the schema probes
 // and the protocol framing. That is deliberate: all of it is bytes this sink sent to that
 // database, which is what the number claims.
-// It is itself the ch.Dialer, so every connection the client opens is counted — including
-// the ones a retry replaces the cached client with.
+//
+// On a plain connection it is the ch.Dialer, so every socket the client opens is counted,
+// including the ones a retry replaces the cached client with. With TLS, ch.Dial only
+// accepts a *net.Dialer, so dialTLS wraps the raw connection before the handshake. The
+// count is the bytes that left this process either way.
 type wireCounter struct {
 	written atomic.Int64
 	dialer  net.Dialer

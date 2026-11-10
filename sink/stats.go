@@ -168,7 +168,9 @@ func (s *Stats) backprocessingProgress() (backprocessingProgress, bool) {
 
 	// Nothing left to backprocess: the object would only restate the same totals until the
 	// stream ends, which is forever for sinks that never become live.
-	if total := backprocessing.Total(s.session); total == 0 || backprocessing.Done(s.progress) >= total {
+	// Done also counts tier1's own linear executions, so it can reach the total while jobs still run.
+	if total := backprocessing.Total(s.session); total == 0 ||
+		(backprocessing.Done(s.progress) >= total && len(s.progress.GetRunningJobs()) == 0) {
 		return backprocessingProgress{}, false
 	}
 
@@ -193,12 +195,12 @@ type backprocessingProgress struct {
 
 func (p backprocessingProgress) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	total := backprocessing.Total(p.session)
-	done := backprocessing.Done(p.progress)
+	done := min(backprocessing.Done(p.progress), total)
 	enc.AddFloat64("pct", roundPct(100*float64(done)/float64(total)))
 
 	if p.hasRate {
 		enc.AddString("rate", formatx.Rate(p.rate, "blk"))
-		if eta, ok := backprocessing.ETA(total-done, p.rate, p.span); ok {
+		if eta, ok := backprocessing.ETA(total-done, p.rate, p.span); ok && done < total {
 			enc.AddString("eta", formatx.Duration(eta))
 		}
 	}

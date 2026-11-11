@@ -230,6 +230,15 @@ func (d *BaseDatabase) walkMessageDescriptorAndInsert(dm protoreflect.Message, b
 		}
 		fv := dm.Get(fd)
 
+		// The schema has no column for a oneof member (schema/table.go processColumns): a
+		// set message member is a child table, the others contribute nothing to the row.
+		if fd.ContainingOneof() != nil && !fd.HasOptionalKeyword() {
+			if fd.Kind() == protoreflect.MessageKind && dm.Has(fd) && !isColumnMessage(fd) {
+				childs = append(childs, fv.Message())
+			}
+			continue
+		}
+
 		if fd.IsList() {
 			// Check if this is an array of messages or native values
 			list := fv.List()
@@ -261,29 +270,30 @@ func (d *BaseDatabase) walkMessageDescriptorAndInsert(dm protoreflect.Message, b
 				fieldValues = append(fieldValues, []interface{}{})
 			}
 		} else if fd.Kind() == protoreflect.MessageKind {
-			if fv.Message().IsValid() {
-				fm := fv.Message()
-				if fm.Descriptor().FullName() == "google.protobuf.Timestamp" {
-					// Convert fv to *timestamppb.Timestamp
-					timestamp := &timestamppb.Timestamp{}
-					timestamp.Seconds = fm.Get(fm.Descriptor().Fields().ByName("seconds")).Int()
-					timestamp.Nanos = int32(fm.Get(fm.Descriptor().Fields().ByName("nanos")).Int())
-					fieldValues = append(fieldValues, timestamp)
+			// A Timestamp or inline field is a column whether or not it is set, so it
+			// always contributes its value(s): leaving an unset one out shifts every
+			// following value onto the wrong column.
+			fm := fv.Message()
+			fieldInfo := proto.FieldInfo(fd)
+			switch {
+			case fd.Message().FullName() == "google.protobuf.Timestamp":
+				if !fm.IsValid() {
+					fieldValues = append(fieldValues, nil)
 					continue
 				}
+				timestamp := &timestamppb.Timestamp{}
+				timestamp.Seconds = fm.Get(fm.Descriptor().Fields().ByName("seconds")).Int()
+				timestamp.Nanos = int32(fm.Get(fm.Descriptor().Fields().ByName("nanos")).Int())
+				fieldValues = append(fieldValues, timestamp)
 
-				// Check if this field should be treated as a nested (inline) column
-				fieldInfo := proto.FieldInfo(fd)
-				if fieldInfo != nil && fieldInfo.Inline {
-					// Delegate to dialect for inline handling
-					var err error
-					fieldValues, err = dialect.AppendInlineFieldValues(fieldValues, fd, fv, dm)
-					if err != nil {
-						return 0, fmt.Errorf("appending inline field values for %q: %w", string(fd.Name()), err)
-					}
-					continue
+			case fieldInfo != nil && fieldInfo.Inline:
+				var err error
+				fieldValues, err = dialect.AppendInlineFieldValues(fieldValues, fd, fv, dm)
+				if err != nil {
+					return 0, fmt.Errorf("appending inline field values for %q: %w", string(fd.Name()), err)
 				}
 
+			case fm.IsValid():
 				childs = append(childs, fm) //need to be handled after current message inserted
 			}
 		} else {
@@ -329,6 +339,17 @@ func (d *BaseDatabase) walkMessageDescriptorAndInsert(dm protoreflect.Message, b
 	}
 
 	return totalSqlDuration, nil
+}
+
+// isColumnMessage reports whether a message field is stored as a column, a Timestamp or an
+// inline message, rather than as a child table.
+func isColumnMessage(fd protoreflect.FieldDescriptor) bool {
+	if fd.Message().FullName() == "google.protobuf.Timestamp" {
+		return true
+	}
+	fieldInfo := proto.FieldInfo(fd)
+
+	return fieldInfo != nil && fieldInfo.Inline
 }
 
 // ScalarFieldValue unwraps a non-message, non-list value for the inserters.

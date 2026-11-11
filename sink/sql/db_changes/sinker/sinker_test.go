@@ -2,6 +2,7 @@ package sinker
 
 import (
 	"context"
+	"errors"
 	"database/sql"
 	"fmt"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var logger *zap.Logger
@@ -666,8 +668,10 @@ func blockScopedData(module string, changes []*pbdatabase.TableChange, blockNum 
 	}
 }
 
+// clock gives block num a time num seconds after the epoch, so blocks come further apart than a
+// test flush takes and a live flush isn't skipped.
 func clock(id string, num uint64) *pbsubstreams.Clock {
-	return &pbsubstreams.Clock{Id: id, Number: num}
+	return &pbsubstreams.Clock{Id: id, Number: num, Timestamp: timestamppb.New(time.Unix(int64(num), 0))}
 }
 
 func simpleCursor(num, finalNum uint64) string {
@@ -716,4 +720,99 @@ func TestProtoUpdateOpToDbUpdateOp_UnknownValue(t *testing.T) {
 	unknownOp := pbdatabase.Field_UpdateOp(999)
 	result := protoUpdateOpToDbUpdateOp(unknownOp)
 	assert.Equal(t, db2.UpdateOpSet, result, "unknown proto values should default to SET")
+}
+
+var catchingUp = new(bool)
+
+func TestSinker_BackgroundFlush(t *testing.T) {
+	ctx := context.Background()
+
+	newSinker := func(t *testing.T, tx *db2.TestTx) *SQLSinker {
+		l := db2.NewTestLoader(t, "psql://x:5432/x?schemaName=testschema", tx, db2.TestSinglePrimaryKeyTables("testschema"), logger, tracer)
+		s, err := sink.NewFromConfig(&sink.SinkerConfig{
+			Pkg:              testPackage,
+			OutputModule:     testPackage.Modules.Modules[0],
+			OutputModuleHash: manifest.ModuleHash([]byte("unused")),
+			ClientConfig:     testClientConfig,
+			Mode:             sink.SubstreamsModeDevelopment,
+			Logger:           logger,
+		})
+		require.NoError(t, err)
+		sinker, err := New(s, l, logger, nil, 0, 0)
+		require.NoError(t, err)
+		return sinker
+	}
+	block := func(num uint64, id string) *pbsubstreamsrpc.BlockScopedData {
+		return blockScopedData("db_out", []*pbdatabase.TableChange{insertRowSinglePK("xfer", id, "from", "a", "to", "b")}, num, num)
+	}
+	flushesAt := func(results []string) (cursors []string) {
+		for _, query := range results {
+			if strings.Contains(query, `"cursors" set cursor`) {
+				cursors = append(cursors, query[strings.Index(query, "block_num"):strings.Index(query, ", block_id")])
+			}
+		}
+		return cursors
+	}
+
+	t.Run("flushes stay in order", func(t *testing.T) {
+		tx := &db2.TestTx{}
+		sinker := newSinker(t, tx)
+		cursor := func(num uint64) *sink.Cursor { return sink.MustNewCursor(simpleCursor(num, num)) }
+
+		for i, num := range []uint64{1000, 2000, 3000} {
+			require.NoError(t, sinker.HandleBlockScopedData(ctx, block(num, fmt.Sprintf("%d", i)), catchingUp, cursor(num)))
+		}
+		require.NoError(t, sinker.waitBackgroundFlush())
+		require.Equal(t, []string{"block_num = 1000", "block_num = 2000", "block_num = 3000"}, flushesAt(tx.Results()))
+	})
+
+	t.Run("a failed flush stops the sink at the next one", func(t *testing.T) {
+		failure := errors.New("database gone")
+		tx := &db2.TestTx{ExecError: func(query string) error {
+			if strings.Contains(query, `"cursors" set cursor`) {
+				return failure
+			}
+			return nil
+		}}
+		sinker := newSinker(t, tx)
+		require.NoError(t, sinker.HandleBlockScopedData(ctx, block(1000, "a"), catchingUp, sink.MustNewCursor(simpleCursor(1000, 1000))))
+		err := sinker.HandleBlockScopedData(ctx, block(2000, "b"), catchingUp, sink.MustNewCursor(simpleCursor(2000, 2000)))
+		require.ErrorIs(t, err, failure)
+		assert.True(t, sinker.handlerFailed, "the pending changes aren't flushed on completion")
+	})
+
+	t.Run("a failed flush stops the sink without waiting for another block", func(t *testing.T) {
+		failure := errors.New("database gone")
+		tx := &db2.TestTx{ExecError: func(query string) error {
+			if strings.Contains(query, `"cursors" set cursor`) {
+				return failure
+			}
+			return nil
+		}}
+		sinker := newSinker(t, tx)
+		require.NoError(t, sinker.HandleBlockScopedData(ctx, block(1000, "a"), catchingUp, sink.MustNewCursor(simpleCursor(1000, 1000))))
+		require.Eventually(t, sinker.IsTerminating, 5*time.Second, 5*time.Millisecond)
+		require.ErrorIs(t, sinker.Err(), failure)
+		require.ErrorIs(t, sinker.waitBackgroundFlush(), failure)
+	})
+
+	t.Run("an undo waits for the running flush", func(t *testing.T) {
+		tx := &db2.TestTx{}
+		sinker := newSinker(t, tx)
+		require.NoError(t, sinker.HandleBlockScopedData(ctx, block(1000, "a"), catchingUp, sink.MustNewCursor(simpleCursor(1000, 1000))))
+		require.NoError(t, sinker.HandleBlockUndoSignal(ctx, &pbsubstreamsrpc.BlockUndoSignal{
+			LastValidBlock:  &pbsubstreams.BlockRef{Id: "999", Number: 999},
+			LastValidCursor: simpleCursor(999, 999),
+		}, sink.MustNewCursor(simpleCursor(999, 999))))
+		assert.Nil(t, sinker.backgroundFlush)
+		assert.Equal(t, []string{"block_num = 1000", "block_num = 999"}, flushesAt(tx.Results()))
+	})
+
+	t.Run("near the head, a flush finishes before the next block", func(t *testing.T) {
+		tx := &db2.TestTx{}
+		sinker := newSinker(t, tx)
+		require.NoError(t, sinker.HandleBlockScopedData(ctx, block(10, "a"), flushEveryBlock, sink.MustNewCursor(simpleCursor(10, 10))))
+		assert.Nil(t, sinker.backgroundFlush)
+		assert.Equal(t, []string{"block_num = 10"}, flushesAt(tx.Results()))
+	})
 }

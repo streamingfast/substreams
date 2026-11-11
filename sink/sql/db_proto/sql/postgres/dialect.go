@@ -237,8 +237,11 @@ func (d *DialectPostgres) AppendInlineFieldValues(fieldValues []any, fd protoref
 		}
 		fieldValues = append(fieldValues, postgresTextArray(jsonStrings))
 	} else {
-		// For single inline message, append the JSON string
 		fm := fv.Message()
+		if !fm.IsValid() {
+			fieldValues = append(fieldValues, nil)
+			return fieldValues, nil
+		}
 		jsonBytes, err := protojson.Marshal(fm.Interface())
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal protobuf message to JSON: %w", err)

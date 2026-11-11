@@ -61,6 +61,9 @@ type Loader struct {
 
 	batchOrdinal uint64 // Counter for ordinals within the current batch, resets on flush
 
+	// detached holds the changes of a background flush, apart from those being added.
+	detached *OrderedMap[string, *OrderedMap[string, *Operation]]
+
 	// expectedCursor is the stored cursor of this sink's module as this loader last read or wrote
 	// it, nil until SetExpectedCursor. Flushes and reverts first check the stored cursor still has this
 	// value (see checkCursor).
@@ -431,6 +434,9 @@ func (l *Loader) LiveBlockFlushInterval() int {
 }
 
 func (l *Loader) FlushNeeded() bool {
+	if l.batchRowFlushInterval <= 0 {
+		return false // the row interval is off, only the block interval flushes
+	}
 	totalRows := 0
 	// todo keep a running count when inserting/deleting rows directly
 	for pair := l.entries.Oldest(); pair != nil; pair = pair.Next() {

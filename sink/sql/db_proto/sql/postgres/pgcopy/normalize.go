@@ -81,6 +81,11 @@ func normalize(oid uint32, value any, encoding sqlbytes.Encoding) (any, error) {
 		return v, nil
 
 	case []byte:
+		if v == nil {
+			// An empty bytes field, which is empty rather than NULL, as an empty string
+			// field is and as every other bytes encoding already stores it.
+			v = []byte{}
+		}
 		encoded, err := encoding.EncodeBytes(v)
 		if err != nil {
 			return nil, fmt.Errorf("encoding bytes: %w", err)

@@ -11,6 +11,104 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Docker
+
+- Upgrade packages (including `apt`, now 2.8.4) when building the `substreams` Docker image to clear a Docker Scout HIGH CVE inherited from the Ubuntu 24.04 base image.
+- Bump `github.com/andybalholm/brotli` to 1.2.7 and `github.com/klauspost/compress` to 1.20.2 to clear a Docker Scout
+  CRITICAL and a HIGH CVE.
+
+### Server
+
+- Log `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` on the `incoming Substreams Blocks request` and `incoming Substreams Estimate request` log lines when the auth plugin provides them (`x-auth-method`, `x-auth-jwt-lifetime-bucket`, `x-auth-jwt-iat`, `x-auth-jwt-exp`). Nothing changes without the plugin.
+
+### CLI
+
+- `substreams auth` now writes the selected API key to `.substreams.env` as `SUBSTREAMS_API_KEY` instead of exchanging it for a JWT, which expired and was never refreshed. `substreams auth --paste` now only accepts an API key (a JWT is rejected; export `SUBSTREAMS_API_TOKEN` yourself for advanced use).
+- Add an [Authentication Reference](../references/authentication.md) (API key vs short-lived JWT) and a guide to [migrate from `SUBSTREAMS_API_TOKEN` to `SUBSTREAMS_API_KEY`](../references/migrating-to-api-key.md).
+- `substreams registry publish` no longer logs the registry API key at debug level.
+- Remove the unused Substreams-powered subgraph code generator (it was no longer registered under `substreams codegen`). The `SUBSTREAMS_AUTH_ISSUE_URL` environment variable is no longer used.
+
+### Sink
+
+- SQL sink (PostgreSQL): DSN values with characters like `/` or a space now reach the database as given. They were URL
+  encoded into a connection string that doesn't decode them, so `sslrootcert=/etc/ssl/ca.pem` or
+  `timezone=Europe/London` were wrong, and a password with a space made the DSN fail to parse.
+- SQL sink (from-proto, ClickHouse): fix a DSN with `secure=true` never connecting. The dial retried
+  forever, because ch-go only accepts a `*net.Dialer` once TLS is on and the byte counter was passed as the dialer.
+- SQL sink: a DSN that fails to parse no longer prints the password in the error. The error now says to percent-encode
+  reserved characters in the user name and password.
+- SQL sink: add `--password-envvar` to `substreams sink postgres` and `substreams sink clickhouse`. When the DSN has no
+  password, the sink reads it from that environment variable (`POSTGRES_PASSWORD` and `CLICKHOUSE_PASSWORD` by default)
+  and percent-encodes it into the DSN, so it can contain any character.
+- SQL sink (ClickHouse, DatabaseChanges): a password percent-encoded in the DSN now reaches the database intact. A
+  password with `/`, `?`, `#` or `%` broke the connection string.
+- Sinks: the `sinker from CLI` log line lists only the names of the `-H` headers, not their values, which can carry
+  credentials.
+- Webhook sink: mask the password of the webhook and undo URLs in logs, errors and the termination log. A URL that
+  does not parse is no longer quoted in the error.
+- SQL sink (DatabaseChanges, PostgreSQL): while catching up, flush in the background so the next blocks are handled during
+  the flush, one flush at a time and each cursor written after its changes. Near the head, flushes work as before.
+- SQL sink (DatabaseChanges): stop formatting each block's whole output as text to check that it isn't empty, which took
+  over a third of the sink's CPU on a busy module.
+- SQL sink (DatabaseChanges, PostgreSQL): send a flush's statements through a pipeline instead of one round trip each, in
+  the same order and transaction, so a flush waits far less on the network. Each is still a statement of its own for the
+  server. With about 1 ms of latency to the database, `BenchmarkPostgresFlush` goes from 707 to 54,440 rows/s on inserts.
+  This times the flush only, so a full run gains less. `tx_query_execution_duration` reports one `batch` type instead of
+  `normal` and `undo`.
+- SQL sink (PostgreSQL): connect through pgx rather than lib/pq, which the proto sink already used for binary COPY.
+  Connections behave as before: TLS stays required unless configured otherwise, and sessions use the same date style,
+  encoding and string settings. lib/pq's DSN options still work, except an enabled `sslinline`,
+  `load_balance_hosts=random` and a list of `hostaddr` values, which are now refused at startup.
+- SQL sink (DatabaseChanges): fix changes to rows with a composite primary key being applied to the wrong row when a
+  key value contains `/`. Within a batch, keys like (`a/b`, `c`) and (`a`, `b/c`) were taken for the same row, so the
+  second change was merged into the first row's operation (or rejected as a duplicate insert) and never written to
+  its own row.
+- SQL sink (DatabaseChanges): an invalid `UpdateOp` sequence on one field within a batch (for example `ADD` after
+  `MAX`) now stops the sink with an error. Upserts and updates used to ignore it, so the change was silently dropped,
+  along with any other fields of that change not merged yet.
+- SQL sink (from-proto): fix rows failing to insert when a `google.protobuf.Timestamp` or inline message field is unset.
+  The field was left out of the row, so the row was one value short and the sink stopped. An unset Timestamp is now
+  stored as `NULL` (the epoch on ClickHouse) and an unset inline message as `NULL` (no element on ClickHouse).
+- SQL sink (from-proto, PostgreSQL): the `batch-insert` and `row-insert` write modes now store what `copy` stores. With
+  the default `auto` mode, a spooled sink loads with `copy` and switches to batched `INSERT` statements at the chain
+  head, so each of these values could stop a sink that had caught up:
+  - a repeated inline message field panicked with `unsupported type`, and its column was missing from the batched
+    `INSERT`;
+  - `NaN` and infinite `float` and `double` values were sent unquoted and read as column names;
+  - an empty string converted to a numeric type (`int128`, `uint256`, `decimal128`, …) was rejected instead of being
+    stored as `0`;
+  - a repeated string field converted to a numeric type was sent as `text[]` and rejected by its `numeric[]` column.
+- SQL sink (from-proto, PostgreSQL): timestamps written by `batch-insert` and `row-insert` keep their fractional
+  seconds, as `copy` does, instead of being cut to the second. This applies to `_block_timestamp_` too.
+- SQL sink (from-proto, PostgreSQL): an empty `bytes` field is stored as an empty `BYTEA` by `copy` and `row-insert`
+  too, instead of `NULL`, as `batch-insert` and the text bytes encodings already stored it.
+- SQL sink (from-proto, PostgreSQL): remove NUL characters (`\x00`) from strings, which PostgreSQL rejects in text and
+  JSON values, instead of stopping the sink. A warning names the table and column the first time each column has one.
+  See [Values PostgreSQL cannot store](../references/sql/proto-annotations.md#values-postgresql-cannot-store).
+- SQL sink (from-proto): fix rows failing to insert when the table's message has a scalar, Timestamp or inline field in a
+  `oneof`. The schema gives these no column but the row carried a value for them.
+- SQL sink (from-proto, ClickHouse): a string converted to a numeric type that is not a number or does not fit the
+  column now stops the sink with an error naming the table and column, instead of a panic. An empty one is stored as `0`
+  whether or not the field is `optional`, as the PostgreSQL sink stores it.
+- SQL sink (DatabaseChanges, PostgreSQL): undo a block's changes last to first on a reorg. The order within a block was
+  left to the database, so undoing a child row inserted after its parent in one block could fail on a foreign key and
+  stop the sink.
+- SQL sink (DatabaseChanges, ClickHouse): write the cursor before a flush returns. It was sent as an asynchronous
+  insert not waited for, so a restart soon after a flush could read the previous cursor and write blocks again, and a
+  server crash could lose the cursor of a flush taken as done.
+- SQL sink (DatabaseChanges): report how long the cursor write takes. The flush debug log gains `cursor_took`, and
+  `substreams_sink_sql_tx_query_execution_duration` gains a `cursor` series. ClickHouse table inserts now feed its
+  `normal` series too, which was only filled for PostgreSQL.
+- SQL sink (DatabaseChanges): count live flushes skipped because the average flush outlasts the time between blocks.
+  The periodic stats log shows `live_flush_skipped` once any is skipped, and
+  `substreams_sink_postgres_live_flush_skipped_count` exposes it as a metric.
+- SQL sink (DatabaseChanges): changes to one field merged within a batch (`ADD`, `MAX`, `MIN`) are now exact. They were
+  rounded to 18 decimals and written with 18 (`150.000000000000000000`), so a result could depend on how blocks were
+  batched: the same changes in separate flushes were added by the database at full precision. Merged values now keep
+  the larger scale of their operands, as PostgreSQL's `numeric` does (`1.50` + `2` gives `3.50`, `1` + `2` gives `3`).
+
+## v1.26.0
+
 ### Server
 
 - Tier2 skips loading dependency stores and compiling WASM modules for a segment once its
@@ -63,6 +161,53 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
+- Sinks: the `substreams stream stats` log line reports backprocessing progress again until the sink is live, as a
+  `backprocessing_progress` object with the same figures as the `substreams run` progress view: overall percentage,
+  rate, ETA, running jobs, blocks to process and blocks cached, and for each stage its percentage, first block,
+  squashed-up-to block, jobs and segments waiting to be squashed. It replaces the `progress_block_rate`,
+  `progress_last_block`, `progress_running_jobs` and `progress_total_processed_blocks` fields, which were only logged
+  once the first block of data had arrived.
+- SQL sink (DatabaseChanges): fix undo leaving changes from orphaned blocks in the database. Changes to the same
+  row in different reversible blocks of one batch were merged into one operation recorded under a single block, so
+  undoing the later block missed them (permanently for `ADD` fields), and pending changes survived an undo. They are
+  now kept as separate operations within the batch, and an undo drops the pending changes of reverted blocks and
+  writes the rest with the cursor. Batching is unchanged.
+- SQL sink (DatabaseChanges, PostgreSQL): once the sink has read or written its cursor, each flush and revert
+  transaction starts by locking its cursor row and checking it still holds the cursor the sink last read or wrote.
+  Otherwise nothing is written and the sink stops with `the stored cursor is not the one this sink last read or wrote`,
+  to be restarted from the stored cursor. This stops a second sink of the same module writing to the same database, a
+  sink writing on top of a database that lost commits (restore, failover with asynchronous replication), and a flush
+  retry applying a batch twice after a commit whose reply was lost (`ADD` fields were doubled). A conflict is not
+  retried. Other cursor rows are not checked, and the cursor update stays the last statement of the transaction.
+- SQL sink (DatabaseChanges, PostgreSQL): add `--standby-lock` to run standby sinks. A sink takes a session advisory
+  lock on the cursors table before streaming and writes through that session; the others wait, checking every
+  `--standby-lock-poll-interval`, and the first to see the lock released takes over from the stored cursor. A sink
+  whose locked session is gone stops instead of retrying its flush, and standbys serve the metrics endpoint while they
+  wait. The active sink queries its locked session every `--standby-lock-poll-interval` while not flushing, so a proxy
+  or `idle_session_timeout` doesn't end it during long stretches without writes (no failover ping-pong on sparse data).
+  See [Standby Sinks](../references/sql/standby-sinks.md).
+- SQL sink (DatabaseChanges): add `--stall-timeout`, which stops the sink when the stream delivers no block or undo for
+  that long once live (blocks held by an undo buffer count). On PostgreSQL a flush now honours its context, so the stop
+  cancels a database call in progress (the transaction rolls back); ClickHouse flushes still always run to the end.
+  The sink library's new `Sinker.LastBlockMessageAt` reports when the stream last delivered a block or undo.
+- SQL sink (DatabaseChanges): an undo whose transaction fails is now rolled back.
+- Sink library: a handler error is never taken for the end of the stream anymore. One wrapping `io.EOF` (a lost database
+  connection, say) used to end the run successfully, as if the stop block was reached, so a live sink exited with
+  status 0. When the handler fails while the sinker is stopping, the completion handler no longer runs on top of the
+  block it did not finish (the failure is taken as caused by the stop and not reported). The completion handler
+  now gets the cursor of the last block the handler accepted rather than of the last block received, which with
+  `--undo-buffer-size` was ahead of the blocks still in the buffer (`Sinker.LastReceivedCursor` still gives the
+  latter).
+- Sink library: add `Sinker.AwaitRun(ctx)`, which waits for `Run` to return and gives its first failure. A stop
+  terminates the sinker right away while `Run` still finishes its completion handler, so a caller about to exit can
+  wait for it there, and get a failure that the termination error, set by the stop, cannot carry.
+- SQL sink (DatabaseChanges): fix the final flush when the stream ends (stopped, or at the stop block) treating the
+  stream's latest block as final. It pruned the undo history of blocks that were still reversible, so a reorg across
+  a sink restart left orphaned rows, and with `--undo-buffer-size` it saved a cursor past the blocks still in the
+  buffer, which were then skipped. It now writes the handled blocks with the last handled block's cursor and the
+  stream's final block height, and writes nothing if a block failed to be handled. The CLI now waits (up to 45 s) for
+  that last flush before exiting: on Kubernetes, raise the pod's `terminationGracePeriodSeconds` above it (30 s by
+  default), otherwise a pod killed first re-processes the blocks since the last stored cursor on restart.
 - Add `substreams sink pubsub`, which publishes any module output to a Google Cloud Pub/Sub topic as the
   webhook sink's batch JSON: `{"manifest": {...}, "blocks": [{"clock": {...}, "data": {...}}]}`. While
   Substreams is not live, `--pubsub-batch-max-blocks` groups blocks into one message. A live block is
@@ -81,12 +226,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+- `substreams pack` writes map entries in key order, so packing the same inputs twice gives a byte-identical
+  `.spkg`. Before, a package with a multi-entry map, such as `networks`, got a different digest from one pack to
+  the next.
 - Commands that take a package (`substreams run`, `gui`, `info`, ...) accept an organization package reference
   `<org>/<package>@<version>`, fetched from the registry's `/v1/packages/<org>/<package>/<version>`. Without a
   version, or with `@latest`, they fetch the package's latest release. An existing file or directory of the
   same name is still read locally; prefix a path with `./` to keep it local in any case.
 - Manifest `imports` accept `<org>/<package>@<version>`. An organization package import needs a specific
   version: `<org>/<package>` and `<org>/<package>@latest` are refused, as `<package>@latest` already is.
+- Manifest: a `foundational-store:` input accepts a hosted store named by its organization,
+  `<org-slug>/<deployment-name>`, with an optional `@<version>`. The server resolves the name to the
+  organization's live store on every run. A deployment id or `<package>@<version>` works as before.
 
 ### Dependencies
 
@@ -94,7 +245,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   CVE-2026-78659 (HIGH), all HTTP/2 issues reported by Docker Scout against the image.
 - Bumped OpenTelemetry to v1.47.0 and `github.com/streamingfast/dhttp` to v0.2.0 to fix known vulnerabilities.
 - Bumped `github.com/yuin/goldmark` to v1.7.17 to fix an XSS (GO-2026-5320) in the CLI's markdown rendering.
+- Bumped `github.com/go-jose/go-jose/v4` to v4.1.6 to fix CVE-2026-116587 (HIGH, inefficient algorithmic complexity).
 - Go 1.27 or newer is now required to build.
+- `github.com/go-jose/go-jose/v4` is at v4.1.6, which clears CVE-2026-116587 (HIGH), reported by Docker Scout against the image.
 
 ## v1.25.0
 
@@ -117,10 +270,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `metering.AddExternalCalls`.
 
 ### CLI
-
-- `substreams pack` writes map entries in key order, so packing the same inputs twice gives a byte-identical
-  `.spkg`. Before, a package with a multi-entry map, such as `networks`, got a different digest from one pack to
-  the next.
 
 - **Breaking for Rust modules**: `substreams build` and `substreams protogen` generate buffa bindings for a
   project whose `Cargo.toml` depends on `buffa`, using `buf.build/anthropics/buffa:v0.9.2`. This pairs with

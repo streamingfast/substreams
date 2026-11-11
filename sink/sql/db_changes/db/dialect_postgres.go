@@ -34,7 +34,7 @@ func NewPostgresDialect(schemaName string, cursorTableName string, historyTableN
 }
 
 func (d PostgresDialect) Revert(tx Tx, ctx context.Context, l *Loader, lastValidFinalBlock uint64) error {
-	query := fmt.Sprintf(`SELECT op,table_name,pk,prev_value,block_num FROM %s WHERE "block_num" > %d ORDER BY "block_num" DESC`,
+	query := fmt.Sprintf(`SELECT op,table_name,pk,prev_value,block_num FROM %s WHERE "block_num" > %d ORDER BY "block_num" DESC, "id" DESC`,
 		d.historyTable(d.schemaName),
 		lastValidFinalBlock,
 	)
@@ -92,7 +92,7 @@ func (d PostgresDialect) Revert(tx Tx, ctx context.Context, l *Loader, lastValid
 
 func (d PostgresDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputModuleHash string, lastFinalBlock uint64) (int, error) {
 	var totalRows int
-	for entriesPair := l.entries.Oldest(); entriesPair != nil; entriesPair = entriesPair.Next() {
+	for entriesPair := l.pendingForFlush().Oldest(); entriesPair != nil; entriesPair = entriesPair.Next() {
 		entries := entriesPair.Value
 		totalRows += entries.Len()
 
@@ -102,7 +102,7 @@ func (d PostgresDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputModu
 	}
 
 	allOperations := make([]*Operation, 0, totalRows)
-	for entriesPair := l.entries.Oldest(); entriesPair != nil; entriesPair = entriesPair.Next() {
+	for entriesPair := l.pendingForFlush().Oldest(); entriesPair != nil; entriesPair = entriesPair.Next() {
 		entries := entriesPair.Value
 		for entryPair := entries.Oldest(); entryPair != nil; entryPair = entryPair.Next() {
 			allOperations = append(allOperations, entryPair.Value)
@@ -113,6 +113,7 @@ func (d PostgresDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputModu
 		return cmp.Compare(a.ordinal, b.ordinal)
 	})
 
+	batch := postgresStatementBatch{tx: tx}
 	var rowCount int
 	for _, entry := range allOperations {
 		normalQuery, undoQuery, err := d.prepareStatement(d.schemaName, entry)
@@ -120,33 +121,27 @@ func (d PostgresDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputModu
 			return 0, fmt.Errorf("failed to prepare statement: %w", err)
 		}
 
-		// Execute undo query first (if present) to save state before modifying
+		// The undo query first (if present), to save the row's state before it changes.
 		if undoQuery != "" {
 			if l.tracer.Enabled() {
 				l.logger.Debug("adding undo query from operation to transaction", zap.Stringer("op", entry), zap.String("query", undoQuery), zap.Uint64("ordinal", entry.ordinal))
 			}
-
-			undoStart := time.Now()
-			if _, err := tx.ExecContext(ctx, undoQuery); err != nil {
-				return 0, fmt.Errorf("executing undo query %q: %w", undoQuery, err)
+			if err := batch.add(ctx, undoQuery); err != nil {
+				return 0, err
 			}
-			undoDuration := time.Since(undoStart)
-			QueryExecutionDuration.AddInt64(undoDuration.Nanoseconds(), "undo")
 		}
 
-		// Execute normal query
 		if l.tracer.Enabled() {
 			l.logger.Debug("adding normal query from operation to transaction", zap.Stringer("op", entry), zap.String("query", normalQuery), zap.Uint64("ordinal", entry.ordinal))
 		}
-
-		normalStart := time.Now()
-		if _, err := tx.ExecContext(ctx, normalQuery); err != nil {
-			return 0, fmt.Errorf("executing normal query %q: %w", normalQuery, err)
+		if err := batch.add(ctx, normalQuery); err != nil {
+			return 0, err
 		}
-		normalDuration := time.Since(normalStart)
-		QueryExecutionDuration.AddInt64(normalDuration.Nanoseconds(), "normal")
 
 		rowCount++
+	}
+	if err := batch.flush(ctx); err != nil {
+		return 0, err
 	}
 
 	pruneStart := time.Now()
@@ -283,6 +278,14 @@ func (d PostgresDialect) GetUpdateCursorQuery(table, moduleHash string, cursor *
 	return query(`
 		UPDATE %s set cursor = '%s', block_num = %d, block_id = '%s' WHERE id = '%s';
 	`, table, cursor, block_num, block_id, moduleHash)
+}
+
+// GetCursorCheckQuery returns a statement that locks the cursor row of moduleHash and affects one row
+// if its cursor is exactly expectedCursor, none otherwise (see cursorChecker). The "C" collation makes
+// the comparison bytewise whatever the column's collation.
+func (d PostgresDialect) GetCursorCheckQuery(table, moduleHash, expectedCursor string) string {
+	return fmt.Sprintf(`SELECT 1 FROM %s WHERE id = %s AND cursor = %s COLLATE "C" FOR UPDATE;`,
+		table, escapeStringValue(moduleHash), escapeStringValue(expectedCursor))
 }
 
 func (d PostgresDialect) GetAllCursorsQuery(table string) string {
@@ -773,4 +776,62 @@ func (d PostgresDialect) GetPrimaryKey(db *sql.DB, schemaName, tableName string)
 	}
 
 	return columns, nil
+}
+
+const (
+	postgresBatchStatements = 1000
+	postgresBatchBytes      = 1 << 20
+)
+
+// statementSender is a transaction able to send several statements in one round trip.
+type statementSender interface {
+	sendStatements(ctx context.Context, statements []string) (completed int, err error)
+}
+
+// postgresStatementBatch sends statements to the database several at a time, in the order they were
+// added, each still a statement of its own for the server.
+type postgresStatementBatch struct {
+	tx         Tx
+	statements []string
+	bytes      int
+}
+
+func (b *postgresStatementBatch) add(ctx context.Context, statement string) error {
+	if len(b.statements) > 0 && b.bytes+len(statement) > postgresBatchBytes {
+		if err := b.flush(ctx); err != nil {
+			return err
+		}
+	}
+	b.statements = append(b.statements, statement)
+	b.bytes += len(statement)
+	if len(b.statements) >= postgresBatchStatements {
+		return b.flush(ctx)
+	}
+	return nil
+}
+
+func (b *postgresStatementBatch) flush(ctx context.Context) error {
+	if len(b.statements) == 0 {
+		return nil
+	}
+	start := time.Now()
+	if sender, ok := b.tx.(statementSender); ok {
+		completed, err := sender.sendStatements(ctx, b.statements)
+		if err != nil {
+			if completed < len(b.statements) {
+				return fmt.Errorf("executing query %q: %w", b.statements[completed], err)
+			}
+			return err
+		}
+	} else {
+		for _, statement := range b.statements {
+			if _, err := b.tx.ExecContext(ctx, statement); err != nil {
+				return fmt.Errorf("executing query %q: %w", statement, err)
+			}
+		}
+	}
+	QueryExecutionDuration.AddInt64(time.Since(start).Nanoseconds(), "batch")
+	b.statements = b.statements[:0]
+	b.bytes = 0
+	return nil
 }

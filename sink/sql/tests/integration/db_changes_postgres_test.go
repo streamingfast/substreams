@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/cli"
 	pbdatabase "github.com/streamingfast/substreams-sink-database-changes/pb/sf/substreams/sink/database/v1"
@@ -542,9 +542,13 @@ func TestSinker_Integration_TimescaleDB(t *testing.T) {
 				TokenID   []byte    `db:"token_id"`
 			}
 
+			rows := readRowsBy[Row](t, dbx, fmt.Sprintf(`"%s"."trades"`, schema), "id, block_time")
+			for _, row := range rows {
+				row.BlockTime = row.BlockTime.UTC()
+			}
 			require.Equal(t, []*Row{
 				{ID: []byte{0x31}, BlockTime: blockTime(t, "2023-10-01T00:00:00Z"), TokenID: []byte{0x04, 0xab}},
-			}, readRowsBy[Row](t, dbx, fmt.Sprintf(`"%s"."trades"`, schema), "id, block_time"))
+			}, rows)
 		},
 		"Block #10 (10a) - LIB #10 (10a)",
 	)
@@ -808,6 +812,119 @@ func TestSinker_Integration_UndoBufferWorks(t *testing.T) {
 	)
 }
 
+// TestSinker_Integration_ReversibleBlocksInOneBatch checks that an undo reverts exactly the
+// orphaned blocks when one flush batch spans several reversible blocks touching the same row,
+// and that pending changes of orphaned blocks are never written.
+func TestSinker_Integration_ReversibleBlocksInOneBatch(t *testing.T) {
+	type CounterRow struct {
+		ID    string `db:"id"`
+		Count int64  `db:"count"`
+	}
+
+	equalsCounter := func(count int64) func(t *testing.T, dbx *sqlx.DB, schema string) {
+		return func(t *testing.T, dbx *sqlx.DB, schema string) {
+			require.Equal(t, []*CounterRow{{ID: "counter1", Count: count}}, readDbChangesRows[CounterRow](t, dbx, schema, "counters"))
+		}
+	}
+
+	tests := []struct {
+		sinkerTestCase
+		liveBlockFlushInterval int
+		stopBlock              uint64
+	}{
+		{
+			sinkerTestCase{
+				"add to same row in two reversible blocks of one batch, undo the later block",
+				streamMock(
+					// Flushes alone, so 10a and 11a are flushed together on 11a
+					dbChangesBlockData(t, "9a", finalBlock("8a")),
+					dbChangesBlockData(t, "10a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					dbChangesBlockData(t, "11a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					blockUndo(t, "10a", finalBlock("8a")),
+				),
+				equalsCounter(1),
+				"Block #10 (10a) - LIB #8 (8a)",
+			},
+			2, 0,
+		},
+		{
+			sinkerTestCase{
+				"add to same row in a final and a reversible block of one batch, undo the reversible block",
+				streamMock(
+					// Flushes alone, so 8a and 9a are flushed together on 9a
+					dbChangesBlockData(t, "7a", finalBlock("7a")),
+					dbChangesBlockData(t, "8a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					dbChangesBlockData(t, "9a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					blockUndo(t, "8a", finalBlock("8a")),
+				),
+				equalsCounter(1),
+				"Block #8 (8a) - LIB #8 (8a)",
+			},
+			2, 0,
+		},
+		{
+			sinkerTestCase{
+				"undo with pending changes writes the valid ones in the revert transaction",
+				streamMock(
+					dbChangesBlockData(t, "10a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					dbChangesBlockData(t, "11a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					blockUndo(t, "10a", finalBlock("8a")),
+				),
+				equalsCounter(1),
+				"Block #10 (10a) - LIB #8 (8a)",
+			},
+			// No interval flush and the stream ends on the undo, only the revert writes
+			1000, 0,
+		},
+		{
+			sinkerTestCase{
+				"undo with pending changes drops the orphaned block and writes the valid one",
+				streamMock(
+					dbChangesBlockData(t, "10a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					dbChangesBlockData(t, "11a", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("1"))),
+					blockUndo(t, "10a", finalBlock("8a")),
+					dbChangesBlockData(t, "11b", finalBlock("8a"), upsertRowSinglePK("counters", "counter1", "count", deltaAdd("10"))),
+				),
+				equalsCounter(11),
+				"Block #11 (11b) - LIB #8 (8a)",
+			},
+			// No interval flush, only the revert and the completion flush on 11b write
+			1000, 12,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			runSinkerTest(
+				t,
+				sharedDbChangesPostgresContainer,
+				func(defaults []sink.Option) []sink.Option {
+					if test.stopBlock == 0 {
+						return defaults
+					}
+					return append(defaults, sink.WithBlockRange(bstream.MustParseRange(fmt.Sprintf("1-%d", test.stopBlock), bstream.WithExclusiveEnd())))
+				},
+				func(defaults sinker.SinkerFactoryOptions) sinker.SinkerFactoryOptions {
+					defaults.LiveBlockFlushInterval = test.liveBlockFlushInterval
+					defaults.BatchRowFlushInterval = 1000
+					return defaults
+				},
+				rawSQLInput(func(schema string) string {
+					return fmt.Sprintf(`
+						CREATE TABLE IF NOT EXISTS "%s".counters (
+							id TEXT PRIMARY KEY,
+							count BIGINT DEFAULT 0
+						);
+					`, schema)
+				}),
+				test.responses,
+				test.expected,
+				test.expectedFinalCursor,
+			)
+		})
+	}
+}
+
 // TestSinker_Integration_BoundedRunFlushesOnCompletion locks in the fix for the
 // bounded-run completion flush. With --stop-block set, the stop block is exclusive,
 // so the last streamed block is stopBlock-1. Here every interval flush is disabled
@@ -851,6 +968,80 @@ func TestSinker_Integration_BoundedRunFlushesOnCompletion(t *testing.T) {
 			{ID: "9101", From: "sender3", To: "receiver3"},
 		}),
 		"Block #12 (12a) - LIB #12 (12a)",
+	)
+}
+
+// TestSinker_Integration_UndoAfterRestart ends a bounded run on reversible blocks, then restarts the
+// sink from the stored cursor and undoes one of them: the completion flush must have kept the undo
+// history of the blocks that are still reversible, instead of treating the last block as final.
+func TestSinker_Integration_UndoAfterRestart(t *testing.T) {
+	runSinkerRunsTest(
+		t,
+		sharedDbChangesPostgresContainer,
+		tablesInput(func(schema string) map[string]*db2.TableInfo { return db2.TestSinglePrimaryKeyTables(schema) }),
+		[]sinkerRun{
+			{
+				customizeSinkOptions: func(defaults []sink.Option) []sink.Option {
+					return append(defaults, sink.WithBlockRange(bstream.MustParseRange("1-12", bstream.WithExclusiveEnd())))
+				},
+				// Only the completion flush writes
+				customizeSinkerFactoryOptions: func(defaults sinker.SinkerFactoryOptions) sinker.SinkerFactoryOptions {
+					defaults.BatchBlockFlushInterval = 1000
+					defaults.LiveBlockFlushInterval = 1000
+					defaults.BatchRowFlushInterval = 1000
+					return defaults
+				},
+				responses: streamMock(
+					dbChangesBlockData(t, "10a", finalBlock("5a"), insertRowSinglePK("xfer", "10", "from", "sender1", "to", "receiver1")),
+					dbChangesBlockData(t, "11a", finalBlock("5a"), insertRowSinglePK("xfer", "11", "from", "sender2", "to", "receiver2")),
+				),
+			},
+			{
+				responses: streamMock(
+					blockUndo(t, "10a", finalBlock("5a")),
+				),
+			},
+		},
+		equalsXferRows([]*XferSinglePKRow{
+			{ID: "10", From: "sender1", To: "receiver1"},
+		}),
+		"Block #10 (10a) - LIB #5 (5a)",
+	)
+}
+
+// TestSinker_Integration_UndoBufferBoundedRunCursor ends a bounded run with blocks still in the undo
+// buffer: the completion flush must store the cursor of the last block handled, not the stream's, or
+// the buffered blocks are skipped on restart.
+func TestSinker_Integration_UndoBufferBoundedRunCursor(t *testing.T) {
+	runSinkerTest(
+		t,
+		sharedDbChangesPostgresContainer,
+		func(defaults []sink.Option) []sink.Option {
+			return append(defaults,
+				sink.WithBlockRange(bstream.MustParseRange("1-14", bstream.WithExclusiveEnd())),
+				sink.WithBlockDataBuffer(2),
+			)
+		},
+		func(defaults sinker.SinkerFactoryOptions) sinker.SinkerFactoryOptions {
+			// An undo buffer replaces reorg handling, and only the completion flush writes
+			defaults.HandleReorgs = false
+			defaults.BatchBlockFlushInterval = 1000
+			defaults.LiveBlockFlushInterval = 1000
+			defaults.BatchRowFlushInterval = 1000
+			return defaults
+		},
+		tablesInput(func(schema string) map[string]*db2.TableInfo { return db2.TestSinglePrimaryKeyTables(schema) }),
+		streamMock(
+			dbChangesBlockData(t, "10a", finalBlock("5a"), insertRowSinglePK("xfer", "10", "from", "sender1", "to", "receiver1")),
+			dbChangesBlockData(t, "11a", finalBlock("5a"), insertRowSinglePK("xfer", "11", "from", "sender2", "to", "receiver2")),
+			dbChangesBlockData(t, "12a", finalBlock("5a"), insertRowSinglePK("xfer", "12", "from", "sender3", "to", "receiver3")),
+			dbChangesBlockData(t, "13a", finalBlock("5a"), insertRowSinglePK("xfer", "13", "from", "sender4", "to", "receiver4")),
+		),
+		equalsXferRows([]*XferSinglePKRow{
+			{ID: "10", From: "sender1", To: "receiver1"},
+			{ID: "11", From: "sender2", To: "receiver2"},
+		}),
+		"Block #11 (11a) - LIB #5 (5a)",
 	)
 }
 
@@ -1870,6 +2061,31 @@ func runSinkerTest(
 	expectedFinalCursor string,
 ) {
 	t.Helper()
+
+	runSinkerRunsTest(t, postgresContainer, setupInput, []sinkerRun{
+		{customizeSinkOptions, customizeSinkerFactoryOptions, responses},
+	}, expected, expectedFinalCursor)
+}
+
+// sinkerRun is one run of the sinker until its stream ends, each run resuming from the cursor the
+// previous one stored, like a sink restart.
+type sinkerRun struct {
+	customizeSinkOptions          func(defaults []sink.Option) []sink.Option
+	customizeSinkerFactoryOptions func(defaults sinker.SinkerFactoryOptions) sinker.SinkerFactoryOptions
+	responses                     []any
+}
+
+// runSinkerRunsTest sets up a fresh schema, runs the sinker once per run against it, then checks
+// the database and the stored cursor.
+func runSinkerRunsTest(
+	t *testing.T,
+	postgresContainer *PostgresContainerExt,
+	setupInput sinkerSetupInput,
+	runs []sinkerRun,
+	expected func(t *testing.T, dbx *sqlx.DB, schema string),
+	expectedFinalCursor string,
+) {
+	t.Helper()
 	t.Parallel()
 
 	ctx := context.Background()
@@ -1877,7 +2093,6 @@ func runSinkerTest(
 	schemaName := randomSchemaName()
 	dsnRaw := postgresContainer.ConnectionString + "&schemaName=" + schemaName
 
-	substreamsClientConfig := setupFakeSubstreamsServer(t, responses...)
 	spkg := substreamsTestPackage(pbdatabase.File_sf_substreams_sink_database_v1_database_proto, (*pbdatabase.DatabaseChanges)(nil).ProtoReflect().Descriptor())
 
 	var err error
@@ -1899,55 +2114,61 @@ func runSinkerTest(
 	err = sinker.SinkerSetup(ctx, dsnRaw, spkg, setupOptions, logger, tracer)
 	require.NoError(t, err)
 
-	baseSinkOptions := []sink.Option{
-		sink.WithBlockRange(bstream.MustParseRange("1-1000", bstream.WithExclusiveEnd())),
-		sink.WithLivenessChecker(&isAlwaysLiveChecker{}),
-		sink.WithRetryBackOff(&backoff.StopBackOff{}),
+	var outputModuleHash string
+	for _, run := range runs {
+		substreamsClientConfig := setupFakeSubstreamsServer(t, run.responses...)
+
+		baseSinkOptions := []sink.Option{
+			sink.WithBlockRange(bstream.MustParseRange("1-1000", bstream.WithExclusiveEnd())),
+			sink.WithLivenessChecker(&isAlwaysLiveChecker{}),
+			sink.WithRetryBackOff(&backoff.StopBackOff{}),
+		}
+		if run.customizeSinkOptions != nil {
+			baseSinkOptions = run.customizeSinkOptions(baseSinkOptions)
+		}
+
+		// Load table metadata (including cursor table) - this is required for InsertCursor to work
+		baseSink, err := sink.New(
+			sink.SubstreamsModeProduction,
+			false,
+			spkg,
+			spkg.Modules.Modules[0],
+			manifest.ModuleHash{},
+			substreamsClientConfig,
+			logger,
+			tracer,
+			baseSinkOptions...,
+		)
+		require.NoError(t, err)
+
+		// Create sinker factory options
+		options := sinker.SinkerFactoryOptions{
+			CursorTableName:         setupOptions.CursorTableName,
+			HistoryTableName:        setupOptions.HistoryTableName,
+			ClickhouseCluster:       setupOptions.ClickhouseCluster,
+			BatchBlockFlushInterval: 1,
+			BatchRowFlushInterval:   5,
+			LiveBlockFlushInterval:  1,
+			OnModuleHashMismatch:    setupOptions.OnModuleHashMismatch,
+			HandleReorgs:            true,
+			FlushRetryCount:         0,
+			FlushRetryDelay:         0,
+		}
+
+		if run.customizeSinkerFactoryOptions != nil {
+			options = run.customizeSinkerFactoryOptions(options)
+		}
+
+		dbSinker, err := sinker.SinkerFactory(baseSink, options)(ctx, dsnRaw, logger, tracer)
+		require.NoError(t, err)
+
+		dbSinker.Run(ctx)
+		require.NoError(t, dbSinker.Err())
+		require.NoError(t, dbSinker.Close())
+		outputModuleHash = dbSinker.OutputModuleHash()
 	}
-	if customizeSinkOptions != nil {
-		baseSinkOptions = customizeSinkOptions(baseSinkOptions)
-	}
 
-	// Load table metadata (including cursor table) - this is required for InsertCursor to work
-	baseSink, err := sink.New(
-		sink.SubstreamsModeProduction,
-		false,
-		spkg,
-		spkg.Modules.Modules[0],
-		manifest.ModuleHash{},
-		substreamsClientConfig,
-		logger,
-		tracer,
-		baseSinkOptions...,
-	)
-	require.NoError(t, err)
-
-	// Create sinker factory options
-	options := sinker.SinkerFactoryOptions{
-		CursorTableName:         setupOptions.CursorTableName,
-		HistoryTableName:        setupOptions.HistoryTableName,
-		ClickhouseCluster:       setupOptions.ClickhouseCluster,
-		BatchBlockFlushInterval: 1,
-		BatchRowFlushInterval:   5,
-		LiveBlockFlushInterval:  1,
-		OnModuleHashMismatch:    setupOptions.OnModuleHashMismatch,
-		HandleReorgs:            true,
-		FlushRetryCount:         0,
-		FlushRetryDelay:         0,
-	}
-
-	if customizeSinkerFactoryOptions != nil {
-		options = customizeSinkerFactoryOptions(options)
-	}
-
-	dbSinker, err := sinker.SinkerFactory(baseSink, options)(ctx, dsnRaw, logger, tracer)
-	require.NoError(t, err)
-	t.Cleanup(func() { dbSinker.Close() })
-
-	dbSinker.Run(ctx)
-	require.NoError(t, dbSinker.Err())
-
-	db, err := sqlx.Connect("postgres", postgresContainer.ConnectionString)
+	db, err := sqlx.Connect("pgx", postgresContainer.ConnectionString)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -1958,7 +2179,7 @@ func runSinkerTest(
 	// Fetch cursor directly from database instead of using GetCursor
 	var cursorStr string
 	cursorQuery := fmt.Sprintf(`SELECT cursor FROM "%s"."cursors" WHERE id = $1`, schemaName)
-	err = db.GetContext(ctx, &cursorStr, cursorQuery, dbSinker.OutputModuleHash())
+	err = db.GetContext(ctx, &cursorStr, cursorQuery, outputModuleHash)
 	require.NoError(t, err)
 
 	finalCursor, err := bstream.CursorFromOpaque(cursorStr)

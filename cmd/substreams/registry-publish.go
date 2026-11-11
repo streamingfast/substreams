@@ -92,8 +92,6 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 		return fmt.Errorf("getting registry token: %w", err)
 	}
 
-	zlog.Debug("loaded api key", zap.String("token", token))
-
 	var manifestPath string
 	switch len(args) {
 	case 0:

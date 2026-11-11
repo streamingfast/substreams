@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/manifest"
 	sink "github.com/streamingfast/substreams/sink"
@@ -46,11 +46,11 @@ func TestDbProtoPostgresBytesRoundTrip(t *testing.T) {
 			var (
 				stored    []byte
 				timestamp time.Time
-				topics    pq.StringArray
+				topics    []string
 			)
 			err := dbx.QueryRow(fmt.Sprintf(
 				`SELECT bytes_field, timestamp_field, repeated_string_field FROM %q.types_tests`, schema,
-			)).Scan(&stored, &timestamp, &topics)
+			)).Scan(&stored, &timestamp, pgtype.NewMap().SQLScanner(&topics))
 			require.NoError(t, err)
 
 			assert.Equal(t, payload, stored,
@@ -58,7 +58,7 @@ func TestDbProtoPostgresBytesRoundTrip(t *testing.T) {
 			assert.True(t, expectedTimestamp.Equal(timestamp),
 				"timestamp_field did not survive the round trip through the %s: expected %s, got %s",
 				name, expectedTimestamp, timestamp)
-			assert.Equal(t, []string{"alpha", "beta"}, []string(topics),
+			assert.Equal(t, []string{"alpha", "beta"}, topics,
 				"repeated_string_field did not survive the round trip through the %s", name)
 		})
 	}
@@ -127,7 +127,7 @@ func runBytesSinker(t *testing.T, schema string, useConstraints bool, payload []
 	require.NoError(t, dbSinker.Run(ctx))
 	require.NoError(t, dbSinker.Err())
 
-	db, err := sql.Open("postgres", postgresContainer.ConnectionString)
+	db, err := sql.Open("pgx", postgresContainer.ConnectionString)
 	require.NoError(t, err)
 
 	return sqlx.NewDb(db, "postgres").Unsafe()

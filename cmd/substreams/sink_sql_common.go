@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	_ "net/http/pprof"
 	"os"
 	"strings"
@@ -36,8 +38,9 @@ var supportedOutputTypes = "sf.substreams.sink.database.v1.DatabaseChanges,sf.su
 
 var onModuleHashMismatchFlag = "on-module-hash-mismatch"
 
-func addDSNFlag(flags *pflag.FlagSet) {
-	flags.String("dsn", "", "Database connection string (falls back to the SUBSTREAMS_SINK_DSN environment variable), e.g. \"psql://user:pass@localhost:5432/db?sslmode=disable\" or \"clickhouse://user:pass@localhost:9000/db\"")
+func addDSNFlag(flags *pflag.FlagSet, defaultPasswordEnvvar string) {
+	flags.String("dsn", "", "Database connection string (falls back to the SUBSTREAMS_SINK_DSN environment variable), e.g. \"psql://user:pass@localhost:5432/db?sslmode=disable\" or \"clickhouse://user:pass@localhost:9000/db\". Percent-encode reserved characters in the password, or leave it out and use --password-envvar")
+	flags.String("password-envvar", defaultPasswordEnvvar, "Environment variable holding the database password, used when the DSN has none. Any character works, the value is percent-encoded into the DSN")
 }
 
 func addOperatorFlags(flags *pflag.FlagSet) {
@@ -53,7 +56,51 @@ func resolveSinkDSN(cmd *cobra.Command) (string, error) {
 	if dsn == "" {
 		return "", fmt.Errorf("no DSN provided, use --dsn or set SUBSTREAMS_SINK_DSN (e.g. \"psql://user:pass@localhost:5432/db?sslmode=disable\" or \"clickhouse://user:pass@localhost:9000/db\")")
 	}
-	return dsn, nil
+
+	envvar := sflags.MustGetString(cmd, "password-envvar")
+	if envvar == "" {
+		return dsn, nil
+	}
+	password := os.Getenv(envvar)
+	if password == "" {
+		return dsn, nil
+	}
+	withPassword, ok := injectDSNPassword(dsn, password)
+	if !ok {
+		zlog.Warn("the DSN already has a password, ignoring the one in the --password-envvar variable", zap.String("envvar", envvar))
+		return dsn, nil
+	}
+	return withPassword, nil
+}
+
+// injectDSNPassword puts password, percent-encoded, in the user info of dsn. It
+// returns false and leaves dsn as is when dsn already has a non-empty password.
+func injectDSNPassword(dsn, password string) (string, bool) {
+	schemeEnd := strings.Index(dsn, "://")
+	if schemeEnd < 0 {
+		return dsn, true
+	}
+	start := schemeEnd + 3
+	authorityEnd := len(dsn)
+	if i := strings.IndexAny(dsn[start:], "/?#"); i >= 0 {
+		authorityEnd = start + i
+	}
+	authority := dsn[start:authorityEnd]
+
+	user, host := "", authority
+	if at := strings.LastIndex(authority, "@"); at >= 0 {
+		user, host = authority[:at], authority[at+1:]
+		if colon := strings.Index(user, ":"); colon >= 0 {
+			if colon < len(user)-1 {
+				return dsn, false
+			}
+			user = user[:colon]
+		}
+	}
+
+	// QueryEscape also encodes '$', which ParseDSN would otherwise expand as a variable.
+	escaped := strings.ReplaceAll(url.QueryEscape(password), "+", "%20")
+	return dsn[:start] + user + ":" + escaped + "@" + host + dsn[authorityEnd:], true
 }
 
 // validateDSNEngine parses the DSN and ensures its driver matches the engine of the
@@ -207,6 +254,9 @@ func addDatabaseChangesModeRunFlags(flags *pflag.FlagSet) {
 	flags.String("cursors-table", "cursors", "Name of the table to use for storing cursors")
 	flags.String("history-table", "substreams_history", "Name of the table to use for storing block history, used to handle reorgs")
 	flags.String(onModuleHashMismatchFlag, "error", "What to do when the module hash in the manifest does not match the one in the database, can be 'error', 'warn' or 'ignore'")
+	flags.Bool("standby-lock", false, "PostgreSQL only. Take a writer lock (a session advisory lock on the cursors table) before streaming, so several sinks can run against one database with a single writer: the others wait as standbys and the first to see the lock released takes over, resuming from the stored cursor. The lock is released when the active sink stops or its database session ends; set the server's tcp_keepalives_* settings so a dead client's session ends quickly. Needs a session connection: direct, or through a TCP proxy or a session-mode pooler, not a transaction-mode pooler.")
+	flags.Duration("standby-lock-poll-interval", 2*time.Second, "With --standby-lock, how often a standby checks whether the writer lock is free, and how often the active sink queries the session holding the lock so a proxy or idle_session_timeout never sees it idle")
+	flags.Duration("stall-timeout", 0, "Stop with an error if no block arrives for this long once live, so a supervisor restarts the sink (and, with --standby-lock, a standby takes over). 0 disables it.")
 }
 
 // defaultSpoolDir is where the from-proto sink spools rows when nothing else is asked
@@ -245,6 +295,9 @@ var databaseChangesFlagNames = []string{
 	"flush-retry-delay",
 	"cursors-table",
 	"history-table",
+	"standby-lock",
+	"standby-lock-poll-interval",
+	"stall-timeout",
 }
 
 // addFromProtoSchemaFlags registers the from-proto flags that describe the schema. They
@@ -418,6 +471,9 @@ func runDatabaseChangesSink(cmd *cobra.Command, driver, manifestPath, outputModu
 		HandleReorgs:            sflags.MustGetInt(cmd, "undo-buffer-size") == 0,
 		FlushRetryCount:         sflags.MustGetInt(cmd, "flush-retry-count"),
 		FlushRetryDelay:         sflags.MustGetDuration(cmd, "flush-retry-delay"),
+		StandbyLock:             sflags.MustGetBool(cmd, "standby-lock"),
+		StandbyLockPollInterval: sflags.MustGetDuration(cmd, "standby-lock-poll-interval"),
+		StallTimeout:            sflags.MustGetDuration(cmd, "stall-timeout"),
 	})
 
 	sqlSinker, err := sinkerFactory(app.Context(), dsnString, zlog, tracer)
@@ -427,7 +483,16 @@ func runDatabaseChangesSink(cmd *cobra.Command, driver, manifestPath, outputModu
 
 	app.SuperviseAndStart(sqlSinker)
 
-	return app.WaitForTermination(zlog, 0*time.Second, 30*time.Second)
+	err = app.WaitForTermination(zlog, 0*time.Second, 30*time.Second)
+
+	// On a stop (a signal, say), the sinker terminates right away while its Run goroutine still writes
+	// the blocks handled so far: wait for it before exiting, and report its failure if the stop left none.
+	awaitCtx, cancel := context.WithTimeout(context.Background(), sinker.RunStopTimeout)
+	defer cancel()
+	if runErr := sqlSinker.AwaitRun(awaitCtx); err == nil {
+		err = runErr
+	}
+	return err
 }
 
 func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string, spkg *pbsubstreams.Package, outputModuleName string) error {

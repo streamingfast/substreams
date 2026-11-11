@@ -99,3 +99,5 @@ keys = {'evt_addr:0xa34', 'evt_addr:0xba7', 'evt_addr:0x99a'}
 ```
 
 If you're looking for an event with address `0xba7`, when Substreams gets to this block, it will know beforehand that the block contains that event. If you're looking for an event with address `0xaa1`, then Substreams knows beforehand it's not contained in the block and can safely skip it.
+
+To use an index module from another module, see [Block Filters](block-filters.md).

@@ -10,8 +10,9 @@ If your blockchain is not supported, please ask in Discord. Then, consult the re
 
 - [EVM](./evm.md)
 - [Solana](./solana/solana.md)
-- [NEAR](./near.md)
 - [Monad](./monad.md)
 - [Tron](./tron.md)
 - [Injective](./cosmos-compatible/injective.md)
 - [Stellar](./stellar.md)
+- [World Chain](./world-chain.md)
+- [Elysium](./elysium.md)

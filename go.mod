@@ -40,9 +40,8 @@ require (
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/jhump/protoreflect v1.14.0
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/klauspost/compress v1.20.1
+	github.com/klauspost/compress v1.20.2
 	github.com/klauspost/connect-compress/v2 v2.1.1
-	github.com/lib/pq v1.12.3
 	github.com/lithammer/dedent v1.1.0
 	github.com/mattn/go-isatty v0.0.24
 	github.com/mattn/go-runewidth v0.0.30
@@ -66,7 +65,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/streamingfast/bstream v0.0.2-0.20261008140057-0873d6f53bd2
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
-	github.com/streamingfast/dauth v0.0.0-20261009160221-75940c11f03e
+	github.com/streamingfast/dauth v0.0.0-20261104193507-69230e98d89e
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7
 	github.com/streamingfast/dgrpc v0.0.0-20260929191947-99e20897ecc7
@@ -105,9 +104,9 @@ require (
 	go.uber.org/zap v1.28.0
 	golang.org/x/exp v0.0.0-20250813145105-42675adae3e6
 	golang.org/x/mod v0.41.0
-	golang.org/x/net v0.60.0
+	golang.org/x/net v0.62.0
 	golang.org/x/oauth2 v0.37.0
-	golang.org/x/sync v0.23.0
+	golang.org/x/sync v0.24.0
 	google.golang.org/grpc v1.86.0-dev
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v2 v2.4.0
@@ -142,7 +141,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator v0.54.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/alecthomas/chroma/v2 v2.20.0 // indirect
-	github.com/andybalholm/brotli v1.2.2 // indirect
+	github.com/andybalholm/brotli v1.2.7 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.41.7 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.10 // indirect
@@ -201,7 +200,7 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.7.1 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
@@ -227,6 +226,7 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
+	github.com/lib/pq v1.12.3 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20260330125221-c963978e514e // indirect
@@ -308,12 +308,12 @@ require (
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/crypto v0.57.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/term v0.46.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
+	golang.org/x/crypto v0.58.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/term v0.47.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.49.0 // indirect
+	golang.org/x/tools v0.51.0 // indirect
 	google.golang.org/api v0.293.0 // indirect
 	google.golang.org/genproto v0.0.0-20260319201613-d00831a3d3e7 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260817212433-ac3dfec99bb1 // indirect

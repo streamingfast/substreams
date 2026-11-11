@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/streamingfast/substreams/internal/backprocessing"
 	"github.com/streamingfast/substreams/internal/formatx"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
@@ -50,146 +51,6 @@ func padLabel(label string) string {
 	}
 
 	return label
-}
-
-// globalDone is the amount of work completed, in module-blocks.
-//
-// ProcessedBlocks alone is a staircase: it only advances when a job completes. Adding the
-// progress of the jobs currently in flight makes it advance continuously, which is what
-// makes a rate derived from it stable.
-func globalDone(progress *pbsubstreamsrpc.ModulesProgress) uint64 {
-	if progress == nil {
-		return 0
-	}
-
-	done := progress.ProcessedBlocks
-	for _, job := range progress.RunningJobs {
-		done += job.ProgressBlocks
-	}
-	return done
-}
-
-// globalTotal is the work left to do at the time the session started, in module-blocks,
-// excluding whatever was already cached.
-func globalTotal(session *pbsubstreamsrpc.SessionInit) uint64 {
-	if session == nil {
-		return 0
-	}
-	return session.EffectiveBlocksToProcessBeforeStartBlock + session.EffectiveBlocksToProcessAfterStartBlock
-}
-
-// cachedBlocks is the work the server did not have to redo, in module-blocks.
-func cachedBlocks(session *pbsubstreamsrpc.SessionInit) uint64 {
-	if session == nil {
-		return 0
-	}
-
-	var cached uint64
-	if session.BlocksToProcessBeforeStartBlock > session.EffectiveBlocksToProcessBeforeStartBlock {
-		cached += session.BlocksToProcessBeforeStartBlock - session.EffectiveBlocksToProcessBeforeStartBlock
-	}
-	if session.BlocksToProcessAfterStartBlock > session.EffectiveBlocksToProcessAfterStartBlock {
-		cached += session.BlocksToProcessAfterStartBlock - session.EffectiveBlocksToProcessAfterStartBlock
-	}
-	return cached
-}
-
-// parallelTarget is the block at which parallel processing stops. LinearHandoffBlock is the
-// accurate answer; ResolvedStartBlock is the fallback for servers that leave it unset.
-func parallelTarget(session *pbsubstreamsrpc.SessionInit) uint64 {
-	if session == nil {
-		return 0
-	}
-	if session.LinearHandoffBlock != 0 {
-		return session.LinearHandoffBlock
-	}
-	return session.ResolvedStartBlock
-}
-
-type stageStat struct {
-	Index      int
-	Ratio      float64
-	Ready      uint64
-	SquashWait uint64
-	Jobs       int
-	OldestJob  time.Duration
-}
-
-// computeStageStats derives, for each stage, how far it has actually got and how much job
-// pressure sits on it. The span ends at the parallel handoff.
-//
-// Progress is measured from ready_up_to_exclusive, never from completed_ranges. The server
-// fills completed_ranges from segments in state UnitCompleted, UnitPartialPresent *or*
-// UnitMerging, so a segment counts there as soon as its partial has been produced — before the
-// squasher on tier1 has merged it. Measured that way a stage reaches 100% while real work
-// remains, and since squashing runs on tier1 rather than on a worker it schedules no job and
-// advances no processed_blocks, so the request reads as frozen at 100% with a rate of zero.
-// ready_up_to_exclusive stops at the last squashed segment and does not have that problem.
-//
-// It also fixes the span anchor. It is the *lowest contiguous* block across the stage's
-// modules, so a stage that has not started reports the block its modules begin at: taking it
-// as a lower bound keeps the bar honest about the part of the range nothing has touched yet,
-// which ranges and jobs alone cannot express.
-//
-// Zero is a valid value, not "unknown" — a stage whose modules and chain both start at 0
-// legitimately reports 0. Never branch on it being zero.
-func computeStageStats(stages []*pbsubstreamsrpc.Stage, jobs []*pbsubstreamsrpc.Job, target uint64) []stageStat {
-	out := make([]stageStat, len(stages))
-
-	for i, stage := range stages {
-		stat := stageStat{
-			Index:      i,
-			Ready:      stage.ReadyUpToExclusive,
-			SquashWait: stage.SquashWaitSegmentCount,
-		}
-
-		lo, hasLo := stageLowBlock(stage, jobs, i)
-		for _, job := range jobs {
-			if int(job.Stage) != i {
-				continue
-			}
-			stat.Jobs++
-			if age := time.Duration(job.DurationMs) * time.Millisecond; age > stat.OldestJob {
-				stat.OldestJob = age
-			}
-		}
-
-		if hasLo && target > lo && stat.Ready > lo {
-			stat.Ratio = float64(stat.Ready-lo) / float64(target-lo)
-			if stat.Ratio > 1 {
-				stat.Ratio = 1
-			}
-		}
-
-		out[i] = stat
-	}
-
-	return out
-}
-
-func stageLowBlock(stage *pbsubstreamsrpc.Stage, jobs []*pbsubstreamsrpc.Job, stageIndex int) (uint64, bool) {
-	var lo uint64
-	var found bool
-
-	consider := func(block uint64) {
-		if !found || block < lo {
-			lo, found = block, true
-		}
-	}
-
-	// ready_up_to_exclusive first: on a stage that has not started it is the only thing that
-	// says where the stage is supposed to begin.
-	consider(stage.ReadyUpToExclusive)
-	for _, r := range stage.CompletedRanges {
-		consider(r.StartBlock)
-	}
-	for _, job := range jobs {
-		if int(job.Stage) == stageIndex {
-			consider(job.StartBlock)
-		}
-	}
-
-	return lo, found
 }
 
 type moduleRow struct {
@@ -302,9 +163,9 @@ func (m model) progressLines() []string {
 		return []string{"Backprocessing  waiting for session…"}
 	}
 
-	total := globalTotal(m.session)
+	total := backprocessing.Total(m.session)
 	if total == 0 {
-		if cached := cachedBlocks(m.session); cached != 0 {
+		if cached := backprocessing.Cached(m.session); cached != 0 {
 			return []string{fmt.Sprintf("Backprocessing  nothing to do  —  %s blocks already cached", formatx.Integer(cached))}
 		}
 		return []string{"Backprocessing  nothing to do"}
@@ -314,7 +175,7 @@ func (m model) progressLines() []string {
 		return []string{fmt.Sprintf("Backprocessing  starting…  %s blocks to process", formatx.Count(total))}
 	}
 
-	done := globalDone(m.progress)
+	done := backprocessing.Done(m.progress)
 	if done >= total {
 		return []string{fmt.Sprintf("Backprocessing  complete  ·  %s blocks in %s", formatx.Count(total), formatx.Duration(m.elapsed()))}
 	}
@@ -338,14 +199,12 @@ func (m model) headerLine(done, total uint64) string {
 
 	var segments []string
 
-	rate, span, ok := m.globalRate.perSecond()
+	rate, span, ok := m.globalRate.PerSecond()
 	if ok {
 		segments = append(segments, formatx.Rate(rate, "blk"))
 
-		// An ETA computed off a window that barely spans two samples swings wildly enough to
-		// be worse than no ETA at all.
-		if span >= minWindowForRate && rate > 0 {
-			segments = append(segments, "eta "+formatx.Duration(time.Duration(float64(total-done)/rate)*time.Second))
+		if eta, ok := backprocessing.ETA(total-done, rate, span); ok {
+			segments = append(segments, "eta "+formatx.Duration(eta))
 		}
 	}
 
@@ -355,7 +214,7 @@ func (m model) headerLine(done, total uint64) string {
 		segments = append(segments, fmt.Sprintf("%d jobs", jobs))
 	}
 
-	if cached := cachedBlocks(m.session); cached != 0 {
+	if cached := backprocessing.Cached(m.session); cached != 0 {
 		segments = append(segments, fmt.Sprintf("(%s cached)", formatx.Count(cached)))
 	}
 
@@ -368,8 +227,8 @@ func (m model) stageLines() []string {
 		return nil
 	}
 
-	target := parallelTarget(m.session)
-	stats := computeStageStats(stages, m.progress.RunningJobs, target)
+	target := backprocessing.ParallelTarget(m.session)
+	stats := backprocessing.StageStats(stages, m.progress.RunningJobs, target)
 	width := barWidthFor(m.Width)
 
 	var lines []string
@@ -444,36 +303,9 @@ func (m model) outLine(width int) string {
 		return ""
 	}
 
-	last := stages[len(stages)-1]
-	lo, hasLo := stageLowBlock(last, m.progress.RunningJobs, len(stages)-1)
-	if !hasLo {
-		// The last stage has not reported anything yet, which is the normal state early in a
-		// run: earlier stages have to produce before it can. Anchoring on the lowest block any
-		// stage knows about keeps the row on screen at 0% instead of having it appear from
-		// nowhere later — a live region that changes shape is harder to read than a still one.
-		for i, stage := range stages {
-			if stageLo, found := stageLowBlock(stage, m.progress.RunningJobs, i); found && (!hasLo || stageLo < lo) {
-				lo, hasLo = stageLo, true
-			}
-		}
-	}
-	if !hasLo {
+	lo, frontier, target, ok := backprocessing.OutFrontier(m.session, m.progress)
+	if !ok {
 		return ""
-	}
-
-	target := m.session.ResolvedStartBlock
-	if target <= lo {
-		return ""
-	}
-
-	// The frontier is the last stage's squashed readiness, not the end of its produced ranges:
-	// output can only be served from what has actually been squashed.
-	frontier := last.ReadyUpToExclusive
-	if frontier < lo {
-		frontier = lo
-	}
-	if frontier > target {
-		frontier = target
 	}
 	ratio := float64(frontier-lo) / float64(target-lo)
 

@@ -191,5 +191,18 @@ type stripDeploymentID struct {
 }
 
 func (s stripDeploymentID) Resolve(ctx context.Context, identifier string) (*dregistry.Endpoint, error) {
-	return s.inner.Resolve(ctx, DeploymentID(identifier))
+	id := DeploymentID(identifier)
+	endpoint, err := s.inner.Resolve(ctx, id)
+	if err != nil && dregistry.IsNotFound(err) && isOrgReference(id) {
+		// An org reference is never a dialable address, so the passthrough
+		// fallback would only turn "no such store" into a failed dial.
+		return nil, fmt.Errorf("no live hosted store matches %q", id)
+	}
+	return endpoint, err
+}
+
+// isOrgReference reports whether id has the `<org-slug>/<deployment-name>` shape, as
+// opposed to a deployment id or a `scheme://host:port` address.
+func isOrgReference(id string) bool {
+	return strings.Contains(id, "/") && !strings.Contains(id, "://")
 }

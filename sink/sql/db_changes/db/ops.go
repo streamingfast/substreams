@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"go.uber.org/zap"
@@ -13,6 +14,7 @@ import (
 // check before with HasTable()
 func (l *Loader) Insert(tableName string, primaryKey map[string]string, data map[string]FieldData, reversibleBlockNum *uint64) error {
 	uniqueID := createRowUniqueID(primaryKey)
+	key := l.entryKey(uniqueID, reversibleBlockNum)
 
 	if l.tracer.Enabled() {
 		l.logger.Debug("processing insert operation", zap.String("table_name", tableName), zap.String("primary_key", uniqueID), zap.Int("field_count", len(data)))
@@ -33,7 +35,7 @@ func (l *Loader) Insert(tableName string, primaryKey map[string]string, data map
 		l.entries.Set(tableName, entry)
 	}
 
-	if operation, found := entry.Get(uniqueID); found {
+	if operation, found := entry.Get(key); found {
 		switch operation.opType {
 		case OperationTypeInsert:
 			if !l.dialect.AllowPkDuplicates() {
@@ -59,9 +61,20 @@ func (l *Loader) Insert(tableName string, primaryKey map[string]string, data map
 		}
 	}
 
-	entry.Set(uniqueID, l.newInsertOperation(table, primaryKey, data, l.NextBatchOrdinal(), reversibleBlockNum))
+	entry.Set(key, l.newInsertOperation(table, primaryKey, data, l.NextBatchOrdinal(), reversibleBlockNum))
 	l.entriesCount++
 	return nil
+}
+
+// entryKey keys a pending operation. When reorgs are reverted through the history table, which
+// records each operation under a single block, changes from different reversible blocks are kept
+// as separate operations instead of being merged.
+func (l *Loader) entryKey(uniqueID string, reversibleBlockNum *uint64) string {
+	if l.handleReorgs && reversibleBlockNum != nil {
+		// NUL cannot appear in a Postgres text value, so the key cannot collide with a primary key.
+		return uniqueID + "\x00" + strconv.FormatUint(*reversibleBlockNum, 10)
+	}
+	return uniqueID
 }
 
 func createRowUniqueID(m map[string]string) string {
@@ -74,13 +87,17 @@ func createRowUniqueID(m map[string]string) string {
 	keys := slices.Collect(maps.Keys(m))
 	slices.Sort(keys)
 
+	// Values are joined with "/", so a "/" or "\" inside a value is escaped: otherwise ("a/b", "c")
+	// and ("a", "b/c") would give the same ID and their operations would be merged together.
 	values := make([]string, len(keys))
 	for i, key := range keys {
-		values[i] = m[key]
+		values[i] = compositeKeyEscaper.Replace(m[key])
 	}
 
 	return strings.Join(values, "/")
 }
+
+var compositeKeyEscaper = strings.NewReplacer(`\`, `\\`, `/`, `\/`)
 
 func (l *Loader) GetPrimaryKey(tableName string, pk string) (map[string]string, error) {
 	primaryKeyColumns := l.tables[tableName].primaryColumns
@@ -107,6 +124,7 @@ func (l *Loader) Upsert(tableName string, primaryKey map[string]string, data map
 	}
 
 	uniqueID := createRowUniqueID(primaryKey)
+	key := l.entryKey(uniqueID, reversibleBlockNum)
 	if l.tracer.Enabled() {
 		l.logger.Debug("processing update operation", zap.String("table_name", tableName), zap.String("primary_key", uniqueID), zap.Int("field_count", len(data)))
 	}
@@ -130,7 +148,7 @@ func (l *Loader) Upsert(tableName string, primaryKey map[string]string, data map
 		l.entries.Set(tableName, entry)
 	}
 
-	if op, found := entry.Get(uniqueID); found {
+	if op, found := entry.Get(key); found {
 		switch op.opType {
 		case OperationTypeInsert:
 			return fmt.Errorf("attempting to upsert an object with primary key %q, that is scheduled to be inserted, insert and upsert are exclusive", primaryKey)
@@ -147,8 +165,10 @@ func (l *Loader) Upsert(tableName string, primaryKey map[string]string, data map
 			l.logger.Debug("primary key entry already exist for table, merging columns together", zap.String("primary_key", uniqueID), zap.String("table_name", tableName))
 		}
 
-		op.mergeOperation(data)
-		entry.Set(uniqueID, op)
+		if err := op.mergeOperation(data); err != nil {
+			return fmt.Errorf("merging changes into pending operation of table %q, primary key %q: %w", tableName, primaryKey, err)
+		}
+		entry.Set(key, op)
 		return nil
 	} else {
 		l.entriesCount++
@@ -165,7 +185,7 @@ func (l *Loader) Upsert(tableName string, primaryKey map[string]string, data map
 		}
 	}
 
-	entry.Set(uniqueID, l.newUpsertOperation(table, primaryKey, data, l.NextBatchOrdinal(), reversibleBlockNum))
+	entry.Set(key, l.newUpsertOperation(table, primaryKey, data, l.NextBatchOrdinal(), reversibleBlockNum))
 	return nil
 }
 
@@ -177,6 +197,7 @@ func (l *Loader) Update(tableName string, primaryKey map[string]string, data map
 	}
 
 	uniqueID := createRowUniqueID(primaryKey)
+	key := l.entryKey(uniqueID, reversibleBlockNum)
 	if l.tracer.Enabled() {
 		l.logger.Debug("processing update operation", zap.String("table_name", tableName), zap.String("primary_key", uniqueID), zap.Int("field_count", len(data)))
 	}
@@ -200,7 +221,7 @@ func (l *Loader) Update(tableName string, primaryKey map[string]string, data map
 		l.entries.Set(tableName, entry)
 	}
 
-	if op, found := entry.Get(uniqueID); found {
+	if op, found := entry.Get(key); found {
 		switch op.opType {
 		case OperationTypeInsert:
 			// Column is scheduled to be inserted, simply add our fields to the insert without changing its Insert type
@@ -216,8 +237,10 @@ func (l *Loader) Update(tableName string, primaryKey map[string]string, data map
 			l.logger.Debug("primary key entry already exist for table, merging fields together", zap.String("primary_key", uniqueID), zap.String("table_name", tableName))
 		}
 
-		op.mergeOperation(data)
-		entry.Set(uniqueID, op)
+		if err := op.mergeOperation(data); err != nil {
+			return fmt.Errorf("merging changes into pending operation of table %q, primary key %q: %w", tableName, primaryKey, err)
+		}
+		entry.Set(key, op)
 		return nil
 	} else {
 		l.entriesCount++
@@ -227,7 +250,7 @@ func (l *Loader) Update(tableName string, primaryKey map[string]string, data map
 		l.logger.Debug("primary key entry never existed for table, adding update operation", zap.String("primary_key", uniqueID), zap.String("table_name", tableName))
 	}
 
-	entry.Set(uniqueID, l.newUpdateOperation(table, primaryKey, data, l.NextBatchOrdinal(), reversibleBlockNum))
+	entry.Set(key, l.newUpdateOperation(table, primaryKey, data, l.NextBatchOrdinal(), reversibleBlockNum))
 	return nil
 }
 
@@ -239,6 +262,7 @@ func (l *Loader) Delete(tableName string, primaryKey map[string]string, reversib
 	}
 
 	uniqueID := createRowUniqueID(primaryKey)
+	key := l.entryKey(uniqueID, reversibleBlockNum)
 	if l.tracer.Enabled() {
 		l.logger.Debug("processing delete operation", zap.String("table_name", tableName), zap.String("primary_key", uniqueID))
 	}
@@ -262,7 +286,7 @@ func (l *Loader) Delete(tableName string, primaryKey map[string]string, reversib
 		l.entries.Set(tableName, entry)
 	}
 
-	if _, found := entry.Get(uniqueID); !found {
+	if _, found := entry.Get(key); !found {
 		if l.tracer.Enabled() {
 			l.logger.Debug("primary key entry never existed for table", zap.String("primary_key", uniqueID), zap.String("table_name", tableName))
 		}
@@ -274,6 +298,6 @@ func (l *Loader) Delete(tableName string, primaryKey map[string]string, reversib
 		l.logger.Debug("adding deleting operation", zap.String("primary_key", uniqueID), zap.String("table_name", tableName))
 	}
 
-	entry.Set(uniqueID, l.newDeleteOperation(table, primaryKey, l.NextBatchOrdinal(), reversibleBlockNum))
+	entry.Set(key, l.newDeleteOperation(table, primaryKey, l.NextBatchOrdinal(), reversibleBlockNum))
 	return nil
 }

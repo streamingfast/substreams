@@ -42,6 +42,7 @@ func (d ClickhouseDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputMo
 	for entriesPair := l.entries.Oldest(); entriesPair != nil; entriesPair = entriesPair.Next() {
 		tableName := entriesPair.Key
 		entries := entriesPair.Value
+		tableStartAt := time.Now()
 		tx, err := l.DB.BeginTx(ctx, nil)
 		if err != nil {
 			return entryCount, fmt.Errorf("failed to begin db transaction")
@@ -85,6 +86,7 @@ func (d ClickhouseDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputMo
 		if err := tx.Commit(); err != nil {
 			return entryCount, fmt.Errorf("failed to commit db transaction: %w", err)
 		}
+		QueryExecutionDuration.AddInt64(time.Since(tableStartAt).Nanoseconds(), "normal")
 		entryCount += entries.Len()
 	}
 

@@ -11,6 +11,10 @@ Composability in Substreams means that you can:
 - **Share common functionality**: Leverage shared libraries and utilities across different projects
 - **Create modular architectures**: Design systems where components can be easily swapped or upgraded
 
+{% hint style="warning" %}
+Composing means building on modules that other packages already provide, not splitting your own logic into many small modules. Each module adds serialization and cache I/O on every block. See [Performance Guidelines](../../references/performance-guidelines.md#keep-the-number-of-modules-small).
+{% endhint %}
+
 ## How Composition Can Be Leveraged
 
 Substreams composition allows you to:

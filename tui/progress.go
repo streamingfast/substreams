@@ -179,13 +179,14 @@ func (m model) progressLines() []string {
 		return []string{"Backprocessing  nothing to do"}
 	}
 
-	if m.progress == nil {
-		return []string{fmt.Sprintf("Backprocessing  starting…  %s blocks to process", formatx.Count(total))}
-	}
-
-	// Completion is never decided here: see TUI.closeProgress.
+	// Completion is never decided here: see TUI.closeProgress. It can arrive before any
+	// progress message when backprocessing ends within the first progress interval.
 	if m.completedIn != nil {
 		return []string{completeLine(total, *m.completedIn)}
+	}
+
+	if m.progress == nil {
+		return []string{fmt.Sprintf("Backprocessing  starting…  %s blocks to process", formatx.Count(total))}
 	}
 
 	done := min(backprocessing.Done(m.progress), total)

@@ -23,7 +23,7 @@ The CLI installation is supported only on Linux and macOS. If you're using Windo
 2. Running `substreams init` will give you the option to choose the EVM protocol, then select one of the project options that best fits your requirements:
     - **evm-hello-world**: Creates a simple Substreams that outputs the events of a smart contract.
     - **evm-events-calls-raw**: (without ABI) Get raw EVM events/calls and create a Substreams as source. You'll need to specify the contract address(es) that you want to follow.
-    - **evm-events-calls**: (with ABI) Decode EVM events/calls using an ABI and create a Substreams as source. You'll need to specify the contract address(es) that you want to follow. Elysium doesn't have a block explorer integration yet, so you'll need to provide the contract ABI yourself.
+    - **evm-events-calls**: (with ABI) Decode EVM events/calls using an ABI and create a Substreams as source. You'll need to specify the contract address(es) that you want to follow. You can look up contracts and their verified ABIs on the [Elysium Explorer](https://elysium.kinetiq.xyz/explorer). If the CLI can't retrieve an ABI automatically, you'll need to provide it yourself.
 
 ## Step 2: Configure Your Elysium Endpoint
 
@@ -70,6 +70,10 @@ Elysium is an EVM-compatible blockchain built on Arbitrum Nitro, which means:
 Elysium Substreams are available on the following endpoint:
 - **Elysium Mainnet**: `mainnet.elysium.streamingfast.io:443`
 - **Elysium Mainnet chain ID**: `99901`
+
+### Elysium Explorer
+
+Use the [Elysium Explorer](https://elysium.kinetiq.xyz/explorer) to browse blocks, transactions and verified contracts, and to find the contract addresses and ABIs you want to follow.
 
 ### Dev Container Reference
 

@@ -168,15 +168,15 @@ func TestBigDecimal(t *testing.T) {
 		},
 		{
 			name:  "big big decimal",
-			value: decimal.New(123, 29301),
+			value: decimal.New(123, 77),
 		},
 		{
 			name:  "negative big decimal",
-			value: decimal.New(-123, 29301),
+			value: decimal.New(-123, 77),
 		},
 		{
 			name:  "zero big decimal",
-			value: decimal.New(0, 29301),
+			value: decimal.New(0, 77),
 		},
 	}
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -256,12 +257,30 @@ var errDecimalOutOfRange = errors.New("number out of range")
 func parseDecimal(s string) (decimal, error) {
 	d, err := shopspring.NewFromString(s)
 	if err != nil {
+		if isScientificNotation(s) {
+			return decimal{}, fmt.Errorf("%q: %w (exponent beyond +/-%d)", s, errDecimalOutOfRange, maxDecimalExponent)
+		}
 		return decimal{}, fmt.Errorf("invalid decimal: %s", s)
 	}
 	if d.Exponent() > maxDecimalExponent || d.Exponent() < -maxDecimalExponent {
 		return decimal{}, fmt.Errorf("%q: %w (exponent beyond +/-%d)", s, errDecimalOutOfRange, maxDecimalExponent)
 	}
 	return decimal{d}, nil
+}
+
+// isScientificNotation reports whether s is a well-formed number in scientific notation. It tells
+// apart a value shopspring rejects for its exponent alone (shopspring.MaxDecodeExponent, larger
+// than maxDecimalExponent) from one that is not a number at all.
+func isScientificNotation(s string) bool {
+	i := strings.IndexAny(s, "eE")
+	if i < 0 {
+		return false
+	}
+	if _, err := shopspring.NewFromString(s[:i]); err != nil {
+		return false
+	}
+	_, err := strconv.ParseInt(s[i+1:], 10, 32)
+	return err == nil
 }
 
 // parseDecimals reads the existing and the incoming value of a field to merge. numeric is false

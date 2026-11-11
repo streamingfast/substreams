@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/substreams/internal/backprocessing"
 	"github.com/streamingfast/substreams/internal/formatx"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/protodecode"
@@ -39,8 +40,12 @@ type TUI struct {
 	outputMode        OutputMode
 	prettyPrintOutput bool
 
-	prog                    *tea.Program
+	prog *tea.Program
+	// progExited is closed when prog stops running, which the user can cause by quitting
+	// the live view.
+	progExited              chan struct{}
 	seenFirstData           bool
+	completionReported      bool
 	RequiredProcessedBlocks uint64
 	ResolvedStartBlock      uint64
 
@@ -48,7 +53,8 @@ type TUI struct {
 	// the session preamble.
 	endpoint string
 
-	session *pbsubstreamsrpc.SessionInit
+	session   *pbsubstreamsrpc.SessionInit
+	sessionAt time.Time
 
 	interrupt   func()
 	interrupted bool
@@ -217,6 +223,9 @@ func (ui *TUI) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 	if data == nil {
 		return nil
 	}
+	if ui.outputMode == OutputModeTUI {
+		ui.trackBackprocessing(data.Clock.Number)
+	}
 	switch ui.outputMode {
 	case OutputModeTUI:
 		printClock(data)
@@ -269,6 +278,7 @@ func (ui *TUI) HandleSession(ctx context.Context, req *pbsubstreamsrpcv3.Request
 	}
 	ui.ResolvedStartBlock = session.ResolvedStartBlock
 	ui.session = session
+	ui.sessionAt = time.Now()
 
 	execGraph, err := exec.NewOutputModuleGraph(req.OutputModule, req.ProductionMode, req.Package.GetModules(), bstream.GetProtocolFirstStreamableBlock, false)
 	if err != nil {
@@ -353,9 +363,12 @@ func (ui *TUI) ensureTerminalLocked() {
 		return
 	}
 
-	ui.prog = tea.NewProgram(newModel(ui))
+	prog := tea.NewProgram(newModel(ui))
+	exited := make(chan struct{})
+	ui.prog, ui.progExited = prog, exited
 	go func() {
-		if _, err := ui.prog.Run(); err != nil {
+		defer close(exited)
+		if _, err := prog.Run(); err != nil {
 			if strings.Contains(err.Error(), context.Canceled.Error()) {
 				// Weird case where we need to check the error string message to know the underlying error
 				// The error returned is a fmt.wrapError which contains the context.Canceled error
@@ -384,6 +397,61 @@ func (ui *TUI) AbortProgress() {
 
 	ui.ensureTerminalUnlocked()
 	fmt.Fprintln(os.Stderr, "Backprocessing  aborted")
+}
+
+// CompleteProgress reports backprocessing as complete when the stream reached its stop block,
+// which happens before the linear handoff on a range that is entirely backprocessed.
+func (ui *TUI) CompleteProgress() {
+	if ui.outputMode != OutputModeTUI {
+		return
+	}
+
+	ui.ensureTerminalUnlocked()
+	if total := backprocessing.Total(ui.session); total != 0 && !ui.completionReported {
+		ui.completionReported = true
+		fmt.Fprintln(os.Stderr, completeLine(total, time.Since(ui.sessionAt)))
+	}
+}
+
+// trackBackprocessing tears down the backprocessing block when the first block of data
+// arrives, and reports backprocessing as complete on the block that proves it is.
+//
+// In production mode, tier2 jobs stream data while backprocessing is still running, so the
+// first block can arrive long before the end: the block then closes without a verdict, which
+// comes with a later block.
+func (ui *TUI) trackBackprocessing(blockNum uint64) {
+	total := backprocessing.Total(ui.session)
+	if total == 0 || ui.completionReported || !backprocessing.Finished(ui.session, blockNum) {
+		ui.ensureTerminalUnlocked()
+		return
+	}
+
+	ui.completionReported = true
+	elapsed := time.Since(ui.sessionAt)
+	if !ui.progRunning() {
+		ui.ensureTerminalUnlocked()
+		fmt.Fprintln(os.Stderr, completeLine(total, elapsed))
+		return
+	}
+
+	// Quitting, unlike killing, renders the model one last time, so the completion line
+	// replaces the progress block in the scrollback instead of landing under it.
+	ui.prog.Send(backprocessingCompleteMsg{elapsed: elapsed})
+	ui.prog.Quit()
+	ui.prog.Wait()
+	ui.prog = nil
+}
+
+func (ui *TUI) progRunning() bool {
+	if ui.prog == nil {
+		return false
+	}
+	select {
+	case <-ui.progExited:
+		return false
+	default:
+		return true
+	}
 }
 
 func (ui *TUI) CleanUpTerminal() {

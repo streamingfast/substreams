@@ -305,7 +305,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 			return MsgJobFailed{Unit: unit, Worker: w, Error: err}
 		}
 
-		stats.RecordEndSubrequest(jobIdx, metrics.JobComplete)
+		stats.RecordJobSucceeded(jobIdx, res.ProcessedBlocks)
 		logger.Info(
 			"job completed",
 			zap.Object("unit", unit),
@@ -427,7 +427,6 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 			case *pbssinternal.ProcessRangeResponse_Completed:
 				logger.Debug("worker done")
 				processedBlocks = r.Completed.ProcessedBlocks
-				stats.RecordBlocksProcessed(processedBlocks) // add workers' processed blocks count to our own stats
 
 			case *pbssinternal.ProcessRangeResponse_BlockScopedData:
 				clock := r.BlockScopedData.Clock

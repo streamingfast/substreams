@@ -625,6 +625,20 @@ func (s *Stats) RecordJobRetried(jobIdx uint64) {
 func (s *Stats) RecordEndSubrequest(jobIdx uint64, status JobStatus) {
 	s.Lock()
 	defer s.Unlock()
+	s.endSubrequestLocked(jobIdx, status)
+}
+
+// RecordJobSucceeded ends a job that completed and adds the blocks it reports having
+// processed. Both happen under the lock JobsAndBlocksProcessed takes, so a progress snapshot
+// counts the job either as running or as processed blocks, never as both.
+func (s *Stats) RecordJobSucceeded(jobIdx uint64, processedBlocks uint64) {
+	s.Lock()
+	defer s.Unlock()
+	s.endSubrequestLocked(jobIdx, JobComplete)
+	s.processedBlocks.Add(processedBlocks)
+}
+
+func (s *Stats) endSubrequestLocked(jobIdx uint64, status JobStatus) {
 	job, ok := s.runningJobs[jobIdx]
 	if !ok {
 		return
@@ -827,7 +841,9 @@ type Config struct {
 	Tier2            bool
 }
 
-func (s *Stats) JobsStats() []*pbsubstreamsrpc.Job {
+// JobsAndBlocksProcessed returns the running jobs and the processed blocks count as one
+// snapshot, see RecordJobSucceeded.
+func (s *Stats) JobsAndBlocksProcessed() ([]*pbsubstreamsrpc.Job, uint64) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -844,7 +860,7 @@ func (s *Stats) JobsStats() []*pbsubstreamsrpc.Job {
 		i++
 	}
 
-	return out
+	return out, s.processedBlocks.Load()
 }
 
 func (s *Stats) LocalModulesStats() []*pbssinternal.ModuleStats {

@@ -43,4 +43,4 @@ var ProgressMessageLastContiguousBlock = Metrics.NewGaugeVec("substreams_sink_pr
 var UndoMessageCount = Metrics.NewCounter("substreams_sink_undo_message", "The number of block undo message received")
 var UnknownMessageCount = Metrics.NewCounter("substreams_sink_unknown_message", "The number of unknown message received")
 
-var BackprocessingCompletion = Metrics.NewGauge("substreams_sink_backprocessing_completion", "Determines if backprocessing is completed, which is if we receive a first data message")
+var BackprocessingCompletion = Metrics.NewGauge("substreams_sink_backprocessing_completion", "Set to 1 once backprocessing is completed, which is when a block at or past the linear handoff block is received or the stream reaches its stop block")

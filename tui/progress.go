@@ -156,8 +156,16 @@ func moduleExtraMetrics(stats *pbsubstreamsrpc.ModuleStats) string {
 	return strings.Join(parts, " ")
 }
 
-// progressLines renders the whole backprocessing block. It is the only place that decides
-// between the three states the block can be in.
+// backprocessingCompleteMsg collapses the backprocessing block to its completion line.
+type backprocessingCompleteMsg struct {
+	elapsed time.Duration
+}
+
+func completeLine(total uint64, elapsed time.Duration) string {
+	return fmt.Sprintf("Backprocessing  complete  ·  %s blocks in %s", formatx.Count(total), formatx.Duration(elapsed))
+}
+
+// progressLines renders the whole backprocessing block.
 func (m model) progressLines() []string {
 	if m.session == nil {
 		return []string{"Backprocessing  waiting for session…"}
@@ -171,27 +179,22 @@ func (m model) progressLines() []string {
 		return []string{"Backprocessing  nothing to do"}
 	}
 
+	// Completion is never decided here: see TUI.trackBackprocessing. It can arrive before any
+	// progress message when backprocessing ends within the first progress interval.
+	if m.completedIn != nil {
+		return []string{completeLine(total, *m.completedIn)}
+	}
+
 	if m.progress == nil {
 		return []string{fmt.Sprintf("Backprocessing  starting…  %s blocks to process", formatx.Count(total))}
 	}
 
 	done := min(backprocessing.Done(m.progress), total)
-	if done >= total && len(m.progress.GetRunningJobs()) == 0 {
-		return []string{fmt.Sprintf("Backprocessing  complete  ·  %s blocks in %s", formatx.Count(total), formatx.Duration(m.elapsed()))}
-	}
-
 	lines := []string{m.headerLine(done, total)}
 	lines = append(lines, m.stageLines()...)
 	lines = append(lines, m.moduleLines()...)
 
 	return lines
-}
-
-func (m model) elapsed() time.Duration {
-	if m.sessionAt.IsZero() {
-		return 0
-	}
-	return m.now().Sub(m.sessionAt)
 }
 
 func (m model) headerLine(done, total uint64) string {

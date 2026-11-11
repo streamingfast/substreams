@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Server
 
 - Log `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` on the `incoming Substreams Blocks request` and `incoming Substreams Estimate request` log lines when the auth plugin provides them (`x-auth-method`, `x-auth-jwt-lifetime-bucket`, `x-auth-jwt-iat`, `x-auth-jwt-exp`). Nothing changes without the plugin.
+- Bigdecimal store writes now fail with a deterministic error when the value's exponent is above 10,000 or below -10,000 (for example `1e-2000000000`). Such values could stall the server or exhaust its memory.
 
 ### CLI
 

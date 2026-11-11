@@ -1,13 +1,13 @@
 package postgres
 
 import (
+	"database/sql/driver"
 	"encoding/hex"
 	"fmt"
 	"hash/fnv"
 	"sort"
 	"strings"
 
-	"github.com/lib/pq"
 	"github.com/streamingfast/substreams/sink/sql/bytes"
 	sql2 "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
@@ -235,10 +235,13 @@ func (d *DialectPostgres) AppendInlineFieldValues(fieldValues []any, fd protoref
 			}
 			jsonStrings = append(jsonStrings, string(jsonBytes))
 		}
-		fieldValues = append(fieldValues, pq.Array(jsonStrings))
+		fieldValues = append(fieldValues, postgresTextArray(jsonStrings))
 	} else {
-		// For single inline message, append the JSON string
 		fm := fv.Message()
+		if !fm.IsValid() {
+			fieldValues = append(fieldValues, nil)
+			return fieldValues, nil
+		}
 		jsonBytes, err := protojson.Marshal(fm.Interface())
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal protobuf message to JSON: %w", err)
@@ -303,4 +306,26 @@ func (d *DialectPostgres) SchemaHash() string {
 
 func tableName(schemaName string, tableName string) string {
 	return fmt.Sprintf("%s.%s", schemaName, tableName)
+}
+
+// postgresTextArray is a list of strings as a PostgreSQL array, NULL when nil. As a driver.Valuer, it
+// goes through database/sql as its literal and through binary COPY by pgx's conversion from text.
+type postgresTextArray []string
+
+func (values postgresTextArray) Value() (driver.Value, error) {
+	if values == nil {
+		return nil, nil
+	}
+	var out strings.Builder
+	out.WriteByte('{')
+	for i, value := range values {
+		if i > 0 {
+			out.WriteByte(',')
+		}
+		out.WriteByte('"')
+		out.WriteString(strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(value))
+		out.WriteByte('"')
+	}
+	out.WriteByte('}')
+	return out.String(), nil
 }

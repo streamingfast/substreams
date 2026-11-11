@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/lib/pq"
 	"github.com/streamingfast/logging/zapx"
 	sink "github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/sink/sql/bytes"
@@ -37,7 +37,7 @@ type Database struct {
 	*sql.BaseDatabase
 	db *pgsql.DB
 	// pool is only created when the spool is enabled: binary COPY needs pgx, the rest of
-	// the sink talks to PostgreSQL through database/sql and lib/pq.
+	// the sink talks to PostgreSQL through database/sql.
 	pool         *pgxpool.Pool
 	spoolOptions *spool.Options
 	tx           *pgsql.Tx
@@ -47,7 +47,13 @@ type Database struct {
 	dialect      *DialectPostgres
 	inserter     pgInserter
 	flusher      pgFlusher
-	constraints  sql.ConstraintPolicy
+	// numericStrings is numericStringPositions for each table.
+	numericStrings map[string][]int
+	// rowLayouts is rowLayout for each table.
+	rowLayouts map[string][]rowValue
+	// nulColumnsLogged holds the "table.column" names removeNulCharacters already logged.
+	nulColumnsLogged map[string]struct{}
+	constraints      sql.ConstraintPolicy
 
 	// writeMode is what the operator asked for; resolvedWriteMode is what Open settled on
 	// and is what the startup log reports.
@@ -165,7 +171,7 @@ func NewDatabase(schema *schema.Schema, dsn *db.DSN, moduleOutputType string, ro
 	logger = logger.Named("postgres")
 
 	logger.Info("connecting to db", zap.String("host", dsn.Host), zap.Int64("port", dsn.Port), zap.String("database", dsn.Database))
-	sqlDB, err := pgsql.Open(dsn.Driver(), dsn.ConnString())
+	sqlDB, err := db.OpenDB(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open db connection: %w", err)
 	}
@@ -188,14 +194,26 @@ func NewDatabase(schema *schema.Schema, dsn *db.DSN, moduleOutputType string, ro
 	if err != nil {
 		return nil, fmt.Errorf("failed to create base database: %w", err)
 	}
+	numericStrings := map[string][]int{}
+	rowLayouts := map[string][]rowValue{}
+	for name, table := range schema.TableRegistry {
+		rowLayouts[name] = rowLayout(table)
+		if positions := numericStringPositions(table); len(positions) > 0 {
+			numericStrings[name] = positions
+		}
+	}
+
 	database := &Database{
-		db:           sqlDB,
-		dsn:          dsn,
-		schema:       schema,
-		constraints:  constraints,
-		BaseDatabase: baseDB,
-		dialect:      dialect,
-		logger:       logger,
+		numericStrings:   numericStrings,
+		rowLayouts:       rowLayouts,
+		nulColumnsLogged: map[string]struct{}{},
+		db:               sqlDB,
+		dsn:              dsn,
+		schema:           schema,
+		constraints:      constraints,
+		BaseDatabase:     baseDB,
+		dialect:          dialect,
+		logger:           logger,
 	}
 
 	return database, nil
@@ -216,6 +234,10 @@ func (d *Database) Open() error {
 	poolConfig, err := pgxpool.ParseConfig(d.dsn.ConnString())
 	if err != nil {
 		return fmt.Errorf("parsing the connection string for binary COPY: %w", err)
+	}
+	poolConfig.ConnConfig, err = db.PostgresConnConfig(d.dsn)
+	if err != nil {
+		return fmt.Errorf("setting up the connections for binary COPY: %w", err)
 	}
 	// One applier goroutine COPYs one segment at a time, so the pgx default of four
 	// connections per core is a fleet of idle connections against the server.
@@ -484,7 +506,7 @@ func (d *Database) EnsureBlockNumberIndexes(ctx context.Context) error {
 			// will ever use, and IF NOT EXISTS would happily keep it forever.
 			d.logger.Info("dropping an index a previous concurrent build left unusable", zap.String("index", key.name))
 			if _, err := d.db.ExecContext(ctx, fmt.Sprintf("DROP INDEX CONCURRENTLY IF EXISTS %s.%s",
-				pq.QuoteIdentifier(d.schema.Name), pq.QuoteIdentifier(key.name))); err != nil {
+				pgx.Identifier{d.schema.Name}.Sanitize(), pgx.Identifier{key.name}.Sanitize())); err != nil {
 				return fmt.Errorf("dropping the invalid index %q: %w", key.name, err)
 			}
 		} else if existing[key] {
@@ -761,7 +783,7 @@ func (d *Database) DropConstraints() error {
 
 			pending = append(pending, statement{
 				kind: kind,
-				sql:  fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s", key.relation, pq.QuoteIdentifier(key.name)),
+				sql:  fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s", key.relation, pgx.Identifier{key.name}.Sanitize()),
 			})
 		}
 	}
@@ -907,6 +929,13 @@ func (d *Database) wrapInsertStatement(stmt *pgsql.Stmt) *pgsql.Stmt {
 }
 
 func (d *Database) Insert(table string, values []any) error {
+	for _, position := range d.numericStrings[table] {
+		if position < len(values) {
+			values[position] = emptyNumericStringsAsZero(values[position])
+		}
+	}
+	d.removeNulCharacters(table, values)
+
 	return d.inserter.insert(table, values, d)
 }
 

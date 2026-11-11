@@ -207,3 +207,10 @@ func TestAddFlagsToSet(t *testing.T) {
 		})
 	}
 }
+
+func TestHeaderNames(t *testing.T) {
+	assert.Equal(t,
+		[]string{"Authorization", "X-Substreams-Parallel-Workers", "bare"},
+		headerNames([]string{"Authorization: Bearer s3cret", "X-Substreams-Parallel-Workers:20", "bare"}),
+	)
+}

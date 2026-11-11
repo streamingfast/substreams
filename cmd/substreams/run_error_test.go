@@ -68,3 +68,10 @@ func TestSuggestedLimit(t *testing.T) {
 	assert.Equal(t, uint64(3_400_000), suggestedLimit(3_394_913))
 	assert.Equal(t, uint64(13_000_000), suggestedLimit(12_000_001))
 }
+
+func TestExplainRunError_AuthFailureSaysHowToAuthenticate(t *testing.T) {
+	err := errors.New("stream auth failure: rpc error: code = Unauthenticated desc = missing api key")
+	out := explainRunError(err, noSession, 10_000)
+	assert.ErrorIs(t, out, err)
+	assert.Contains(t, out.Error(), "Authenticate with `substreams auth`, or set SUBSTREAMS_API_KEY")
+}

@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Docker
 
 - Upgrade packages (including `apt`, now 2.8.4) when building the `substreams` Docker image to clear a Docker Scout HIGH CVE inherited from the Ubuntu 24.04 base image.
+- Bump `github.com/andybalholm/brotli` to 1.2.7 and `github.com/klauspost/compress` to 1.20.2 to clear a Docker Scout
+  CRITICAL and a HIGH CVE.
 
 ### Server
 
@@ -21,14 +23,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+- `substreams run` and `substreams gui` now offer to authenticate when they would reach a StreamingFast endpoint with no credentials: answering yes runs the `substreams auth` flow, writes `.substreams.env` and continues the run with the selected key. They only ask in an interactive terminal, never when input or output is redirected, for `--plaintext` or for other endpoints, and an authentication failure in `substreams run` now ends with how to authenticate.
 - `substreams auth` now writes the selected API key to `.substreams.env` as `SUBSTREAMS_API_KEY` instead of exchanging it for a JWT, which expired and was never refreshed. `substreams auth --paste` now only accepts an API key (a JWT is rejected; export `SUBSTREAMS_API_TOKEN` yourself for advanced use).
 - Add an [Authentication Reference](../references/authentication.md) (API key vs short-lived JWT) and a guide to [migrate from `SUBSTREAMS_API_TOKEN` to `SUBSTREAMS_API_KEY`](../references/migrating-to-api-key.md).
+- `substreams registry publish` no longer logs the registry API key at debug level.
 - Remove the unused Substreams-powered subgraph code generator (it was no longer registered under `substreams codegen`). The `SUBSTREAMS_AUTH_ISSUE_URL` environment variable is no longer used.
 
 ### Sink
 
+- SQL sink (DatabaseChanges): `--batch-row-flush-interval=0` now turns the row interval off, as its help says, leaving
+  `--batch-block-flush-interval` to decide. It used to flush after every block that had any row. Both set to 0 is
+  refused at startup, as the sink would not flush while catching up. `--live-block-flush-interval=0` is now refused
+  too, as it can leave the sink without any flush near the chain head.
+- SQL sink (PostgreSQL): DSN values with characters like `/` or a space now reach the database as given. They were URL
+  encoded into a connection string that doesn't decode them, so `sslrootcert=/etc/ssl/ca.pem` or
+  `timezone=Europe/London` were wrong, and a password with a space made the DSN fail to parse.
+- SQL sink (from-proto, ClickHouse): fix a DSN with `secure=true` never connecting. The dial retried
+  forever, because ch-go only accepts a `*net.Dialer` once TLS is on and the byte counter was passed as the dialer.
+- SQL sink: a DSN that fails to parse no longer prints the password in the error. The error now says to percent-encode
+  reserved characters in the user name and password.
+- SQL sink: add `--password-envvar` to `substreams sink postgres` and `substreams sink clickhouse`. When the DSN has no
+  password, the sink reads it from that environment variable (`POSTGRES_PASSWORD` and `CLICKHOUSE_PASSWORD` by default)
+  and percent-encodes it into the DSN, so it can contain any character.
+- SQL sink (ClickHouse, DatabaseChanges): a password percent-encoded in the DSN now reaches the database intact. A
+  password with `/`, `?`, `#` or `%` broke the connection string.
+- Sinks: the `sinker from CLI` log line lists only the names of the `-H` headers, not their values, which can carry
+  credentials.
+- Webhook sink: mask the password of the webhook and undo URLs in logs, errors and the termination log. A URL that
+  does not parse is no longer quoted in the error.
+- SQL sink (DatabaseChanges, PostgreSQL): while catching up, flush in the background so the next blocks are handled during
+  the flush, one flush at a time and each cursor written after its changes. Near the head, flushes work as before.
 - SQL sink (DatabaseChanges): stop formatting each block's whole output as text to check that it isn't empty, which took
   over a third of the sink's CPU on a busy module.
+- SQL sink (DatabaseChanges, PostgreSQL): send a flush's statements through a pipeline instead of one round trip each, in
+  the same order and transaction, so a flush waits far less on the network. Each is still a statement of its own for the
+  server. With about 1 ms of latency to the database, `BenchmarkPostgresFlush` goes from 707 to 54,440 rows/s on inserts.
+  This times the flush only, so a full run gains less. `tx_query_execution_duration` reports one `batch` type instead of
+  `normal` and `undo`.
+- SQL sink (PostgreSQL): connect through pgx rather than lib/pq, which the proto sink already used for binary COPY.
+  Connections behave as before: TLS stays required unless configured otherwise, and sessions use the same date style,
+  encoding and string settings. lib/pq's DSN options still work, except an enabled `sslinline`,
+  `load_balance_hosts=random` and a list of `hostaddr` values, which are now refused at startup.
 - SQL sink (DatabaseChanges): fix changes to rows with a composite primary key being applied to the wrong row when a
   key value contains `/`. Within a batch, keys like (`a/b`, `c`) and (`a`, `b/c`) were taken for the same row, so the
   second change was merged into the first row's operation (or rejected as a duplicate insert) and never written to
@@ -36,6 +71,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - SQL sink (DatabaseChanges): an invalid `UpdateOp` sequence on one field within a batch (for example `ADD` after
   `MAX`) now stops the sink with an error. Upserts and updates used to ignore it, so the change was silently dropped,
   along with any other fields of that change not merged yet.
+- SQL sink (from-proto): fix rows failing to insert when a `google.protobuf.Timestamp` or inline message field is unset.
+  The field was left out of the row, so the row was one value short and the sink stopped. An unset Timestamp is now
+  stored as `NULL` (the epoch on ClickHouse) and an unset inline message as `NULL` (no element on ClickHouse).
+- SQL sink (from-proto, PostgreSQL): the `batch-insert` and `row-insert` write modes now store what `copy` stores. With
+  the default `auto` mode, a spooled sink loads with `copy` and switches to batched `INSERT` statements at the chain
+  head, so each of these values could stop a sink that had caught up:
+  - a repeated inline message field panicked with `unsupported type`, and its column was missing from the batched
+    `INSERT`;
+  - `NaN` and infinite `float` and `double` values were sent unquoted and read as column names;
+  - an empty string converted to a numeric type (`int128`, `uint256`, `decimal128`, …) was rejected instead of being
+    stored as `0`;
+  - a repeated string field converted to a numeric type was sent as `text[]` and rejected by its `numeric[]` column.
+- SQL sink (from-proto, PostgreSQL): timestamps written by `batch-insert` and `row-insert` keep their fractional
+  seconds, as `copy` does, instead of being cut to the second. This applies to `_block_timestamp_` too.
+- SQL sink (from-proto, PostgreSQL): an empty `bytes` field is stored as an empty `BYTEA` by `copy` and `row-insert`
+  too, instead of `NULL`, as `batch-insert` and the text bytes encodings already stored it.
+- SQL sink (from-proto, PostgreSQL): remove NUL characters (`\x00`) from strings, which PostgreSQL rejects in text and
+  JSON values, instead of stopping the sink. A warning names the table and column the first time each column has one.
+  See [Values PostgreSQL cannot store](../references/sql/proto-annotations.md#values-postgresql-cannot-store).
+- SQL sink (from-proto): fix rows failing to insert when the table's message has a scalar, Timestamp or inline field in a
+  `oneof`. The schema gives these no column but the row carried a value for them.
+- SQL sink (from-proto, ClickHouse): a string converted to a numeric type that is not a number or does not fit the
+  column now stops the sink with an error naming the table and column, instead of a panic. An empty one is stored as `0`
+  whether or not the field is `optional`, as the PostgreSQL sink stores it.
 - SQL sink (DatabaseChanges, PostgreSQL): undo a block's changes last to first on a reorg. The order within a block was
   left to the database, so undoing a child row inserted after its parent in one block could fail on a foreign key and
   stop the sink.
@@ -48,6 +107,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - SQL sink (DatabaseChanges): count live flushes skipped because the average flush outlasts the time between blocks.
   The periodic stats log shows `live_flush_skipped` once any is skipped, and
   `substreams_sink_postgres_live_flush_skipped_count` exposes it as a metric.
+- SQL sink (DatabaseChanges): changes to one field merged within a batch (`ADD`, `MAX`, `MIN`) are now exact. They were
+  rounded to 18 decimals and written with 18 (`150.000000000000000000`), so a result could depend on how blocks were
+  batched: the same changes in separate flushes were added by the database at full precision. Merged values now keep
+  the larger scale of their operands, as PostgreSQL's `numeric` does (`1.50` + `2` gives `3.50`, `1` + `2` gives `3`).
 
 ## v1.26.0
 

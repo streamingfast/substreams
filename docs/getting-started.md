@@ -20,6 +20,7 @@ If you can't find a Substreams package that meets your specific needs, you can d
 - [EVM](./tutorials/evm.md)
 - [Solana](./tutorials/solana/solana.md)
 - [Injective](./tutorials/cosmos-compatible/injective.md)
+- [Elysium](./tutorials/elysium.md)
 
 To build and optimize your Substreams from zero, use the minimal path within the [Dev Container](./references/devcontainer-ref.md) to setup your environment and follow the [How-To Guides](./how-to-guides/develop-your-own-substreams/develop-your-own-substreams.md).
 

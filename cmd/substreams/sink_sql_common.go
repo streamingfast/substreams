@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	_ "net/http/pprof"
 	"os"
 	"strings"
@@ -37,8 +38,9 @@ var supportedOutputTypes = "sf.substreams.sink.database.v1.DatabaseChanges,sf.su
 
 var onModuleHashMismatchFlag = "on-module-hash-mismatch"
 
-func addDSNFlag(flags *pflag.FlagSet) {
-	flags.String("dsn", "", "Database connection string (falls back to the SUBSTREAMS_SINK_DSN environment variable), e.g. \"psql://user:pass@localhost:5432/db?sslmode=disable\" or \"clickhouse://user:pass@localhost:9000/db\"")
+func addDSNFlag(flags *pflag.FlagSet, defaultPasswordEnvvar string) {
+	flags.String("dsn", "", "Database connection string (falls back to the SUBSTREAMS_SINK_DSN environment variable), e.g. \"psql://user:pass@localhost:5432/db?sslmode=disable\" or \"clickhouse://user:pass@localhost:9000/db\". Percent-encode reserved characters in the password, or leave it out and use --password-envvar")
+	flags.String("password-envvar", defaultPasswordEnvvar, "Environment variable holding the database password, used when the DSN has none. Any character works, the value is percent-encoded into the DSN")
 }
 
 func addOperatorFlags(flags *pflag.FlagSet) {
@@ -54,7 +56,51 @@ func resolveSinkDSN(cmd *cobra.Command) (string, error) {
 	if dsn == "" {
 		return "", fmt.Errorf("no DSN provided, use --dsn or set SUBSTREAMS_SINK_DSN (e.g. \"psql://user:pass@localhost:5432/db?sslmode=disable\" or \"clickhouse://user:pass@localhost:9000/db\")")
 	}
-	return dsn, nil
+
+	envvar := sflags.MustGetString(cmd, "password-envvar")
+	if envvar == "" {
+		return dsn, nil
+	}
+	password := os.Getenv(envvar)
+	if password == "" {
+		return dsn, nil
+	}
+	withPassword, ok := injectDSNPassword(dsn, password)
+	if !ok {
+		zlog.Warn("the DSN already has a password, ignoring the one in the --password-envvar variable", zap.String("envvar", envvar))
+		return dsn, nil
+	}
+	return withPassword, nil
+}
+
+// injectDSNPassword puts password, percent-encoded, in the user info of dsn. It
+// returns false and leaves dsn as is when dsn already has a non-empty password.
+func injectDSNPassword(dsn, password string) (string, bool) {
+	schemeEnd := strings.Index(dsn, "://")
+	if schemeEnd < 0 {
+		return dsn, true
+	}
+	start := schemeEnd + 3
+	authorityEnd := len(dsn)
+	if i := strings.IndexAny(dsn[start:], "/?#"); i >= 0 {
+		authorityEnd = start + i
+	}
+	authority := dsn[start:authorityEnd]
+
+	user, host := "", authority
+	if at := strings.LastIndex(authority, "@"); at >= 0 {
+		user, host = authority[:at], authority[at+1:]
+		if colon := strings.Index(user, ":"); colon >= 0 {
+			if colon < len(user)-1 {
+				return dsn, false
+			}
+			user = user[:colon]
+		}
+	}
+
+	// QueryEscape also encodes '$', which ParseDSN would otherwise expand as a variable.
+	escaped := strings.ReplaceAll(url.QueryEscape(password), "+", "%20")
+	return dsn[:start] + user + ":" + escaped + "@" + host + dsn[authorityEnd:], true
 }
 
 // validateDSNEngine parses the DSN and ensures its driver matches the engine of the
@@ -202,7 +248,7 @@ func addDatabaseChangesModeRunFlags(flags *pflag.FlagSet) {
 	flags.Int("undo-buffer-size", 0, "If non-zero, handling of reorgs in the database is disabled. Instead, a buffer is introduced to only process blocks once they have been confirmed by that many blocks, introducing a latency but slightly reducing the load on the database when close to head. Set to 0 to enable reorg handling in the database (required for some databases like Postgres).")
 	flags.Int("batch-block-flush-interval", 1_000, "When in catch up mode, flush every N blocks or after batch-row-flush-interval, whichever comes first. Set to 0 to disable and only use batch-row-flush-interval. Ineffective if the sink is now in the live portion of the chain where only 'live-block-flush-interval' applies.")
 	flags.Int("batch-row-flush-interval", 100_000, "When in catch up mode, flush every N rows or after batch-block-flush-interval, whichever comes first. Set to 0 to disable and only use batch-block-flush-interval. Ineffective if the sink is now in the live portion of the chain where only 'live-block-flush-interval' applies.")
-	flags.Int("live-block-flush-interval", 1, "When processing in live mode, flush every N blocks.")
+	flags.Int("live-block-flush-interval", 1, "When processing in live mode, flush every N blocks. Must be at least 1.")
 	flags.Int("flush-retry-count", 3, "Number of retry attempts for flush operations")
 	flags.Duration("flush-retry-delay", 1*time.Second, "Base delay for incremental retry backoff on flush failures")
 	flags.String("cursors-table", "cursors", "Name of the table to use for storing cursors")
@@ -395,6 +441,12 @@ func newSinkRunE(driver string) func(*cobra.Command, []string) error {
 }
 
 func runDatabaseChangesSink(cmd *cobra.Command, driver, manifestPath, outputModule, dsnString string) error {
+	if sflags.MustGetInt(cmd, "batch-block-flush-interval") <= 0 && sflags.MustGetInt(cmd, "batch-row-flush-interval") <= 0 {
+		return fmt.Errorf("--batch-block-flush-interval and --batch-row-flush-interval can't both be 0: the sink wouldn't flush while catching up")
+	}
+	if sflags.MustGetInt(cmd, "live-block-flush-interval") <= 0 {
+		return fmt.Errorf("--live-block-flush-interval must be at least 1")
+	}
 	sinkDBPreStart(cmd)
 
 	app := cli.NewApplication(cmd.Context())

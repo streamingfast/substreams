@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/cenkalti/backoff/v4"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -116,7 +116,7 @@ func TestDbProtoPostgresIntegration(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, dbSinker.Err())
 
-			db, err := sql.Open("postgres", postgresContainer.ConnectionString)
+			db, err := sql.Open("pgx", postgresContainer.ConnectionString)
 			require.NoError(t, err)
 
 			dbx := sqlx.NewDb(db, "postgres").Unsafe()
@@ -132,7 +132,7 @@ func TestDbProtoPostgresIntegration(t *testing.T) {
 func createPostgresTestSchema(t *testing.T, dsn string, schemaName string) {
 	t.Helper()
 
-	db, err := sql.Open("postgres", dsn)
+	db, err := sql.Open("pgx", dsn)
 	require.NoError(t, err)
 	defer db.Close()
 

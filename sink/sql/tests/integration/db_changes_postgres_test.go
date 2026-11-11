@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/cli"
 	pbdatabase "github.com/streamingfast/substreams-sink-database-changes/pb/sf/substreams/sink/database/v1"
@@ -542,9 +542,13 @@ func TestSinker_Integration_TimescaleDB(t *testing.T) {
 				TokenID   []byte    `db:"token_id"`
 			}
 
+			rows := readRowsBy[Row](t, dbx, fmt.Sprintf(`"%s"."trades"`, schema), "id, block_time")
+			for _, row := range rows {
+				row.BlockTime = row.BlockTime.UTC()
+			}
 			require.Equal(t, []*Row{
 				{ID: []byte{0x31}, BlockTime: blockTime(t, "2023-10-01T00:00:00Z"), TokenID: []byte{0x04, 0xab}},
-			}, readRowsBy[Row](t, dbx, fmt.Sprintf(`"%s"."trades"`, schema), "id, block_time"))
+			}, rows)
 		},
 		"Block #10 (10a) - LIB #10 (10a)",
 	)
@@ -2164,7 +2168,7 @@ func runSinkerRunsTest(
 		outputModuleHash = dbSinker.OutputModuleHash()
 	}
 
-	db, err := sqlx.Connect("postgres", postgresContainer.ConnectionString)
+	db, err := sqlx.Connect("pgx", postgresContainer.ConnectionString)
 	require.NoError(t, err)
 	defer db.Close()
 

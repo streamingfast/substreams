@@ -280,13 +280,21 @@ func SetMetadataDetached(metaStore dstore.Store, filename, storeName string, met
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), setMetadataTimeout)
 		defer cancel()
-		if err := metaStore.SetMetadata(ctx, filename, metadata); err != nil {
-			logger.Warn("failed to set metadata on store",
-				zap.String("store_name", storeName),
-				zap.String("filename", filename),
-				zap.Error(err))
-		}
+		setMetadata(ctx, metaStore, filename, storeName, metadata, logger)
 	}()
+}
+
+// setMetadata writes metadata and logs a failure, except on stores that have no metadata
+// (local disk), where it fails on every call.
+func setMetadata(ctx context.Context, metaStore dstore.Store, filename, storeName string, metadata map[string]string, logger *zap.Logger) {
+	err := metaStore.SetMetadata(ctx, filename, metadata)
+	if err == nil || errors.Is(err, dstore.ErrMetadataNotSupported) {
+		return
+	}
+	logger.Warn("failed to set metadata on store",
+		zap.String("store_name", storeName),
+		zap.String("filename", filename),
+		zap.Error(err))
 }
 
 // SetDataSizeDetached records the size of a loaded full KV file in its metadata, through

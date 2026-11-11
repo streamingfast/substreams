@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"maps"
 	"testing"
 	"time"
@@ -9,6 +11,8 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 // TestSetMetadataDetached_SurvivesAndUsesLiveCtx pins the tier1/tier2 metadata
@@ -101,6 +105,39 @@ func TestSetDataSizeDetached(t *testing.T) {
 				require.Nil(t, test.expectedWrite, "SetMetadata was never called")
 			}
 			require.Equal(t, original, test.metadata, "the caller's metadata must not be changed")
+		})
+	}
+}
+
+// TestSetMetadata_LogsFailures checks that a failed metadata write is logged, except on stores
+// that have no metadata.
+func TestSetMetadata_LogsFailures(t *testing.T) {
+	tests := []struct {
+		name        string
+		err         error
+		expectedLog bool
+	}{
+		{"success", nil, false},
+		{"metadata not supported", dstore.ErrMetadataNotSupported, false},
+		{"metadata not supported, wrapped", fmt.Errorf("writing: %w", dstore.ErrMetadataNotSupported), false},
+		{"other error", errors.New("access denied"), true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			core, logs := observer.New(zapcore.WarnLevel)
+			mock := dstore.NewMockStore(nil)
+			mock.SetMetadataFunc = func(context.Context, string, map[string]string) error {
+				return test.err
+			}
+
+			setMetadata(context.Background(), mock, "0000-0100.kv", "store_x", map[string]string{"datasize": "42"}, zap.New(core))
+
+			if test.expectedLog {
+				require.Equal(t, 1, logs.Len())
+			} else {
+				require.Zero(t, logs.Len())
+			}
 		})
 	}
 }

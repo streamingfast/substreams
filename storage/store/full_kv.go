@@ -19,6 +19,9 @@ import (
 
 var _ Store = (*FullKV)(nil)
 
+// NotLoadedFilename is what Filename returns for a full KV that was not loaded from a file.
+const NotLoadedFilename = "N/A"
+
 type FullKV struct {
 	*baseStore
 
@@ -293,7 +296,7 @@ func SetMetadataDetached(metaStore dstore.Store, filename, storeName string, met
 // metadata write as a copy of the whole object onto itself.
 func SetDataSizeDetached(metaStore dstore.Store, filename, storeName string, metadata map[string]string, size uint64, logger *zap.Logger) {
 	dataSize := strconv.FormatUint(size, 10)
-	if filename == "" || metadata["datasize"] == dataSize {
+	if filename == NotLoadedFilename || metadata["datasize"] == dataSize {
 		return // no file: a store starting at its initial block is not loaded from one
 	}
 

@@ -74,7 +74,7 @@ func TestSetDataSizeDetached(t *testing.T) {
 		metadata      map[string]string
 		expectedWrite map[string]string
 	}{
-		{"no file", "", nil, nil},
+		{"no file", NotLoadedFilename, nil, nil},
 		{"no metadata", "0000-0100.kv", nil, map[string]string{"datasize": "42"}},
 		{"metadata without the size", "0000-0100.kv", map[string]string{"other": "value"}, map[string]string{"other": "value", "datasize": "42"}},
 		{"metadata with an empty size", "0000-0100.kv", map[string]string{"datasize": ""}, map[string]string{"datasize": "42"}},

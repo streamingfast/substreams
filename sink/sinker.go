@@ -979,7 +979,6 @@ func (s *Sinker) processBlockScopedData(
 	HeadBlockTimeDrift.SetBlockTime(data.Clock.Timestamp.AsTime())
 	DataMessageCount.Inc()
 	ServerEgressBytes.AddInt(proto.Size(data))
-	BackprocessingCompletion.SetUint64(1)
 
 	cursor, err := NewCursor(data.Cursor)
 	if err != nil {

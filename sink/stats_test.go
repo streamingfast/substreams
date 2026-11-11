@@ -131,6 +131,13 @@ func TestStatsLogNow_BackprocessingProgressUntilFinished(t *testing.T) {
 		s.LogNow()
 		entries := logs.FilterMessage("substreams stream stats").All()
 		_, found := entries[len(entries)-1].ContextMap()["backprocessing_progress"]
+
+		completion := BackprocessingCompletion.Get()
+		if found {
+			assert.Equal(t, 0.0, completion, "the gauge says completed while the logs still show progress")
+		} else {
+			assert.Equal(t, 1.0, completion, "the gauge says not completed while the logs show no progress")
+		}
 		return found
 	}
 

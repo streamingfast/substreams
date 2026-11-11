@@ -36,7 +36,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Sinks and `substreams run` no longer report backprocessing as finished while jobs are still running or tier1 is
   still squashing stores. Backprocessing now counts as finished when the first block at or past the linear handoff
-  arrives, or when the stream reaches its stop block.
+  arrives, or when the stream reaches its stop block. The `substreams_sink_backprocessing_completion` gauge follows
+  the same rule; it used to be set on the first data block, which in production mode arrives while jobs are still
+  running.
 - SQL sink (DatabaseChanges): `--batch-row-flush-interval=0` now turns the row interval off, as its help says, leaving
   `--batch-block-flush-interval` to decide. It used to flush after every block that had any row. Both set to 0 is
   refused at startup, as the sink would not flush while catching up. `--live-block-flush-interval=0` is now refused

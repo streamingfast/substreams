@@ -56,8 +56,8 @@ func (s *Stats) RecordBlock(block bstream.BlockRef) {
 	s.progressLock.Lock()
 	defer s.progressLock.Unlock()
 
-	if backprocessing.Finished(s.session, block.Num()) {
-		s.backprocessingDone = true
+	if !s.backprocessingDone && backprocessing.Finished(s.session, block.Num()) {
+		s.setBackprocessingDone(true)
 	}
 }
 
@@ -67,7 +67,18 @@ func (s *Stats) RecordStreamEnd() {
 	s.progressLock.Lock()
 	defer s.progressLock.Unlock()
 
-	s.backprocessingDone = true
+	s.setBackprocessingDone(true)
+}
+
+// setBackprocessingDone keeps the BackprocessingCompletion gauge in step with the logs. The
+// caller must hold progressLock.
+func (s *Stats) setBackprocessingDone(done bool) {
+	s.backprocessingDone = done
+	if done {
+		BackprocessingCompletion.SetUint64(1)
+	} else {
+		BackprocessingCompletion.SetUint64(0)
+	}
 }
 
 // RecordSession starts tracking backprocessing progress for a new session, discarding what the
@@ -79,7 +90,7 @@ func (s *Stats) RecordSession(session *pbsubstreamsrpc.SessionInit) {
 	s.session = session
 	s.progress = nil
 	s.progressRate.Reset()
-	s.backprocessingDone = false
+	s.setBackprocessingDone(false)
 }
 
 func (s *Stats) RecordProgress(progress *pbsubstreamsrpc.ModulesProgress) {

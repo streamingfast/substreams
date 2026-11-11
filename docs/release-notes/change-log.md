@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.27.0
 
 ### Docker
 
@@ -23,6 +23,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   running job progress, which made backprocessing progress jump ahead.
 - Full KV store files are now saved with their size (`datasize`) in their metadata, so tier1 and tier2 no longer write the metadata back after loading them. They did on every load, which on S3 dstore implements as a copy of the whole file onto itself (adding a version on versioned buckets) and elsewhere as a metadata update. Files saved by earlier versions get their size written once, on their first load. As a result loading a snapshot no longer refreshes its modification time, so `prune-states --minimum-age` counts from when the snapshot was written, as its help describes; use `--truncate-below-block` to keep the snapshots near the head.
 - Log `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` on the `incoming Substreams Blocks request` and `incoming Substreams Estimate request` log lines when the auth plugin provides them (`x-auth-method`, `x-auth-jwt-lifetime-bucket`, `x-auth-jwt-iat`, `x-auth-jwt-exp`). Nothing changes without the plugin.
+- Bump `dstore`: an S3 upload now fails when its reader fails partway instead of storing a truncated object, S3 copies run server-side, and zstd stores accept `compression_config` (level, window, decoder `lowmem` and pool) in the store URL.
+- Bump `bstream`: `Forkable` clamps `LibNum` to the block number to stop permanent stalls, a start block below the hub falls back to merged blocks, and a live stream whose start block is missing starts at the next block.
+- Bump `dsession` to fix two worker counter leaks.
+- Bump `firehose-ethereum/types` for the account abstraction and Optimism post-execution transaction types.
 - Bigdecimal store writes now fail when the value's exponent is above 10,000 or below -10,000 (for example `1e-2000000000`), since such (unrealistic) values could stall the server or exhaust its memory. No on-chain value comes close: the largest `uint256` has an exponent of 77, and `add`, `set_min` and `set_max` already stored anything below 1e-34 as 0, because they truncate values to 34 decimal places.
 
 ### CLI

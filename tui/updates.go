@@ -49,6 +49,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.TraceID = msg.TraceId
 		m.session = msg
 
+	case backprocessingCompleteMsg:
+		m.completedIn = &msg.elapsed
+
 	case *pbsubstreamsrpc.ModulesProgress:
 		m.progress = msg
 

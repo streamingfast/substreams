@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/streamingfast/substreams/internal/backprocessing"
@@ -155,6 +156,15 @@ func moduleExtraMetrics(stats *pbsubstreamsrpc.ModuleStats) string {
 	return strings.Join(parts, " ")
 }
 
+// backprocessingCompleteMsg collapses the backprocessing block to its completion line.
+type backprocessingCompleteMsg struct {
+	elapsed time.Duration
+}
+
+func completeLine(total uint64, elapsed time.Duration) string {
+	return fmt.Sprintf("Backprocessing  complete  ·  %s blocks in %s", formatx.Count(total), formatx.Duration(elapsed))
+}
+
 // progressLines renders the whole backprocessing block.
 func (m model) progressLines() []string {
 	if m.session == nil {
@@ -174,6 +184,10 @@ func (m model) progressLines() []string {
 	}
 
 	// Completion is never decided here: see TUI.closeProgress.
+	if m.completedIn != nil {
+		return []string{completeLine(total, *m.completedIn)}
+	}
+
 	done := min(backprocessing.Done(m.progress), total)
 	lines := []string{m.headerLine(done, total)}
 	lines = append(lines, m.stageLines()...)

@@ -26,6 +26,8 @@ type model struct {
 
 	session  *pbsubstreamsrpc.SessionInit
 	progress *pbsubstreamsrpc.ModulesProgress
+	// completedIn is set by backprocessingCompleteMsg, see TUI.closeProgress.
+	completedIn *time.Duration
 
 	globalRate  *backprocessing.RateWindow
 	moduleRates *moduleWindow

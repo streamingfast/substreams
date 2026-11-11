@@ -175,6 +175,14 @@ func TestGolden_ProcessedBlocksPastTotal(t *testing.T) {
 	assertGolden(t, "processed_blocks_past_total", m.View())
 }
 
+func TestGolden_Complete(t *testing.T) {
+	m := update(t, newTestModel(newTestClock()), nominalSession())
+	m = update(t, m, &pbsubstreamsrpc.ModulesProgress{ProcessedBlocks: 1_500_000, RunningJobs: []*pbsubstreamsrpc.Job{{Stage: 0}}})
+	m = update(t, m, backprocessingCompleteMsg{elapsed: 4*time.Minute + 12*time.Second})
+
+	assertGolden(t, "complete", m.View())
+}
+
 // A single stage has nothing to compare itself against, so the output frontier folds into its
 // row rather than restating the same bar underneath it.
 func TestGolden_SingleStage(t *testing.T) {

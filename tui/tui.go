@@ -398,14 +398,24 @@ func (ui *TUI) AbortProgress() {
 // In production mode, tier2 jobs stream data while backprocessing is still running, so the
 // first block can arrive long before the end: the block then closes without a verdict.
 func (ui *TUI) closeProgress(blockNum uint64) {
-	if ui.prog == nil {
+	total := backprocessing.Total(ui.session)
+	if total == 0 || !backprocessing.Finished(ui.session, blockNum) {
+		ui.ensureTerminalUnlocked()
 		return
 	}
-	ui.ensureTerminalUnlocked()
 
-	if total := backprocessing.Total(ui.session); total != 0 && backprocessing.Finished(ui.session, blockNum) {
-		fmt.Fprintf(os.Stderr, "Backprocessing  complete  ·  %s blocks in %s\n", formatx.Count(total), formatx.Duration(time.Since(ui.sessionAt)))
+	elapsed := time.Since(ui.sessionAt)
+	if ui.prog == nil {
+		fmt.Fprintln(os.Stderr, completeLine(total, elapsed))
+		return
 	}
+
+	// Quitting, unlike killing, renders the model one last time, so the completion line
+	// replaces the progress block in the scrollback instead of landing under it.
+	ui.prog.Send(backprocessingCompleteMsg{elapsed: elapsed})
+	ui.prog.Quit()
+	ui.prog.Wait()
+	ui.prog = nil
 }
 
 func (ui *TUI) CleanUpTerminal() {

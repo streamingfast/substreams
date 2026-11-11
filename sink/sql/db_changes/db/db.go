@@ -434,6 +434,9 @@ func (l *Loader) LiveBlockFlushInterval() int {
 }
 
 func (l *Loader) FlushNeeded() bool {
+	if l.batchRowFlushInterval <= 0 {
+		return false // the row interval is off, only the block interval flushes
+	}
 	totalRows := 0
 	// todo keep a running count when inserting/deleting rows directly
 	for pair := l.entries.Oldest(); pair != nil; pair = pair.Next() {

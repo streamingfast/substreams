@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var logger *zap.Logger
@@ -667,8 +668,10 @@ func blockScopedData(module string, changes []*pbdatabase.TableChange, blockNum 
 	}
 }
 
+// clock gives block num a time num seconds after the epoch, so blocks come further apart than a
+// test flush takes and a live flush isn't skipped.
 func clock(id string, num uint64) *pbsubstreams.Clock {
-	return &pbsubstreams.Clock{Id: id, Number: num}
+	return &pbsubstreams.Clock{Id: id, Number: num, Timestamp: timestamppb.New(time.Unix(int64(num), 0))}
 }
 
 func simpleCursor(num, finalNum uint64) string {

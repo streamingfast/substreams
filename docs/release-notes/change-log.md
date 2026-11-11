@@ -20,9 +20,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Server
 
 - Log `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` on the `incoming Substreams Blocks request` and `incoming Substreams Estimate request` log lines when the auth plugin provides them (`x-auth-method`, `x-auth-jwt-lifetime-bucket`, `x-auth-jwt-iat`, `x-auth-jwt-exp`). Nothing changes without the plugin.
+- Bigdecimal store writes now fail when the value's exponent is above 10,000 or below -10,000 (for example `1e-2000000000`), since such (unrealistic) values could stall the server or exhaust its memory. No on-chain value comes close: the largest `uint256` has an exponent of 77, and `add`, `set_min` and `set_max` already stored anything below 1e-34 as 0, because they truncate values to 34 decimal places.
 
 ### CLI
 
+- `substreams run` and `substreams gui` now offer to authenticate when they would reach a StreamingFast endpoint with no credentials: answering yes runs the `substreams auth` flow, writes `.substreams.env` and continues the run with the selected key. They only ask in an interactive terminal, never when input or output is redirected, for `--plaintext` or for other endpoints, and an authentication failure in `substreams run` now ends with how to authenticate.
 - `substreams auth` now writes the selected API key to `.substreams.env` as `SUBSTREAMS_API_KEY` instead of exchanging it for a JWT, which expired and was never refreshed. `substreams auth --paste` now only accepts an API key (a JWT is rejected; export `SUBSTREAMS_API_TOKEN` yourself for advanced use).
 - Add an [Authentication Reference](../references/authentication.md) (API key vs short-lived JWT) and a guide to [migrate from `SUBSTREAMS_API_TOKEN` to `SUBSTREAMS_API_KEY`](../references/migrating-to-api-key.md).
 - `substreams registry publish` no longer logs the registry API key at debug level.
@@ -31,6 +33,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Sink
 
 - Sinks and `substreams run` no longer report backprocessing as finished while jobs are still running.
+- SQL sink (DatabaseChanges): `--batch-row-flush-interval=0` now turns the row interval off, as its help says, leaving
+  `--batch-block-flush-interval` to decide. It used to flush after every block that had any row. Both set to 0 is
+  refused at startup, as the sink would not flush while catching up. `--live-block-flush-interval=0` is now refused
+  too, as it can leave the sink without any flush near the chain head.
 - SQL sink (PostgreSQL): DSN values with characters like `/` or a space now reach the database as given. They were URL
   encoded into a connection string that doesn't decode them, so `sslrootcert=/etc/ssl/ca.pem` or
   `timezone=Europe/London` were wrong, and a password with a space made the DSN fail to parse.

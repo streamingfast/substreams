@@ -83,11 +83,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ steps.extract-version.outputs.VERSION }}
-          # Canonical's DNS for ubuntu.com is unreachable from the runners; remove once it resolves again.
-          add-hosts: |
-            archive.ubuntu.com:185.125.190.83
-            security.ubuntu.com:185.125.190.82
-            ports.ubuntu.com:91.189.91.104
 
       - name: Compute short SHA
         id: sha

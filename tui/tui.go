@@ -52,7 +52,7 @@ type TUI struct {
 	session   *pbsubstreamsrpc.SessionInit
 	sessionAt time.Time
 
-	interrupt  func()
+	interrupt   func()
 	interrupted bool
 
 	testRunner *test.Runner

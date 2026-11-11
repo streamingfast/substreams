@@ -118,3 +118,23 @@ func TestStatsLogNow_BackprocessingProgress(t *testing.T) {
 	assert.NotContains(t, entries[1].ContextMap(), "backprocessing_progress")
 	assert.Equal(t, true, entries[1].ContextMap()["is_live"])
 }
+
+func TestStatsLogNow_BackprocessingProgressWhileJobsRun(t *testing.T) {
+	core, logs := observer.New(zapcore.InfoLevel)
+	s := newStats(zap.New(core))
+	defer s.Close()
+
+	s.RecordSession(&pbsubstreamsrpc.SessionInit{EffectiveBlocksToProcessAfterStartBlock: 1_000})
+	s.RecordProgress(&pbsubstreamsrpc.ModulesProgress{
+		ProcessedBlocks: 1_500,
+		RunningJobs:     []*pbsubstreamsrpc.Job{{Stage: 0}},
+	})
+	s.LogNow()
+	s.RecordProgress(&pbsubstreamsrpc.ModulesProgress{ProcessedBlocks: 1_500})
+	s.LogNow()
+
+	entries := logs.FilterMessage("substreams stream stats").All()
+	require.Len(t, entries, 2)
+	assert.Contains(t, entries[0].ContextMap(), "backprocessing_progress")
+	assert.NotContains(t, entries[1].ContextMap(), "backprocessing_progress")
+}

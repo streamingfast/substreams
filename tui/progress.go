@@ -175,8 +175,8 @@ func (m model) progressLines() []string {
 		return []string{fmt.Sprintf("Backprocessing  starting…  %s blocks to process", formatx.Count(total))}
 	}
 
-	done := backprocessing.Done(m.progress)
-	if done >= total {
+	done := min(backprocessing.Done(m.progress), total)
+	if done >= total && len(m.progress.GetRunningJobs()) == 0 {
 		return []string{fmt.Sprintf("Backprocessing  complete  ·  %s blocks in %s", formatx.Count(total), formatx.Duration(m.elapsed()))}
 	}
 
@@ -203,7 +203,7 @@ func (m model) headerLine(done, total uint64) string {
 	if ok {
 		segments = append(segments, formatx.Rate(rate, "blk"))
 
-		if eta, ok := backprocessing.ETA(total-done, rate, span); ok {
+		if eta, ok := backprocessing.ETA(total-done, rate, span); ok && done < total {
 			segments = append(segments, "eta "+formatx.Duration(eta))
 		}
 	}

@@ -736,10 +736,10 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 			select {
 			case <-time.After(progressMessageInterval(time.Since(p.startTime), reqDetails.UpdateInterval)):
 				stagesProgress := stats.Stages()
-				jobs := stats.JobsStats()
+				jobs, blocksProcessed := stats.JobsAndBlocksProcessed()
 				modStats := stats.AggregatedModulesStats()
 				remoteBytesRead, remoteBytesWritten := stats.RemoteBytesConsumption()
-				stream.SendModulesStats(modStats, stagesProgress, jobs, metering.GetTotalBytesRead(meter)+remoteBytesRead, metering.GetTotalBytesWritten(meter)+remoteBytesWritten, stats.GetBlocksProcessed())
+				stream.SendModulesStats(modStats, stagesProgress, jobs, metering.GetTotalBytesRead(meter)+remoteBytesRead, metering.GetTotalBytesWritten(meter)+remoteBytesWritten, blocksProcessed)
 			case <-progressCtx.Done():
 				return
 			}
@@ -875,12 +875,12 @@ func (p *Pipeline) returnRPCModuleProgressOutputs(forceOutput bool) error {
 	stats := reqctx.ReqStats(p.ctx)
 	stream := response.New(p.respFunc)
 	stagesProgress := stats.Stages()
-	jobs := stats.JobsStats()
+	jobs, blocksProcessed := stats.JobsAndBlocksProcessed()
 	modStats := stats.AggregatedModulesStats()
 
 	meter := dmetering.GetBytesMeter(p.ctx)
 	remoteBytesRead, remoteBytesWritten := stats.RemoteBytesConsumption()
-	return stream.SendModulesStats(modStats, stagesProgress, jobs, metering.GetTotalBytesRead(meter)+remoteBytesRead, metering.GetTotalBytesWritten(meter)+remoteBytesWritten, stats.GetBlocksProcessed())
+	return stream.SendModulesStats(modStats, stagesProgress, jobs, metering.GetTotalBytesRead(meter)+remoteBytesRead, metering.GetTotalBytesWritten(meter)+remoteBytesWritten, blocksProcessed)
 
 }
 

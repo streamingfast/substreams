@@ -29,9 +29,9 @@ func Done(progress *pbsubstreamsrpc.ModulesProgress) uint64 {
 // Finished reports whether receiving a block at blockNum proves that backprocessing is over.
 //
 // Only tier1 produces blocks at or past the linear handoff, and it starts once every
-// backprocessing job has ended and every store has been squashed. The progress messages
-// cannot tell this: the server stops sending them when backprocessing ends, so the last one
-// always describes work still in flight, and Done can reach Total before the work is over.
+// backprocessing job has ended and every store has been squashed. No progress message field
+// says this: Done reaching Total with no job running also happens while tier1 squashes stores
+// and between two jobs, and Done keeps growing past Total during linear processing.
 func Finished(session *pbsubstreamsrpc.SessionInit, blockNum uint64) bool {
 	return session != nil && blockNum >= session.LinearHandoffBlock
 }

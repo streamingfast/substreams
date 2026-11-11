@@ -174,3 +174,14 @@ func TestStatsLogNow_BackprocessingProgressUntilFinished(t *testing.T) {
 	s.RecordStreamEnd()
 	assert.False(t, hasProgress(), "the stream reached its stop block")
 }
+
+func TestStats_BackprocessingGaugeWithNothingToBackprocess(t *testing.T) {
+	s := newStats(zap.NewNop())
+	defer s.Close()
+
+	s.RecordSession(&pbsubstreamsrpc.SessionInit{LinearHandoffBlock: 2_000_000, EffectiveBlocksToProcessAfterStartBlock: 1_000})
+	assert.Equal(t, 0.0, BackprocessingCompletion.Get())
+
+	s.RecordSession(&pbsubstreamsrpc.SessionInit{LinearHandoffBlock: 2_000_000, BlocksToProcessAfterStartBlock: 1_000})
+	assert.Equal(t, 1.0, BackprocessingCompletion.Get(), "everything was cached")
+}

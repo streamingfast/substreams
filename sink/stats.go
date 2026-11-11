@@ -90,7 +90,7 @@ func (s *Stats) RecordSession(session *pbsubstreamsrpc.SessionInit) {
 	s.session = session
 	s.progress = nil
 	s.progressRate.Reset()
-	s.setBackprocessingDone(false)
+	s.setBackprocessingDone(backprocessing.Total(session) == 0)
 }
 
 func (s *Stats) RecordProgress(progress *pbsubstreamsrpc.ModulesProgress) {

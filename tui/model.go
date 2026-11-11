@@ -24,9 +24,8 @@ type model struct {
 	// Width is 0 until the first tea.WindowSizeMsg is received.
 	Width int
 
-	session   *pbsubstreamsrpc.SessionInit
-	sessionAt time.Time
-	progress  *pbsubstreamsrpc.ModulesProgress
+	session  *pbsubstreamsrpc.SessionInit
+	progress *pbsubstreamsrpc.ModulesProgress
 
 	globalRate  *backprocessing.RateWindow
 	moduleRates *moduleWindow

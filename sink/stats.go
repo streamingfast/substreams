@@ -32,6 +32,8 @@ type Stats struct {
 	session      *pbsubstreamsrpc.SessionInit
 	progress     *pbsubstreamsrpc.ModulesProgress
 	progressRate *backprocessing.RateWindow
+	// Once set, only a new session clears it.
+	backprocessingDone bool
 }
 
 func newStats(logger *zap.Logger) *Stats {
@@ -50,6 +52,22 @@ func newStats(logger *zap.Logger) *Stats {
 
 func (s *Stats) RecordBlock(block bstream.BlockRef) {
 	s.lastBlock = block
+
+	s.progressLock.Lock()
+	defer s.progressLock.Unlock()
+
+	if backprocessing.Finished(s.session, block.Num()) {
+		s.backprocessingDone = true
+	}
+}
+
+// RecordStreamEnd marks backprocessing as over when the stream reached its stop block, which
+// happens before the linear handoff on a range that is entirely backprocessed.
+func (s *Stats) RecordStreamEnd() {
+	s.progressLock.Lock()
+	defer s.progressLock.Unlock()
+
+	s.backprocessingDone = true
 }
 
 // RecordSession starts tracking backprocessing progress for a new session, discarding what the
@@ -61,6 +79,7 @@ func (s *Stats) RecordSession(session *pbsubstreamsrpc.SessionInit) {
 	s.session = session
 	s.progress = nil
 	s.progressRate.Reset()
+	s.backprocessingDone = false
 }
 
 func (s *Stats) RecordProgress(progress *pbsubstreamsrpc.ModulesProgress) {
@@ -168,9 +187,7 @@ func (s *Stats) backprocessingProgress() (backprocessingProgress, bool) {
 
 	// Nothing left to backprocess: the object would only restate the same totals until the
 	// stream ends, which is forever for sinks that never become live.
-	// Done also counts tier1's own linear executions, so it can reach the total while jobs still run.
-	if total := backprocessing.Total(s.session); total == 0 ||
-		(backprocessing.Done(s.progress) >= total && len(s.progress.GetRunningJobs()) == 0) {
+	if backprocessing.Total(s.session) == 0 || s.backprocessingDone {
 		return backprocessingProgress{}, false
 	}
 

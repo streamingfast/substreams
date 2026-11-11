@@ -164,13 +164,15 @@ func TestGolden_Starting(t *testing.T) {
 	assertGolden(t, "starting", m.View())
 }
 
-func TestGolden_Complete(t *testing.T) {
+// Processed blocks reaching the total does not mean backprocessing is over, so the block keeps
+// showing progress, capped at 100%, until the first block of data closes it.
+func TestGolden_ProcessedBlocksPastTotal(t *testing.T) {
 	clock := newTestClock()
 	m := update(t, newTestModel(clock), nominalSession())
 	clock.advance(4*time.Minute + 12*time.Second)
-	m = update(t, m, &pbsubstreamsrpc.ModulesProgress{ProcessedBlocks: 2_000_000})
+	m = update(t, m, &pbsubstreamsrpc.ModulesProgress{ProcessedBlocks: 2_500_000})
 
-	assertGolden(t, "complete", m.View())
+	assertGolden(t, "processed_blocks_past_total", m.View())
 }
 
 // A single stage has nothing to compare itself against, so the output frontier folds into its

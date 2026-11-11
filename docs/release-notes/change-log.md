@@ -30,7 +30,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
-- Sinks and `substreams run` no longer report backprocessing as finished while jobs are still running.
+- Sinks and `substreams run` no longer report backprocessing as finished while jobs are still running or tier1 is
+  still squashing stores. Backprocessing now counts as finished when the first block at or past the linear handoff
+  arrives, or when the stream reaches its stop block.
 - SQL sink (PostgreSQL): DSN values with characters like `/` or a space now reach the database as given. They were URL
   encoded into a connection string that doesn't decode them, so `sslrootcert=/etc/ssl/ca.pem` or
   `timezone=Europe/London` were wrong, and a password with a space made the DSN fail to parse.

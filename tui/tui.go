@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/substreams/internal/backprocessing"
 	"github.com/streamingfast/substreams/internal/formatx"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/protodecode"
@@ -48,9 +49,10 @@ type TUI struct {
 	// the session preamble.
 	endpoint string
 
-	session *pbsubstreamsrpc.SessionInit
+	session   *pbsubstreamsrpc.SessionInit
+	sessionAt time.Time
 
-	interrupt   func()
+	interrupt  func()
 	interrupted bool
 
 	testRunner *test.Runner
@@ -217,6 +219,9 @@ func (ui *TUI) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 	if data == nil {
 		return nil
 	}
+	if ui.outputMode == OutputModeTUI && !ui.seenFirstData {
+		ui.closeProgress(data.Clock.Number)
+	}
 	switch ui.outputMode {
 	case OutputModeTUI:
 		printClock(data)
@@ -269,6 +274,7 @@ func (ui *TUI) HandleSession(ctx context.Context, req *pbsubstreamsrpcv3.Request
 	}
 	ui.ResolvedStartBlock = session.ResolvedStartBlock
 	ui.session = session
+	ui.sessionAt = time.Now()
 
 	execGraph, err := exec.NewOutputModuleGraph(req.OutputModule, req.ProductionMode, req.Package.GetModules(), bstream.GetProtocolFirstStreamableBlock, false)
 	if err != nil {
@@ -384,6 +390,22 @@ func (ui *TUI) AbortProgress() {
 
 	ui.ensureTerminalUnlocked()
 	fmt.Fprintln(os.Stderr, "Backprocessing  aborted")
+}
+
+// closeProgress tears down the backprocessing block when the first block of data arrives, and
+// reports backprocessing as complete when that block proves it is.
+//
+// In production mode, tier2 jobs stream data while backprocessing is still running, so the
+// first block can arrive long before the end: the block then closes without a verdict.
+func (ui *TUI) closeProgress(blockNum uint64) {
+	if ui.prog == nil {
+		return
+	}
+	ui.ensureTerminalUnlocked()
+
+	if total := backprocessing.Total(ui.session); total != 0 && backprocessing.Finished(ui.session, blockNum) {
+		fmt.Fprintf(os.Stderr, "Backprocessing  complete  ·  %s blocks in %s\n", formatx.Count(total), formatx.Duration(time.Since(ui.sessionAt)))
+	}
 }
 
 func (ui *TUI) CleanUpTerminal() {

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/streamingfast/bstream"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -119,22 +120,50 @@ func TestStatsLogNow_BackprocessingProgress(t *testing.T) {
 	assert.Equal(t, true, entries[1].ContextMap()["is_live"])
 }
 
-func TestStatsLogNow_BackprocessingProgressWhileJobsRun(t *testing.T) {
+// Done reaching the total, with or without running jobs, does not end backprocessing: only a
+// block at or past the linear handoff, or the end of the stream, does.
+func TestStatsLogNow_BackprocessingProgressUntilFinished(t *testing.T) {
 	core, logs := observer.New(zapcore.InfoLevel)
 	s := newStats(zap.New(core))
 	defer s.Close()
 
-	s.RecordSession(&pbsubstreamsrpc.SessionInit{EffectiveBlocksToProcessAfterStartBlock: 1_000})
+	hasProgress := func() bool {
+		s.LogNow()
+		entries := logs.FilterMessage("substreams stream stats").All()
+		_, found := entries[len(entries)-1].ContextMap()["backprocessing_progress"]
+		return found
+	}
+
+	session := &pbsubstreamsrpc.SessionInit{
+		LinearHandoffBlock:                      2_000_000,
+		EffectiveBlocksToProcessAfterStartBlock: 1_000,
+	}
+	s.RecordSession(session)
+
 	s.RecordProgress(&pbsubstreamsrpc.ModulesProgress{
 		ProcessedBlocks: 1_500,
 		RunningJobs:     []*pbsubstreamsrpc.Job{{Stage: 0}},
 	})
-	s.LogNow()
-	s.RecordProgress(&pbsubstreamsrpc.ModulesProgress{ProcessedBlocks: 1_500})
-	s.LogNow()
+	assert.True(t, hasProgress(), "jobs still running")
 
-	entries := logs.FilterMessage("substreams stream stats").All()
-	require.Len(t, entries, 2)
-	assert.Contains(t, entries[0].ContextMap(), "backprocessing_progress")
-	assert.NotContains(t, entries[1].ContextMap(), "backprocessing_progress")
+	s.RecordProgress(&pbsubstreamsrpc.ModulesProgress{
+		ProcessedBlocks: 1_500,
+		Stages:          []*pbsubstreamsrpc.Stage{{Modules: []string{"store_a"}, SquashWaitSegmentCount: 3}},
+	})
+	assert.True(t, hasProgress(), "no job running, but tier1 is squashing")
+
+	s.RecordBlock(bstream.NewBlockRef("a", 1_999_999))
+	assert.True(t, hasProgress(), "a block produced by tier2")
+
+	s.RecordBlock(bstream.NewBlockRef("b", 2_000_000))
+	assert.False(t, hasProgress(), "a block at the linear handoff")
+
+	s.RecordProgress(&pbsubstreamsrpc.ModulesProgress{ProcessedBlocks: 500, RunningJobs: []*pbsubstreamsrpc.Job{{Stage: 0}}})
+	assert.False(t, hasProgress(), "progress after the handoff does not bring it back")
+
+	s.RecordSession(session)
+	assert.True(t, hasProgress(), "a new session starts over")
+
+	s.RecordStreamEnd()
+	assert.False(t, hasProgress(), "the stream reached its stop block")
 }

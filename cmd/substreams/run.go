@@ -66,9 +66,15 @@ func runRun(cmd *cobra.Command, args []string) error {
 	sink.LoadSubstreamsAuthEnvFile(manifestPath)
 
 	// parses flags
-	sinkerConfig, err := sink.ConfigFromViper(cmd, sink.IgnoreOutputModuleType, manifestPath, outputModule, "substreams_run", zlog, tracer)
+	sinkerConfig, err := sinkerConfigWithAuthPrompt(cmd, func() (*sink.SinkerConfig, error) {
+		config, err := sink.ConfigFromViper(cmd, sink.IgnoreOutputModuleType, manifestPath, outputModule, "substreams_run", zlog, tracer)
+		if err != nil {
+			return nil, fmt.Errorf("creating sink config: %w", err)
+		}
+		return config, nil
+	})
 	if err != nil {
-		return fmt.Errorf("creating sink config: %w", err)
+		return err
 	}
 
 	// override from our own production-mode flag

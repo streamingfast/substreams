@@ -2,6 +2,7 @@ package sink
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/bobg/go-generics/v2/slices"
@@ -379,7 +380,7 @@ func ConfigFromViper(
 		zap.Bool("skip_package_validation", skipPackageValidation),
 		zap.Duration("live_block_time_delta", liveBlockTimeDelta),
 		zap.Int("undo_buffer_size", undoBufferSize),
-		zap.Strings("extra_headers", extraHeaders),
+		zap.Strings("extra_header_names", headerNames(extraHeaders)),
 	)
 
 	if finalBlocksOnly {
@@ -575,4 +576,15 @@ func some[E any](s []E, test func(e E) bool) bool {
 	}
 
 	return false
+}
+
+// headerNames returns the names of "Name: value" headers, leaving out the values
+// as they can carry credentials.
+func headerNames(headers []string) []string {
+	names := make([]string, len(headers))
+	for i, header := range headers {
+		name, _, _ := strings.Cut(header, ":")
+		names[i] = strings.TrimSpace(name)
+	}
+	return names
 }

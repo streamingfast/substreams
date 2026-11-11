@@ -28,6 +28,7 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Ethereum | [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto)       | [ethereum-v0.10.4.spkg](https://github.com/streamingfast/sf-ethereum/releases/download/v0.10.2/ethereum-v0.10.4.spkg) |
 | Monad    | [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto)       |                                                                                                                       |
+| Elysium | [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto)       |                                                                                                                       |
 | Solana   | [`sf.solana.type.v1.Block`](https://github.com/streamingfast/firehose-solana/blob/develop/proto/sf/solana/type/v1/type.proto)             | [solana-v0.1.0.spkg](https://github.com/streamingfast/sf-solana/releases/download/v0.1.0/solana-v0.1.0.spkg)          |
 | Cosmos   | [`sf.cosmos.type.v2.Block`](https://github.com/streamingfast/firehose-cosmos/blob/develop/cosmos/proto/sf/cosmos/type/v2/block.proto#L10) |                                                                                                                       |
 | Antelope | [`sf.antelope.type.v1.Block`](https://buf.build/pinax/firehose-antelope/docs/main:sf.antelope.type.v1#sf.antelope.type.v1.Block)          |                                                                                                                       |
@@ -75,6 +76,7 @@ The data missing in the Base Block makes the corresponding Protobuf field empty.
 - **Stellar Testnet**: `testnet.stellar.streamingfast.io:443`
 - **Unichain Mainnet**: `mainnet.unichain.streamingfast.io:443`
 - **World Chain Mainnet**: `mainnet.worldchain.streamingfast.io:443`
+- **Elysium Mainnet**: `mainnet.elysium.streamingfast.io:443`
 
 ## Community Endpoints
 

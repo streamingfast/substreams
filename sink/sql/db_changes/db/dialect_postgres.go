@@ -92,7 +92,7 @@ func (d PostgresDialect) Revert(tx Tx, ctx context.Context, l *Loader, lastValid
 
 func (d PostgresDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputModuleHash string, lastFinalBlock uint64) (int, error) {
 	var totalRows int
-	for entriesPair := l.entries.Oldest(); entriesPair != nil; entriesPair = entriesPair.Next() {
+	for entriesPair := l.pendingForFlush().Oldest(); entriesPair != nil; entriesPair = entriesPair.Next() {
 		entries := entriesPair.Value
 		totalRows += entries.Len()
 
@@ -102,7 +102,7 @@ func (d PostgresDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputModu
 	}
 
 	allOperations := make([]*Operation, 0, totalRows)
-	for entriesPair := l.entries.Oldest(); entriesPair != nil; entriesPair = entriesPair.Next() {
+	for entriesPair := l.pendingForFlush().Oldest(); entriesPair != nil; entriesPair = entriesPair.Next() {
 		entries := entriesPair.Value
 		for entryPair := entries.Oldest(); entryPair != nil; entryPair = entryPair.Next() {
 			allOperations = append(allOperations, entryPair.Value)

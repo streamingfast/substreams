@@ -93,12 +93,10 @@ func createInsertFromDescriptorAcc(table *schema.Table, dialect sql2.Dialect) (s
 		if field.IsExtension { //not a direct child
 			continue
 		}
-		if field.IsRepeated {
-			// Check if it's a repeated message (which should be skipped) or repeated scalar (which should be processed)
-			if field.IsMessage {
-				continue
-			}
-			// Allow repeated scalar fields to be processed as arrays
+		// A repeated message is a child table, unless it is inline (Nested), which is a
+		// column. Must stay in sync with createInsertFromDescriptor in row_inserter.go.
+		if field.IsRepeated && field.IsMessage && field.Nested == nil {
+			continue
 		}
 		fieldNames = append(fieldNames, field.QuotedName())
 	}

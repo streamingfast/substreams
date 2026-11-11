@@ -120,8 +120,10 @@ func mustNewTableInfo(schema, name string, pkList []string, columnsByName map[st
 }
 
 type TestTx struct {
-	queries []string
-	next    []*sql.Rows
+	// ExecError, if set, gives the error of a query.
+	ExecError func(query string) error
+	queries   []string
+	next      []*sql.Rows
 
 	// NoRowsAffected, if set, makes the statements it matches report 0 affected rows.
 	NoRowsAffected func(query string) bool
@@ -138,6 +140,11 @@ func (t *TestTx) Commit() error {
 }
 
 func (t *TestTx) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	if t.ExecError != nil {
+		if err := t.ExecError(query); err != nil {
+			return nil, err
+		}
+	}
 	t.queries = append(t.queries, query)
 	if t.NoRowsAffected != nil && t.NoRowsAffected(query) {
 		return &testResult{rowsAffected: 0}, nil

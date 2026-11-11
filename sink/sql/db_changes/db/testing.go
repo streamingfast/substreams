@@ -33,7 +33,7 @@ func NewTestLoader(
 		testCursorTableName,
 		testHistoryTableName,
 		"",
-		0, 0, 0,
+		1, 0, 1, // a flush every block
 		OnModuleHashMismatchIgnore.String(),
 		nil,
 		zlog, tracer,

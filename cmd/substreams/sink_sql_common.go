@@ -248,7 +248,7 @@ func addDatabaseChangesModeRunFlags(flags *pflag.FlagSet) {
 	flags.Int("undo-buffer-size", 0, "If non-zero, handling of reorgs in the database is disabled. Instead, a buffer is introduced to only process blocks once they have been confirmed by that many blocks, introducing a latency but slightly reducing the load on the database when close to head. Set to 0 to enable reorg handling in the database (required for some databases like Postgres).")
 	flags.Int("batch-block-flush-interval", 1_000, "When in catch up mode, flush every N blocks or after batch-row-flush-interval, whichever comes first. Set to 0 to disable and only use batch-row-flush-interval. Ineffective if the sink is now in the live portion of the chain where only 'live-block-flush-interval' applies.")
 	flags.Int("batch-row-flush-interval", 100_000, "When in catch up mode, flush every N rows or after batch-block-flush-interval, whichever comes first. Set to 0 to disable and only use batch-block-flush-interval. Ineffective if the sink is now in the live portion of the chain where only 'live-block-flush-interval' applies.")
-	flags.Int("live-block-flush-interval", 1, "When processing in live mode, flush every N blocks.")
+	flags.Int("live-block-flush-interval", 1, "When processing in live mode, flush every N blocks. Must be at least 1.")
 	flags.Int("flush-retry-count", 3, "Number of retry attempts for flush operations")
 	flags.Duration("flush-retry-delay", 1*time.Second, "Base delay for incremental retry backoff on flush failures")
 	flags.String("cursors-table", "cursors", "Name of the table to use for storing cursors")
@@ -441,6 +441,12 @@ func newSinkRunE(driver string) func(*cobra.Command, []string) error {
 }
 
 func runDatabaseChangesSink(cmd *cobra.Command, driver, manifestPath, outputModule, dsnString string) error {
+	if sflags.MustGetInt(cmd, "batch-block-flush-interval") <= 0 && sflags.MustGetInt(cmd, "batch-row-flush-interval") <= 0 {
+		return fmt.Errorf("--batch-block-flush-interval and --batch-row-flush-interval can't both be 0: the sink wouldn't flush while catching up")
+	}
+	if sflags.MustGetInt(cmd, "live-block-flush-interval") <= 0 {
+		return fmt.Errorf("--live-block-flush-interval must be at least 1")
+	}
 	sinkDBPreStart(cmd)
 
 	app := cli.NewApplication(cmd.Context())

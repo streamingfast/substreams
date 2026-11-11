@@ -926,7 +926,15 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 
 	for _, modState := range storeModuleStates {
 		go func() {
+			// A store kept in memory has moved past the file it was loaded from, its size is not
+			// that file's.
+			fromFile := !modState.hasCachedStore(exclusiveEndBlock)
 			fullKV, err := modState.getStore(s.ctx, exclusiveEndBlock)
+			// Read before handing the store over: once sent, the receiver owns and changes it.
+			var size uint64
+			if err == nil {
+				size = fullKV.SizeBytes()
+			}
 			loaded := loadedStore{
 				name: modState.name,
 				kv:   fullKV,
@@ -938,19 +946,11 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 				return
 			}
 
-			if err == nil {
-				//  add loaded file size to metadata
-				met := storesMetadata[modState.name]
-				if met == nil {
-					met = make(map[string]string)
-				}
-				if met["datasize"] == "" {
-					met["datasize"] = fmt.Sprintf("%d", fullKV.SizeBytes())
-				}
+			if err == nil && fromFile {
 				// Detached metadata write: does not retain fullKV or ride the
 				// request ctx (see store.SetMetadataDetached). Tier1 twin of the
 				// tier2 fix in pipeline.setupSubrequestStores.
-				store.SetMetadataDetached(fullKV.Store(), fullKV.Filename(), modState.name, met, s.logger)
+				store.SetDataSizeDetached(fullKV.Store(), fullKV.Filename(), modState.name, storesMetadata[modState.name], size, s.logger)
 			}
 		}()
 	}

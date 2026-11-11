@@ -18,7 +18,7 @@ This guide explains how to authenticate when running a Substreams package (`.spk
 substreams auth
 ```
 
-You can also skip this step: `substreams run` and `substreams gui` ask whether to authenticate when they find no credentials for a StreamingFast endpoint, then run the same login and continue.
+You can also skip this step: in an interactive terminal, `substreams run` and `substreams gui` ask whether to authenticate when they find no credentials for a StreamingFast endpoint, then run the same login and continue.
 
 The command prints an approval URL (and tries to open it in your browser). Sign in, choose an organization if asked, then select an API key.
 

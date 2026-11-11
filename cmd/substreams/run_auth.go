@@ -46,10 +46,8 @@ type authPrompter struct {
 
 func defaultAuthPrompter() authPrompter {
 	return authPrompter{
-		// stdout may be piped (`run -o jsonl | jq`): the question goes to stderr
-		// and the answer comes from stdin, so those are what must be a terminal.
 		interactive: func() bool {
-			return isatty.IsTerminal(os.Stdin.Fd()) && isatty.IsTerminal(os.Stderr.Fd())
+			return isatty.IsTerminal(os.Stdin.Fd()) && isatty.IsTerminal(os.Stdout.Fd()) && isatty.IsTerminal(os.Stderr.Fd())
 		},
 		confirm:          confirmOnStderr,
 		authenticate:     authenticateInteractively,

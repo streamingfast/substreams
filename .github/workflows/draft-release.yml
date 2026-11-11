@@ -1,0 +1,55 @@
+name: Draft release
+
+on:
+  pull_request:
+    branches:
+      - "develop"
+    paths:
+      - "docs/release-notes/change-log.md"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: draft-release-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  draft-release:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Detect release PR
+        id: detect
+        uses: streamingfast/actions/sfreleaser/detect@v1
+
+      - name: Set up Go
+        if: steps.detect.outputs.is_release_pr
+        uses: actions/setup-go@v6
+        with:
+          # Go 1.27.4 rejects the libwasmtime.a bundled with wasmtime-go (disallowed LTO section ".llvmbc").
+          go-version: '1.27.3'
+
+      - name: Cache zig
+        if: steps.detect.outputs.is_release_pr
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/sfreleaser
+            ~/.cache/zig
+          key: ${{ runner.os }}-zig-${{ github.run_id }}
+          restore-keys: ${{ runner.os }}-zig-
+
+      - name: Prepare release
+        if: steps.detect.outputs.is_release_pr
+        uses: streamingfast/actions/sfreleaser/prepare@v1
+        with:
+          version: ${{ steps.detect.outputs.version }}
+          homebrew-tap-token: ${{ secrets.HOMEBREW_TAP_TOKEN }}

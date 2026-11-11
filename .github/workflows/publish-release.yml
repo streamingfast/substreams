@@ -1,0 +1,43 @@
+name: Publish release
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - "develop"
+    paths:
+      - "docs/release-notes/change-log.md"
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: publish-release-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.event.pull_request.merged && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+
+      - name: Detect release PR
+        id: detect
+        uses: streamingfast/actions/sfreleaser/detect@v1
+        with:
+          before: ${{ github.event.pull_request.merge_commit_sha }}^1
+
+      - name: Publish release
+        if: steps.detect.outputs.is_release_pr
+        uses: streamingfast/actions/sfreleaser/publish@v1
+        with:
+          version: ${{ steps.detect.outputs.version }}
+          build-workflow: docker.yml
+          homebrew-tap-token: ${{ secrets.HOMEBREW_TAP_TOKEN }}

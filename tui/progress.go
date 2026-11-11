@@ -179,7 +179,7 @@ func (m model) progressLines() []string {
 		return []string{"Backprocessing  nothing to do"}
 	}
 
-	// Completion is never decided here: see TUI.closeProgress. It can arrive before any
+	// Completion is never decided here: see TUI.trackBackprocessing. It can arrive before any
 	// progress message when backprocessing ends within the first progress interval.
 	if m.completedIn != nil {
 		return []string{completeLine(total, *m.completedIn)}

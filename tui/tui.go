@@ -40,8 +40,12 @@ type TUI struct {
 	outputMode        OutputMode
 	prettyPrintOutput bool
 
-	prog                    *tea.Program
+	prog *tea.Program
+	// progExited is closed when prog stops running, which the user can cause by quitting
+	// the live view.
+	progExited              chan struct{}
 	seenFirstData           bool
+	completionReported      bool
 	RequiredProcessedBlocks uint64
 	ResolvedStartBlock      uint64
 
@@ -219,8 +223,8 @@ func (ui *TUI) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 	if data == nil {
 		return nil
 	}
-	if ui.outputMode == OutputModeTUI && !ui.seenFirstData {
-		ui.closeProgress(data.Clock.Number)
+	if ui.outputMode == OutputModeTUI {
+		ui.trackBackprocessing(data.Clock.Number)
 	}
 	switch ui.outputMode {
 	case OutputModeTUI:
@@ -359,9 +363,12 @@ func (ui *TUI) ensureTerminalLocked() {
 		return
 	}
 
-	ui.prog = tea.NewProgram(newModel(ui))
+	prog := tea.NewProgram(newModel(ui))
+	exited := make(chan struct{})
+	ui.prog, ui.progExited = prog, exited
 	go func() {
-		if _, err := ui.prog.Run(); err != nil {
+		defer close(exited)
+		if _, err := prog.Run(); err != nil {
 			if strings.Contains(err.Error(), context.Canceled.Error()) {
 				// Weird case where we need to check the error string message to know the underlying error
 				// The error returned is a fmt.wrapError which contains the context.Canceled error
@@ -392,20 +399,37 @@ func (ui *TUI) AbortProgress() {
 	fmt.Fprintln(os.Stderr, "Backprocessing  aborted")
 }
 
-// closeProgress tears down the backprocessing block when the first block of data arrives, and
-// reports backprocessing as complete when that block proves it is.
+// CompleteProgress reports backprocessing as complete when the stream reached its stop block,
+// which happens before the linear handoff on a range that is entirely backprocessed.
+func (ui *TUI) CompleteProgress() {
+	if ui.outputMode != OutputModeTUI {
+		return
+	}
+
+	ui.ensureTerminalUnlocked()
+	if total := backprocessing.Total(ui.session); total != 0 && !ui.completionReported {
+		ui.completionReported = true
+		fmt.Fprintln(os.Stderr, completeLine(total, time.Since(ui.sessionAt)))
+	}
+}
+
+// trackBackprocessing tears down the backprocessing block when the first block of data
+// arrives, and reports backprocessing as complete on the block that proves it is.
 //
 // In production mode, tier2 jobs stream data while backprocessing is still running, so the
-// first block can arrive long before the end: the block then closes without a verdict.
-func (ui *TUI) closeProgress(blockNum uint64) {
+// first block can arrive long before the end: the block then closes without a verdict, which
+// comes with a later block.
+func (ui *TUI) trackBackprocessing(blockNum uint64) {
 	total := backprocessing.Total(ui.session)
-	if total == 0 || !backprocessing.Finished(ui.session, blockNum) {
+	if total == 0 || ui.completionReported || !backprocessing.Finished(ui.session, blockNum) {
 		ui.ensureTerminalUnlocked()
 		return
 	}
 
+	ui.completionReported = true
 	elapsed := time.Since(ui.sessionAt)
-	if ui.prog == nil {
+	if !ui.progRunning() {
+		ui.ensureTerminalUnlocked()
 		fmt.Fprintln(os.Stderr, completeLine(total, elapsed))
 		return
 	}
@@ -416,6 +440,18 @@ func (ui *TUI) closeProgress(blockNum uint64) {
 	ui.prog.Quit()
 	ui.prog.Wait()
 	ui.prog = nil
+}
+
+func (ui *TUI) progRunning() bool {
+	if ui.prog == nil {
+		return false
+	}
+	select {
+	case <-ui.progExited:
+		return false
+	default:
+		return true
+	}
 }
 
 func (ui *TUI) CleanUpTerminal() {

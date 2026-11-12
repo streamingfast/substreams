@@ -38,7 +38,7 @@ func runFailingDialWork(failures int) (res *Result, closed int) {
 	factory := func() (pbssinternal.SubstreamsClient, func() error, []grpc.CallOption, client.Headers, error) {
 		return fake, func() error { closed++; return nil }, nil, client.Headers{}, nil
 	}
-	w := NewRemoteWorker(factory, "test-worker", zap.NewNop(), NewLaunchQueue(1))
+	w := NewRemoteWorker(factory, "test-worker", zap.NewNop(), NewLaunchQueue(1), 0)
 	res = w.work(testWorkerCtx(), &pbssinternal.ProcessRangeRequest{}, nil, response.New(func(substreams.ResponseFromAnyTier) error { return nil }), 0, func() {})
 	return res, closed
 }

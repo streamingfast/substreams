@@ -42,7 +42,7 @@ func newScriptedWorker(errs ...error) (*RemoteWorker, *scriptedSubstreamsClient)
 	factory := func() (pbssinternal.SubstreamsClient, func() error, []grpc.CallOption, client.Headers, error) {
 		return fake, func() error { return nil }, nil, client.Headers{}, nil
 	}
-	return NewRemoteWorker(factory, "test-worker", zap.NewNop(), NewLaunchQueue(1)), fake
+	return NewRemoteWorker(factory, "test-worker", zap.NewNop(), NewLaunchQueue(1), 0), fake
 }
 
 // TestWork_OverloadedRetriesFastAndDoesNotCount validates that a tier2 refusing the job at
@@ -130,7 +130,7 @@ func TestWork_LeavesLaunchQueueOnceAdmitted(t *testing.T) {
 	}
 
 	queue := NewLaunchQueue(10)
-	w := NewRemoteWorker(factory, "test-worker", zap.NewNop(), queue)
+	w := NewRemoteWorker(factory, "test-worker", zap.NewNop(), queue, 0)
 
 	unit := stage.Unit{Stage: 0, Segment: 0}
 	done := make(chan loop.Msg, 1)

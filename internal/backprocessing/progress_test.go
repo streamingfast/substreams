@@ -74,3 +74,12 @@ func TestComputeStageStats_ZeroReadinessIsAValue(t *testing.T) {
 	require.Len(t, stats, 1)
 	assert.Zero(t, stats[0].Ratio)
 }
+
+func TestFinished(t *testing.T) {
+	session := &pbsubstreamsrpc.SessionInit{LinearHandoffBlock: 2_000_000}
+
+	assert.False(t, Finished(nil, 5_000_000), "no session")
+	assert.False(t, Finished(session, 1_999_999), "a block tier2 produced")
+	assert.True(t, Finished(session, 2_000_000), "the first block tier1 produces")
+	assert.True(t, Finished(session, 2_500_000))
+}

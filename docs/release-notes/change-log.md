@@ -11,6 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Server
+
+- Add `Tier1Config.SubrequestDisappearTimeout`: tier1 considers a tier2 disappeared when it sent nothing on a running job for that long, and sends the job to a tier2 again instead of waiting on it indefinitely. This covers a tier2 that disappears behind a load balancer that keeps the stream open. Zero, the default, waits forever. Counted in the new `substreams_tier1_worker_disappeared_counter` metric.
+- Fix tier1 streams stalling when the merger falls more than 200 blocks behind the chain: the live hub keeps its final blocks from the last merged-blocks file instead of a fixed 200 blocks, up to `Tier1Config.HubMaxKeptFinalBlocks` (`LiveHubConfig.MaxKeptFinalBlocks` for a shared hub, default 20 merged-blocks files worth). While the merger is behind, each tier1 can hold up to that many final blocks in memory, 2000 with 100-block files against 200 before, so lower it on chains with large blocks. `app.HubKeepFinalBlocks` is removed, `app.LiveHubConfig.MergedBlocksStore` is required, and `app.NewLiveHub` now returns an error, which it does when that store is missing.
+- Fix tier1 placing the linear handoff above the last merged-blocks file when the merger is behind, which left tier2 jobs waiting for files that were not written yet.
+
+## v1.27.0
+
 ### Docker
 
 - Upgrade packages (including `apt`, now 2.8.4) when building the `substreams` Docker image to clear a Docker Scout HIGH CVE inherited from the Ubuntu 24.04 base image.
@@ -19,10 +27,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-- Fix tier1 streams stalling when the merger falls more than 200 blocks behind the chain: the live hub keeps its final blocks from the last merged-blocks file instead of a fixed 200 blocks, up to `Tier1Config.HubMaxKeptFinalBlocks` (`LiveHubConfig.MaxKeptFinalBlocks` for a shared hub, default 20 merged-blocks files worth). While the merger is behind, each tier1 can hold up to that many final blocks in memory, 2000 with 100-block files against 200 before, so lower it on chains with large blocks. `app.HubKeepFinalBlocks` is removed, `app.LiveHubConfig.MergedBlocksStore` is required, and `app.NewLiveHub` now returns an error, which it does when that store is missing.
-- Fix tier1 placing the linear handoff above the last merged-blocks file when the merger is behind, which left tier2 jobs waiting for files that were not written yet.
+- Progress messages no longer count a job that just completed twice, once in `processed_blocks` and once in its
+  running job progress, which made backprocessing progress jump ahead.
 - Full KV store files are now saved with their size (`datasize`) in their metadata, so tier1 and tier2 no longer write the metadata back after loading them. They did on every load, which on S3 dstore implements as a copy of the whole file onto itself (adding a version on versioned buckets) and elsewhere as a metadata update. Files saved by earlier versions get their size written once, on their first load. As a result loading a snapshot no longer refreshes its modification time, so `prune-states --minimum-age` counts from when the snapshot was written, as its help describes; use `--truncate-below-block` to keep the snapshots near the head.
 - Log `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` on the `incoming Substreams Blocks request` and `incoming Substreams Estimate request` log lines when the auth plugin provides them (`x-auth-method`, `x-auth-jwt-lifetime-bucket`, `x-auth-jwt-iat`, `x-auth-jwt-exp`). Nothing changes without the plugin.
+- Bump `dstore`: an S3 upload now fails when its reader fails partway instead of storing a truncated object, S3 copies run server-side, and zstd stores accept `compression_config` (level, window, decoder `lowmem` and pool) in the store URL.
+- Bump `bstream`: `Forkable` clamps `LibNum` to the block number to stop permanent stalls, a start block below the hub falls back to merged blocks, and a live stream whose start block is missing starts at the next block.
+- Bump `dsession` to fix two worker counter leaks.
+- Bump `firehose-ethereum/types` for the account abstraction and Optimism post-execution transaction types.
 - Bigdecimal store writes now fail when the value's exponent is above 10,000 or below -10,000 (for example `1e-2000000000`), since such (unrealistic) values could stall the server or exhaust its memory. No on-chain value comes close: the largest `uint256` has an exponent of 77, and `add`, `set_min` and `set_max` already stored anything below 1e-34 as 0, because they truncate values to 34 decimal places.
 
 ### CLI
@@ -35,7 +47,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
-- Sinks and `substreams run` no longer report backprocessing as finished while jobs are still running.
+- Sinks and `substreams run` no longer report backprocessing as finished while jobs are still running or tier1 is
+  still squashing stores. Backprocessing now counts as finished when the first block at or past the linear handoff
+  arrives, or when the stream reaches its stop block. The `substreams_sink_backprocessing_completion` gauge follows
+  the same rule; it used to be set on the first data block, which in production mode arrives while jobs are still
+  running.
 - SQL sink (DatabaseChanges): `--batch-row-flush-interval=0` now turns the row interval off, as its help says, leaving
   `--batch-block-flush-interval` to decide. It used to flush after every block that had any row. Both set to 0 is
   refused at startup, as the sink would not flush while catching up. `--live-block-flush-interval=0` is now refused

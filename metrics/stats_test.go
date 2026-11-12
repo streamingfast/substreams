@@ -267,3 +267,27 @@ func TestStats_CurrentBlock(t *testing.T) {
 	stats.lastProcessedBlockNum = 250
 	assert.Equal(t, uint64(250), stats.CurrentBlock())
 }
+
+// A progress snapshot must count a job's blocks once: from its progress while it runs, from
+// the processed blocks total once it has succeeded.
+func TestJobsAndBlocksProcessed_CountsSucceededJobOnce(t *testing.T) {
+	stats := NewReqStats(&Config{}, nil, nil, zlogTest)
+
+	snapshotDone := func() uint64 {
+		jobs, done := stats.JobsAndBlocksProcessed()
+		for _, job := range jobs {
+			done += job.ProgressBlocks
+		}
+		return done
+	}
+
+	jobIdx := stats.RecordNewSubrequest(0, 1000, 2000)
+	stats.RecordJobUpdate(jobIdx, &pbssinternal.Update{ProgressBlocks: 1000})
+	assert.Equal(t, uint64(1000), snapshotDone())
+
+	stats.RecordJobSucceeded(jobIdx, 1000)
+	jobs, processed := stats.JobsAndBlocksProcessed()
+	assert.Empty(t, jobs)
+	assert.Equal(t, uint64(1000), processed)
+	assert.Equal(t, uint64(1), stats.completedJobs)
+}

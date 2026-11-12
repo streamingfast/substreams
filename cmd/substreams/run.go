@@ -179,7 +179,11 @@ func runRun(cmd *cobra.Command, args []string) error {
 	err = sinker.Err()
 
 	ui.Cancel()
-	ui.AbortProgress()
+	if err == nil && context.Cause(ctx) == nil {
+		ui.CompleteProgress()
+	} else {
+		ui.AbortProgress()
+	}
 
 	// The progress block, the usage report and the error each come from a different writer and
 	// otherwise pile up as one wall of text.

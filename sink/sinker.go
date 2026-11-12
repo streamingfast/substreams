@@ -522,6 +522,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 				// number that is no in the chain meaning we will receive `io.EOF` but the last seen block before
 				// it is not our block number, we must have confidence in the Substreams provider to respect the
 				// protocol
+				s.stats.RecordStreamEnd()
 				return activeCursor, nil
 			}
 
@@ -978,7 +979,6 @@ func (s *Sinker) processBlockScopedData(
 	HeadBlockTimeDrift.SetBlockTime(data.Clock.Timestamp.AsTime())
 	DataMessageCount.Inc()
 	ServerEgressBytes.AddInt(proto.Size(data))
-	BackprocessingCompletion.SetUint64(1)
 
 	cursor, err := NewCursor(data.Cursor)
 	if err != nil {

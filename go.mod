@@ -63,7 +63,7 @@ require (
 	github.com/shopspring/decimal v1.5.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.1.0
-	github.com/streamingfast/bstream v0.0.2-0.20261008140057-0873d6f53bd2
+	github.com/streamingfast/bstream v0.0.2-0.20261112155221-1a200dc70067
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
 	github.com/streamingfast/dauth v0.0.0-20261104193507-69230e98d89e
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c

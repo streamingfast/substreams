@@ -5,6 +5,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
+	"github.com/streamingfast/bstream/forkable"
 	"github.com/streamingfast/bstream/hub"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
@@ -20,6 +21,19 @@ type LiveHubConfig struct {
 	BlockStreamAddr        string
 	MergedBlocksBundleSize uint64
 	OneBlocksStore         dstore.Store
+
+	// MergedBlocksStore, when set, makes the hub keep its final blocks until they are
+	// in a merged-blocks file, so a merger that is behind leaves no range of blocks
+	// that neither the files nor the hub can serve.
+	MergedBlocksStore dstore.Store
+
+	// MaxKeptFinalBlocks limits the final blocks the hub holds in memory while it
+	// waits for merged blocks. 0 means 10 times HubKeepFinalBlocks.
+	MaxKeptFinalBlocks int
+
+	// MergedBlocksLagMetric, when set along with MergedBlocksStore, reports how many
+	// blocks the hub's LIB is ahead of the last merged block.
+	MergedBlocksLagMetric forkable.Uint64Metric
 
 	// Requester names the hub to the relayer.
 	Requester string
@@ -62,14 +76,22 @@ func NewLiveHub(conf LiveHubConfig) *hub.ForkableHub {
 		)
 	})
 
+	hubOptions := []hub.Option{
+		hub.WithLogger(conf.Logger),
+		hub.WithMaxConsecutiveUnlinkableBlocks(maxConsecutiveUnlinkableBlocks),
+	}
+	if conf.MergedBlocksStore != nil {
+		hubOptions = append(hubOptions, hub.WithMergedBlocksStore(conf.MergedBlocksStore), hub.WithMaxKeptFinalBlocks(conf.MaxKeptFinalBlocks))
+		if conf.MergedBlocksLagMetric != nil {
+			hubOptions = append(hubOptions, hub.WithMergedBlocksLagMetric(conf.MergedBlocksLagMetric))
+		}
+	}
+
 	forkableHub = hub.NewForkableHubWithOptions(
 		liveSourceFactory,
 		HubKeepFinalBlocks(conf.MergedBlocksBundleSize),
 		conf.OneBlocksStore,
-		[]hub.Option{
-			hub.WithLogger(conf.Logger),
-			hub.WithMaxConsecutiveUnlinkableBlocks(maxConsecutiveUnlinkableBlocks),
-		},
+		hubOptions,
 	)
 	return forkableHub
 }

@@ -103,9 +103,29 @@ func (sf *StreamFactory) New(
 	return factory, nil
 }
 
+// GetRecentFinalBlock returns the most recent final block under which every block can be
+// read from merged-blocks files. Tier2 only reads those files, so this is where the
+// linear handoff to tier1 is placed.
 func (s *StreamFactory) GetRecentFinalBlock() (uint64, error) {
 	_, _, _, finalBlockNum, err := s.hub.HeadInfo()
-	return roundToBundleFinalBlock(finalBlockNum, s.bundleSize(), bstream.GetProtocolFirstStreamableBlock), err
+	recent := roundToBundleFinalBlock(finalBlockNum, s.bundleSize(), bstream.GetProtocolFirstStreamableBlock)
+	if err != nil {
+		return recent, err
+	}
+
+	mergedUpTo, ok := s.hub.MergedBlocksUpTo()
+	return capToMergedBlocks(recent, mergedUpTo, ok, bstream.GetProtocolFirstStreamableBlock), nil
+}
+
+// capToMergedBlocks lowers recentFinalBlock to the first block the hub has not found in a
+// merged-blocks file, when the hub knows it. With a merger keeping up this changes
+// nothing; with a merger that is behind, it keeps tier2 off files that do not exist yet
+// and leaves the blocks above to tier1, which reads them from the hub.
+func capToMergedBlocks(recentFinalBlock, mergedUpTo uint64, mergedUpToKnown bool, firstStreamableBlock uint64) uint64 {
+	if !mergedUpToKnown || mergedUpTo >= recentFinalBlock {
+		return recentFinalBlock
+	}
+	return max(mergedUpTo, firstStreamableBlock)
 }
 
 func (s *StreamFactory) bundleSize() uint64 {

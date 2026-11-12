@@ -84,7 +84,7 @@ func NewLiveHub(conf LiveHubConfig) *hub.ForkableHub {
 	hubOptions := []hub.Option{
 		hub.WithLogger(conf.Logger),
 		hub.WithMaxConsecutiveUnlinkableBlocks(maxConsecutiveUnlinkableBlocks),
-		hub.WithMergedBlocksStore(conf.MergedBlocksStore, maxKeptFinalBlocks),
+		hub.WithMergedBlocksStore(conf.MergedBlocksStore, conf.MergedBlocksBundleSize, maxKeptFinalBlocks),
 	}
 	if conf.MergedBlocksLagMetric != nil {
 		hubOptions = append(hubOptions, hub.WithMergedBlocksLagMetric(conf.MergedBlocksLagMetric))

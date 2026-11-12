@@ -103,7 +103,7 @@ type Tier1Config struct {
 	BlockType               string
 	StateBundleSize         uint64
 	MergedBlocksBundleSize  uint64 // number of blocks per merged-blocks file in MergedBlocksStoreURL (0 means the default of 100)
-	HubMaxKeptFinalBlocks   int    // final blocks the live hub holds at most while merged blocks are behind (0 means 10 times HubKeepFinalBlocks)
+	HubMaxKeptFinalBlocks   int    // final blocks the live hub holds at most while merged blocks are behind (0 means HubMaxKeptFinalBlocks)
 	EnforceCompression      bool   // refuse incoming requests that do not accept gzip compression (ConnectRPC or GRPC)
 	ActiveRequestsSoftLimit int    // maximum number of active requests a tier1 app can have with external clients before starting to advertise itself as unready in the health check
 

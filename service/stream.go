@@ -121,9 +121,11 @@ func (s *StreamFactory) GetRecentFinalBlock() (uint64, error) {
 }
 
 // capToLastMergedFile lowers recentFinalBlock to the start of the last merged-blocks file
-// the hub found, mergedUpTo being the first block that is not in a merged-blocks file.
-// With a merger that is behind, it keeps tier2 off files that do not exist yet and leaves
-// the blocks above to tier1, which reads them from the hub. With a merger keeping up, it
+// the hub found, mergedUpTo being the first block the hub has not found in a merged-blocks
+// file. With a merger that is behind, it keeps tier2 off files that do not exist yet and
+// leaves the blocks above to tier1, which reads them from the hub. The hub does not look
+// more than its maximum kept final blocks below LIB, so with a merger further behind the
+// files end lower than mergedUpTo, and tier2 waits for the merger to write them. With a merger keeping up, it
 // only lowers recentFinalBlock by one file for the few seconds the hub takes to find each
 // new file.
 func capToLastMergedFile(recentFinalBlock, mergedUpTo, bundleSize, firstStreamableBlock uint64) uint64 {

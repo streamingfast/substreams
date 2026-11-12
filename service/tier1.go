@@ -126,6 +126,7 @@ type Tier1Service struct {
 	streamFactoryFunc     StreamFactoryFunc
 	blockExecutionTimeout time.Duration
 	runtimeConfig         config.RuntimeConfig
+	workerPoolFactory     *work.SessionWorkerPoolFactory
 	tracer                ttrace.Tracer
 	logger                *zap.Logger
 
@@ -292,6 +293,7 @@ func NewTier1(
 	s := &Tier1Service{
 		Shutter:                  shutter.New(),
 		runtimeConfig:            runtimeConfig,
+		workerPoolFactory:        workerPoolFactory,
 		blockType:                blockType,
 		tracer:                   tracing.GetTracer(),
 		resolveCursor:            pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore, cursorResolverOptions...),

@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -53,19 +54,23 @@ type RemoteWorker struct {
 	// launchQueue is shared by every worker of the request: it decides which job gets to
 	// send its request to a tier2 first when the fleet has no room.
 	launchQueue *LaunchQueue
+	// silenceTimeout is how long a job waits for the next message from its tier2 before it
+	// gives up on that tier2 and is sent again. Zero waits forever.
+	silenceTimeout time.Duration
 }
 
-func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, logger *zap.Logger, launchQueue *LaunchQueue) *RemoteWorker {
+func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, logger *zap.Logger, launchQueue *LaunchQueue, silenceTimeout time.Duration) *RemoteWorker {
 	logger = logger.Named("remote-worker")
 	if launchQueue == nil {
 		launchQueue = NewLaunchQueue(1)
 	}
 	return &RemoteWorker{
-		clientFactory: clientFactory,
-		tracer:        otel.GetTracerProvider().Tracer("worker"),
-		logger:        logger,
-		id:            id,
-		launchQueue:   launchQueue,
+		clientFactory:  clientFactory,
+		tracer:         otel.GetTracerProvider().Tracer("worker"),
+		logger:         logger,
+		id:             id,
+		launchQueue:    launchQueue,
+		silenceTimeout: silenceTimeout,
 	}
 }
 
@@ -325,6 +330,55 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 
 var ErrConnectionRefused = errors.New("connection refused")
 
+// ErrSilentWorker is the error of a job whose tier2 sent nothing for the silence timeout.
+var ErrSilentWorker = errors.New("no message received from tier2")
+
+// silenceWatchdog cancels a job's stream when the tier2 sends nothing for the timeout. A
+// tier2 that runs a job reports on it every few seconds, so a silent one is gone, or the
+// path to it is: a load balancer in between can keep the stream open long after the tier2
+// behind it disappeared, and it answers the connection's keepalive pings itself.
+//
+// Only the time spent waiting on the tier2 counts. The watchdog is stopped while a received
+// message is handled, since forwarding a block to a slow consumer can take any amount of time.
+type silenceWatchdog struct {
+	timeout time.Duration
+	timer   *time.Timer
+	fired   atomic.Bool
+}
+
+// newSilenceWatchdog returns a watchdog that calls cancel once the tier2 has been silent for
+// the timeout. It is stopped until the first call to waiting. A zero timeout never fires.
+func newSilenceWatchdog(timeout time.Duration, cancel context.CancelFunc) *silenceWatchdog {
+	w := &silenceWatchdog{timeout: timeout}
+	if timeout <= 0 {
+		return w
+	}
+	w.timer = time.AfterFunc(timeout, func() {
+		w.fired.Store(true)
+		cancel()
+	})
+	w.timer.Stop()
+	return w
+}
+
+// waiting starts the countdown: the job is about to block on the tier2.
+func (w *silenceWatchdog) waiting() {
+	if w.timer != nil {
+		w.timer.Reset(w.timeout)
+	}
+}
+
+// received stops the countdown: the tier2 answered.
+func (w *silenceWatchdog) received() {
+	if w.timer != nil {
+		w.timer.Stop()
+	}
+}
+
+func (w *silenceWatchdog) hasFired() bool {
+	return w.fired.Load()
+}
+
 func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, _ []string, upstream *response.Stream, jobIdx uint64, admitted func()) (res *Result) {
 	metrics.Tier1ActiveWorkerRequest.Inc()
 	metrics.Tier1WorkerRequestCounter.Inc()
@@ -356,7 +410,25 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	if headers.IsSet() {
 		ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
 	}
-	stream, err := grpcClient.ProcessRange(ctx, request, grpcCallOpts...)
+
+	// The stream has its own context so that the watchdog ends this attempt only, and ctx
+	// keeps telling whether the request itself was canceled.
+	streamCtx, cancelStream := context.WithCancel(ctx)
+	defer cancelStream()
+	watchdog := newSilenceWatchdog(w.silenceTimeout, cancelStream)
+	defer watchdog.received()
+	silentWorkerResult := func() *Result {
+		err = fmt.Errorf("%w for %s", ErrSilentWorker, w.silenceTimeout)
+		metrics.Tier1WorkerSilentCounter.Inc()
+		logger.Warn("tier2 went silent, giving up on it",
+			zap.Uint64("segment", request.SegmentNumber),
+			zap.Uint32("stage", request.Stage),
+			zap.Duration("silence_timeout", w.silenceTimeout),
+		)
+		return &Result{Error: NewRetryableErr(err)}
+	}
+
+	stream, err := grpcClient.ProcessRange(streamCtx, request, grpcCallOpts...)
 	if err != nil {
 		if ctx.Err() != nil {
 			return &Result{Error: ctx.Err()}
@@ -372,10 +444,16 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 		}
 	}()
 
+	// The header comes with the first message of the tier2, so this waits on it too.
+	watchdog.waiting()
 	meta, err := stream.Header()
+	watchdog.received()
 	if err != nil {
 		if ctx.Err() != nil {
 			return &Result{Error: ctx.Err()}
+		}
+		if watchdog.hasFired() {
+			return silentWorkerResult()
 		}
 		logger.Warn("error getting stream header", zap.Error(err))
 	}
@@ -391,7 +469,9 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	var processedBlocks uint64
 	firstResponse := true
 	for {
+		watchdog.waiting()
 		resp, err := stream.Recv()
+		watchdog.received()
 
 		if firstResponse {
 			firstResponse = false
@@ -464,6 +544,9 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 			}
 			if ctx.Err() != nil {
 				return &Result{Error: ctx.Err()}
+			}
+			if watchdog.hasFired() {
+				return silentWorkerResult()
 			}
 			if grpcErr := dgrpc.AsGRPCError(err); grpcErr != nil {
 				switch grpcErr.Code() {

@@ -155,6 +155,11 @@ type Tier1Config struct {
 	// balancer in front of tier1.
 	MaxRequestDuration time.Duration
 
+	// SubrequestSilenceTimeout, if non-zero, is how long a job waits for the next message
+	// from its tier2 before tier1 gives up on that tier2 and sends the job again. A tier2
+	// reports on a job every 10 seconds.
+	SubrequestSilenceTimeout time.Duration
+
 	// StatusPageTemplateFile is a Go html/template file served to browsers
 	// hitting the root of the endpoint. Empty serves no status page.
 	StatusPageTemplateFile string
@@ -313,6 +318,9 @@ func (a *Tier1App) Run() error {
 
 	if a.config.MaxRequestDuration != 0 {
 		opts = append(opts, service.WithMaxRequestDuration(a.config.MaxRequestDuration))
+	}
+	if a.config.SubrequestSilenceTimeout != 0 {
+		opts = append(opts, service.WithSubrequestSilenceTimeout(a.config.SubrequestSilenceTimeout))
 	}
 	if a.config.LiveBackFillerFinalBlockDelay != 0 {
 		opts = append(opts, service.WithLiveBackFillerFinalBlockDelay(a.config.LiveBackFillerFinalBlockDelay))
@@ -519,6 +527,9 @@ func (config *Tier1Config) Validate() error {
 	}
 	if config.MaxRequestDuration < 0 {
 		return fmt.Errorf("max request duration must not be negative, got %s", config.MaxRequestDuration)
+	}
+	if config.SubrequestSilenceTimeout < 0 {
+		return fmt.Errorf("subrequest silence timeout must not be negative, got %s", config.SubrequestSilenceTimeout)
 	}
 	return nil
 }

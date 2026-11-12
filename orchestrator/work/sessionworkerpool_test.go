@@ -21,7 +21,7 @@ func TestSessionWorkerPoolReleaseAllBeforeSessionRelease(t *testing.T) {
 		ctx, cancel := context.WithCancel(reqctx.WithRequest(context.Background(), &reqctx.RequestDetails{MaxParallelJobs: 4}))
 		sessionID, err := sessionPool.Get(ctx, "t1r", "org", "key", "trace", nil)
 		require.NoError(t, err)
-		pool := NewSessionWorkerPool(ctx, sessionID, sessionPool, nil)
+		pool := NewSessionWorkerPool(ctx, sessionID, sessionPool, nil, 0)
 		pool.rampingUp.Store(false)
 		for i := 0; i < 4; i++ {
 			_, err := pool.Borrow(ctx)

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
@@ -56,7 +57,11 @@ func HubMaxKeptFinalBlocks(mergedBlocksBundleSize uint64) int {
 //
 // Several apps of one process can share it, tier1 receiving it through
 // Tier1Modules.ForkableHub, so that the live blocks are held in memory once.
-func NewLiveHub(conf LiveHubConfig) *hub.ForkableHub {
+func NewLiveHub(conf LiveHubConfig) (*hub.ForkableHub, error) {
+	if conf.MergedBlocksStore == nil {
+		return nil, fmt.Errorf("live hub needs a merged-blocks store")
+	}
+
 	var forkableHub *hub.ForkableHub
 
 	liveSourceFactory := bstream.SourceFactory(func(h bstream.Handler) bstream.Source {
@@ -92,7 +97,7 @@ func NewLiveHub(conf LiveHubConfig) *hub.ForkableHub {
 
 	// keepFinalBlocks is 0: the merged-blocks store decides what the hub keeps
 	forkableHub = hub.NewForkableHubWithOptions(liveSourceFactory, 0, conf.OneBlocksStore, hubOptions)
-	return forkableHub
+	return forkableHub, nil
 }
 
 // burstFromLIB is the burst the hub's live source asks the relayer for: every block from

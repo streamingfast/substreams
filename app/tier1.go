@@ -269,7 +269,7 @@ func (a *Tier1App) Run() error {
 	if withLive {
 		ownHub := a.modules.ForkableHub == nil
 		if ownHub {
-			forkableHub = NewLiveHub(LiveHubConfig{
+			forkableHub, err = NewLiveHub(LiveHubConfig{
 				BlockStreamAddr:        a.config.BlockStreamAddr,
 				MergedBlocksBundleSize: mergedBlocksBundleSize,
 				OneBlocksStore:         oneBlocksStore,
@@ -283,6 +283,9 @@ func (a *Tier1App) Run() error {
 					a.modules.HeadTimeDriftMetric.SetBlockTime(blk.Time())
 				},
 			})
+			if err != nil {
+				return fmt.Errorf("setting up live hub: %w", err)
+			}
 		} else {
 			a.logger.Info("using the forkable hub shared by the process")
 			forkableHub = a.modules.ForkableHub

@@ -60,7 +60,7 @@ require (
 	github.com/prometheus/client_golang v1.25.0
 	github.com/protocolbuffers/protoscope v0.0.0-20221109213918-8e7a6aafa2c9
 	github.com/schollz/closestmatch v2.1.0+incompatible
-	github.com/shopspring/decimal v1.5.0
+	github.com/shopspring/decimal v1.6.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.1.0
 	github.com/streamingfast/bstream v0.0.2-0.20261104202417-6a5b7e4000ed
@@ -92,8 +92,8 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/clickhouse v0.45.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.45.0
 	github.com/tetratelabs/wazero v1.12.0
-	github.com/tidwall/gjson v1.20.1
-	github.com/tidwall/pretty v1.2.2
+	github.com/tidwall/gjson v1.20.2
+	github.com/tidwall/pretty v1.3.0
 	github.com/wk8/go-ordered-map/v2 v2.1.8
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.etcd.io/bbolt v1.5.0

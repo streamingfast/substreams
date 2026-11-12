@@ -33,26 +33,27 @@ func TestRoundToBundleFinalBlock(t *testing.T) {
 	}
 }
 
-func TestCapToMergedBlocks(t *testing.T) {
+func TestCapToLastMergedFile(t *testing.T) {
 	cases := []struct {
 		name                 string
 		recentFinalBlock     uint64
 		mergedUpTo           uint64
-		mergedUpToKnown      bool
 		firstStreamableBlock uint64
 		expected             uint64
 	}{
-		{"merged blocks unknown", 1100, 0, false, 0, 1100},
-		{"merger keeping up", 1100, 1200, true, 0, 1100},
-		{"merged blocks end at the recent final block", 1100, 1100, true, 0, 1100},
-		{"merger behind", 1100, 500, true, 0, 500},
-		{"nothing merged yet", 1100, 0, true, 0, 0},
-		{"nothing merged yet, chain starting above 0", 1100, 0, true, 150, 150},
+		{"merger keeping up", 1100, 1200, 0, 1100},
+		{"merger keeping up, next file not found yet", 1200, 1200, 0, 1100},
+		{"merger behind", 1100, 600, 0, 500},
+		{"only the first file", 1100, 100, 0, 0},
+		{"nothing merged yet", 1100, 0, 0, 0},
+		{"nothing merged yet, chain starting above 0", 1100, 100, 150, 150},
+		{"only the first file, chain starting above 0", 1100, 200, 150, 150},
+		{"young chain", 30, 0, 0, 0},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			assert.Equal(t, c.expected, capToMergedBlocks(c.recentFinalBlock, c.mergedUpTo, c.mergedUpToKnown, c.firstStreamableBlock))
+			assert.Equal(t, c.expected, capToLastMergedFile(c.recentFinalBlock, c.mergedUpTo, 100, c.firstStreamableBlock))
 		})
 	}
 }

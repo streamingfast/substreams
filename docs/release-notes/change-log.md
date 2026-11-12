@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-- Add `Tier1Config.SubrequestSilenceTimeout`: tier1 gives up on a tier2 that sent nothing on a running job for that long and sends the job to a tier2 again, instead of waiting on it indefinitely. This covers a tier2 that disappears behind a load balancer that keeps the stream open. A tier2 reports on a job every 10 seconds since v1.22.0; keep the timeout off (zero, the default) with older tier2 instances. Counted in the new `substreams_tier1_worker_silent_counter` metric.
+- Add `Tier1Config.SubrequestDisappearTimeout`: tier1 considers a tier2 disappeared when it sent nothing on a running job for that long, and sends the job to a tier2 again instead of waiting on it indefinitely. This covers a tier2 that disappears behind a load balancer that keeps the stream open. Zero, the default, waits forever. Counted in the new `substreams_tier1_worker_disappeared_counter` metric.
 
 ## v1.27.0
 

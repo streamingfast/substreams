@@ -41,7 +41,7 @@ type SessionWorkerPool struct {
 
 	launchQueue *LaunchQueue
 
-	silenceTimeout time.Duration
+	disappearTimeout time.Duration
 
 	rampingUp         *atomic.Bool
 	rampupWorkerGiven *atomic.Bool
@@ -52,7 +52,7 @@ func NewSessionWorkerPool(
 	sessionKey string,
 	sessionPool dsession.SessionPool,
 	clientFactory client.InternalClientFactory,
-	silenceTimeout time.Duration,
+	disappearTimeout time.Duration,
 ) *SessionWorkerPool {
 	logger := reqctx.Logger(ctx)
 	logger = logger.Named("session-worker-pool").With(zap.Bool("keep", false))
@@ -74,7 +74,7 @@ func NewSessionWorkerPool(
 		maxWorkersPerSession: maxWorkers,
 		borrowedWorkers:      make(map[string]Worker),
 		launchQueue:          NewLaunchQueue(maxWorkers),
-		silenceTimeout:       silenceTimeout,
+		disappearTimeout:     disappearTimeout,
 		rampingUp:            &atomic.Bool{},
 		rampupWorkerGiven:    &atomic.Bool{},
 	}
@@ -132,7 +132,7 @@ func (p *SessionWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 		return nil, fmt.Errorf("failed to get worker: %w", err)
 	}
 
-	worker := NewRemoteWorker(p.clientFactory, workerKey, p.logger, p.launchQueue, p.silenceTimeout)
+	worker := NewRemoteWorker(p.clientFactory, workerKey, p.logger, p.launchQueue, p.disappearTimeout)
 
 	p.borrowedWorkersMutex.Lock()
 	p.borrowedWorkers[workerKey] = worker

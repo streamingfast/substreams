@@ -189,13 +189,13 @@ func WithMaxRequestDuration(d time.Duration) Option {
 	}
 }
 
-// WithSubrequestSilenceTimeout makes tier1 give up on a tier2 that sent nothing on a running
-// job for the given duration, and send the job again. A tier2 reports on a job every 10
+// WithSubrequestDisappearTimeout makes tier1 consider a tier2 disappeared when it sent nothing
+// on a running job for the given duration, and send the job again. A tier2 reports on a job every 10
 // seconds, so keep it well above that. Zero waits forever.
-func WithSubrequestSilenceTimeout(d time.Duration) Option {
+func WithSubrequestDisappearTimeout(d time.Duration) Option {
 	return func(a anyTierService) {
 		if s, ok := a.(*Tier1Service); ok {
-			s.workerPoolFactory.SilenceTimeout = d
+			s.workerPoolFactory.DisappearTimeout = d
 		}
 	}
 }

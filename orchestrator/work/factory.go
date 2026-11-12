@@ -15,9 +15,9 @@ type SessionWorkerPoolFactory struct {
 	sessionPool   dsession.SessionPool
 	clientFactory client.InternalClientFactory
 
-	// SilenceTimeout is how long a job waits for the next message from its tier2 before it
+	// DisappearTimeout is how long a job waits for the next message from its tier2 before it
 	// is sent again. Zero waits forever.
-	SilenceTimeout time.Duration
+	DisappearTimeout time.Duration
 }
 
 func NewSessionWorkerPoolFactory(sessionPool dsession.SessionPool, clientFactory client.InternalClientFactory) *SessionWorkerPoolFactory {
@@ -33,5 +33,5 @@ func (f *SessionWorkerPoolFactory) WorkerPool(ctx context.Context) WorkerPool {
 		// For backward compatibility with tests that don't set sessionKey
 		sessionKey = "test-session"
 	}
-	return NewSessionWorkerPool(ctx, sessionKey, f.sessionPool, f.clientFactory, f.SilenceTimeout)
+	return NewSessionWorkerPool(ctx, sessionKey, f.sessionPool, f.clientFactory, f.DisappearTimeout)
 }

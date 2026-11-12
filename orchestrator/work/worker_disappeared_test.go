@@ -22,10 +22,10 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-// TestWork_SilenceTimeout validates that a job gives up on a tier2 only when that tier2 sent
-// nothing for the silence timeout, and that neither a tier2 that keeps reporting nor a
+// TestWork_DisappearTimeout validates that a job gives up on a tier2 only when that tier2 sent
+// nothing for the disappear timeout, and that neither a tier2 that keeps reporting nor a
 // consumer that is slow to take a block is mistaken for one.
-func TestWork_SilenceTimeout(t *testing.T) {
+func TestWork_DisappearTimeout(t *testing.T) {
 	const timeout = 150 * time.Millisecond
 
 	update := &pbssinternal.ProcessRangeResponse{Type: &pbssinternal.ProcessRangeResponse_Update{Update: &pbssinternal.Update{}}}
@@ -36,23 +36,23 @@ func TestWork_SilenceTimeout(t *testing.T) {
 	testCases := []struct {
 		name string
 		// steps are what the fake tier2 does, in order, before it ends the job.
-		steps          []tier2Step
-		silenceTimeout time.Duration
+		steps            []tier2Step
+		disappearTimeout time.Duration
 		// consumerDelay is how long tier1 takes to hand a block to its own consumer.
-		consumerDelay time.Duration
-		expectSilent  bool
+		consumerDelay     time.Duration
+		expectDisappeared bool
 	}{
 		{
-			name:           "tier2 never answers",
-			steps:          []tier2Step{{hang: true}},
-			silenceTimeout: timeout,
-			expectSilent:   true,
+			name:              "tier2 never answers",
+			steps:             []tier2Step{{hang: true}},
+			disappearTimeout:  timeout,
+			expectDisappeared: true,
 		},
 		{
-			name:           "tier2 stops answering after a few updates",
-			steps:          []tier2Step{{msg: update}, {msg: update}, {hang: true}},
-			silenceTimeout: timeout,
-			expectSilent:   true,
+			name:              "tier2 stops answering after a few updates",
+			steps:             []tier2Step{{msg: update}, {msg: update}, {hang: true}},
+			disappearTimeout:  timeout,
+			expectDisappeared: true,
 		},
 		{
 			name: "tier2 keeps reporting for longer than the timeout",
@@ -62,24 +62,24 @@ func TestWork_SilenceTimeout(t *testing.T) {
 				{delay: timeout / 2, msg: update},
 				{delay: timeout / 2, msg: update},
 			},
-			silenceTimeout: timeout,
+			disappearTimeout: timeout,
 		},
 		{
-			name:           "consumer takes longer than the timeout to read a block",
-			steps:          []tier2Step{{msg: block}, {msg: update}},
-			silenceTimeout: timeout,
-			consumerDelay:  2 * timeout,
+			name:             "consumer takes longer than the timeout to read a block",
+			steps:            []tier2Step{{msg: block}, {msg: update}},
+			disappearTimeout: timeout,
+			consumerDelay:    2 * timeout,
 		},
 		{
-			name:           "no timeout waits for a slow tier2",
-			steps:          []tier2Step{{delay: 2 * timeout, msg: update}},
-			silenceTimeout: 0,
+			name:             "no timeout waits for a slow tier2",
+			steps:            []tier2Step{{delay: 2 * timeout, msg: update}},
+			disappearTimeout: 0,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			w := newSteppedWorker(tc.silenceTimeout, tc.steps)
+			w := newSteppedWorker(tc.disappearTimeout, tc.steps)
 			upstream := response.New(func(substreams.ResponseFromAnyTier) error {
 				time.Sleep(tc.consumerDelay)
 				return nil
@@ -87,34 +87,34 @@ func TestWork_SilenceTimeout(t *testing.T) {
 
 			res := runWorkWithDeadline(t, w, testWorkerCtx(), upstream)
 
-			if !tc.expectSilent {
+			if !tc.expectDisappeared {
 				require.NoError(t, res.Error)
 				return
 			}
-			require.ErrorIs(t, res.Error, ErrSilentWorker)
+			require.ErrorIs(t, res.Error, ErrWorkerDisappeared)
 			_, retryable := res.Error.(*RetryableErr)
-			assert.True(t, retryable, "a silent tier2 must be retried, got %T", res.Error)
+			assert.True(t, retryable, "a job whose tier2 disappeared must be retried, got %T", res.Error)
 		})
 	}
 }
 
-// TestWork_SilenceTimeoutLeavesCanceledRequestAlone validates that a request canceled by its
-// own consumer while the tier2 is quiet ends as a cancellation, not as a silent tier2.
-func TestWork_SilenceTimeoutLeavesCanceledRequestAlone(t *testing.T) {
+// TestWork_DisappearTimeoutLeavesCanceledRequestAlone validates that a request canceled by its
+// own consumer while the tier2 is quiet ends as a cancellation, not as a disappeared tier2.
+func TestWork_DisappearTimeoutLeavesCanceledRequestAlone(t *testing.T) {
 	w := newSteppedWorker(time.Minute, []tier2Step{{hang: true}})
 	ctx, cancel := context.WithCancel(testWorkerCtx())
 	time.AfterFunc(50*time.Millisecond, cancel)
 
 	res := runWorkWithDeadline(t, w, ctx, response.New(func(substreams.ResponseFromAnyTier) error { return nil }))
 
-	assert.NotErrorIs(t, res.Error, ErrSilentWorker)
+	assert.NotErrorIs(t, res.Error, ErrWorkerDisappeared)
 	_, retryable := res.Error.(*RetryableErr)
 	assert.False(t, retryable, "a canceled request must not be retried")
 }
 
-// TestWork_SilentTier2IsSentAgain validates that the job whose tier2 went silent is sent to
+// TestWork_DisappearedTier2IsSentAgain validates that the job whose tier2 disappeared is sent to
 // a tier2 again and completes there.
-func TestWork_SilentTier2IsSentAgain(t *testing.T) {
+func TestWork_DisappearedTier2IsSentAgain(t *testing.T) {
 	prevFailed := workerFailedRetryDelay
 	workerFailedRetryDelay = 10 * time.Millisecond
 	defer func() { workerFailedRetryDelay = prevFailed }()
@@ -201,9 +201,9 @@ func (c *steppedSubstreamsClient) factory() client.InternalClientFactory {
 	}
 }
 
-func newSteppedWorker(silenceTimeout time.Duration, steps []tier2Step) *RemoteWorker {
+func newSteppedWorker(disappearTimeout time.Duration, steps []tier2Step) *RemoteWorker {
 	fake := &steppedSubstreamsClient{scripts: [][]tier2Step{steps}}
-	return NewRemoteWorker(fake.factory(), "test-worker", zap.NewNop(), NewLaunchQueue(1), silenceTimeout)
+	return NewRemoteWorker(fake.factory(), "test-worker", zap.NewNop(), NewLaunchQueue(1), disappearTimeout)
 }
 
 // runWorkWithDeadline runs a single work() attempt and fails the test if it does not return.

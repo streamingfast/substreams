@@ -21,7 +21,7 @@ var Tier1ActiveWorkerRequest *dmetrics.Gauge
 var Tier1WorkerRequestCounter *dmetrics.Counter
 var Tier1WorkerRetryCounter *dmetrics.Counter
 var Tier1WorkerRejectedOverloadedCounter *dmetrics.Counter
-var Tier1WorkerSilentCounter *dmetrics.Counter
+var Tier1WorkerDisappearedCounter *dmetrics.Counter
 
 var Tier1WasmExtensionCallCounter *dmetrics.CounterVec
 var Tier1WasmExtensionCallDuration *dmetrics.HistogramVec
@@ -86,7 +86,7 @@ func DeclareTier1Metrics(zlog *zap.Logger) {
 	Tier1WorkerRequestCounter = MetricSet.NewCounter("substreams_tier1_worker_request_counter", "Counter for total Substreams worker requests a tier1 app made against tier2 nodes")
 	Tier1WorkerRetryCounter = MetricSet.NewCounter("substreams_tier1_worker_retry_counter", "Counter for total retryable errors returned from tier2")
 	Tier1WorkerRejectedOverloadedCounter = MetricSet.NewCounter("substreams_tier1_worker_rejected_overloaded_counter", "Counter for number of times a worker rejected a request because it was overloaded (included in RetryCounter)")
-	Tier1WorkerSilentCounter = MetricSet.NewCounter("substreams_tier1_worker_silent_counter", "Counter for number of times a tier1 gave up on a tier2 that stopped sending messages on a running job (included in RetryCounter)")
+	Tier1WorkerDisappearedCounter = MetricSet.NewCounter("substreams_tier1_worker_disappeared_counter", "Counter for number of times a tier1 gave up on a tier2 that disappeared while running a job: it stopped sending messages (included in RetryCounter)")
 	Tier1OutputHeadBlockRelativeTime = MetricSet.NewHeadBlockRelativeTime("substreams_output")
 	Tier1ActiveRequestsHardLimit = MetricSet.NewGauge("substreams_tier1_active_requests_hard_limit", "Hard limit of concurrent active requests on tier1 (0 means unlimited)")
 

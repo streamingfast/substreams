@@ -54,23 +54,23 @@ type RemoteWorker struct {
 	// launchQueue is shared by every worker of the request: it decides which job gets to
 	// send its request to a tier2 first when the fleet has no room.
 	launchQueue *LaunchQueue
-	// silenceTimeout is how long a job waits for the next message from its tier2 before it
-	// gives up on that tier2 and is sent again. Zero waits forever.
-	silenceTimeout time.Duration
+	// disappearTimeout is how long a job waits for the next message from its tier2 before it
+	// considers that tier2 disappeared and is sent again. Zero waits forever.
+	disappearTimeout time.Duration
 }
 
-func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, logger *zap.Logger, launchQueue *LaunchQueue, silenceTimeout time.Duration) *RemoteWorker {
+func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, logger *zap.Logger, launchQueue *LaunchQueue, disappearTimeout time.Duration) *RemoteWorker {
 	logger = logger.Named("remote-worker")
 	if launchQueue == nil {
 		launchQueue = NewLaunchQueue(1)
 	}
 	return &RemoteWorker{
-		clientFactory:  clientFactory,
-		tracer:         otel.GetTracerProvider().Tracer("worker"),
-		logger:         logger,
-		id:             id,
-		launchQueue:    launchQueue,
-		silenceTimeout: silenceTimeout,
+		clientFactory:    clientFactory,
+		tracer:           otel.GetTracerProvider().Tracer("worker"),
+		logger:           logger,
+		id:               id,
+		launchQueue:      launchQueue,
+		disappearTimeout: disappearTimeout,
 	}
 }
 
@@ -330,26 +330,26 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 
 var ErrConnectionRefused = errors.New("connection refused")
 
-// ErrSilentWorker is the error of a job whose tier2 sent nothing for the silence timeout.
-var ErrSilentWorker = errors.New("no message received from tier2")
+// ErrWorkerDisappeared is the error of a job whose tier2 sent nothing for the disappear timeout.
+var ErrWorkerDisappeared = errors.New("tier2 disappeared: no message received")
 
-// silenceWatchdog cancels a job's stream when the tier2 sends nothing for the timeout. A
-// tier2 that runs a job reports on it every few seconds, so a silent one is gone, or the
+// disappearWatchdog cancels a job's stream when the tier2 sends nothing for the timeout. A
+// tier2 that runs a job reports on it every few seconds, so one that stops has disappeared, or the
 // path to it is: a load balancer in between can keep the stream open long after the tier2
 // behind it disappeared, and it answers the connection's keepalive pings itself.
 //
 // Only the time spent waiting on the tier2 counts. The watchdog is stopped while a received
 // message is handled, since forwarding a block to a slow consumer can take any amount of time.
-type silenceWatchdog struct {
+type disappearWatchdog struct {
 	timeout time.Duration
 	timer   *time.Timer
 	fired   atomic.Bool
 }
 
-// newSilenceWatchdog returns a watchdog that calls cancel once the tier2 has been silent for
+// newDisappearWatchdog returns a watchdog that calls cancel once the tier2 has sent nothing for
 // the timeout. It is stopped until the first call to waiting. A zero timeout never fires.
-func newSilenceWatchdog(timeout time.Duration, cancel context.CancelFunc) *silenceWatchdog {
-	w := &silenceWatchdog{timeout: timeout}
+func newDisappearWatchdog(timeout time.Duration, cancel context.CancelFunc) *disappearWatchdog {
+	w := &disappearWatchdog{timeout: timeout}
 	if timeout <= 0 {
 		return w
 	}
@@ -362,20 +362,20 @@ func newSilenceWatchdog(timeout time.Duration, cancel context.CancelFunc) *silen
 }
 
 // waiting starts the countdown: the job is about to block on the tier2.
-func (w *silenceWatchdog) waiting() {
+func (w *disappearWatchdog) waiting() {
 	if w.timer != nil {
 		w.timer.Reset(w.timeout)
 	}
 }
 
 // received stops the countdown: the tier2 answered.
-func (w *silenceWatchdog) received() {
+func (w *disappearWatchdog) received() {
 	if w.timer != nil {
 		w.timer.Stop()
 	}
 }
 
-func (w *silenceWatchdog) hasFired() bool {
+func (w *disappearWatchdog) hasFired() bool {
 	return w.fired.Load()
 }
 
@@ -415,15 +415,15 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	// keeps telling whether the request itself was canceled.
 	streamCtx, cancelStream := context.WithCancel(ctx)
 	defer cancelStream()
-	watchdog := newSilenceWatchdog(w.silenceTimeout, cancelStream)
+	watchdog := newDisappearWatchdog(w.disappearTimeout, cancelStream)
 	defer watchdog.received()
-	silentWorkerResult := func() *Result {
-		err = fmt.Errorf("%w for %s", ErrSilentWorker, w.silenceTimeout)
-		metrics.Tier1WorkerSilentCounter.Inc()
-		logger.Warn("tier2 went silent, giving up on it",
+	workerDisappearedResult := func() *Result {
+		err = fmt.Errorf("%w for %s", ErrWorkerDisappeared, w.disappearTimeout)
+		metrics.Tier1WorkerDisappearedCounter.Inc()
+		logger.Warn("tier2 disappeared, giving up on it",
 			zap.Uint64("segment", request.SegmentNumber),
 			zap.Uint32("stage", request.Stage),
-			zap.Duration("silence_timeout", w.silenceTimeout),
+			zap.Duration("disappear_timeout", w.disappearTimeout),
 		)
 		return &Result{Error: NewRetryableErr(err)}
 	}
@@ -453,7 +453,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 			return &Result{Error: ctx.Err()}
 		}
 		if watchdog.hasFired() {
-			return silentWorkerResult()
+			return workerDisappearedResult()
 		}
 		logger.Warn("error getting stream header", zap.Error(err))
 	}
@@ -546,7 +546,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 				return &Result{Error: ctx.Err()}
 			}
 			if watchdog.hasFired() {
-				return silentWorkerResult()
+				return workerDisappearedResult()
 			}
 			if grpcErr := dgrpc.AsGRPCError(err); grpcErr != nil {
 				switch grpcErr.Code() {

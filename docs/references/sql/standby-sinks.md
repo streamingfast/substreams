@@ -1,7 +1,8 @@
 # Standby Sinks
 
 This applies to the PostgreSQL sink in Database Changes mode (`substreams sink postgres` with a module
-outputting `DatabaseChanges`).
+outputting `DatabaseChanges`), and to the ClickHouse sink in [stateful mode](clickhouse-stateful.md#one-writer-and-standby-sinks),
+where the lock is a lease in ClickHouse Keeper.
 
 ## One writer per cursor
 

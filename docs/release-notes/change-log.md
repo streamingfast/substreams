@@ -132,6 +132,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   rounded to 18 decimals and written with 18 (`150.000000000000000000`), so a result could depend on how blocks were
   batched: the same changes in separate flushes were added by the database at full precision. Merged values now keep
   the larger scale of their operands, as PostgreSQL's `numeric` does (`1.50` + `2` gives `3.50`, `1` + `2` gives `3`).
+- SQL sink (DatabaseChanges, ClickHouse): add `--clickhouse-stateful` (on `run` and `setup`). The sink computes each
+  row's new state itself, so upserts, updates, deletes and field update operations (`ADD`, `MAX`, `MIN`, `SET_IF_NULL`)
+  are supported, with the same results as on PostgreSQL. Tables with `ENGINE = ReplacingMergeTree(_version_, _deleted_)`
+  ordered by their primary key take every operation, `MergeTree` or `CollapsingMergeTree(_sign_)` tables with a
+  `_version_ UInt64` column take inserts only. Reorgs are handled in the database, and a journal table makes a flush cut
+  short roll back, so no change is applied twice. `--standby-lock` works, with a lease in a `KeeperMap` table (needs
+  ClickHouse Keeper). See [ClickHouse Stateful Mode](https://docs.substreams.dev/references/sql/clickhouse-stateful).
 
 ## v1.26.0
 

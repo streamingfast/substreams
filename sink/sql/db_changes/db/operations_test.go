@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"math/rand/v2"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -440,7 +441,7 @@ func TestMergeData_SameAsAppliedOneByOne(t *testing.T) {
 	number := func() string {
 		switch r.IntN(5) {
 		case 0:
-			return fmt.Sprint(r.Int64N(1_000_000) - 500_000)
+			return strconv.FormatInt(r.Int64N(1_000_000)-500_000, 10)
 		case 1:
 			return new(big.Int).Lsh(big.NewInt(r.Int64()), uint(r.IntN(190))).String()
 		case 2:
@@ -461,7 +462,7 @@ func TestMergeData_SameAsAppliedOneByOne(t *testing.T) {
 		return sum
 	}
 
-	for i := 0; i < 5000; i++ {
+	for range 5000 {
 		values := []string{number(), number(), number(), number()}
 		op := &Operation{opType: OperationTypeUpsert, data: map[string]FieldData{"v": {Value: values[0], UpdateOp: UpdateOpAdd}}}
 		for _, v := range values[1:] {

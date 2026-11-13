@@ -63,7 +63,7 @@ require (
 	github.com/shopspring/decimal v1.5.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.1.0
-	github.com/streamingfast/bstream v0.0.2-0.20261112211843-2dad87c33b2a
+	github.com/streamingfast/bstream v0.0.2-0.20261113020143-719404bfada3
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
 	github.com/streamingfast/dauth v0.0.0-20261104193507-69230e98d89e
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
@@ -75,7 +75,7 @@ require (
 	github.com/streamingfast/dmetrics v0.0.0-20260819172634-28069dc8018a
 	github.com/streamingfast/dregistry v0.0.0-20260818204944-2fed3956d4e1
 	github.com/streamingfast/dsession v0.0.0-20260716142251-bdc5686715bf
-	github.com/streamingfast/dstore v0.2.4-0.20261109193326-242abd31842d
+	github.com/streamingfast/dstore v0.2.4-0.20261113015734-ed2936b371f8
 	github.com/streamingfast/dummy-blockchain v1.7.10
 	github.com/streamingfast/firehose-ethereum/types v0.0.0-20261111194310-411aae9f640f
 	github.com/streamingfast/firehose-networks v0.3.1

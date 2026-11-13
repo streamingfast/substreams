@@ -8,36 +8,42 @@ on:
       - "develop"
     paths:
       - "docs/release-notes/change-log.md"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to run the publish steps for again, e.g. v1.2.3"
+        required: true
 
 permissions:
   actions: write
   contents: write
 
 concurrency:
-  group: publish-release-${{ github.event.pull_request.number }}
+  group: publish-release-${{ github.event.pull_request.number || inputs.tag }}
   cancel-in-progress: false
 
 jobs:
   publish:
-    if: github.event.pull_request.merged && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ github.event.pull_request.merge_commit_sha || inputs.tag }}
           fetch-depth: 0
 
       - name: Detect release PR
         id: detect
+        if: github.event_name == 'pull_request'
         uses: streamingfast/actions/sfreleaser/detect@v1
         with:
           before: ${{ github.event.pull_request.merge_commit_sha }}^1
 
       - name: Publish release
-        if: steps.detect.outputs.is_release_pr
+        if: steps.detect.outputs.is_release_pr || github.event_name == 'workflow_dispatch'
         uses: streamingfast/actions/sfreleaser/publish@v1
         with:
-          version: ${{ steps.detect.outputs.version }}
+          version: ${{ steps.detect.outputs.version || inputs.tag }}
           build-workflow: docker.yml
           homebrew-tap-token: ${{ secrets.HOMEBREW_TAP_TOKEN }}

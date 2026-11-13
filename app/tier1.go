@@ -11,6 +11,7 @@ import (
 
 	connectrpc "connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/bstream/forkable"
 	"github.com/streamingfast/bstream/hub"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dauth"
@@ -49,6 +50,10 @@ type Tier1Modules struct {
 	// ForkableHub is a hub built with NewLiveHub that another app of the process
 	// owns, runs and feeds metrics from. When nil, tier1 builds and runs its own.
 	ForkableHub *hub.ForkableHub
+
+	// MergedBlocksLagMetric reports how many blocks the LIB of the hub tier1 builds
+	// is ahead of the last merged block. Not used with a shared ForkableHub.
+	MergedBlocksLagMetric forkable.Uint64Metric
 }
 
 type InfoServer interface {
@@ -98,6 +103,7 @@ type Tier1Config struct {
 	BlockType               string
 	StateBundleSize         uint64
 	MergedBlocksBundleSize  uint64 // number of blocks per merged-blocks file in MergedBlocksStoreURL (0 means the default of 100)
+	HubMaxKeptFinalBlocks   int    // final blocks the live hub holds at most while merged blocks are behind (0 means HubMaxKeptFinalBlocks)
 	EnforceCompression      bool   // refuse incoming requests that do not accept gzip compression (ConnectRPC or GRPC)
 	ActiveRequestsSoftLimit int    // maximum number of active requests a tier1 app can have with external clients before starting to advertise itself as unready in the health check
 
@@ -268,10 +274,13 @@ func (a *Tier1App) Run() error {
 	if withLive {
 		ownHub := a.modules.ForkableHub == nil
 		if ownHub {
-			forkableHub = NewLiveHub(LiveHubConfig{
+			forkableHub, err = NewLiveHub(LiveHubConfig{
 				BlockStreamAddr:        a.config.BlockStreamAddr,
 				MergedBlocksBundleSize: mergedBlocksBundleSize,
 				OneBlocksStore:         oneBlocksStore,
+				MergedBlocksStore:      mergedBlocksStore,
+				MaxKeptFinalBlocks:     a.config.HubMaxKeptFinalBlocks,
+				MergedBlocksLagMetric:  a.modules.MergedBlocksLagMetric,
 				Requester:              "substreams-tier1",
 				Logger:                 a.logger,
 				OnBlock: func(blk *pbbstream.Block) {
@@ -279,6 +288,9 @@ func (a *Tier1App) Run() error {
 					a.modules.HeadTimeDriftMetric.SetBlockTime(blk.Time())
 				},
 			})
+			if err != nil {
+				return fmt.Errorf("setting up live hub: %w", err)
+			}
 		} else {
 			a.logger.Info("using the forkable hub shared by the process")
 			forkableHub = a.modules.ForkableHub

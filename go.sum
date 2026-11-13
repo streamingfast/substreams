@@ -669,8 +669,8 @@ github.com/spiffe/go-spiffe/v2 v2.8.1 h1:eXZMLsu+3MLEPJyGJkolqtVrteZfQdUpOWj6LTi
 github.com/spiffe/go-spiffe/v2 v2.8.1/go.mod h1:47Q0Q9/AqGha8QLHp+kxpH4Wca7X7EnOtlIJy3mxZ3U=
 github.com/stoewer/go-strcase v1.3.1 h1:iS0MdW+kVTxgMoE1LAZyMiYJFKlOzLooE4MxjirtkAs=
 github.com/stoewer/go-strcase v1.3.1/go.mod h1:fAH5hQ5pehh+j3nZfvwdk2RgEgQjAoM8wodgtPmh1xo=
-github.com/streamingfast/bstream v0.0.2-0.20261104202417-6a5b7e4000ed h1:crUkKVZy+gDVEJu2Ls5CpWpvp8PJXe5FOLbLkANp4oI=
-github.com/streamingfast/bstream v0.0.2-0.20261104202417-6a5b7e4000ed/go.mod h1:duqjBtD6U7/Y2swB/VCwgzoLODC5L+x6fDmvlgZIAPM=
+github.com/streamingfast/bstream v0.0.2-0.20261113020143-719404bfada3 h1:KBWF2I1StHr1jBWyVNR6bm9gwDNKrxnClksSWYS6rjA=
+github.com/streamingfast/bstream v0.0.2-0.20261113020143-719404bfada3/go.mod h1:ZOllX4U95eCFUOAcb3Q8NAitx8lkCLlLTXfQO6kSN2U=
 github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b h1:ztYeX3/5rg2tV2EU7edcrcHzMz6wUbdJB+LqCrP5W8s=
 github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b/go.mod h1:o9R/tjNON01X2mgWL5qirl2MV6xQ4EZI5D504ST3K/M=
 github.com/streamingfast/dauth v0.0.0-20261104193507-69230e98d89e h1:nRgrvMMQCaYJtL2XjDuqrdwWvD75gVADk70SaJQ4sB4=
@@ -693,8 +693,8 @@ github.com/streamingfast/dregistry v0.0.0-20260818204944-2fed3956d4e1 h1:keuutoe
 github.com/streamingfast/dregistry v0.0.0-20260818204944-2fed3956d4e1/go.mod h1:vfsE+IinxWwS89Zu7KdQAizkF+INgG9x/7V++Aeum6A=
 github.com/streamingfast/dsession v0.0.0-20260716142251-bdc5686715bf h1:HYyWRnUSn9Q4+0vN29zHaSJ93v8/IyyxXNz5M2eopWE=
 github.com/streamingfast/dsession v0.0.0-20260716142251-bdc5686715bf/go.mod h1:ldDwFqr20xXyaLhwDm7XlMaf2vvoZNOrjgsMcFJGtrw=
-github.com/streamingfast/dstore v0.2.4-0.20261109193326-242abd31842d h1:roA+Ww2QSuEEcKCh59eebp8T0k5xdxZGkNRnRxYop3I=
-github.com/streamingfast/dstore v0.2.4-0.20261109193326-242abd31842d/go.mod h1:DangUsbON/YBKPbxfUaoSFi9zupzHKP70q2bu9DhR68=
+github.com/streamingfast/dstore v0.2.4-0.20261113015734-ed2936b371f8 h1:ldOWWBRYaWflNpeEAP8H/SztvszPaHNDVn+1ihqHhbg=
+github.com/streamingfast/dstore v0.2.4-0.20261113015734-ed2936b371f8/go.mod h1:DangUsbON/YBKPbxfUaoSFi9zupzHKP70q2bu9DhR68=
 github.com/streamingfast/dummy-blockchain v1.7.10 h1:UDYKbd5LyhGezuflw3CxEsz+X07hbNEJDqkRaRDf29c=
 github.com/streamingfast/dummy-blockchain v1.7.10/go.mod h1:LM3ZPF/HwuUJGdW3sIL68wOOkJk/JsE5eDBO9EGETc4=
 github.com/streamingfast/firehose-ethereum/types v0.0.0-20261111194310-411aae9f640f h1:aTXlR3l5Z+aIPxVxOHCceVam4gPzszk7qOdl6il9Wp8=

@@ -2,9 +2,11 @@ package app
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
+	"github.com/streamingfast/bstream/forkable"
 	"github.com/streamingfast/bstream/hub"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
@@ -21,6 +23,19 @@ type LiveHubConfig struct {
 	MergedBlocksBundleSize uint64
 	OneBlocksStore         dstore.Store
 
+	// MergedBlocksStore is where the hub checks which blocks are merged: it keeps its
+	// final blocks from the start of the last merged-blocks file, so a stream reading
+	// the files can always continue on the hub, even with a merger that is behind.
+	MergedBlocksStore dstore.Store
+
+	// MaxKeptFinalBlocks limits the final blocks the hub holds in memory when the
+	// merger is behind. 0 means HubMaxKeptFinalBlocks(MergedBlocksBundleSize).
+	MaxKeptFinalBlocks int
+
+	// MergedBlocksLagMetric, when set, reports how many blocks the hub's LIB is ahead
+	// of the last merged block.
+	MergedBlocksLagMetric forkable.Uint64Metric
+
 	// Requester names the hub to the relayer.
 	Requester string
 	Logger    *zap.Logger
@@ -30,11 +45,11 @@ type LiveHubConfig struct {
 	OnBlock func(blk *pbbstream.Block)
 }
 
-// HubKeepFinalBlocks is how many final blocks a hub keeps below its LIB: at least
-// two merged-blocks files worth, so the joining source can hand off from a file
-// boundary.
-func HubKeepFinalBlocks(mergedBlocksBundleSize uint64) int {
-	return int(max(200, 2*mergedBlocksBundleSize))
+// HubMaxKeptFinalBlocks is the default limit on the final blocks a hub holds in memory
+// when the merger is behind: 20 merged-blocks files worth. A hub holds up to two files
+// worth when the merger keeps up.
+func HubMaxKeptFinalBlocks(mergedBlocksBundleSize uint64) int {
+	return int(20 * bstream.SanitizeBundleSize(mergedBlocksBundleSize))
 }
 
 // NewLiveHub builds the forkable hub tier1 streams live blocks from, fed by the
@@ -42,7 +57,11 @@ func HubKeepFinalBlocks(mergedBlocksBundleSize uint64) int {
 //
 // Several apps of one process can share it, tier1 receiving it through
 // Tier1Modules.ForkableHub, so that the live blocks are held in memory once.
-func NewLiveHub(conf LiveHubConfig) *hub.ForkableHub {
+func NewLiveHub(conf LiveHubConfig) (*hub.ForkableHub, error) {
+	if conf.MergedBlocksStore == nil {
+		return nil, fmt.Errorf("live hub needs a merged-blocks store")
+	}
+
 	var forkableHub *hub.ForkableHub
 
 	liveSourceFactory := bstream.SourceFactory(func(h bstream.Handler) bstream.Source {
@@ -62,16 +81,23 @@ func NewLiveHub(conf LiveHubConfig) *hub.ForkableHub {
 		)
 	})
 
-	forkableHub = hub.NewForkableHubWithOptions(
-		liveSourceFactory,
-		HubKeepFinalBlocks(conf.MergedBlocksBundleSize),
-		conf.OneBlocksStore,
-		[]hub.Option{
-			hub.WithLogger(conf.Logger),
-			hub.WithMaxConsecutiveUnlinkableBlocks(maxConsecutiveUnlinkableBlocks),
-		},
-	)
-	return forkableHub
+	maxKeptFinalBlocks := conf.MaxKeptFinalBlocks
+	if maxKeptFinalBlocks == 0 {
+		maxKeptFinalBlocks = HubMaxKeptFinalBlocks(conf.MergedBlocksBundleSize)
+	}
+
+	hubOptions := []hub.Option{
+		hub.WithLogger(conf.Logger),
+		hub.WithMaxConsecutiveUnlinkableBlocks(maxConsecutiveUnlinkableBlocks),
+		hub.WithMergedBlocksStore(conf.MergedBlocksStore, conf.MergedBlocksBundleSize, maxKeptFinalBlocks),
+	}
+	if conf.MergedBlocksLagMetric != nil {
+		hubOptions = append(hubOptions, hub.WithMergedBlocksLagMetric(conf.MergedBlocksLagMetric))
+	}
+
+	// keepFinalBlocks is 0: the merged-blocks store decides what the hub keeps
+	forkableHub = hub.NewForkableHubWithOptions(liveSourceFactory, 0, conf.OneBlocksStore, hubOptions)
+	return forkableHub, nil
 }
 
 // burstFromLIB is the burst the hub's live source asks the relayer for: every block from

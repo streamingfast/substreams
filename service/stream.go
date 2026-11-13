@@ -103,9 +103,37 @@ func (sf *StreamFactory) New(
 	return factory, nil
 }
 
+// GetRecentFinalBlock returns the most recent final block up to which tier2 can process:
+// tier2 only reads merged-blocks files, and it needs the first block of the file after a
+// segment to know that the segment is over. The linear handoff to tier1 is placed there.
 func (s *StreamFactory) GetRecentFinalBlock() (uint64, error) {
 	_, _, _, finalBlockNum, err := s.hub.HeadInfo()
-	return roundToBundleFinalBlock(finalBlockNum, s.bundleSize(), bstream.GetProtocolFirstStreamableBlock), err
+	recent := roundToBundleFinalBlock(finalBlockNum, s.bundleSize(), bstream.GetProtocolFirstStreamableBlock)
+	if err != nil {
+		return recent, err
+	}
+
+	mergedUpTo, ok := s.hub.MergedBlocksUpTo()
+	if !ok {
+		return recent, nil
+	}
+	return capToLastMergedFile(recent, mergedUpTo, s.bundleSize(), bstream.GetProtocolFirstStreamableBlock), nil
+}
+
+// capToLastMergedFile lowers recentFinalBlock to the start of the last merged-blocks file
+// the hub found, mergedUpTo being the first block the hub has not found in a merged-blocks
+// file. With a merger that is behind, it keeps tier2 off files that do not exist yet and
+// leaves the blocks above to tier1, which reads them from the hub. The hub does not look
+// more than its maximum kept final blocks below LIB, so with a merger further behind the
+// files end lower than mergedUpTo, and tier2 waits for the merger to write them. With a merger keeping up, it
+// only lowers recentFinalBlock by one file for the few seconds the hub takes to find each
+// new file.
+func capToLastMergedFile(recentFinalBlock, mergedUpTo, bundleSize, firstStreamableBlock uint64) uint64 {
+	var lastFileStart uint64
+	if mergedUpTo > bundleSize {
+		lastFileStart = mergedUpTo - bundleSize
+	}
+	return min(recentFinalBlock, max(lastFileStart, firstStreamableBlock))
 }
 
 func (s *StreamFactory) bundleSize() uint64 {
@@ -116,8 +144,9 @@ func (s *StreamFactory) bundleSize() uint64 {
 }
 
 // roundToBundleFinalBlock rounds a final block down to the start of the previous
-// merged-blocks bundle, the most recent block that is guaranteed to be readable
-// from a fully-written merged-blocks file.
+// merged-blocks bundle, the most recent block readable from a fully-written
+// merged-blocks file when the merger keeps up. capToLastMergedFile covers a merger
+// that is behind.
 func roundToBundleFinalBlock(finalBlockNum, bundleSize, firstStreamableBlock uint64) uint64 {
 	// Need at least one complete bundle above the chain start; below that no
 	// merged-blocks file exists yet, so there is nothing to snap to.

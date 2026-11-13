@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Server
 
 - Add `Tier1Config.SubrequestDisappearTimeout`: tier1 considers a tier2 disappeared when it sent nothing on a running job for that long, and sends the job to a tier2 again instead of waiting on it indefinitely. This covers a tier2 that disappears behind a load balancer that keeps the stream open. Zero, the default, waits forever. Counted in the new `substreams_tier1_worker_disappeared_counter` metric.
+- Fix tier1 streams stalling when the merger falls more than 200 blocks behind the chain: the live hub keeps its final blocks from the last merged-blocks file instead of a fixed 200 blocks, up to `Tier1Config.HubMaxKeptFinalBlocks` (`LiveHubConfig.MaxKeptFinalBlocks` for a shared hub, default 20 merged-blocks files worth). While the merger is behind, each tier1 can hold up to that many final blocks in memory, 2000 with 100-block files against 200 before, so lower it on chains with large blocks. `app.HubKeepFinalBlocks` is removed, `app.LiveHubConfig.MergedBlocksStore` is required, and `app.NewLiveHub` now returns an error, which it does when that store is missing.
+- Fix tier1 placing the linear handoff above the last merged-blocks file when the merger is behind, which left tier2 jobs waiting for files that were not written yet.
 
 ## v1.27.0
 

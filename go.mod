@@ -10,7 +10,7 @@ require (
 	connectrpc.com/connect v1.21.1
 	github.com/AfterShip/clickhouse-sql-parser v0.5.6
 	github.com/ClickHouse/ch-go v0.75.0
-	github.com/ClickHouse/clickhouse-go/v2 v2.50.0
+	github.com/ClickHouse/clickhouse-go/v2 v2.51.0
 	github.com/KimMachineGun/automemlimit v1.0.1
 	github.com/RoaringBitmap/roaring v1.9.4
 	github.com/abourget/llerrgroup v0.2.0
@@ -40,7 +40,7 @@ require (
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/jhump/protoreflect v1.14.0
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/klauspost/compress v1.20.3
+	github.com/klauspost/compress v1.20.4
 	github.com/klauspost/connect-compress/v2 v2.1.1
 	github.com/lithammer/dedent v1.1.0
 	github.com/mattn/go-isatty v0.0.24
@@ -60,7 +60,7 @@ require (
 	github.com/prometheus/client_golang v1.25.0
 	github.com/protocolbuffers/protoscope v0.0.0-20221109213918-8e7a6aafa2c9
 	github.com/schollz/closestmatch v2.1.0+incompatible
-	github.com/shopspring/decimal v1.5.0
+	github.com/shopspring/decimal v1.6.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.1.0
 	github.com/streamingfast/bstream v0.0.2-0.20261113020143-719404bfada3
@@ -92,8 +92,8 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/clickhouse v0.45.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.45.0
 	github.com/tetratelabs/wazero v1.12.0
-	github.com/tidwall/gjson v1.20.1
-	github.com/tidwall/pretty v1.2.2
+	github.com/tidwall/gjson v1.20.2
+	github.com/tidwall/pretty v1.3.0
 	github.com/wk8/go-ordered-map/v2 v2.1.8
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.etcd.io/bbolt v1.5.0
@@ -103,7 +103,7 @@ require (
 	go.uber.org/atomic v1.12.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/exp v0.0.0-20260813180055-c1d0aacb2297
-	golang.org/x/mod v0.42.0
+	golang.org/x/mod v0.43.0
 	golang.org/x/net v0.62.0
 	golang.org/x/oauth2 v0.38.0
 	golang.org/x/sync v0.25.0
@@ -263,7 +263,7 @@ require (
 	github.com/parquet-go/parquet-go v0.25.1 // indirect
 	github.com/pascaldekloe/name v1.0.1 // indirect
 	github.com/paulbellamy/ratecounter v0.2.0 // indirect
-	github.com/paulmach/orb v0.13.0 // indirect
+	github.com/paulmach/orb v0.14.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.33 // indirect
 	github.com/pinax-network/graph-networks-libs/packages/golang v0.8.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
@@ -319,7 +319,7 @@ require (
 	golang.org/x/term v0.47.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
-	golang.org/x/tools v0.51.0 // indirect
+	golang.org/x/tools v0.52.0 // indirect
 	google.golang.org/api v0.304.0 // indirect
 	google.golang.org/genproto v0.0.0-20261012220534-4341edf3f941 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20261012220534-4341edf3f941 // indirect

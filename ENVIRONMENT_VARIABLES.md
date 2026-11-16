@@ -180,9 +180,9 @@ This document lists all environment variables used by the Substreams project, or
 ## General CLI Tool Variables
 
 ### `SF_API_TOKEN`
-**StreamingFast API token fallback**
-- **Purpose**: StreamingFast API token, used as fallback when specific API token environment variable is not set
-- **Usage**: Fallback authentication token in various commands and tools
+**StreamingFast API token fallback (`substreams tools` only)**
+- **Purpose**: StreamingFast API token, used as fallback when a `substreams tools` command's token environment variable is not set
+- **Usage**: Fallback authentication token in `tools/cmd.go` (`ReadAPIToken`) and `wasm/bench/generate.go`. User-facing CLI commands (`run`, `sink`, and so on) use `SUBSTREAMS_API_KEY` (preferred) or `SUBSTREAMS_API_TOKEN` (JWT); see [Authentication](docs/references/authentication.md).
 - **Default**: None
 - **Location**: `tools/cmd.go`, `wasm/bench/generate.go`
 

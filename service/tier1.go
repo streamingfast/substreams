@@ -152,6 +152,9 @@ type Tier1Service struct {
 	execOutMessageBufferSize int
 	execOutPrefetch          execout.PrefetchConfig
 
+	// lastUsedRefreshInterval is how often a running request rewrites its last_used markers; <= 0 disables.
+	lastUsedRefreshInterval time.Duration
+
 	// liveBackFillerFinalBlockDelay overrides the default 120-block delay the
 	// live backfiller waits past a segment end before concluding merged blocks
 	// are safely written. 0 means use the default.
@@ -309,6 +312,7 @@ func NewTier1(
 		sessionPool:              sessionPool,
 		activeRequestsManager:    active_requests.NewActiveRequestsManager(logger),
 		execOutMessageBufferSize: int(outputBufferSize),
+		lastUsedRefreshInterval:  defaultLastUsedRefreshInterval,
 	}
 	s.OnTerminating(func(_ error) {
 		s.activeRequestsWG.Wait()
@@ -687,6 +691,25 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 // can never outlive a request by more than this.
 const cacheMarkerWriteTimeout = 30 * time.Second
 
+const defaultLastUsedRefreshInterval = 6 * time.Hour
+
+// every calls fn each interval until ctx is done; a non-positive interval never calls it.
+func every(ctx context.Context, interval time.Duration, fn func()) {
+	if interval <= 0 {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			fn()
+		}
+	}
+}
+
 // lastUsedFilename names the usage marker written in every module's cache folder:
 // `last_used` for unauthenticated requests, `last_used_<plan>` (lowercase) otherwise.
 // `firecore tools substreams purge` reads the plan back from that name to apply a
@@ -698,19 +721,24 @@ func lastUsedFilename(planTier string) string {
 	return "last_used_" + strings.ToLower(planTier)
 }
 
+// writeLastUsed writes the marker of every used module, continuing past failures.
 func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph, cacheStore dstore.Store) error {
 	filename := lastUsedFilename(reqctx.Details(ctx).PlanTier)
+	date := time.Now().Format("2006-01-02")
+	var errs []error
 	for _, module := range execGraph.UsedModules() {
-		moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes()[module.Name])
+		hash := execGraph.ModuleHashes()[module.Name]
+		moduleStore, err := cacheStore.SubStore(hash)
 		if err != nil {
-			return fmt.Errorf("getting substore: %w", err)
+			errs = append(errs, fmt.Errorf("module %s: getting substore: %w", hash, err))
+			continue
 		}
 		moduleStore.SetOverwrite(true)
-		if err := moduleStore.WriteObject(ctx, filename, strings.NewReader(time.Now().Format("2006-01-02"))); err != nil {
-			return fmt.Errorf("writing %s file", filename)
+		if err := moduleStore.WriteObject(ctx, filename, strings.NewReader(date)); err != nil {
+			errs = append(errs, fmt.Errorf("module %s: writing %s: %w", hash, filename, err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
@@ -864,15 +892,29 @@ func (s *Tier1Service) blocks(
 	s.cacheMarkerWrites.Add(1)
 	go func() {
 		defer s.cacheMarkerWrites.Done()
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cacheMarkerWriteTimeout)
-		defer cancel()
-		if err := s.writePackage(ctx, request, execGraph, cacheStore); err != nil {
+		detached := context.WithoutCancel(ctx)
+		pkgCtx, cancelPkg := context.WithTimeout(detached, cacheMarkerWriteTimeout)
+		if err := s.writePackage(pkgCtx, request, execGraph, cacheStore); err != nil {
 			logger.Warn("cannot write package", zap.Error(err))
 		}
-		if err := s.writeLastUsed(ctx, execGraph, cacheStore); err != nil {
+		cancelPkg()
+		markerCtx, cancelMarker := context.WithTimeout(detached, cacheMarkerWriteTimeout)
+		defer cancelMarker()
+		if err := s.writeLastUsed(markerCtx, execGraph, cacheStore); err != nil {
 			logger.Warn("cannot write 'last_used' file", zap.Error(err))
 		}
 	}()
+
+	// Keep the markers fresh while the request runs.
+	refreshCtx, stopRefresh := context.WithCancel(ctx)
+	defer stopRefresh()
+	go every(refreshCtx, s.lastUsedRefreshInterval, func() {
+		writeCtx, cancel := context.WithTimeout(refreshCtx, cacheMarkerWriteTimeout)
+		defer cancel()
+		if err := s.writeLastUsed(writeCtx, execGraph, cacheStore); err != nil {
+			logger.Warn("cannot refresh 'last_used' file", zap.Error(err))
+		}
+	})
 
 	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), segmentSize, chainFirstStreamableBlock, logger)
 	if err != nil {

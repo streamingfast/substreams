@@ -47,8 +47,10 @@ Exchange an API key for a token with the issuer:
 ```bash
 curl -s -X POST https://auth.thegraph.market/v1/auth/issue \
   -H 'Content-Type: application/json' \
-  -d '{"api_key": "'"$SUBSTREAMS_API_KEY"'"}'
+  -d '{"api_key": "'"$SUBSTREAMS_API_KEY"'", "lifetime": 900}'
 ```
+
+`lifetime` is the requested validity in seconds. Always set it explicitly and keep it short; the example asks for 15 minutes. The issuer may cap the value, so the actual validity is whatever `expires_at` says.
 
 The response carries the token and the moment it stops being valid:
 
@@ -69,7 +71,7 @@ The Substreams clients send the token as-is and **do not refresh it**. When it e
 
 ### Rules for handling JWTs
 
-- Do not assume a fixed lifetime. Read `expires_at` from the issuer response.
+- Always send a short `lifetime` when issuing a token, and do not rely on the issuer's default. The issuer may still cap or adjust it, so read `expires_at` from the issuer response instead of assuming the lifetime you asked for.
 - Issue a new token **before** `expires_at` (leave some margin), not after the first failure.
 - Do not cache a token for longer than its `expires_at`, and do not write it to long-lived files such as `.substreams.env`.
 - Do not request an artificially long lifetime to avoid refreshing. If you need a credential that does not expire, you want an API key.

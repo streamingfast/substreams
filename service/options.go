@@ -179,7 +179,7 @@ func WithLiveBackFillerFinalBlockDelay(delay uint64) Option {
 }
 
 // WithLastUsedRefreshInterval sets how often a running tier1 request rewrites the
-// last_used markers of its modules (default 6h). A value <= 0 writes them only at request start.
+// last_used markers of its modules (default 1h). A value <= 0 writes them only at request start.
 func WithLastUsedRefreshInterval(d time.Duration) Option {
 	return func(a anyTierService) {
 		if s, ok := a.(*Tier1Service); ok {

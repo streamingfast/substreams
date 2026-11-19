@@ -6,6 +6,7 @@ import (
 	"io"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/streamingfast/derr"
@@ -315,30 +316,25 @@ func TestLastUsedFilename(t *testing.T) {
 
 func TestEvery(t *testing.T) {
 	t.Run("calls fn each interval until ctx is done", func(t *testing.T) {
-		var calls atomic.Int32
-		ctx, cancel := context.WithCancel(context.Background())
-		t.Cleanup(cancel)
-		done := make(chan struct{})
-		go func() {
-			every(ctx, 5*time.Millisecond, func() { calls.Add(1) })
-			close(done)
-		}()
+		synctest.Test(t, func(t *testing.T) {
+			var calls atomic.Int32
+			ctx, cancel := context.WithCancel(t.Context())
+			go every(ctx, time.Hour, func() { calls.Add(1) })
 
-		require.Eventually(t, func() bool { return calls.Load() >= 3 }, time.Second, time.Millisecond)
-		cancel()
-		select {
-		case <-done:
-		case <-time.After(time.Second):
-			t.Fatal("every did not return after ctx was canceled")
-		}
-		stopped := calls.Load()
-		time.Sleep(20 * time.Millisecond)
-		assert.Equal(t, stopped, calls.Load(), "fn called after ctx was canceled")
+			time.Sleep(3*time.Hour + time.Minute)
+			synctest.Wait()
+			assert.Equal(t, int32(3), calls.Load())
+
+			// synctest.Test fails if every is still blocked once the bubble ends.
+			cancel()
+			time.Sleep(10 * time.Hour)
+			assert.Equal(t, int32(3), calls.Load(), "fn called after ctx was canceled")
+		})
 	})
 
 	t.Run("non-positive interval never calls fn", func(t *testing.T) {
-		every(context.Background(), 0, func() { t.Fatal("fn called") })
-		every(context.Background(), -time.Second, func() { t.Fatal("fn called") })
+		every(t.Context(), 0, func() { require.Fail(t, "fn called") })
+		every(t.Context(), -time.Second, func() { require.Fail(t, "fn called") })
 	})
 }
 
@@ -390,8 +386,8 @@ func TestWriteLastUsedContinuesPastFailures(t *testing.T) {
 
 func TestLastUsedRefreshIntervalOption(t *testing.T) {
 	s := &Tier1Service{lastUsedRefreshInterval: defaultLastUsedRefreshInterval}
-	WithLastUsedRefreshInterval(time.Hour)(s)
-	assert.Equal(t, time.Hour, s.lastUsedRefreshInterval)
+	WithLastUsedRefreshInterval(2 * time.Hour)(s)
+	assert.Equal(t, 2*time.Hour, s.lastUsedRefreshInterval)
 	WithLastUsedRefreshInterval(0)(s)
 	assert.Zero(t, s.lastUsedRefreshInterval)
 }

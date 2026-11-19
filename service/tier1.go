@@ -691,7 +691,7 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 // can never outlive a request by more than this.
 const cacheMarkerWriteTimeout = 30 * time.Second
 
-const defaultLastUsedRefreshInterval = 6 * time.Hour
+const defaultLastUsedRefreshInterval = time.Hour
 
 // every calls fn each interval until ctx is done; a non-positive interval never calls it.
 func every(ctx context.Context, interval time.Duration, fn func()) {
@@ -705,6 +705,10 @@ func every(ctx context.Context, interval time.Duration, fn func()) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			// select picks randomly when both are ready, don't run fn on an already-canceled ctx.
+			if ctx.Err() != nil {
+				return
+			}
 			fn()
 		}
 	}
@@ -893,11 +897,13 @@ func (s *Tier1Service) blocks(
 	go func() {
 		defer s.cacheMarkerWrites.Done()
 		detached := context.WithoutCancel(ctx)
-		pkgCtx, cancelPkg := context.WithTimeout(detached, cacheMarkerWriteTimeout)
-		if err := s.writePackage(pkgCtx, request, execGraph, cacheStore); err != nil {
-			logger.Warn("cannot write package", zap.Error(err))
-		}
-		cancelPkg()
+		func() {
+			pkgCtx, cancel := context.WithTimeout(detached, cacheMarkerWriteTimeout)
+			defer cancel()
+			if err := s.writePackage(pkgCtx, request, execGraph, cacheStore); err != nil {
+				logger.Warn("cannot write package", zap.Error(err))
+			}
+		}()
 		markerCtx, cancelMarker := context.WithTimeout(detached, cacheMarkerWriteTimeout)
 		defer cancelMarker()
 		if err := s.writeLastUsed(markerCtx, execGraph, cacheStore); err != nil {

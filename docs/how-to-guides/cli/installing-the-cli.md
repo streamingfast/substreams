@@ -14,14 +14,14 @@ brew install streamingfast/tap/substreams
 
 ### Docker Alias (macOS or Linux)
 
-You can use our published Substreams CLI Docker image and assign an alias to Docker. Pass `SUBSTREAMS_API_KEY` into the container so the CLI running inside Docker can authenticate (see [Substreams CLI Authentication](authentication.md)). For advanced JWT use, also pass `SUBSTREAMS_API_TOKEN`.
+You can use our published Substreams CLI Docker image and assign an alias to Docker. Pass `SUBSTREAMS_API_KEY` into the container so the CLI running inside Docker can authenticate (see [Substreams CLI Authentication](authentication.md)).
 
 ```bash
 alias substreams='docker run --rm -it -e SUBSTREAMS_API_KEY -e SUBSTREAMS_API_TOKEN ghcr.io/streamingfast/substreams'
 ```
 
 {% hint style="note" %}
-**Note**: Docker forwards those variables from your host environment when they are set. Use [`substreams auth`](authentication.md) on the host, or export `SUBSTREAMS_API_KEY` yourself. `SF_API_TOKEN` is only a fallback for `substreams tools`, not for `substreams run` and other user-facing commands.
+**Note**: Docker forwards those variables from your host environment when they are set. Use [`substreams auth`](authentication.md) on the host, or export `SUBSTREAMS_API_KEY` yourself.
 {% endhint %}
 
 ### Pre-compiled binary installation (macOS or Linux)

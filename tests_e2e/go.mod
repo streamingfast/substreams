@@ -3,9 +3,9 @@ module github.com/streamingfast/substreams/tests_e2e
 go 1.27.0
 
 require (
-	cloud.google.com/go/pubsub/v2 v2.8.1
+	cloud.google.com/go/pubsub/v2 v2.9.0
 	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/streamingfast/bstream v0.0.2-0.20261112211843-2dad87c33b2a
+	github.com/streamingfast/bstream v0.0.2-0.20261113020143-719404bfada3
 	github.com/streamingfast/dmetering v0.0.0-20260901152443-1ff4cd0d617d
 	github.com/streamingfast/dregistry v0.0.0-20260818204944-2fed3956d4e1
 	github.com/streamingfast/dsession v0.0.0-20260716142251-bdc5686715bf
@@ -193,7 +193,7 @@ require (
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7 // indirect
 	github.com/streamingfast/dgrpc v0.0.0-20260929191947-99e20897ecc7 // indirect
 	github.com/streamingfast/dmetrics v0.0.0-20260819172634-28069dc8018a // indirect
-	github.com/streamingfast/dstore v0.2.4-0.20261109193326-242abd31842d // indirect
+	github.com/streamingfast/dstore v0.2.4-0.20261113015734-ed2936b371f8 // indirect
 	github.com/streamingfast/dummy-blockchain v1.7.10 // indirect
 	github.com/streamingfast/firehose-networks v0.3.1 // indirect
 	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 // indirect

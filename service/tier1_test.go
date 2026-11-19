@@ -3,13 +3,18 @@ package service
 import (
 	"context"
 	"errors"
+	"io"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/shutter"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/exec"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -307,6 +312,84 @@ func TestLastUsedFilename(t *testing.T) {
 	assert.Equal(t, "last_used", lastUsedFilename(""))
 	assert.Equal(t, "last_used_pro", lastUsedFilename("PRO"))
 	assert.Equal(t, "last_used_enterprise", lastUsedFilename("ENTERPRISE"))
+}
+
+func TestEvery(t *testing.T) {
+	t.Run("calls fn each interval until ctx is done", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			var calls atomic.Int32
+			ctx, cancel := context.WithCancel(t.Context())
+			go every(ctx, time.Hour, func() { calls.Add(1) })
+
+			time.Sleep(3*time.Hour + time.Minute)
+			synctest.Wait()
+			assert.Equal(t, int32(3), calls.Load())
+
+			// synctest.Test fails if every is still blocked once the bubble ends.
+			cancel()
+			time.Sleep(10 * time.Hour)
+			assert.Equal(t, int32(3), calls.Load(), "fn called after ctx was canceled")
+		})
+	})
+
+	t.Run("non-positive interval never calls fn", func(t *testing.T) {
+		every(t.Context(), 0, func() { require.Fail(t, "fn called") })
+		every(t.Context(), -time.Second, func() { require.Fail(t, "fn called") })
+	})
+}
+
+func TestWriteLastUsedContinuesPastFailures(t *testing.T) {
+	execGraph, err := exec.NewOutputModuleGraph("map_a", true, &pbsubstreams.Modules{
+		Modules: []*pbsubstreams.Module{
+			{
+				Name: "store_a",
+				Kind: &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{
+					UpdatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
+					ValueType:    "string",
+				}},
+				Inputs: []*pbsubstreams.Module_Input{
+					{Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "test.Block"}}},
+				},
+			},
+			{
+				Name: "map_a",
+				Kind: &pbsubstreams.Module_KindMap_{},
+				Inputs: []*pbsubstreams.Module_Input{
+					{Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "test.Block"}}},
+					{Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{
+						ModuleName: "store_a",
+						Mode:       pbsubstreams.Module_Input_Store_GET,
+					}}},
+				},
+			},
+		},
+		Binaries: []*pbsubstreams.Binary{{Type: "test", Content: []byte("fake")}},
+	}, 0, false)
+	require.NoError(t, err)
+	require.Len(t, execGraph.UsedModules(), 2)
+
+	var writes atomic.Int32
+	cacheStore := dstore.NewMockStore(nil)
+	cacheStore.WriteObjectFunc = func(_ context.Context, base string, _ io.Reader, _ ...string) error {
+		assert.Equal(t, "last_used", base)
+		if writes.Add(1) == 1 {
+			return errors.New("write failed")
+		}
+		return nil
+	}
+
+	ctx := reqctx.WithRequest(context.Background(), &reqctx.RequestDetails{})
+	err = (&Tier1Service{}).writeLastUsed(ctx, execGraph, cacheStore)
+	require.ErrorContains(t, err, "write failed")
+	assert.Equal(t, int32(2), writes.Load(), "a failed write must not skip the other modules")
+}
+
+func TestLastUsedRefreshIntervalOption(t *testing.T) {
+	s := &Tier1Service{lastUsedRefreshInterval: defaultLastUsedRefreshInterval}
+	WithLastUsedRefreshInterval(2 * time.Hour)(s)
+	assert.Equal(t, 2*time.Hour, s.lastUsedRefreshInterval)
+	WithLastUsedRefreshInterval(0)(s)
+	assert.Zero(t, s.lastUsedRefreshInterval)
 }
 
 func TestPendingShutdownCheck(t *testing.T) {

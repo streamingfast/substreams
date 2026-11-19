@@ -503,7 +503,15 @@ func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 		return s.guardSquash(func() loop.Msg {
 			merged, unmerged, err := s.squashStage(stage, run)
 			if err != nil {
-				return MsgMergeFailed{Unit: run[len(merged)], Error: err}
+				// Usually the unit right after the merged prefix, same as before
+				// pipelining. A pipelined upload can fail after every unit of the run
+				// already merged, in which case there is no next unit to point at —
+				// report the last one instead; Unit is informational only.
+				failedUnit := run[len(run)-1]
+				if len(merged) < len(run) {
+					failedUnit = run[len(merged)]
+				}
+				return MsgMergeFailed{Unit: failedUnit, Error: err}
 			}
 			return MsgMergeFinished{Stage: stageIdx, Merged: merged, Unmerged: unmerged}
 		})

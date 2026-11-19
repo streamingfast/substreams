@@ -3,7 +3,7 @@ module github.com/streamingfast/substreams/tests_e2e
 go 1.27.0
 
 require (
-	cloud.google.com/go/pubsub/v2 v2.8.1
+	cloud.google.com/go/pubsub/v2 v2.9.0
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/streamingfast/bstream v0.0.2-0.20261113020143-719404bfada3
 	github.com/streamingfast/dmetering v0.0.0-20260901152443-1ff4cd0d617d

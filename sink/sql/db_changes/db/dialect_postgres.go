@@ -300,12 +300,8 @@ func (d PostgresDialect) DriverSupportRowsAffected() bool {
 	return true
 }
 
-func (d PostgresDialect) OnlyInserts() bool {
-	return false
-}
-
-func (d PostgresDialect) AllowPkDuplicates() bool {
-	return false
+func (d PostgresDialect) Capabilities() DialectCapabilities {
+	return DialectCapabilities{Mutations: true, Reorgs: true}
 }
 
 func (d PostgresDialect) CreateUser(tx Tx, ctx context.Context, l *Loader, username string, password string, database string, readOnly bool) error {

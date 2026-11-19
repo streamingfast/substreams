@@ -156,6 +156,12 @@ func (s *SQLSinker) Run(ctx context.Context) {
 		}()
 	}
 
+	// Once this sink is the writer, and before reading the cursor, which recovery can move.
+	if err := s.loader.RecoverClickhouseStateful(ctx); err != nil {
+		s.Shutdown(fmt.Errorf("recovering clickhouse stateful mode: %w", err))
+		return
+	}
+
 	cursor, rawCursor, mismatchDetected, err := s.loader.GetCursor(ctx, s.OutputModuleHash())
 	if err != nil && !errors.Is(err, db2.ErrCursorNotFound) {
 		s.Shutdown(fmt.Errorf("unable to retrieve cursor: %w", err))
@@ -532,6 +538,7 @@ func (s *SQLSinker) recordFlush(result flushResult) {
 }
 
 func (s *SQLSinker) applyDatabaseChanges(dbChanges *pbdatabase.DatabaseChanges, blockNum, finalBlockNum uint64) error {
+	s.loader.SetCurrentBlock(blockNum)
 	for _, change := range dbChanges.TableChanges {
 		if !s.loader.HasTable(change.Table) {
 			return fmt.Errorf(

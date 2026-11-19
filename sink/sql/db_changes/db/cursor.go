@@ -145,7 +145,7 @@ func (l *Loader) InsertCursor(ctx context.Context, moduleHash string, c *sink.Cu
 		c.Block().Num(),
 		c.Block().ID(),
 	)
-	if _, err := l.execer().ExecContext(ctx, query); err != nil {
+	if _, err := l.execer().ExecContext(synchronousInserts(ctx), query); err != nil {
 		return fmt.Errorf("insert cursor: %w", err)
 	}
 

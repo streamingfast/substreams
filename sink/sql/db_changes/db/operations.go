@@ -52,6 +52,7 @@ type Operation struct {
 	data               map[string]FieldData
 	ordinal            uint64
 	reversibleBlockNum *uint64 // nil if that block is known to be irreversible
+	blockNum           uint64  // the block the change comes from, see Loader.SetCurrentBlock
 }
 
 func (o *Operation) String() string {
@@ -66,6 +67,7 @@ func (l *Loader) newInsertOperation(table *TableInfo, primaryKey map[string]stri
 		data:               data,
 		ordinal:            ordinal,
 		reversibleBlockNum: reversibleBlockNum,
+		blockNum:           l.currentBlockNum,
 	}
 }
 
@@ -77,6 +79,7 @@ func (l *Loader) newUpsertOperation(table *TableInfo, primaryKey map[string]stri
 		data:               data,
 		ordinal:            ordinal,
 		reversibleBlockNum: reversibleBlockNum,
+		blockNum:           l.currentBlockNum,
 	}
 }
 
@@ -88,6 +91,7 @@ func (l *Loader) newUpdateOperation(table *TableInfo, primaryKey map[string]stri
 		data:               data,
 		ordinal:            ordinal,
 		reversibleBlockNum: reversibleBlockNum,
+		blockNum:           l.currentBlockNum,
 	}
 }
 
@@ -98,6 +102,7 @@ func (l *Loader) newDeleteOperation(table *TableInfo, primaryKey map[string]stri
 		primaryKey:         primaryKey,
 		ordinal:            ordinal,
 		reversibleBlockNum: reversibleBlockNum,
+		blockNum:           l.currentBlockNum,
 	}
 }
 

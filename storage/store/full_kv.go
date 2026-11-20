@@ -175,10 +175,25 @@ func (s *FullKV) Delete(ctx context.Context, file *FileInfo) error {
 	return nil
 }
 
-func (s *FullKV) Load(ctx context.Context, file *FileInfo) error {
+// fullKVLoadAttempts bounds the reads of a snapshot before a stream error is reported as
+// ErrInvalidFullKVFile: a dropped connection fails once, a corrupt file fails every time.
+const fullKVLoadAttempts = 2
+
+func (s *FullKV) Load(ctx context.Context, file *FileInfo) (err error) {
 	s.loadedFrom = file.Filename
 	s.logger.Debug("loading full store state from file", zap.String("fileName", file.Filename))
 
+	for attempt := 1; attempt <= fullKVLoadAttempts; attempt++ {
+		err = s.load(ctx, file)
+		if !errors.Is(err, ErrInvalidFullKVFile) {
+			return err
+		}
+		s.logger.Warn("cannot read full store state", zap.String("fileName", file.Filename), zap.Int("attempt", attempt), zap.Error(err))
+	}
+	return err
+}
+
+func (s *FullKV) load(ctx context.Context, file *FileInfo) error {
 	reader, err := loadStoreStream(ctx, s.objStore, file.Filename)
 	if err != nil {
 		if errors.Is(err, dstore.ErrNotFound) {

@@ -24,8 +24,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/encoding"
@@ -78,31 +76,28 @@ func ListenTier1(
 
 	for _, addr := range listenAddresses {
 		go func() {
-			h2s := &http2.Server{
-				MaxConcurrentStreams: 1000,
+			errorLogger, err := zap.NewStdLogAt(logger, zap.ErrorLevel)
+			if err != nil {
+				logger.Error("failed to start grpc server", zap.Error(err))
+				grpcServer.Shutdown(0)
+				return
 			}
-			handler := h2c.NewHandler(drainRejectedRequestBody(rootMux), h2s)
+
+			// dgrpc's NewHTTPServer applies the HTTP/2 settings (server PINGs) on both the TLS
+			// and the cleartext (h2c) path; a plain http2.Server given to h2c.NewHandler is
+			// ignored by net/http on TLS connections.
+			httpOptions := dgrpcserver.NewOptions()
 
 			if strings.Contains(addr, "*") {
+				dgrpcserver.WithInsecureServer()(httpOptions)
+				httpServer := dgrpcserver.NewHTTPServer(drainRejectedRequestBody(rootMux), httpOptions, errorLogger)
+
 				cleanAddr := strings.ReplaceAll(addr, "*", "")
 				tcpListener, err := net.Listen("tcp", cleanAddr)
 				if err != nil {
 					logger.Error("failed to start secure grpc server", zap.Error(err))
 					grpcServer.Shutdown(0)
 					return
-				}
-
-				errorLogger, err := zap.NewStdLogAt(logger, zap.ErrorLevel)
-				if err != nil {
-					logger.Error("failed to start secure grpc server", zap.Error(err))
-					grpcServer.Shutdown(0)
-					return
-				}
-
-				httpServer := &http.Server{
-					Handler:   handler,
-					ErrorLog:  errorLogger,
-					TLSConfig: dgrpcserver.SecuredByBuiltInSelfSignedCertificate().AsTLSConfig(),
 				}
 
 				logger.Info("serving gRPC (over HTTP router) (secure)", zap.String("listen_addr", addr))
@@ -112,8 +107,11 @@ func ListenTier1(
 					return
 				}
 			} else {
+				httpServer := dgrpcserver.NewHTTPServer(drainRejectedRequestBody(rootMux), httpOptions, errorLogger)
+				httpServer.Addr = addr
+
 				logger.Info("serving gRPC (over HTTP router) (plain-text)", zap.String("listen_addr", addr))
-				if err := http.ListenAndServe(addr, handler); err != nil {
+				if err := httpServer.ListenAndServe(); err != nil {
 					logger.Error("failed to start secure proxy server", zap.Error(err))
 					grpcServer.Shutdown(0)
 				}

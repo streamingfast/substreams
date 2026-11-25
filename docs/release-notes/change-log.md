@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Fix tier1 placing the linear handoff above the last merged-blocks file when the merger is behind, which left tier2 jobs waiting for files that were not written yet.
 - Fix `firecore tools substreams purge` deleting module caches still used by long-running tier1 requests: tier1 now rewrites the `last_used` markers every hour while a request runs, instead of only at its start. `service.WithLastUsedRefreshInterval` changes the interval, and zero or less writes them only at request start.
 
+### Security
+
+- Bump `golang.org/x/crypto` to `v0.58.1-0.20261009181718-2f1f834330b2` to fix GO-2026-5932.
+
 ## v1.27.0
 
 ### Docker

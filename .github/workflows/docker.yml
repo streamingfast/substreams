@@ -52,6 +52,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Release and moving tags, promoted by the image-scan gate only once the image is clean.
+      # Also the source of the labels/annotations put on the built image.
       - name: Generate docker tags/labels from github build context
         id: meta
         uses: docker/metadata-action@v6
@@ -64,6 +66,15 @@ jobs:
             type=edge,branch=develop
           flavor: |
             latest=${{ startsWith(github.ref, 'refs/tags/') }}
+
+      # The immutable commit tag, the only one pushed by the build and the one scanned by the gate
+      - name: Generate docker commit tag
+        id: sha-tag
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
 
       - name: Extract version
         id: extract-version
@@ -82,23 +93,21 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.sha-tag.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ steps.extract-version.outputs.VERSION }}
 
-      - name: Compute short SHA
-        id: sha
-        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-
       # The image is always built, only the scan is skipped on pull requests that cannot change its contents.
-      # Branch/tag pushes always scan (the release gate stays strict).
+      # Branch/tag pushes always scan (the release gate stays strict) and the release tags (vX.Y.Z, develop, edge,
+      # latest) only exist once the scan is clean, the build pushes the commit tag alone.
       - name: Scan the image
         if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]' }}
         uses: streamingfast/actions/image-scan/gate@v1
         with:
-          # Single multi-arch image tagged with the short SHA, no per-architecture suffix
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sha.outputs.short }}
+          # Single multi-arch image tagged with the short SHA, no per-architecture suffix, exactly the tag pushed by the build
+          image: ${{ steps.sha-tag.outputs.tags }}
+          promote-tags: ${{ steps.meta.outputs.tags }}
           dockerhub-user: ${{ secrets.DOCKER_SCOUT_USER }}
           dockerhub-password: ${{ secrets.DOCKER_SCOUT_PASSWORD }}
           github-token: ${{ secrets.PR_COMMENTER }}

@@ -75,6 +75,7 @@ func TestEmptyPartialKVs(t *testing.T) {
 		}
 	})
 	missing := NewPartialFileInfo("test", 40, 50)
+	withDeletedKey := writePartial(t, cfg, 50, 60, func(p *PartialKV) { p.DeleteKey(0, "k") })
 
 	emptySize, err := cfg.FileSize(ctx, empty)
 	require.NoError(t, err)
@@ -83,7 +84,7 @@ func TestEmptyPartialKVs(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, largeSize, int64(maxEmptyPartialSize))
 
-	got, err := cfg.EmptyPartialKVs(ctx, []*FileInfo{empty, withKey, withDeletedPrefix, large, missing})
+	got, err := cfg.EmptyPartialKVs(ctx, []*FileInfo{empty, withKey, withDeletedPrefix, large, missing, withDeletedKey})
 	require.NoError(t, err)
 
 	assert.Equal(t, map[string]bool{empty.Filename: true}, got)

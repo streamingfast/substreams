@@ -19,9 +19,11 @@ type PartialKV struct {
 
 	initialBlock    uint64 // block at which we initialized this store
 	DeletedPrefixes []string
+	DeletedKeys     []string
 
 	loadedFrom string
 	seen       map[string]bool
+	seenKeys   map[string]bool
 }
 
 func (p *PartialKV) Roll(lastBlock uint64) {
@@ -44,8 +46,9 @@ func (p *PartialKV) Load(ctx context.Context, file *FileInfo) error {
 	}
 	defer reader.Close()
 
-	size, err := unmarshalIterInto(ctx, p.kvImpl, p.marshaller, reader, func(deletePrefixes []string) {
+	size, err := unmarshalIterInto(ctx, p.kvImpl, p.marshaller, reader, func(deletePrefixes, deleteKeys []string) {
 		p.DeletedPrefixes = deletePrefixes
+		p.DeletedKeys = deleteKeys
 	})
 	if err != nil {
 		return fmt.Errorf("unmarshal store (streaming): %w", err)
@@ -65,7 +68,7 @@ func (p *PartialKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error
 	if err != nil {
 		return nil, nil, fmt.Errorf("snapshotting store %q: %w", p.name, err)
 	}
-	reader := p.marshaller.MarshalStreamSnapshot(snap, p.DeletedPrefixes)
+	reader := p.marshaller.MarshalStreamSnapshot(snap, p.DeletedPrefixes, p.DeletedKeys)
 
 	fw := &fileWriter{
 		store:    p.objStore,
@@ -82,6 +85,15 @@ func (p *PartialKV) DeletePrefix(ord uint64, prefix string) {
 	if !p.seen[prefix] {
 		p.DeletedPrefixes = append(p.DeletedPrefixes, prefix)
 		p.seen[prefix] = true
+	}
+}
+
+func (p *PartialKV) DeleteKey(ord uint64, key string) {
+	p.baseStore.DeleteKey(ord, key)
+
+	if !p.seenKeys[key] {
+		p.DeletedKeys = append(p.DeletedKeys, key)
+		p.seenKeys[key] = true
 	}
 }
 

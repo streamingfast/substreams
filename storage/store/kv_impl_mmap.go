@@ -44,7 +44,7 @@ type mmapKVImpl struct {
 	db        *bbolt.DB
 	path      string
 	storeName string
-	noSync    bool // if true, bbolt skips fsync on each write
+	noSync    bool         // if true, bbolt skips fsync on each write
 	keyCount  atomic.Int64 // tracked in-memory to avoid O(N) bucket.Stats() traversal; atomic because
 	// write paths mutate it while holding only the shared snapMu.RLock() side.
 
@@ -440,6 +440,7 @@ func (b *mmapKVImpl) Load(it iter.Seq2[marshaller.StoreDataEntry, error]) (*mars
 		}
 		if t := entry.Trailer(); t != nil {
 			trailer.DeletePrefixes = append(trailer.DeletePrefixes, t.DeletePrefixes...)
+			trailer.DeleteKeys = append(trailer.DeleteKeys, t.DeleteKeys...)
 			if t.TotalSizeBytes > 0 {
 				trailer.TotalSizeBytes = t.TotalSizeBytes
 			}

@@ -40,7 +40,7 @@ func TestMmapSnapshotLoadRoundTrip_ByteExact(t *testing.T) {
 	snap, err := src.Snapshot()
 	require.NoError(t, err)
 	vt := &marshaller.VTproto{}
-	reader := vt.MarshalStreamSnapshot(snap, nil)
+	reader := vt.MarshalStreamSnapshot(snap, nil, nil)
 	defer reader.Close()
 
 	// Production mmap load path: UnmarshalIter -> Load into a fresh mmap store.

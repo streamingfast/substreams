@@ -77,6 +77,18 @@ var StateFuncs = []funcs{
 		}),
 	},
 	{
+		"delete_key",
+		[]parm{i64, i32, i32},
+		[]parm{},
+		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			ord := stack[0]
+			key := readStringFromStack(mod, stack[1:])
+			call := wasm.FromContext(ctx)
+
+			call.DoDeleteKey(ord, key)
+		}),
+	},
+	{
 		"add_bigint",
 		[]parm{i64, i32, i32, i32, i32},
 		[]parm{},

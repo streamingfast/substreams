@@ -100,7 +100,7 @@ func loadStoreStream(ctx context.Context, store dstore.Store, filename string) (
 }
 
 // unmarshalIterInto streams entries from an UnmarshalIter call directly into the kvImpl.
-func unmarshalIterInto(ctx context.Context, impl KVImpl, um marshaller.StreamMarshaller, reader io.Reader, onTrailer func(deletePrefixes []string)) (uint64, error) {
+func unmarshalIterInto(ctx context.Context, impl KVImpl, um marshaller.StreamMarshaller, reader io.Reader, onTrailer func(deletePrefixes, deleteKeys []string)) (uint64, error) {
 	var totalSizeBytes uint64
 
 	trailer, err := impl.Load(withCancelCheck(ctx, um.UnmarshalIter(reader, 10*1024*1024)))
@@ -112,7 +112,7 @@ func unmarshalIterInto(ctx context.Context, impl KVImpl, um marshaller.StreamMar
 	if trailer != nil {
 		totalSizeBytes = trailer.TotalSizeBytes
 		if onTrailer != nil {
-			onTrailer(trailer.DeletePrefixes)
+			onTrailer(trailer.DeletePrefixes, trailer.DeleteKeys)
 		}
 	}
 

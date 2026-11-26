@@ -47,6 +47,7 @@ message Operation {
         SET_SUM_FLOAT64 = 19;
         SET_SUM_BIG_INT = 20;
         SET_SUM_BIG_DECIMAL = 21;
+        DELETE_KEY = 22;
     }
 
     Type type = 1;

@@ -103,6 +103,7 @@ func (m *memoryKVImpl) Load(it iter.Seq2[marshaller.StoreDataEntry, error]) (*ma
 		}
 		if t := entry.Trailer(); t != nil {
 			trailer.DeletePrefixes = append(trailer.DeletePrefixes, t.DeletePrefixes...)
+			trailer.DeleteKeys = append(trailer.DeleteKeys, t.DeleteKeys...)
 			if t.TotalSizeBytes > 0 {
 				trailer.TotalSizeBytes = t.TotalSizeBytes
 			}

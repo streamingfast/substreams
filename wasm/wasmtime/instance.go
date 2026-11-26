@@ -147,6 +147,7 @@ func (i *instance) registerStateImports(linker *wasmtime.Linker) error {
 	functions["set_if_not_exists"] = i.setIfNotExists
 	functions["append"] = i.append
 	functions["delete_prefix"] = i.deletePrefix
+	functions["delete_key"] = i.deleteKey
 	functions["set_sum_int64"] = i.setSumInt64
 	functions["set_sum_float64"] = i.setSumFloat64
 	functions["set_sum_bigint"] = i.setSumBigInt

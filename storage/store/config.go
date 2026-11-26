@@ -190,6 +190,7 @@ func (c *Config) NewPartialKV(initialBlock uint64, logger *zap.Logger) *PartialK
 		baseStore:    c.newBaseStoreWithBackend(logger, &MemoryBackendConfig{}),
 		initialBlock: initialBlock,
 		seen:         make(map[string]bool),
+		seenKeys:     make(map[string]bool),
 	}
 }
 

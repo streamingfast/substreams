@@ -48,6 +48,15 @@ func (m *StoreData) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if len(m.DeleteKeys) > 0 {
+		for iNdEx := len(m.DeleteKeys) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.DeleteKeys[iNdEx])
+			copy(dAtA[i:], m.DeleteKeys[iNdEx])
+			i = encodeVarint(dAtA, i, uint64(len(m.DeleteKeys[iNdEx])))
+			i--
+			dAtA[i] = 0x1a
+		}
+	}
 	if len(m.DeletePrefixes) > 0 {
 		for iNdEx := len(m.DeletePrefixes) - 1; iNdEx >= 0; iNdEx-- {
 			i -= len(m.DeletePrefixes[iNdEx])
@@ -107,6 +116,12 @@ func (m *StoreData) SizeVT() (n int) {
 	}
 	if len(m.DeletePrefixes) > 0 {
 		for _, s := range m.DeletePrefixes {
+			l = len(s)
+			n += 1 + l + sov(uint64(l))
+		}
+	}
+	if len(m.DeleteKeys) > 0 {
+		for _, s := range m.DeleteKeys {
 			l = len(s)
 			n += 1 + l + sov(uint64(l))
 		}
@@ -311,6 +326,38 @@ func (m *StoreData) UnmarshalVT(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.DeletePrefixes = append(m.DeletePrefixes, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DeleteKeys", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLength
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DeleteKeys = append(m.DeleteKeys, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

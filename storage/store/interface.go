@@ -136,6 +136,7 @@ type Appender interface {
 
 type Deleter interface {
 	DeletePrefix(ord uint64, prefix string)
+	DeleteKey(ord uint64, key string)
 	//// Deletes a range of keys, lexicographically between `lowKey` and `highKey`
 	//DeleteRange(lowKey, highKey string)
 	//// Deletes a range of keys, first considering the _value_ of such keys as a _pointerSeparator_-separated list of keys to _also_ delete.

@@ -49,7 +49,7 @@ substreams run -e mainnet.elysium.streamingfast.io:443 substreams.yaml [module_n
 
 ## Step 4: Load the Data
 
-To make your Substreams queryable (as opposed to [direct streaming](../how-to-guides/sinks/stream/stream.md)), you can automatically send the data to a SQL database by using the [SQL sink](../how-to-guides/sinks/sql/sql.md) or through [PubSub](../how-to-guides/sinks/pubsub.md).
+To make your Substreams queryable (as opposed to [direct streaming](../how-to-guides/sinks/grpc/grpc.md)), you can automatically send the data to a SQL database by using the [SQL sink](../how-to-guides/sinks/sql/sql.md) or through [PubSub](../how-to-guides/sinks/pubsub.md).
 
 ## Elysium Specifics
 

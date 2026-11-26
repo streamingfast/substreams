@@ -1,4 +1,4 @@
-# Key/value store
+# KV
 
 ## Purpose
 
@@ -16,13 +16,13 @@ A Connect-Web interface makes the data available directly from the `substreams-s
 
 * An existing substreams (including `substreams.yaml` and Rust code) that you want to instrument for `substreams-sink-kv`.
 * A key-value store where you want to send your data (a badger local file can be used for development)
-* Knowledge about Substreams development (start [here](../../../../tutorials/intro-to-tutorials.md))
+* Knowledge about Substreams development (start [here](../../tutorials/intro-to-tutorials.md))
 * Rust installation and compiler
 
 ## Installation
 
 * Install [substreams-sink-kv CLI](https://github.com/streamingfast/substreams-sink-kv/releases)
-* Install [substreams CLI](../../../cli/installing-the-cli.md)
+* Install [substreams CLI](../cli/installing-the-cli.md)
 * Install [grpcurl](https://github.com/fullstorydev/grpcurl/releases) to easily read the data back from the KV store
 
 ## Instrumenting your Substreams
@@ -60,7 +60,7 @@ message BlockMeta {
 ### Import the Cargo module
 
 {% hint style="info" %}
-**Compatibility**: `substreams-sink-kv` 0.2.0 generates its protobuf types with buffa and requires `substreams` 0.8.0 or above. For `substreams` 0.5 to 0.7, pin `substreams-sink-kv = "0.1.3"`, which generates its types with prost. See [Migrating from prost to buffa](../../../../references/migrating-to-buffa.md).
+**Compatibility**: `substreams-sink-kv` 0.2.0 generates its protobuf types with buffa and requires `substreams` 0.8.0 or above. For `substreams` 0.5 to 0.7, pin `substreams-sink-kv = "0.1.3"`, which generates its types with prost. See [Migrating from prost to buffa](../../references/migrating-to-buffa.md).
 {% endhint %}
 
 1. Add the `substreams-sink-kv` crate to your `Cargo.toml`:
@@ -157,7 +157,7 @@ substreams build
 substreams run -e mainnet.eth.streamingfast.io:443 substreams.yaml kv_out --start-block 1000000 --stop-block +1
 ```
 
-> **Note** To connect to a public StreamingFast substreams endpoint, you will need an authentication token, follow this [guide](../../../cli/authentication.md) to obtain one.
+> **Note** To connect to a public StreamingFast substreams endpoint, you will need an authentication token, follow this [guide](../cli/authentication.md) to obtain one.
 
 1. Run with `substreams-sink-kv`:
 
@@ -288,4 +288,4 @@ See [kvdb](https://github.com/streamingfast/kvdb) for more details.
 
 ## Conclusion and review
 
-The ability to route data extracted from the blockchain by using Substreams is powerful and useful. Key-value stores aren't the only type of sink the data extracted by Substreams can be piped into. Review the core Substreams sinks documentation for [additional information on other types of sinks](../../sinks.md) and sinking strategies.
+The ability to route data extracted from the blockchain by using Substreams is powerful and useful. Key-value stores aren't the only type of sink the data extracted by Substreams can be piped into. Review the core Substreams sinks documentation for [additional information on other types of sinks](sinks.md) and sinking strategies.

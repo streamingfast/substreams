@@ -2,3 +2,12 @@ root: ./docs/
 
 structure:
   summary: SUMMARY.md
+
+redirects:
+  how-to-guides/sinks/stream: how-to-guides/sinks/grpc/grpc.md
+  how-to-guides/sinks/stream/go: how-to-guides/sinks/grpc/go.md
+  how-to-guides/sinks/stream/javascript: how-to-guides/sinks/grpc/javascript.md
+  how-to-guides/sinks/community-sinks: how-to-guides/sinks/sinks.md
+  how-to-guides/sinks/community-sinks/mongodb: how-to-guides/sinks/mongodb.md
+  how-to-guides/sinks/community-sinks/kv: how-to-guides/sinks/kv.md
+  how-to-guides/sinks/community-sinks/prometheus: how-to-guides/sinks/prometheus.md

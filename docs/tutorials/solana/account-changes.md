@@ -47,7 +47,7 @@ This tutorial will continue to guide you through filtering, sinking the data, an
 
 ## Step 2: Sink the Substreams
 
-Consume the account stream [directly in your applicaion](../../how-to-guides/sinks/stream/stream.md) using a callback or make it queryable by using the [Substreams:SQL sink](../../how-to-guides/sinks/sql/sql.md).
+Consume the account stream [directly in your application](../../how-to-guides/sinks/grpc/grpc.md) using a callback or make it queryable by using the [SQL sink](../../how-to-guides/sinks/sql/sql.md).
 
 ## Step 3: Setting up a Reconnection Policy
 

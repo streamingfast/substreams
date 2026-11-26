@@ -339,7 +339,7 @@ Now that you have a working local environment:
 
 1. **Try Other Platforms** - Explore [Foundry](foundry.md) or [Solana](../../solana/local-development/anchor.md) local development
 2. **Advanced Substreams** - Learn about [modules](../../../../references/substreams-components/modules/modules.md), [manifests](../../../../references/substreams-components/manifests.md), and [data transformations](../../generic/using-rust-proto.md)
-3. **Consuming Substreams** - Connect to [databases](../../../sinks/sql/sql.md) or [streaming platforms](../../../sinks/stream/stream.md)
+3. **Consuming Substreams** - Connect to [databases](../../../sinks/sql/sql.md) or [streaming platforms](../../../sinks/grpc/grpc.md)
 4. **Production Deployment** - Move to [production endpoints](../../../../references/chains-and-endpoints.md)
 
 ## Additional Resources

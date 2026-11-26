@@ -8,8 +8,9 @@ There are many ready-to-use Substreams packages available. You can explore these
 
 Once you find a package that fits your needs, you can choose how you want to consume the data:
 - **[SQL Database](./how-to-guides/sinks/sql/sql.md)**: Send the data to a database.
-- **[Direct Streaming](./how-to-guides/sinks/stream/stream.md)**: Stream data directly to your application.
+- **[gRPC](./how-to-guides/sinks/grpc/grpc.md)**: Stream data directly to your application.
 - **[PubSub](./how-to-guides/sinks/pubsub.md)**: Send data to a PubSub topic.
+- **[All sinks](./how-to-guides/sinks/sinks.md)**: Webhook, files, and more.
 
 <figure><img src=".gitbook/assets/intro/consume-flow.png" width="100%" /></figure>
 

@@ -4,7 +4,7 @@ description: Learn how to read the progress and performance output the SQL sink 
 
 # Progress & Performance Output Reference
 
-A running `substreams-sink-sql` prints two independent things on a loop:
+A running SQL sink (`substreams sink postgres` or `substreams sink clickhouse`) prints two independent things on a loop:
 
 - a **one-line stream summary**, `substreams stream stats`, emitted by the sink library
   ([`sink/stats.go`](https://github.com/streamingfast/substreams/blob/develop/sink/stats.go)) every 15s (5s in development mode). It describes the

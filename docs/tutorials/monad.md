@@ -40,7 +40,7 @@ The CLI installation is supported only on Linux and macOS. If you're using Windo
 
 ## Step 3: Load the Data
 
-To make your Substreams queryable (as opposed to [direct streaming](../how-to-guides/sinks/stream/stream.md)), you can automatically send the data to a SQL data by using the [SQL sink](../how-to-guides/sinks/sql/sql.md) or through [PubSub](../how-to-guides/sinks/pubsub.md).
+To make your Substreams queryable (as opposed to [direct streaming](../how-to-guides/sinks/grpc/grpc.md)), you can automatically send the data to a SQL data by using the [SQL sink](../how-to-guides/sinks/sql/sql.md) or through [PubSub](../how-to-guides/sinks/pubsub.md).
 
 ## Additional Resources
 

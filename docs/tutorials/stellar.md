@@ -60,7 +60,7 @@ Within the generated directories, modify your Substreams modules to include addi
 
 ## Step 3: Load the Data
 
-To make your Substreams queryable (as opposed to [direct streaming](../how-to-guides/sinks/stream/stream.md)), you can automatically generate a SQL sink.
+To make your Substreams queryable (as opposed to [direct streaming](../how-to-guides/sinks/grpc/grpc.md)), you can automatically generate a SQL sink.
 
 
 ## Additional Resources

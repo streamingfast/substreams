@@ -323,6 +323,22 @@ substreams protogen ./substreams.yaml
 cat substreams.yaml | substreams protogen "-"
 ```
 
+### `estimate`
+
+The `estimate` command estimates the processed blocks and egress bytes a module costs over a block range. The endpoint runs a sample of the range (`--sample-percentage`, 1% by default) and extrapolates from it. Use `estimate-local` against an endpoint that does not support remote estimation.
+
+```bash
+substreams estimate ./substreams.yaml map_events -s 20000000 -t +1000000
+```
+
+### `sink`
+
+The `sink` command runs a built-in sink: `postgres`, `clickhouse`, `pubsub`, `webhook`, `protojson`, and `noop`. See [Consuming Substreams](../../how-to-guides/sinks/sinks.md).
+
+```bash
+substreams sink postgres ./substreams.yaml --dsn "$DSN"
+```
+
 ### **`codegen`**
 
 The `codegen` command generates a code for a specific sink taking a Substreams module as input.

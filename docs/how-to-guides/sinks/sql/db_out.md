@@ -16,7 +16,7 @@ The `substreams.yaml` file of your package must contain the sink configuration:
 
 ```yaml
 sink:
-  module: map_program_data
+  module: db_out
   type: sf.substreams.sink.sql.v1.Service
   config:
     engine: postgres
@@ -29,7 +29,7 @@ Consider that you want to dump all the Pump.Fun data decoded with an IDL into yo
 
 Clone the [Pump Fun Substreams GitHub repository](https://github.com/enoldev/pump-fun-substreams).
 
-### Inpsect the Project
+### Inspect the Project
 
 - Observe the `substreams.yaml` file:
 
@@ -60,10 +60,11 @@ modules:
 network: solana-mainnet 
 
 sink: # 3.
-  module: map_program_data
+  module: db_out
   type: sf.substreams.sink.sql.v1.Service
   config:
     engine: postgres
+    schema: schema.sql
 ```
 
 1. The `map_program_data` module maps a Solana `Block` to the different instructions and events of the Pump.Fun IDL.
@@ -92,3 +93,5 @@ substreams sink postgres setup ./substreams.yaml --dsn $DSN
 ```bash
 substreams sink postgres ./substreams.yaml --dsn $DSN
 ```
+
+To use ClickHouse instead, set `engine: clickhouse` in the `sink` section, write a ClickHouse `schema.sql`, and run the same commands with `substreams sink clickhouse` and a `clickhouse://` DSN.

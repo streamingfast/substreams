@@ -1,46 +1,50 @@
-Once you find a package that fits your needs, you can choose how you want to consume the data. Sinks are integrations that allow you to send the extracted data to different destinations, such as a SQL database, or a file.
+Once you find a package that fits your needs, you can choose how you want to consume the data. Sinks are integrations that send the extracted data to a destination, such as a SQL database, a message queue, or files.
+
+Most sinks are built into the [Substreams CLI](../cli/installing-the-cli.md) as `substreams sink <name>`. There is nothing else to install.
 
 {% hint style="info" %}
 **Tip**: Building a SQL sink? The [substreams-sql agent skill](../develop-your-own-substreams/generic/agent-skills.md) gives your AI coding assistant expert knowledge on Database Changes Mode (CDC) patterns, Relational Mappings Mode, PostgreSQL, and ClickHouse schema design.
 {% endhint %}
 
 {% hint style="info" %}
-**Note**: Some of the sinks are officially supported by StreamingFast (i.e. active support is provided), but other sinks are community-driven and support can’t be guaranteed.
+**Hosted Sinks**: Let StreamingFast run your PostgreSQL or ClickHouse sink for you, with no infrastructure to manage. See [Hosted Sinks](../hosted-services/hosted-sinks.md) and [Hosted Services](../hosted-services/hosted-services.md).
 {% endhint %}
 
-- [Hosted Sinks](../hosted-services/hosted-sinks.md): Let StreamingFast run your sink for you — no infrastructure to manage. See [Hosted Services](../hosted-services/hosted-services.md) for the full hosted offering, including Hosted Stores.
-- [SQL Database](./sql/sql.md): Send the data to a database.
-- [Direct Streaming](./stream/stream.md): Stream data directly from your application.
-- [PubSub](./pubsub.md): Send data to a PubSub topic.
-- [Community Sinks](../sinks/community): Explore quality community maintained sinks.
+## Sinks
 
-## Navigating Sink Repos
+| Sink | How to run | Maintainer |
+|------|------------|------------|
+| [PostgreSQL](./sql/sql.md) | `substreams sink postgres` | StreamingFast |
+| [ClickHouse](./sql/sql.md) | `substreams sink clickhouse` | StreamingFast |
+| [PubSub](./pubsub.md) | `substreams sink pubsub` | StreamingFast |
+| [Webhook](./webhook.md) | `substreams sink webhook` | StreamingFast |
+| [ProtoJSON](./protojson.md) | `substreams sink protojson` | StreamingFast |
+| [Noop](./noop.md) | `substreams sink noop` | StreamingFast |
+| [Files](./files.md) (CSV, Parquet) | [substreams-sink-files](https://github.com/streamingfast/substreams-sink-files) | StreamingFast |
+| [KV](./kv.md) | [substreams-sink-kv](https://github.com/streamingfast/substreams-sink-kv) | StreamingFast |
+| [MongoDB](./mongodb.md) | [substreams-sink-mongodb](https://github.com/streamingfast/substreams-sink-mongodb) | StreamingFast |
+| [Prometheus](./prometheus.md) | [substreams-sink-prometheus](https://github.com/pinax-network/substreams-sink-prometheus) (archived) | Pinax |
+| CSV | [substreams-sink-csv](https://github.com/pinax-network/substreams-sink-csv) | Pinax |
+| Webhook (JS) | [substreams-sink-webhook](https://github.com/pinax-network/substreams-sink-webhook) | Pinax |
 
-### Official
+## gRPC
 
-| Name       | Support | Maintainer       | Source Code |
-|------------|---------|------------------|-------------|
-| SQL        | O       | StreamingFast    |[substreams sink postgres, substreams sink clickhouse](https://github.com/streamingfast/substreams/tree/develop/sink/sql)|
-| Go SDK     | O       | StreamingFast    |[substreams/sink](https://github.com/streamingfast/substreams/tree/develop/sink)|
-| Rust SDK   | O       | StreamingFast    |[substreams-sink-rust](https://github.com/streamingfast/substreams-sink-rust) (archived)|
-| JS SDK     | O       | StreamingFast    |[substreams-js](https://github.com/substreams-js/substreams-js)|
-| KV Store   | O       | StreamingFast    |[substreams-sink-kv](https://github.com/streamingfast/substreams-sink-kv)|
-| PubSub     | O       | StreamingFast    |[substreams sink pubsub](https://github.com/streamingfast/substreams/tree/develop/sink/pubsub), [substreams-sink-pubsub](https://github.com/streamingfast/substreams-sink-pubsub)|
-| ProtoJSON  | O       | StreamingFast    |[substreams-sink-protojson](https://github.com/streamingfast/substreams/tree/develop/sink/protojson)|
-| Webhook    | O       | StreamingFast    |[substreams-sink-webhook](https://github.com/streamingfast/substreams/tree/develop/sink/webhook)|
-| Noop       | O       | StreamingFast    |[substreams-sink-noop](https://github.com/streamingfast/substreams/tree/develop/sink/noop)|
-| Prometheus | O       | Pinax            |[substreams-sink-prometheus](https://github.com/pinax-network/substreams-sink-prometheus)|
-| Webhook(JS)| O       | Pinax            |[substreams-sink-webhook](https://github.com/pinax-network/substreams-sink-webhook)|
-| CSV        | O       | Pinax            |[substreams-sink-csv](https://github.com/pinax-network/substreams-sink-csv)|
+To consume Substreams from your own application, stream the data over [gRPC](./grpc/grpc.md):
 
-### Community
+| Language | Library | Maintainer |
+|----------|---------|------------|
+| [Go](./grpc/go.md) | [substreams/sink](https://github.com/streamingfast/substreams/tree/develop/sink) | StreamingFast |
+| [JavaScript](./grpc/javascript.md) | [substreams-js](https://github.com/substreams-js/substreams-js) | StreamingFast |
+| Rust | [substreams-sink-examples/rust](https://github.com/streamingfast/substreams-sink-examples/tree/master/rust) | StreamingFast |
+| Python | [substreams-sink-examples/python](https://github.com/streamingfast/substreams-sink-examples/tree/master/python) | StreamingFast |
+| Java | [substreams-sink-examples/java](https://github.com/streamingfast/substreams-sink-examples/tree/master/java) | StreamingFast |
 
-| Name      | Support | Maintainer       | Source Code |
-|-----------|---------|------------------|-------------|
-| MongoDB   | C       | Community        |[substreams-sink-mongodb](https://github.com/streamingfast/substreams-sink-mongodb)|
-| Files     | C       | Community        |[substreams-sink-files](https://github.com/streamingfast/substreams-sink-files)|
-| KV Store  | C       | Community        |[substreams-sink-kv](https://github.com/streamingfast/substreams-sink-kv)|
-| Prometheus| C       | Community        |[substreams-sink-Prometheus](https://github.com/pinax-network/substreams-sink-prometheus)|
+## Estimate the cost first
 
-* O = Official Support (by one of the main Substreams providers)
-* C = Community Support
+Before you sink a large block range, `substreams estimate` gives you the processed blocks and egress bytes it will cost. The endpoint runs a small sample of the range (`--sample-percentage`, 1% by default) and extrapolates from it. The module output never leaves the endpoint, so the estimate costs no egress:
+
+```bash
+substreams estimate ./substreams.yaml map_events -s 20000000 -t +1000000 -e <endpoint>
+```
+
+The result is an approximation. Use a block range that represents the activity you expect. Against an endpoint that does not support remote estimation, use `substreams estimate-local`, which samples from the client and only supports modules without stores.

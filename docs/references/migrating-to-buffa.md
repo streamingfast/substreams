@@ -73,7 +73,7 @@ These generate prost types and do not compile against `substreams` 0.8.0:
 | `substreams-entity-change` 2.0.0 | `substreams ^0.6` | Define the `EntityChanges` protobuf in your own `proto` directory and let `substreams build` generate it, rather than depending on the crate |
 | `substreams-antelope` 0.6.0 | `substreams ^0.6.0` | Stay on the 0.6 row until a buffa release lands |
 
-A Rust sink is a separate case: `tonic` generates prost clients, so a program that consumes a Substreams stream keeps using prost. This page applies to modules compiled to WebAssembly.
+A Rust sink can use buffa too. `tonic` clients are bound to prost messages, so a sink on buffa types uses [connectrpc](https://crates.io/crates/connectrpc) for the gRPC client instead. The [Rust sink example](https://github.com/streamingfast/substreams-sink-examples/tree/master/rust) shows the setup: `buf.gen.yaml` generates the buffa messages and `buf.gen.connect.yaml` the `Stream` service stub. A sink that stays on prost and `tonic` keeps working.
 
 ## Troubleshooting
 

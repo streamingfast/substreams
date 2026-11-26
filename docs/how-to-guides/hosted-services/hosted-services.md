@@ -21,9 +21,9 @@ There are two kinds of hosted service. Both are created from **Hosted Services**
 
 A hosted sink continuously reads a Substreams package and writes the output into **your** Postgres or ClickHouse database. StreamingFast hosts the sink runner only. It does not create, host, or manage the database.
 
-Use a hosted sink when you want SQL in a database you already run (or a managed one such as Supabase, Neon, or ClickHouse Cloud) without operating `substreams-sink-sql` yourself.
+Use a hosted sink when you want SQL in a database you already run (or a managed one such as Supabase, Neon, or ClickHouse Cloud) without operating `substreams sink postgres` or `substreams sink clickhouse` yourself.
 
-Supported engines are **PostgreSQL** and **ClickHouse**, in Database Changes Mode or Relational Mappings Mode. See [Substreams:SQL](../sinks/sql/sql.md).
+Supported engines are **PostgreSQL** and **ClickHouse**, in Database Changes Mode or Relational Mappings Mode. See [SQL](../sinks/sql/sql.md).
 
 The database must be reachable from StreamingFast's network (a public hostname, not `localhost` or a private Docker name).
 
@@ -60,4 +60,4 @@ An API key is created automatically for each deployment. Manage keys at [https:/
 - [Remote Feed Hosted Store Guide](hosted-store-remote-feed.md) — write, delete, and read a hosted store over gRPC
 - [Substreams Feed Hosted Store Guide](hosted-store-substreams-feed.md) — populate a hosted store from a Substreams package
 - [Foundational Stores](../composing-substreams/foundational-stores/foundational-stores.md) — chain-specific stores populated by a Substreams package
-- [Consuming Substreams](../sinks/sinks.md) — self-managed sinks (SQL, stream, PubSub, files, and community sinks)
+- [Consuming Substreams](../sinks/sinks.md) — self-managed sinks (SQL, gRPC, PubSub, webhook, files, and more)

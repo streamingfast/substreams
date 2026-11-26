@@ -1,4 +1,6 @@
-# [`Substreams`](../../../../getting-started.md) [Prometheus](https://prometheus.io/) sink module
+# Prometheus
+
+[substreams-sink-prometheus](https://github.com/pinax-network/substreams-sink-prometheus) exposes metrics computed by a Substreams module on a Prometheus endpoint. It is mostly an operator tool: track chain health indicators (block rate, transaction counts, contract activity) on the dashboards and alerts you already run for your infrastructure.
 
 [<img alt="github" src="https://img.shields.io/badge/Github-substreams.prometheus-8da0cb?style=for-the-badge&logo=github" height="20">](https://github.com/pinax-network/substreams-sink-prometheus)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/substreams-sink-prometheus.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/substreams-sink-prometheus)
@@ -6,15 +8,13 @@
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-substreams.prometheus-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/substreams-sink-prometheus)
 [<img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/pinax-network/substreams-sink-prometheus/ci.yml?branch=main&style=for-the-badge" height="20">](https://github.com/pinax-network/substreams-sink-prometheus/actions?query=branch%3Amain)
 
-> `substreams-sink-prometheus` is a tool that allows developers to pipe data extracted metrics from a blockchain into a Prometheus time series database.
-
 ## 📖 Documentation
 
 ### https://docs.rs/substreams-sink-prometheus
 
 ### Further resources
 
-- [Substreams documentation](../../../../getting-started.md)
+- [Substreams documentation](../../getting-started.md)
 - [Prometheus documentation](https://prometheus.io)
 
 ## CLI
@@ -80,7 +80,7 @@ $ cargo add substreams-sink-prometheus
 ## Quickstart
 
 {% hint style="warning" %}
-**Compatibility**: The `substreams-sink-prometheus` crate generates its protobuf types with prost, which does not compile against `substreams` 0.8.0 and above, and its repository is archived. Pin a pre-0.8 row for a module that uses it. See [Migrating from prost to buffa](../../../../references/migrating-to-buffa.md).
+**Compatibility**: The `substreams-sink-prometheus` crate generates its protobuf types with prost, which does not compile against `substreams` 0.8.0 and above, and its repository is archived. Pin a pre-0.8 row for a module that uses it. See [Migrating from prost to buffa](../../references/migrating-to-buffa.md).
 {% endhint %}
 
 **Cargo.toml**

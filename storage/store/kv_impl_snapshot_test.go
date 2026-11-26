@@ -36,11 +36,12 @@ func TestSnapshotStreamRoundTrip(t *testing.T) {
 			require.NoError(t, src.BatchSet(kv))
 
 			deletePrefixes := []string{"gone:", "also_gone:"}
+			deleteKeys := []string{"gone:1", "key:gone"}
 
 			snap, err := src.Snapshot()
 			require.NoError(t, err)
 			sm := &marshaller.VTproto{}
-			reader := sm.MarshalStreamSnapshot(snap, deletePrefixes)
+			reader := sm.MarshalStreamSnapshot(snap, deletePrefixes, deleteKeys)
 			serialized, err := io.ReadAll(reader)
 			require.NoError(t, err)
 			require.NoError(t, reader.Close())
@@ -48,14 +49,16 @@ func TestSnapshotStreamRoundTrip(t *testing.T) {
 			dst := createTestStore(t, "snap_roundtrip_dst", 0, "").kvImpl
 			defer dst.Close()
 
-			var gotPrefixes []string
-			size, err := unmarshalIterInto(context.Background(), dst, sm, bytes.NewReader(serialized), func(dp []string) {
+			var gotPrefixes, gotKeys []string
+			size, err := unmarshalIterInto(context.Background(), dst, sm, bytes.NewReader(serialized), func(dp, dk []string) {
 				gotPrefixes = dp
+				gotKeys = dk
 			})
 			require.NoError(t, err)
 
 			assert.Equal(t, numKeys, dst.KeyCount())
 			assert.Equal(t, deletePrefixes, gotPrefixes)
+			assert.Equal(t, deleteKeys, gotKeys)
 			assert.NotZero(t, size)
 
 			for i := 0; i < numKeys; i += numKeys / 100 {

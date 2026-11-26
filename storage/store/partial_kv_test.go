@@ -64,6 +64,25 @@ func TestPartialKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 	require.NotNilf(t, kvl.kvImpl, "kvl.kvImpl is nil")
 }
 
+func TestPartialKV_Save_Load_DeletedKeys(t *testing.T) {
+	cfg, _ := newLocalTestConfig(t)
+
+	file := writePartial(t, cfg, 0, 10, func(p *PartialKV) {
+		p.Set(1, "a:1", "v")
+		p.DeleteKey(2, "a:1")
+		p.DeleteKey(3, "a:1")
+		p.DeleteKey(4, "b:1")
+		p.DeletePrefix(5, "c:")
+	})
+
+	loaded := cfg.NewPartialKV(0, zap.NewNop())
+	require.NoError(t, loaded.Load(context.Background(), file))
+
+	require.Equal(t, []string{"a:1", "b:1"}, loaded.DeletedKeys)
+	require.Equal(t, []string{"c:"}, loaded.DeletedPrefixes)
+	require.Zero(t, loaded.kvImpl.KeyCount())
+}
+
 func TestBigIntConversion(t *testing.T) {
 	cases := []struct {
 		name  string

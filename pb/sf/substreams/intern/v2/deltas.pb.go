@@ -49,6 +49,7 @@ const (
 	Operation_SET_SUM_FLOAT64         Operation_Type = 19
 	Operation_SET_SUM_BIG_INT         Operation_Type = 20
 	Operation_SET_SUM_BIG_DECIMAL     Operation_Type = 21
+	Operation_DELETE_KEY              Operation_Type = 22
 )
 
 // Enum value maps for Operation_Type.
@@ -76,6 +77,7 @@ var (
 		19: "SET_SUM_FLOAT64",
 		20: "SET_SUM_BIG_INT",
 		21: "SET_SUM_BIG_DECIMAL",
+		22: "DELETE_KEY",
 	}
 	Operation_Type_value = map[string]int32{
 		"SET":                     0,
@@ -100,6 +102,7 @@ var (
 		"SET_SUM_FLOAT64":         19,
 		"SET_SUM_BIG_INT":         20,
 		"SET_SUM_BIG_DECIMAL":     21,
+		"DELETE_KEY":              22,
 	}
 )
 
@@ -375,12 +378,12 @@ const file_sf_substreams_intern_v2_deltas_proto_rawDesc = "" +
 	"Operations\x12D\n" +
 	"\n" +
 	"operations\x18\x01 \x03(\v2$.sf.substreams.internal.v2.OperationR\n" +
-	"operations\"\xc0\x04\n" +
+	"operations\"\xd0\x04\n" +
 	"\tOperation\x12=\n" +
 	"\x04type\x18\x01 \x01(\x0e2).sf.substreams.internal.v2.Operation.TypeR\x04type\x12\x10\n" +
 	"\x03ord\x18\x02 \x01(\x04R\x03ord\x12\x10\n" +
 	"\x03key\x18\x03 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x04 \x01(\fR\x05value\"\xb9\x03\n" +
+	"\x05value\x18\x04 \x01(\fR\x05value\"\xc9\x03\n" +
 	"\x04Type\x12\a\n" +
 	"\x03SET\x10\x00\x12\r\n" +
 	"\tSET_BYTES\x10\x01\x12\x15\n" +
@@ -405,7 +408,9 @@ const file_sf_substreams_intern_v2_deltas_proto_rawDesc = "" +
 	"\rSET_SUM_INT64\x10\x12\x12\x13\n" +
 	"\x0fSET_SUM_FLOAT64\x10\x13\x12\x13\n" +
 	"\x0fSET_SUM_BIG_INT\x10\x14\x12\x17\n" +
-	"\x13SET_SUM_BIG_DECIMAL\x10\x15BMZKgithub.com/streamingfast/substreams/pb/sf/substreams/intern/v2;pbssinternalb\x06proto3"
+	"\x13SET_SUM_BIG_DECIMAL\x10\x15\x12\x0e\n" +
+	"\n" +
+	"DELETE_KEY\x10\x16BMZKgithub.com/streamingfast/substreams/pb/sf/substreams/intern/v2;pbssinternalb\x06proto3"
 
 var (
 	file_sf_substreams_intern_v2_deltas_proto_rawDescOnce sync.Once

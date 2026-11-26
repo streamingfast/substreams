@@ -29,6 +29,11 @@ func (i *instance) deletePrefix(ord int64, keyPtr, keyLength int32) {
 	i.CurrentCall.DoDeletePrefix(uint64(ord), prefix)
 }
 
+func (i *instance) deleteKey(ord int64, keyPtr, keyLength int32) {
+	key := i.Heap.ReadString(keyPtr, keyLength)
+	i.CurrentCall.DoDeleteKey(uint64(ord), key)
+}
+
 func (i *instance) setSumInt64(ord int64, keyPtr, keyLength int32, valPtr, valLength int32) {
 	key := i.Heap.ReadString(keyPtr, keyLength)
 	value := i.Heap.ReadString(valPtr, valLength)

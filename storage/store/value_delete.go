@@ -61,3 +61,29 @@ func (b *baseStore) deletePrefix(ord uint64, prefix string) {
 	})
 	b.deltas = append(b.deltas, deltas...)
 }
+
+func (b *baseStore) DeleteKey(ord uint64, key string) {
+	b.kvOps.Add(&pbssinternal.Operation{
+		Type: pbssinternal.Operation_DELETE_KEY,
+		Ord:  ord,
+		Key:  key,
+	})
+}
+
+func (b *baseStore) deleteKey(ord uint64, key string) {
+	// Unlike Scan's, Get's value stays valid after the call (the mmap backend
+	// copies it out of bbolt), so OldValue needs no copy here.
+	val, found := b.kvImpl.Get(key)
+	if !found {
+		return
+	}
+
+	delta := &pbsubstreams.StoreDelta{
+		Operation: pbsubstreams.StoreDelta_DELETE,
+		Ordinal:   ord,
+		Key:       key,
+		OldValue:  val,
+	}
+	b.ApplyDelta(delta)
+	b.deltas = append(b.deltas, delta)
+}

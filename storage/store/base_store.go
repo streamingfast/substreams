@@ -105,6 +105,8 @@ func (b *baseStore) Flush() (err error) {
 			}
 		case pbssinternal.Operation_DELETE_PREFIX:
 			b.deletePrefix(op.Ord, op.Key)
+		case pbssinternal.Operation_DELETE_KEY:
+			b.deleteKey(op.Ord, op.Key)
 		case pbssinternal.Operation_SET_MAX_BIG_INT:
 			b.setMaxBigInt(op.Ord, op.Key, valueToBigInt(op.Value))
 		case pbssinternal.Operation_SET_MAX_INT64:

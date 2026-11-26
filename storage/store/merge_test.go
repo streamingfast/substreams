@@ -515,6 +515,71 @@ func TestStore_Merge_TotalSizeBytes(t *testing.T) {
 	}
 }
 
+func TestStore_Merge_DeletedKeys(t *testing.T) {
+	tests := []struct {
+		name        string
+		policy      pbsubstreams.Module_KindStore_UpdatePolicy
+		valueType   string
+		prev        map[string][]byte
+		partial     map[string][]byte
+		deletedKeys []string
+		expectedKV  map[string][]byte
+	}{
+		{
+			name:      "set: only the exact keys go, and a key set again in the segment keeps its new value",
+			policy:    pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
+			valueType: manifest.OutputValueTypeString,
+			prev: map[string][]byte{
+				"p:3":  []byte("lol"),
+				"p:30": []byte("kept"),
+				"t:1":  []byte("baz"),
+			},
+			partial: map[string][]byte{
+				"t:1": []byte("bar"),
+			},
+			deletedKeys: []string{"p:3", "t:1", "absent"},
+			expectedKV: map[string][]byte{
+				"p:30": []byte("kept"),
+				"t:1":  []byte("bar"),
+			},
+		},
+		{
+			name:      "add: a key deleted then added to in the segment restarts from the segment's sum",
+			policy:    pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD,
+			valueType: manifest.OutputValueTypeInt64,
+			prev: map[string][]byte{
+				"c": []byte("10"),
+				"d": []byte("10"),
+			},
+			partial: map[string][]byte{
+				"c": []byte("5"),
+				"d": []byte("5"),
+			},
+			deletedKeys: []string{"c"},
+			expectedKV: map[string][]byte{
+				"c": []byte("5"),
+				"d": []byte("15"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			prev := newStore(test.prev, test.policy, test.valueType)
+			prev.totalSizeBytes = kvSizeBytes(prev.kvImpl)
+			partial := newPartialStore(test.partial, test.policy, test.valueType, nil)
+			partial.DeletedKeys = test.deletedKeys
+
+			require.NoError(t, prev.Merge(partial))
+
+			got, err := saveToMap(prev.kvImpl.Save())
+			require.NoError(t, err)
+			assert.Equal(t, test.expectedKV, got)
+			assert.Equal(t, kvSizeBytes(prev.kvImpl), prev.totalSizeBytes)
+		})
+	}
+}
+
 func newPartialStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, deletedPrefixes []string) *PartialKV {
 	kvImpl := newMemoryKVImpl()
 	kvImpl.Load(mapToIter(kv))

@@ -68,7 +68,7 @@ The `updatePolicy` also defines the merging strategy for identical keys found in
 | `append`            | `string`, `bytes`                        | Both keys are concatenated in order. Appended values are limited to 8Kb.  Aggregation pattern examples are available in the [`lib.rs`](https://github.com/streamingfast/substreams-uniswap-v3/blob/develop/src/lib.rs#L760) file |
 
 {% hint style="success" %}
-**Tip**: All update policies provide the `delete_prefix` method.
+**Tip**: All update policies provide the `delete_prefix` and `delete_key` methods.
 {% endhint %}
 
 The merge strategy is **applied during parallel processing**.

@@ -260,9 +260,9 @@ func (p *VTproto) UnmarshalIter(reader io.Reader, estimatedSize int64) iter.Seq2
 					return
 				}
 
-			case 2: // delete_prefixes — emit as trailer at end, collect for now
+			case 2, 3: // delete_prefixes and delete_keys — emit as trailer at end, collect for now
 				if wireType != 2 {
-					yield(StoreDataEntry{}, fmt.Errorf("proto: wrong wireType = %d for field DeletePrefixes", wireType))
+					yield(StoreDataEntry{}, fmt.Errorf("proto: wrong wireType = %d for field %d", wireType, fieldNum))
 					return
 				}
 				slen, err := readVarint()
@@ -275,8 +275,13 @@ func (p *VTproto) UnmarshalIter(reader io.Reader, estimatedSize int64) iter.Seq2
 					yield(StoreDataEntry{}, err)
 					return
 				}
-				prefix := string(data)
-				if !yield(StoreDataEntry{sdt: &StoreDataTrailer{DeletePrefixes: []string{prefix}}}, nil) {
+				var trailer StoreDataTrailer
+				if fieldNum == 2 {
+					trailer.DeletePrefixes = []string{string(data)}
+				} else {
+					trailer.DeleteKeys = []string{string(data)}
+				}
+				if !yield(StoreDataEntry{sdt: &trailer}, nil) {
 					return
 				}
 
@@ -300,8 +305,8 @@ func (p *VTproto) UnmarshalIter(reader io.Reader, estimatedSize int64) iter.Seq2
 // store.
 // IMPORTANT: The caller MUST call Close() on the returned ReadCloser — it
 // closes the underlying snapshot, releasing its resources (locks, transactions).
-func (p *VTproto) MarshalStreamSnapshot(snap KVSnapshotIter, deletePrefixes []string) io.ReadCloser {
-	return &lazySnapshotMarshaler{snap: snap, deletePrefixes: deletePrefixes}
+func (p *VTproto) MarshalStreamSnapshot(snap KVSnapshotIter, deletePrefixes, deleteKeys []string) io.ReadCloser {
+	return &lazySnapshotMarshaler{snap: snap, deletePrefixes: deletePrefixes, deleteKeys: deleteKeys}
 }
 
 // lazySnapshotMarshaler streams the protobuf wire format from a pull-based
@@ -311,9 +316,11 @@ func (p *VTproto) MarshalStreamSnapshot(snap KVSnapshotIter, deletePrefixes []st
 type lazySnapshotMarshaler struct {
 	snap           KVSnapshotIter
 	deletePrefixes []string
+	deleteKeys     []string
 
 	kvDone    bool // snapshot exhausted, move on to delete prefixes
 	prefixIdx int  // index of the next delete-prefix to encode
+	keyIdx    int  // index of the next delete-key to encode
 
 	entry     []byte // current encoded entry awaiting readout (reused across entries)
 	entryPos  int    // read position within entry
@@ -323,7 +330,8 @@ type lazySnapshotMarshaler struct {
 }
 
 // encodeNextEntry pulls the next KV entry from the snapshot (then delete
-// prefixes) and serializes it into l.entry, reusing its backing array.
+// prefixes, then delete keys) and serializes it into l.entry, reusing its
+// backing array.
 // Returns false once everything has been encoded.
 func (l *lazySnapshotMarshaler) encodeNextEntry() (bool, error) {
 	l.entry = l.entry[:0]
@@ -345,6 +353,13 @@ func (l *lazySnapshotMarshaler) encodeNextEntry() (bool, error) {
 		prefix := l.deletePrefixes[l.prefixIdx]
 		l.prefixIdx++
 		l.entry = l.enc.appendDeletePrefixField(l.entry, prefix, l.varintBuf[:])
+		return true, nil
+	}
+
+	if l.keyIdx < len(l.deleteKeys) {
+		key := l.deleteKeys[l.keyIdx]
+		l.keyIdx++
+		l.entry = l.enc.appendDeleteKeyField(l.entry, key, l.varintBuf[:])
 		return true, nil
 	}
 
@@ -560,6 +575,13 @@ func (f *fastStreamingMarshaler) appendDeletePrefixField(buf []byte, prefix stri
 	buf = appendVarint(buf, 2<<3|2, varintBuf)
 	buf = appendVarint(buf, uint64(len(prefix)), varintBuf)
 	return append(buf, prefix...)
+}
+
+// appendDeleteKeyField appends a delete key field to the buffer
+func (f *fastStreamingMarshaler) appendDeleteKeyField(buf []byte, key string, varintBuf []byte) []byte {
+	buf = appendVarint(buf, 3<<3|2, varintBuf)
+	buf = appendVarint(buf, uint64(len(key)), varintBuf)
+	return append(buf, key...)
 }
 
 func (f *fastStreamingMarshaler) Read(p []byte) (n int, err error) {

@@ -54,6 +54,7 @@ func (s *FullKV) DerivePartialStore(initialBlock uint64) *PartialKV {
 		baseStore:    b,
 		initialBlock: initialBlock,
 		seen:         make(map[string]bool),
+		seenKeys:     make(map[string]bool),
 	}
 }
 
@@ -147,7 +148,7 @@ func (s *FullKV) QuickSave(ctx context.Context, atBlockHash string) error {
 	if err != nil {
 		return fmt.Errorf("snapshotting store %q: %w", s.name, err)
 	}
-	reader := s.marshaller.MarshalStreamSnapshot(snap, nil)
+	reader := s.marshaller.MarshalStreamSnapshot(snap, nil, nil)
 
 	fw := &fileWriter{
 		store:    store,
@@ -235,7 +236,7 @@ func (s *FullKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("snapshotting store %q: %w", s.name, err)
 	}
-	reader := s.marshaller.MarshalStreamSnapshot(snap, nil)
+	reader := s.marshaller.MarshalStreamSnapshot(snap, nil, nil)
 
 	// The size is written with the file, so that loading it never has to write its metadata
 	// (see SetDataSizeDetached). It is the size of what is serialized as long as the store is

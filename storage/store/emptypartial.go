@@ -24,9 +24,9 @@ const (
 	deletePartialConcurrency     = 16
 )
 
-// EmptyPartialKVs reports which of files, partial files of this store, are empty: no keys
-// and no deleted prefixes. It lists the sizes of the files, then reads the first
-// decompressed byte of the small ones only, so a large partial is never downloaded. A
+// EmptyPartialKVs reports which of files, partial files of this store, are empty: no keys,
+// no deleted prefixes and no deleted keys. It lists the sizes of the files, then reads
+// the first decompressed byte of the small ones only, so a large partial is never downloaded. A
 // file that is missing, too large or unreadable is reported as not empty.
 func (c *Config) EmptyPartialKVs(ctx context.Context, files []*FileInfo) (map[string]bool, error) {
 	if len(files) == 0 {

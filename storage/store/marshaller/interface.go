@@ -21,6 +21,7 @@ type KeyValue struct {
 }
 type StoreDataTrailer struct {
 	DeletePrefixes []string
+	DeleteKeys     []string
 	TotalSizeBytes uint64
 }
 
@@ -57,7 +58,7 @@ type StreamMarshaller interface {
 	UnmarshalStream(reader io.Reader, estimatedSize int64) (*StoreData, uint64, error)
 	UnmarshalIter(reader io.Reader, estimatedSize int64) iter.Seq2[StoreDataEntry, error]
 	MarshalStream(data *StoreData, estimatedSize int64) io.ReadCloser
-	MarshalStreamSnapshot(snap KVSnapshotIter, deletePrefixes []string) io.ReadCloser
+	MarshalStreamSnapshot(snap KVSnapshotIter, deletePrefixes, deleteKeys []string) io.ReadCloser
 }
 
 // UnsortedStreamMarshaller streams the store without sorting keys, trading

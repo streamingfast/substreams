@@ -277,7 +277,7 @@ func BenchmarkKV_LoadFromStream(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		rc := sm.MarshalStreamSnapshot(snap, nil)
+		rc := sm.MarshalStreamSnapshot(snap, nil, nil)
 		serialized, err := io.ReadAll(rc)
 		rc.Close()
 		if err != nil {
@@ -358,7 +358,7 @@ func BenchmarkFullKV_Save(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				rc := sm.MarshalStreamSnapshot(snap, nil)
+				rc := sm.MarshalStreamSnapshot(snap, nil, nil)
 				if _, err := io.ReadAll(rc); err != nil {
 					b.Fatal(err)
 				}

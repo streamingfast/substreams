@@ -201,6 +201,12 @@ func (c *Call) DoDeletePrefix(ord uint64, prefix string) {
 	c.outputStore.DeletePrefix(ord, prefix)
 	c.stats.RecordModuleWasmStoreDeletePrefix(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
 }
+func (c *Call) DoDeleteKey(ord uint64, key string) {
+	now := time.Now()
+	c.outputStore.DeleteKey(ord, key)
+	// Counted as a write: the delete-prefix counter is for prefix deletes, which can be costly on large stores.
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+}
 func (c *Call) DoAddBigInt(ord uint64, key string, value string) {
 	now := time.Now()
 	c.validateWithValueType("add_bigint", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "bigint", key)

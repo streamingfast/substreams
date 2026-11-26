@@ -31,7 +31,7 @@ import (
 // perhaps used to _produce_ that prior FullKV), or load it from storage.
 // This allows for both initialization of the store, and skipping of FullKV if we
 // happen to have some that were deleted.
-func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
+func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit, uploads *squashUploads) error {
 	if stage.kind != KindStore {
 		panic("multiSquash called on non-store stage")
 	}
@@ -46,7 +46,7 @@ func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
 			stats := reqctx.ReqStats(s.ctx)
 			stats.RecordModuleMerging(modState.name)
 			defer stats.RecordModuleMergeComplete(modState.name)
-			err := s.singleSquash(stage, modState, mergeUnit)
+			err := s.singleSquash(stage, modState, mergeUnit, uploads)
 			if err != nil {
 				return fmt.Errorf("squash stage %d module %q: %w", stage.idx, modState.name, err)
 			}
@@ -65,7 +65,30 @@ const (
 
 	// snapshotCopyConcurrency bounds the full store copies in flight for one store module.
 	snapshotCopyConcurrency = 32
+
+	// squasherUploadConcurrency bounds the full-store uploads in flight per local squash
+	// run. Keeping it small (rather than unbounded) caps how many segments the merge loop
+	// can get ahead of storage: once this many uploads are outstanding, the next segment's
+	// upload submission blocks, which blocks that segment's own squashStep from returning,
+	// which blocks the next one from starting.
+	squasherUploadConcurrency = 4
 )
+
+// squashUploads bounds and tracks the full-store uploads of one local squash run (one
+// CmdTryMerge call). Go enqueues an upload, blocking once squasherUploadConcurrency are
+// already in flight; Wait joins them all. Its ctx is cancelled as soon as any upload
+// fails, so the merge loop's next step sees it and stops — the same "stops at its next
+// unit" cancellation idiom Stages.Close() already uses for the stages context.
+type squashUploads struct {
+	*errgroup.Group
+	ctx context.Context
+}
+
+func newSquashUploads(ctx context.Context) *squashUploads {
+	grp, uploadCtx := errgroup.WithContext(ctx)
+	grp.SetLimit(squasherUploadConcurrency)
+	return &squashUploads{Group: grp, ctx: uploadCtx}
+}
 
 // copyOverEmptyPartials enables copying the previous full store over segments whose
 // partials are all empty, instead of merging and saving them one at a time. Tests turn it
@@ -188,8 +211,18 @@ func (s *Stages) findEmptyUnits(stage *Stage, run []Unit) map[int]bool {
 // Copying needs that previous full store both in memory and in storage: until it is, units
 // go through the regular squash one at a time. If a copy fails, the units go through the
 // regular squash too, which rewrites any full store already copied with the same content.
-func (s *Stages) squashEmptyUnits(stage *Stage, units []Unit) error {
+// uploads is a pointer to the caller's current upload pool: canCopySnapshots needs
+// modState.snapshotEnd caught up with any save this same loop just enqueued (its own
+// fallback squash below can enqueue one, same as the regular squash can), so each
+// iteration drains and replaces *uploads before relying on it — see squashStep's own
+// drain-and-replace for why a pool can't just be reused after a Wait.
+func (s *Stages) squashEmptyUnits(stage *Stage, units []Unit, uploads **squashUploads) error {
 	for len(units) > 0 {
+		if err := (*uploads).Wait(); err != nil {
+			return err
+		}
+		*uploads = newSquashUploads(s.ctx)
+
 		if canCopySnapshots(stage, units[0]) {
 			err := s.copySnapshots(stage, units)
 			if err == nil {
@@ -200,13 +233,13 @@ func (s *Stages) squashEmptyUnits(stage *Stage, units []Unit) error {
 			}
 			s.logger.Warn("copying full stores over empty partials failed, squashing them one at a time", zap.Error(err))
 			for _, u := range units {
-				if err := s.multiSquash(stage, u); err != nil {
+				if err := s.multiSquash(stage, u, *uploads); err != nil {
 					return err
 				}
 			}
 			return nil
 		}
-		if err := s.multiSquash(stage, units[0]); err != nil {
+		if err := s.multiSquash(stage, units[0], *uploads); err != nil {
 			return err
 		}
 		units = units[1:]
@@ -229,7 +262,7 @@ func canCopySnapshots(stage *Stage, u Unit) bool {
 			modState.cachedStore == nil ||
 			modState.storeConfig.ModuleInitialBlock() >= rng.StartBlock ||
 			modState.lastBlockInStore != rng.StartBlock ||
-			modState.snapshotEnd != rng.StartBlock {
+			modState.SnapshotEnd() != rng.StartBlock {
 			return false
 		}
 	}
@@ -267,7 +300,7 @@ func (s *Stages) copySnapshots(stage *Stage, units []Unit) error {
 
 	for i, modState := range modStates {
 		modState.lastBlockInStore = modState.segmenter.Range(units[len(units)-1].Segment).ExclusiveEndBlock
-		modState.snapshotEnd = lastCopied[i]
+		modState.setSnapshotEnd(lastCopied[i])
 
 		// Like the regular squash, only delete the partials that a full store now covers.
 		partials := make([]*store.FileInfo, 0, len(units))
@@ -287,7 +320,7 @@ func (s *Stages) copySnapshots(stage *Stage, units []Unit) error {
 // the store interval, and returns the end block of the last full store written.
 func (s *Stages) copyModuleSnapshots(modState *StoreModuleState, units []Unit) (uint64, error) {
 	start := time.Now()
-	from := modState.snapshotEnd
+	from := modState.SnapshotEnd()
 
 	eg, ctx := errgroup.WithContext(s.ctx)
 	eg.SetLimit(snapshotCopyConcurrency)
@@ -404,31 +437,66 @@ func (s *Stages) squashStage(stage *Stage, run []Unit) (merged, unmerged []Unit,
 	return s.localSquashRun(stage, run)
 }
 
+// localSquashRun squashes run, pipelining each unit's full-store upload against the next
+// unit's merge: a step's squashStep call returns once its merge (and its copy-forward,
+// for empty steps) is done, while its save upload runs in the background on uploads,
+// bounded by squasherUploadConcurrency. Waiting for uploads here, after the merge loop is
+// done with the whole run, is what makes a segment's snapshot count as available only
+// once its upload actually succeeded: nothing reads modState.snapshotEnd or deletes a
+// partial before an upload's completion advances it (see singleSquash), and nothing above
+// this call reads merged/unmerged until uploads.Wait() returns.
 func (s *Stages) localSquashRun(stage *Stage, run []Unit) (merged, unmerged []Unit, err error) {
 	empty := s.findEmptyUnits(stage, run)
-	return squashRun(planSquashSteps(run, empty), squashRunTimeBudget, localStepSquasher{
-		stages: s,
-		stage:  stage,
-		empty:  empty,
-	})
+	q := &localStepSquasher{
+		stages:  s,
+		stage:   stage,
+		empty:   empty,
+		uploads: newSquashUploads(s.ctx),
+	}
+	merged, unmerged, err = squashRun(planSquashSteps(run, empty), squashRunTimeBudget, q)
+	// q.uploads may have been replaced (see squashStep's drain below): wait on whichever
+	// pool is current once the merge loop is done with the whole run.
+	if uploadErr := q.uploads.Wait(); uploadErr != nil && err == nil {
+		err = uploadErr
+	}
+	return merged, unmerged, err
 }
 
 // localStepSquasher is the in-process stepSquasher. Empty steps are copied
 // forward; every other step is merged one unit at a time.
 type localStepSquasher struct {
-	stages *Stages
-	stage  *Stage
-	empty  map[int]bool
+	stages  *Stages
+	stage   *Stage
+	empty   map[int]bool
+	uploads *squashUploads
 }
 
-func (q localStepSquasher) squashStep(step []Unit) error {
+func (q *localStepSquasher) squashStep(step []Unit) error {
 	if err := q.stages.ctx.Err(); err != nil {
 		return err
 	}
-	if q.empty[step[0].Segment] {
-		return q.stages.squashEmptyUnits(q.stage, step)
+	// uploads.ctx is cancelled as soon as any of this run's uploads fails, so a failure
+	// stops the merge loop at its next step instead of merging further segments on top
+	// of a store whose save is already known to have failed. Wait (instead of returning
+	// uploads.ctx.Err() directly) surfaces the actual upload error — e.g. "uploading full
+	// store at segment %d: %w" — rather than a bare context.Canceled, which upstream
+	// (service/error.go's toConnectError, tier1's reqStats.SetError) specifically treats
+	// as a benign client cancellation and would otherwise misreport a real storage
+	// failure as the caller having canceled the request.
+	if q.uploads.ctx.Err() != nil {
+		if err := q.uploads.Wait(); err != nil {
+			return err
+		}
+		return q.uploads.ctx.Err()
 	}
-	return q.stages.multiSquash(q.stage, step[0])
+	if q.empty[step[0].Segment] {
+		// squashEmptyUnits drains and replaces *uploads itself before every
+		// canCopySnapshots check (including its first): that check needs the
+		// immediately preceding segment's save already reflected in
+		// modState.snapshotEnd, which now lands asynchronously (see singleSquash).
+		return q.stages.squashEmptyUnits(q.stage, step, &q.uploads)
+	}
+	return q.stages.multiSquash(q.stage, step[0], q.uploads)
 }
 
 func (s *Stages) remoteSquashRun(stage *Stage, run []Unit) error {
@@ -471,8 +539,16 @@ func rangesForModule(modState *StoreModuleState, run []Unit) []squash.Range {
 }
 
 // singleSquash gets the current fullKV and merges the next partialKV into it.
-// If there is an existing fullKV at the destination (next segment), it will be loaded instead (whichever file is seen first)
-func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUnit Unit) error {
+// If there is an existing fullKV at the destination (next segment), it will be loaded
+// instead (whichever file is seen first). The merge itself is synchronous — the next
+// segment's merge depends on it — but when the segment ends on a save interval, the
+// save's upload is handed to uploads and this returns as soon as it's enqueued, so the
+// next segment can start merging while this one's full store is still uploading.
+// modState.snapshotEnd only advances, and the partial is only deleted, once that upload
+// actually succeeds (see uploads.Go below) — a failure there fails the squash exactly
+// like a synchronous one did before pipelining, just surfaced at uploads.Wait() instead
+// of here.
+func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUnit Unit, uploads *squashUploads) error {
 	rng := modState.segmenter.Range(mergeUnit.Segment)
 	meter := mergeMetrics{}
 	meter.start = time.Now()
@@ -508,17 +584,17 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 		}
 		modState.cachedStore = newFullKV
 		modState.lastBlockInStore = rng.ExclusiveEndBlock
-		modState.snapshotEnd = rng.ExclusiveEndBlock
+		modState.setSnapshotEnd(rng.ExclusiveEndBlock)
 		s.logger.Debug("squashing time metrics (skipped, loaded from full kv)", meter.logFields()...)
 		return nil
 	}
 
 	metrics.Tier1SquashersStarted.Inc()
-	defer metrics.Tier1SquashersEnded.Inc()
 
 	// Merge
 	meter.mergeStart = time.Now()
 	if err := fullKV.Merge(partialKV); err != nil {
+		metrics.Tier1SquashersEnded.Inc()
 		return fmt.Errorf("merging: %w", err)
 	}
 
@@ -531,32 +607,45 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 		zap.String("store_size", humanize.IBytes(fullKV.SizeBytes())),
 	)
 
-	s.logger.Debug("deleting partial store", zap.Stringer("store", partialKV))
-
-	// Flush full store
-	if segmentEndsOnInterval {
-		err := derr.RetryContext(s.ctx, 5, func(ctx context.Context) error {
-			meter.saveStart = time.Now()
-			_, writer, err := fullKV.Save(rng.ExclusiveEndBlock)
-			if err != nil {
-				return fmt.Errorf("save full store: %w", err)
-			}
-			meter.saveEnd = time.Now()
-			meter.writeStart = time.Now()
-			err = writer.Write(ctx)
-			meter.writeEnd = time.Now()
-			if err == nil {
-				go partialKV.DeleteStore(context.Background(), partialFile)
-			}
-			return err
-		})
-		if err != nil {
-			return fmt.Errorf("flushing full store: %w", err)
-		}
-		modState.snapshotEnd = rng.ExclusiveEndBlock
+	if !segmentEndsOnInterval {
+		metrics.Tier1SquashersEnded.Inc()
+		s.logger.Info("squashing time metrics", meter.logFields()...)
+		return nil
 	}
 
-	s.logger.Info("squashing time metrics", meter.logFields()...)
+	endBlock := rng.ExclusiveEndBlock
+
+	// Open the snapshot now, synchronously, before the next segment's merge can touch
+	// this store: SaveRetryable's snapshot (and, on mmap, its open read transaction)
+	// reflects the store's state at exactly this point, never a later one. A failed
+	// upload's retry rewinds and re-streams this same snapshot (see retryableSave)
+	// instead of opening a fresh one, so it can't silently save a later segment's
+	// content under this one's filename.
+	meter.saveStart = time.Now()
+	_, retryable, err := fullKV.SaveRetryable(endBlock)
+	meter.saveEnd = time.Now()
+	if err != nil {
+		metrics.Tier1SquashersEnded.Inc()
+		return fmt.Errorf("snapshotting full store at segment %d: %w", mergeUnit.Segment, err)
+	}
+
+	s.logger.Debug("scheduling upload of full store", zap.Stringer("store", partialKV))
+
+	uploads.Go(func() error {
+		defer metrics.Tier1SquashersEnded.Inc()
+		defer retryable.Close()
+		meter.writeStart = time.Now()
+		err := derr.RetryContext(uploads.ctx, 5, retryable.Write)
+		meter.writeEnd = time.Now()
+		if err != nil {
+			return fmt.Errorf("squash stage %d module %q: uploading full store at segment %d: %w", stage.idx, modState.name, mergeUnit.Segment, err)
+		}
+
+		modState.advanceSnapshotEnd(endBlock)
+		go partialKV.DeleteStore(context.Background(), partialFile)
+		s.logger.Info("squashing time metrics", meter.logFields()...)
+		return nil
+	})
 
 	return nil
 }

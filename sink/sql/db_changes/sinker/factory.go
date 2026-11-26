@@ -18,6 +18,7 @@ type SinkerFactoryOptions struct {
 	CursorTableName         string
 	HistoryTableName        string
 	ClickhouseCluster       string
+	ClickhouseStateful      bool
 	BatchBlockFlushInterval int
 	BatchRowFlushInterval   int
 	LiveBlockFlushInterval  int
@@ -48,7 +49,8 @@ func SinkerFactory(
 			return nil, fmt.Errorf("the stall timeout cannot be negative, got %s", options.StallTimeout)
 		}
 		if options.StandbyLock {
-			if dsn.Driver() != "postgres" {
+			lockSupported := dsn.Driver() == "postgres" || (dsn.Driver() == "clickhouse" && options.ClickhouseStateful)
+			if !lockSupported {
 				return nil, db.ErrWriterLockUnsupported
 			}
 			if options.StandbyLockPollInterval <= 0 {
@@ -56,6 +58,8 @@ func SinkerFactory(
 			}
 		}
 
+		// Reorg handling on ClickHouse needs stateful mode, turned on below.
+		loaderHandleReorgs := options.HandleReorgs && !options.ClickhouseStateful
 		dbLoader, err := db.NewLoader(
 			dsn,
 			options.CursorTableName,
@@ -65,12 +69,18 @@ func SinkerFactory(
 			options.BatchRowFlushInterval,
 			options.LiveBlockFlushInterval,
 			options.OnModuleHashMismatch,
-			&options.HandleReorgs,
+			&loaderHandleReorgs,
 			logger,
 			tracer,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("creating loader: %w", err)
+		}
+
+		if options.ClickhouseStateful {
+			if err := dbLoader.EnableClickhouseStateful(db.DefaultJournalTableName, options.HistoryTableName, options.HandleReorgs); err != nil {
+				return nil, err
+			}
 		}
 
 		if err := dbLoader.LoadTables(dsn.Schema(), options.CursorTableName, options.HistoryTableName); err != nil {
@@ -79,6 +89,10 @@ func SinkerFactory(
 				return nil, fmt.Errorf("error validating the system table: %w. Did you run setup?", err)
 			}
 			return nil, fmt.Errorf("load tables: %w", err)
+		}
+
+		if err := dbLoader.PrepareClickhouseStateful(ctx); err != nil {
+			return nil, fmt.Errorf("preparing clickhouse stateful mode: %w", err)
 		}
 
 		sinker, err := New(baseSink, dbLoader, logger, tracer, options.FlushRetryCount, options.FlushRetryDelay)

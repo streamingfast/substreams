@@ -5,20 +5,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/streamingfast/logging/zapx"
 	sink "github.com/streamingfast/substreams/sink"
 	"go.uber.org/zap"
 )
 
 func (l *Loader) Flush(ctx context.Context, outputModuleHash string, cursor *sink.Cursor, lastFinalBlock uint64) (rowFlushedCount int, err error) {
+	l.activeModuleHash, l.activeCursor = outputModuleHash, cursor
 	// On PostgreSQL the flush is one transaction, so cancelling it (the sink is stopping, or stalled
 	// on a hung call) rolls it all back. ClickHouse writes are not transactional: a flush cut short
 	// could leave some tables written without the cursor, so it always runs to the end there.
 	if _, transactional := l.dialect.(*PostgresDialect); !transactional {
-		// Inserts return once written, whatever the DSN or the server settings say: the cursor
-		// must not be taken as stored before it is.
-		ctx = clickhouse.Context(context.Background(), clickhouse.WithSettings(clickhouse.Settings{"async_insert": 0}))
+		ctx = synchronousInserts(context.Background())
 	}
 
 	startAt := time.Now()
@@ -48,6 +46,11 @@ func (l *Loader) Flush(ctx context.Context, outputModuleHash string, cursor *sin
 	}
 
 	rowFlushedCount += 1
+	if c, ok := l.dialect.(cursorWriteChecker); ok {
+		if ctx, err = c.beforeCursorWrite(ctx, l); err != nil {
+			return 0, err
+		}
+	}
 	cursorStartAt := time.Now()
 	if err := l.UpdateCursor(ctx, tx, outputModuleHash, cursor); err != nil {
 		return 0, fmt.Errorf("update cursor: %w", err)
@@ -59,6 +62,9 @@ func (l *Loader) Flush(ctx context.Context, outputModuleHash string, cursor *sin
 
 	if err := tx.Commit(); err != nil {
 		return 0, fmt.Errorf("failed to commit db transaction: %w", err)
+	}
+	if c, ok := l.dialect.(flushCommitter); ok {
+		c.flushCommitted()
 	}
 	l.recordCursor(cursor)
 	if l.detached != nil {
@@ -72,6 +78,10 @@ func (l *Loader) Flush(ctx context.Context, outputModuleHash string, cursor *sin
 }
 
 func (l *Loader) Revert(ctx context.Context, outputModuleHash string, cursor *sink.Cursor, lastValidBlock uint64) (err error) {
+	l.activeModuleHash, l.activeCursor = outputModuleHash, cursor
+	if _, transactional := l.dialect.(*PostgresDialect); !transactional {
+		ctx = synchronousInserts(context.Background())
+	}
 	tx, err := l.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to being db transaction: %w", err)
@@ -91,6 +101,9 @@ func (l *Loader) Revert(ctx context.Context, outputModuleHash string, cursor *si
 		}
 	}
 
+	l.reverting = true
+	defer func() { l.reverting = false }()
+
 	if err := l.dialect.Revert(tx, ctx, l, lastValidBlock); err != nil {
 		return err
 	}
@@ -104,12 +117,20 @@ func (l *Loader) Revert(ctx context.Context, outputModuleHash string, cursor *si
 		}
 	}
 
+	if c, ok := l.dialect.(cursorWriteChecker); ok {
+		if ctx, err = c.beforeCursorWrite(ctx, l); err != nil {
+			return err
+		}
+	}
 	if err := l.UpdateCursor(ctx, tx, outputModuleHash, cursor); err != nil {
 		return fmt.Errorf("update cursor after revert: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit db transaction: %w", err)
+	}
+	if c, ok := l.dialect.(flushCommitter); ok {
+		c.flushCommitted()
 	}
 	l.recordCursor(cursor)
 	l.reset()
@@ -165,4 +186,15 @@ func (l *Loader) reset() {
 		l.entries.Set(entriesPair.Key, NewOrderedMap[string, *Operation]())
 	}
 	l.batchOrdinal = 0
+}
+
+// flushCommitter is a dialect told when a flush's cursor is written.
+type flushCommitter interface {
+	flushCommitted()
+}
+
+// cursorWriteChecker is a dialect checking it may still write, right before a cursor is written. It
+// gives the context to write the cursor with.
+type cursorWriteChecker interface {
+	beforeCursorWrite(ctx context.Context, l *Loader) (context.Context, error)
 }

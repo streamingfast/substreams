@@ -208,6 +208,11 @@ func runClickhouseSinkerTest(
 		Postgraphile:               false,
 	}
 
+	if customizeSinkerFactoryOptions != nil {
+		// Setup creates the tables the run options need (the journal of stateful mode)
+		setupOptions.ClickhouseStateful = customizeSinkerFactoryOptions(sinker.SinkerFactoryOptions{}).ClickhouseStateful
+	}
+
 	err = sinker.SinkerSetup(ctx, dsnRaw, spkg, setupOptions, logger, tracer)
 	require.NoError(t, err, "setting up sinker")
 

@@ -38,7 +38,7 @@ func (l *Loader) Insert(tableName string, primaryKey map[string]string, data map
 	if operation, found := entry.Get(key); found {
 		switch operation.opType {
 		case OperationTypeInsert:
-			if !l.dialect.AllowPkDuplicates() {
+			if !l.dialect.Capabilities().DuplicateInserts {
 				return fmt.Errorf("attempting to insert in table %q a primary key %q, that is already scheduled for insertion, insert should only be called once for a given primary key", tableName, primaryKey)
 			}
 		case OperationTypeDelete:
@@ -119,7 +119,7 @@ func (l *Loader) GetPrimaryKey(tableName string, pk string) (map[string]string, 
 // Upsert a row in the DB, it is assumed the table exists, you can do a
 // check before with HasTable().
 func (l *Loader) Upsert(tableName string, primaryKey map[string]string, data map[string]FieldData, reversibleBlockNum *uint64) error {
-	if l.dialect.OnlyInserts() {
+	if !l.dialect.Capabilities().Mutations {
 		return fmt.Errorf("update operation is not supported by the current database")
 	}
 
@@ -192,7 +192,7 @@ func (l *Loader) Upsert(tableName string, primaryKey map[string]string, data map
 // Update a row in the DB, it is assumed the table exists, you can do a
 // check before with HasTable()
 func (l *Loader) Update(tableName string, primaryKey map[string]string, data map[string]FieldData, reversibleBlockNum *uint64) error {
-	if l.dialect.OnlyInserts() {
+	if !l.dialect.Capabilities().Mutations {
 		return fmt.Errorf("update operation is not supported by the current database")
 	}
 
@@ -257,7 +257,7 @@ func (l *Loader) Update(tableName string, primaryKey map[string]string, data map
 // Delete a row in the DB, it is assumed the table exists, you can do a
 // check before with HasTable()
 func (l *Loader) Delete(tableName string, primaryKey map[string]string, reversibleBlockNum *uint64) error {
-	if l.dialect.OnlyInserts() {
+	if !l.dialect.Capabilities().Mutations {
 		return fmt.Errorf("delete operation is not supported by the current database")
 	}
 

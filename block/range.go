@@ -30,6 +30,10 @@ func ParseRange(in string, defaultSegmentSize uint64) (*Range, error) {
 		ch = []string{in}
 	}
 
+	if len(ch) > 2 {
+		return nil, fmt.Errorf("ParseRange: invalid range format: %q", in)
+	}
+
 	lo, err := strconv.ParseInt(ch[0], 10, 64)
 	if err != nil {
 		return nil, err

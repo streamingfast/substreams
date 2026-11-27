@@ -154,9 +154,9 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 		return fmt.Errorf("package meta not found")
 	}
 
-	projectName := pkg.GetPackageMeta()[0].Name
+	projectName := strings.ReplaceAll(pkg.GetPackageMeta()[0].Name, "/", "-")
 
-	spkgProjectName := fmt.Sprintf("%s-%s.spkg", strings.Replace(pkg.PackageMeta[0].Name, "_", "-", -1), pkg.PackageMeta[0].Version)
+	spkgProjectName := fmt.Sprintf("%s-%s.spkg", manifest.PackageNameFileSlug(pkg.PackageMeta[0].Name), pkg.PackageMeta[0].Version)
 	_, err = os.Stat(spkgProjectName)
 
 	if os.IsNotExist(err) {

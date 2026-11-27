@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### CLI
+
+- Allow an organization-scoped `package.name` (`<org>/<name>`, e.g. `sf/uniswap-v4`) in `substreams.yaml`, validated with the same rules as `<org>/<name>@<version>` references: `<org>` is 2 to 39 lowercase letters, digits and single hyphens, `<name>` matches `^[a-zA-Z][a-zA-Z0-9_-]{0,63}$`. Where the package name becomes a file or directory name (`substreams tools unpack`, codegen), `/` becomes `-`; the default `substreams pack` output also turns `_` into `-` as before, so `sf/uniswap-v4` at `v0.2.0` packs to `sf-uniswap-v4-v0.2.0.spkg`.
+
 ### Server
 
 - Add an idle heartbeat to tier1 client streams: once a request streams linearly (live, or after back-processing), a progress message is sent whenever nothing was sent to the client for 20s (no block, progress or undo), widening to 30s after 1min and 1min after 5min, or `progress_messages_interval_ms` when the client sets it. Streams on chains that finalize in bursts (e.g. `final_blocks_only` on Ethereum PoS, ~6.4min apart) no longer sit silent long enough for a NAT/firewall or load balancer to drop them unnoticed. Applies to dev and production modes.

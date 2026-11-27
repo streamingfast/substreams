@@ -386,7 +386,7 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	spkgTemporaryFilePath := filepath.Join(tmpDir, pkg.PackageMeta[0].Name+".tmp.spkg")
+	spkgTemporaryFilePath := filepath.Join(tmpDir, strings.ReplaceAll(pkg.PackageMeta[0].Name, "/", "-")+".tmp.spkg")
 	cnt, err := proto.Marshal(pkg)
 	if err != nil {
 		return fmt.Errorf("marshalling package: %w", err)

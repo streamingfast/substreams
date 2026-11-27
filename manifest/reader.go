@@ -635,8 +635,8 @@ func validatePackage(pkg *pbsubstreams.Package, validation ReaderValidation) err
 	}
 
 	for _, spkg := range pkg.PackageMeta {
-		if !moduleNameRegexp.MatchString(spkg.Name) {
-			return fmt.Errorf("package %q: invalid name: must match %s", spkg.Name, moduleNameRegexp.String())
+		if err := ValidatePackageName(spkg.Name); err != nil {
+			return fmt.Errorf("package %q: invalid name: %w", spkg.Name, err)
 		}
 		if !semver.IsValid(spkg.Version) {
 			return fmt.Errorf("package %q: version %q should match Semver", spkg.Name, spkg.Version)
@@ -841,8 +841,8 @@ func ParseOrgPackageReference(input string) (org, packageName, version string, i
 		return "", "", "", false, nil
 	}
 
-	if len(org) < organizationSlugMinLength || len(org) > organizationSlugMaxLength || !organizationSlugRegexp.MatchString(org) {
-		validationError = errors.Join(validationError, fmt.Errorf("organization %q is not a valid organization slug (lowercase letters, digits and single hyphens, %d to %d characters)", org, organizationSlugMinLength, organizationSlugMaxLength))
+	if err := validateOrganizationSlug(org); err != nil {
+		validationError = errors.Join(validationError, err)
 	}
 	if !moduleNameRegexp.MatchString(packageName) {
 		validationError = errors.Join(validationError, fmt.Errorf("package name %s does not match regexp %s", packageName, moduleNameRegexp))
@@ -861,6 +861,43 @@ func ParseOrgPackageReference(input string) (org, packageName, version string, i
 	}
 
 	return org, packageName, version, true, validationError
+}
+
+func validateOrganizationSlug(org string) error {
+	if len(org) < organizationSlugMinLength || len(org) > organizationSlugMaxLength || !organizationSlugRegexp.MatchString(org) {
+		return fmt.Errorf("organization %q is not a valid organization slug (lowercase letters, digits and single hyphens, %d to %d characters)", org, organizationSlugMinLength, organizationSlugMaxLength)
+	}
+	return nil
+}
+
+// ValidatePackageName validates a manifest `package.name`, which is either a bare name
+// (`<name>`) or an organization-scoped one (`<org>/<name>`). The rules are the same as
+// the ones [ParseOrgPackageReference] applies when consuming `<org>/<name>@<version>`:
+// <org> is an organization slug and <name> matches the module name regexp.
+func ValidatePackageName(name string) error {
+	org, bare, scoped := strings.Cut(name, "/")
+	if !scoped {
+		if !moduleNameRegexp.MatchString(name) {
+			return fmt.Errorf("must match %s, optionally prefixed by an organization slug as <org>/<name>", moduleNameRegexp.String())
+		}
+		return nil
+	}
+
+	var err error
+	if orgErr := validateOrganizationSlug(org); orgErr != nil {
+		err = errors.Join(err, orgErr)
+	}
+	if !moduleNameRegexp.MatchString(bare) {
+		err = errors.Join(err, fmt.Errorf("package name %q does not match regexp %s", bare, moduleNameRegexp))
+	}
+	return err
+}
+
+// PackageNameFileSlug turns a package name into a string safe to use as a file or
+// directory name: the organization separator "/" and "_" both become "-", so
+// `sf/uniswap_v4` is `sf-uniswap-v4`.
+func PackageNameFileSlug(name string) string {
+	return strings.NewReplacer("/", "-", "_", "-").Replace(name)
 }
 
 // Deprecated: ParseStandardPackageAndVersion is deprecated, use [manifest.ParseShortPackageIdentifier] instead.

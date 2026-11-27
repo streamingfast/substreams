@@ -20,6 +20,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Fix `firecore tools substreams purge` deleting module caches still used by long-running tier1 requests: tier1 now rewrites the `last_used` markers every hour while a request runs, instead of only at its start. `service.WithLastUsedRefreshInterval` changes the interval, and zero or less writes them only at request start.
 - Tier1 and tier2 now send HTTP/2 PINGs on a connection after 30s without reading anything from it, and close it if the PING is not acknowledged within 15s. A connection that dies silently, for example between a load balancer and the pod, now frees its streams in about 45s instead of waiting on TCP timeouts. Before, the HTTP/2 settings were ignored on TLS listeners, and no server PINGs were sent on any listener. The concurrent stream limit per connection stays as it effectively was: 250 on TLS listeners, 1000 on plaintext ones.
 
+### Sink
+
+- Add the `sink/cdc` package, the core of a Debezium-style change-event output: a JSON event envelope (`c`/`u`/`d` with key, after, source block, finality and cursor), an `Emitter` interface with a URL-scheme registry and a `stdout://` JSONL emitter, a reversible-block `Journal` that answers reorgs with `revert_of` tombstone events (updates and deletes can't be reverted and are refused unless blocks are final or pseudo-final) and persists next to the cursor file, and a `Handler` that plugs it into a `sink.Sinker`.
+
 ### Security
 
 - Bump `golang.org/x/crypto` to `v0.58.1-0.20261009181718-2f1f834330b2` to fix GO-2026-5932.

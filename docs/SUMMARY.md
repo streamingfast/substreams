@@ -86,6 +86,7 @@
   * [Files](how-to-guides/sinks/files.md)
   * [KV](how-to-guides/sinks/kv.md)
   * [MongoDB](how-to-guides/sinks/mongodb.md)
+  * [CDC Outputs](how-to-guides/sinks/cdc-outputs.md)
   * [Prometheus](how-to-guides/sinks/prometheus.md)
 * [Publishing a Substreams Package](how-to-guides/publish-package.md)
 

@@ -93,8 +93,8 @@ func TestHandler_FailFastOnUpdateDelete(t *testing.T) {
 		err := h.HandleBlockScopedData(t.Context(), blockData(5, 3), nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `module "db_out" table "t"`)
-		assert.Contains(t, err.Error(), FlagFinalBlocksOnly)
-		assert.Contains(t, err.Error(), FlagUndoBufferSize)
+		assert.Contains(t, err.Error(), "--"+sink.FlagFinalBlocksOnly)
+		assert.Contains(t, err.Error(), "--"+sink.FlagUndoBufferSize)
 		assert.Empty(t, em.batches, "nothing emitted for a refused block")
 		assert.Equal(t, 0, h.journal.Len())
 

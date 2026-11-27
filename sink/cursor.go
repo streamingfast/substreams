@@ -28,19 +28,28 @@ func WriteCursor(filename string, cursor *Cursor) error {
 		return nil
 	}
 
-	dir := filepath.Dir(filename)
-	tempFile, err := os.CreateTemp(dir, ".cursor_*")
+	return WriteFileAtomic(filename, []byte(cursor.String()))
+}
+
+// WriteFileAtomic writes data to a temp file next to filename and renames it over filename, so readers
+// never see a partially written file. The data is synced to disk before the rename.
+func WriteFileAtomic(filename string, data []byte) error {
+	tempFile, err := os.CreateTemp(filepath.Dir(filename), ".tmp_*")
 	if err != nil {
 		return err
 	}
 
 	tempPath := tempFile.Name()
 
-	// cleanupt, prevents leaving temp file on disk if rename fails
+	// cleanup, prevents leaving temp file on disk if rename fails
 	defer os.Remove(tempPath)
 
-	_, err = tempFile.Write([]byte(cursor.String()))
-	if err != nil {
+	if _, err = tempFile.Write(data); err != nil {
+		tempFile.Close()
+		return err
+	}
+
+	if err = tempFile.Sync(); err != nil {
 		tempFile.Close()
 		return err
 	}

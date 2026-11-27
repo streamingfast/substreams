@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/streamingfast/substreams/sink"
 )
 
 func ids(events []Event) []string {
@@ -64,8 +66,8 @@ func TestJournal_CompensationsIrreversible(t *testing.T) {
 		var irr *IrreversibleError
 		require.ErrorAs(t, err, &irr)
 		assert.Equal(t, "b", irr.Event.ID)
-		assert.Contains(t, err.Error(), FlagFinalBlocksOnly)
-		assert.Contains(t, err.Error(), FlagUndoBufferSize)
+		assert.Contains(t, err.Error(), "--"+sink.FlagFinalBlocksOnly)
+		assert.Contains(t, err.Error(), "--"+sink.FlagUndoBufferSize)
 		assert.Contains(t, err.Error(), `table "tbl"`)
 
 		// Same events but the update/delete is at or below the last valid block: fine.
@@ -110,4 +112,21 @@ func TestJournal_RestartOnFork(t *testing.T) {
 	comps, err := restarted.Compensations(10, "u")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"b:revert"}, ids(comps))
+}
+
+func TestJournal_PagedByBlock(t *testing.T) {
+	j := NewJournal()
+	c := newEvent("c", OpCreate, 11, "t")
+	c.Source.Block.ID = "bb"
+	j.Add(newEvent("a", OpCreate, 10, "t"), newEvent("b", OpCreate, 11, "t"), c)
+	assert.Len(t, j.blocks, 2)
+	assert.Equal(t, 3, j.Len())
+
+	j.Discard(10)
+	assert.Len(t, j.blocks, 1)
+	assert.Equal(t, 1, j.Len())
+
+	// A discarded block's ids can be journaled again (the fork replays the same ids only on the same block).
+	j.Add(newEvent("b", OpCreate, 11, "t"))
+	assert.Equal(t, 2, j.Len())
 }

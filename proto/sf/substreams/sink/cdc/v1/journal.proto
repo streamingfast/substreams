@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package sf.substreams.sink.cdc.v1;
+
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/sink/cdc/v1;pbcdc";
+
+import "google/protobuf/timestamp.proto";
+
+// JournalState is the persisted form of the CDC journal: the change events emitted for blocks that were
+// not final yet, kept next to the sink cursor file so a restart on a fork can still compensate them.
+message JournalState {
+  // Cursor is the stream cursor the journal was saved at.
+  string cursor = 1;
+  // Blocks holds the journaled blocks, oldest first.
+  repeated JournalBlock blocks = 2;
+}
+
+// JournalBlock groups the events emitted for one block, in emission order.
+message JournalBlock {
+  uint64 number = 1;
+  string id = 2;
+  repeated JournalEvent events = 3;
+}
+
+// JournalEvent is a change event as it was emitted. Only what is needed to build a compensation event
+// is kept besides the identification of the event.
+message JournalEvent {
+  string id = 1;
+  // op is one of "c", "u" or "d".
+  string op = 2;
+  map<string, string> key = 3;
+  // after_json is the JSON encoding of the event's `after` object, empty when there is none.
+  bytes after_json = 4;
+  bool partial = 5;
+  string module = 6;
+  string table = 7;
+  google.protobuf.Timestamp block_timestamp = 8;
+  uint64 ordinal = 9;
+}

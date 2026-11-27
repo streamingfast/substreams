@@ -117,7 +117,7 @@ func (h *Handler) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsr
 			return fmt.Errorf(
 				"module %q table %q produced a %s event at block #%d which is not final (final block height is #%d) and could be reverted by a reorg, "+
 					"but updates and deletes can't be reverted since no before-image is available. Run with %s (final blocks only) or %s N (pseudo-final blocks) to allow them",
-				module, event.Source.Table, opName(event.Op), clock.Number, data.FinalBlockHeight, FlagFinalBlocksOnly, FlagUndoBufferSize,
+				module, event.Source.Table, opName(event.Op), clock.Number, data.FinalBlockHeight, "--"+sink.FlagFinalBlocksOnly, "--"+sink.FlagUndoBufferSize,
 			)
 		}
 

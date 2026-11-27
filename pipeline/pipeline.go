@@ -865,16 +865,22 @@ func (p *Pipeline) returnRPCModuleProgressOutputs(forceOutput bool) error {
 	}
 	p.lastProgressSent = time.Now()
 
-	stats := reqctx.ReqStats(p.ctx)
-	stream := response.New(p.respFunc)
+	return SendModulesProgress(p.ctx, p.respFunc)
+}
+
+// SendModulesProgress sends one progress message built from the request stats found in ctx.
+// It is safe to call from any goroutine as long as respFunc is, which is what lets tier1
+// send an idle heartbeat from outside the block loop.
+func SendModulesProgress(ctx context.Context, respFunc substreams.ResponseFunc) error {
+	stats := reqctx.ReqStats(ctx)
+	stream := response.New(respFunc)
 	stagesProgress := stats.Stages()
 	jobs, blocksProcessed := stats.JobsAndBlocksProcessed()
 	modStats := stats.AggregatedModulesStats()
 
-	meter := dmetering.GetBytesMeter(p.ctx)
+	meter := dmetering.GetBytesMeter(ctx)
 	remoteBytesRead, remoteBytesWritten := stats.RemoteBytesConsumption()
 	return stream.SendModulesStats(modStats, stagesProgress, jobs, metering.GetTotalBytesRead(meter)+remoteBytesRead, metering.GetTotalBytesWritten(meter)+remoteBytesWritten, blocksProcessed)
-
 }
 
 func (p *Pipeline) toInternalUpdate(clock *pbsubstreams.Clock) *pbssinternal.Update {

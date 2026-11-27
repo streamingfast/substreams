@@ -42,6 +42,7 @@ type Client struct {
 	authHeaderName  string
 	authHeaderValue string
 	signingSecret   []byte
+	headers         map[string]string
 	logger          *zap.Logger // Logger for webhook operations
 }
 
@@ -59,6 +60,10 @@ type Config struct {
 
 	// SigningSecret, when not empty, adds a SignatureHeader to every request.
 	SigningSecret string
+
+	// Headers are extra headers sent verbatim on every request, set before the auth and signature headers
+	// so those always win.
+	Headers map[string]string
 }
 
 // DeliveryError is returned by Client.Call once every attempt for a payload
@@ -116,6 +121,7 @@ func NewClient(config Config, logger *zap.Logger) *Client {
 		authHeaderName:  authHeaderName,
 		authHeaderValue: config.AuthHeaderValue,
 		signingSecret:   signingSecret,
+		headers:         config.Headers,
 		logger:          logger,
 	}
 }
@@ -226,6 +232,9 @@ func (c *Client) Call(ctx context.Context, rawURL string, payload []byte, blockN
 		}
 
 		req.Header.Set("Content-Type", "application/json")
+		for name, value := range c.headers {
+			req.Header.Set(name, value)
+		}
 		if c.authHeaderValue != "" {
 			req.Header.Set(c.authHeaderName, c.authHeaderValue)
 		}

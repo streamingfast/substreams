@@ -23,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Sink
 
 - Add the `sink/cdc` package, the core of a Debezium-style change-event output: a JSON event envelope (`c`/`u`/`d` with key, after, source block, finality and cursor), an `Emitter` interface with a URL-scheme registry and a `stdout://` JSONL emitter, a reversible-block `Journal` that answers reorgs with `revert_of` tombstone events (updates and deletes can't be reverted and are refused unless blocks are final or pseudo-final) and persists next to the cursor file, and a `Handler` that plugs it into a `sink.Sinker`.
+- Add the `file://`, `webhook://`/`webhooks://` and `pubsub://` CDC emitters (package `sink/cdc/emitters`, import it to register them): JSONL files rotated every N blocks with fsync and atomic rename, batched HTTP POSTs reusing the webhook sink client (retries, auth, signing), and one Pub/Sub message per event with a configurable ordering key. See `docs/how-to-guides/sinks/cdc-outputs.md`.
+- Add `Headers` to `webhook.Config` to send extra headers on every webhook call. Existing webhook sink behavior is unchanged.
 
 ### Security
 

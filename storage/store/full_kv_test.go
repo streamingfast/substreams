@@ -94,6 +94,62 @@ func TestFullKV_Load_CanceledContext_NotCorrupt(t *testing.T) {
 	require.NotErrorIs(t, err, ErrInvalidFullKVFile, "canceled load must not look like corruption")
 }
 
+func TestFullKV_Load_ReadErrorRetried(t *testing.T) {
+	var saved []byte
+	objStore := dstore.NewMockStore(func(_ string, f io.Reader) (err error) {
+		saved, err = io.ReadAll(f)
+		return err
+	})
+	newKV := func() *FullKV {
+		return &FullKV{
+			baseStore: &baseStore{
+				kvImpl:     newMemoryKVImpl(),
+				kvOps:      &pbssinternal.Operations{},
+				logger:     zap.NewNop(),
+				marshaller: marshaller.Default(),
+				Config:     &Config{moduleInitialBlock: 0, objStore: objStore, itemSizeLimit: 1024, totalSizeLimit: 1024},
+			},
+		}
+	}
+
+	src := newKV()
+	src.Set(0, "key", "value")
+	require.NoError(t, src.Flush())
+	file, writer, err := src.Save(100)
+	require.NoError(t, err)
+	require.NoError(t, writer.Write(context.Background()))
+
+	t.Run("transient failure loads on retry", func(t *testing.T) {
+		opens := 0
+		objStore.OpenObjectFunc = func(context.Context, string) (io.ReadCloser, error) {
+			opens++
+			if opens == 1 {
+				return io.NopCloser(io.MultiReader(bytes.NewReader(saved[:len(saved)/2]), &errReaderReadCloser{err: io.ErrUnexpectedEOF})), nil
+			}
+			return io.NopCloser(bytes.NewReader(saved)), nil
+		}
+
+		kv := newKV()
+		require.NoError(t, kv.Load(context.Background(), file))
+		require.Equal(t, 2, opens)
+		value, found := kv.GetLast("key")
+		require.True(t, found)
+		require.Equal(t, []byte("value"), value)
+	})
+
+	t.Run("persistent failure is reported as corrupt", func(t *testing.T) {
+		opens := 0
+		objStore.OpenObjectFunc = func(context.Context, string) (io.ReadCloser, error) {
+			opens++
+			return io.NopCloser(bytes.NewReader(saved[:len(saved)/2])), nil
+		}
+
+		err := newKV().Load(context.Background(), file)
+		require.ErrorIs(t, err, ErrInvalidFullKVFile)
+		require.Equal(t, fullKVLoadAttempts, opens)
+	})
+}
+
 type errReaderReadCloser struct{ err error }
 
 func (r *errReaderReadCloser) Read([]byte) (int, error) { return 0, r.err }

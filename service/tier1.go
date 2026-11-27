@@ -759,16 +759,7 @@ func (s *Tier1Service) blocks(
 	supportBuffering bool,
 	execOutMessageBufferSize int,
 ) (err error) {
-	// Any response sent on the stream, not only the heartbeat, resets the idle time.
-	var lastSent lastSentTracker
-	clientRespFunc := respFunc
-	respFunc = func(resp substreams.ResponseFromAnyTier) error {
-		err := clientRespFunc(resp)
-		if err == nil {
-			lastSent.touch()
-		}
-		return err
-	}
+	respFunc, lastSent := withIdleTracking(respFunc)
 
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 	// A cursor replaces the start block, so only a request without one is checked here;
@@ -1163,15 +1154,10 @@ func (s *Tier1Service) blocks(
 	// From here the request streams linearly: blocks may stop coming for minutes (e.g. final blocks
 	// only), and silence lets idle timeouts on the path to the client drop the connection unnoticed.
 	// The parallel phase is excluded, it already sends progress on its own ticker.
-	heartbeatCtx, stopHeartbeat := context.WithCancel(ctx)
-	defer stopHeartbeat()
-	linearStartedAt := time.Now()
-	requestedInterval := time.Duration(request.ProgressMessagesIntervalMs) * time.Millisecond
-	go runIdleHeartbeat(heartbeatCtx, func() time.Duration {
-		return idleHeartbeatInterval(time.Since(linearStartedAt), requestedInterval)
-	}, &lastSent, func() error {
+	stopHeartbeat := startIdleHeartbeat(ctx, time.Duration(request.ProgressMessagesIntervalMs)*time.Millisecond, lastSent, func() error {
 		return pipeline.SendModulesProgress(ctx, respFunc)
 	})
+	defer stopHeartbeat()
 
 	if requestDetails.ProductionMode && !loadedFromQuicksave && reqPlan.RequiresParallelProcessing() {
 		if lastFinalBlock, err := s.getRecentFinalBlock(); err != nil {

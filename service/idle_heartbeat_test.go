@@ -8,6 +8,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/streamingfast/substreams"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -130,23 +132,104 @@ func TestIdleHeartbeat_StopsAtStreamEnd(t *testing.T) {
 	})
 }
 
-func TestIdleHeartbeat_StopsOnSendError(t *testing.T) {
+func TestIdleHeartbeat_RetriesAfterSendError(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var last lastSentTracker
 		last.touch()
 
-		stop, done := startHeartbeat(t, &last, func() error {
-			return errors.New("client gone")
+		var calls atomic.Int32
+		stop, _ := startHeartbeat(t, &last, func() error {
+			calls.Add(1)
+			return errors.New("transient")
 		})
 		defer stop()
 
-		time.Sleep(testHeartbeatInterval)
+		time.Sleep(3 * testHeartbeatInterval)
 		synctest.Wait()
-		select {
-		case <-done:
-		default:
-			require.Fail(t, "heartbeat goroutine did not stop after send error")
+		assert.Equal(t, int32(3), calls.Load())
+	})
+}
+
+// The tests below go through the same helpers blocks() uses, with the real ramp.
+
+func TestWithIdleTracking_OnlySuccessfulSendsTouch(t *testing.T) {
+	var fail bool
+	wrapped, last := withIdleTracking(func(substreams.ResponseFromAnyTier) error {
+		if fail {
+			return errors.New("client gone")
 		}
+		return nil
+	})
+
+	_, sent := last.idle()
+	require.False(t, sent)
+
+	fail = true
+	require.Error(t, wrapped(&pbsubstreamsrpc.Response{}))
+	_, sent = last.idle()
+	assert.False(t, sent, "a failed send must not reset the idle time")
+
+	fail = false
+	require.NoError(t, wrapped(&pbsubstreamsrpc.Response{}))
+	_, sent = last.idle()
+	assert.True(t, sent)
+}
+
+func TestStartIdleHeartbeat_BlockSendsResetTimerAndStopWaits(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var heartbeats, blocks atomic.Int32
+		var wrapped substreams.ResponseFunc
+		wrapped, last := withIdleTracking(func(substreams.ResponseFromAnyTier) error { return nil })
+
+		// Session init went out before linear streaming started.
+		require.NoError(t, wrapped(&pbsubstreamsrpc.Response{}))
+
+		stop := startIdleHeartbeat(t.Context(), 0, last, func() error {
+			heartbeats.Add(1)
+			return wrapped(&pbsubstreamsrpc.Response{})
+		})
+
+		// A block 15s in pushes the first heartbeat from 20s to 35s.
+		time.Sleep(15 * time.Second)
+		require.NoError(t, wrapped(&pbsubstreamsrpc.Response{}))
+		blocks.Add(1)
+
+		time.Sleep(19 * time.Second) // t=34s
+		synctest.Wait()
+		assert.Zero(t, heartbeats.Load())
+
+		time.Sleep(time.Second) // t=35s
+		synctest.Wait()
+		assert.Equal(t, int32(1), heartbeats.Load())
+
+		// Still in the first minute: next one 20s later.
+		time.Sleep(20 * time.Second)
+		synctest.Wait()
+		assert.Equal(t, int32(2), heartbeats.Load())
+
+		stop()
+		time.Sleep(10 * time.Minute)
+		synctest.Wait()
+		assert.Equal(t, int32(2), heartbeats.Load(), "heartbeat sent after stop")
+		assert.Equal(t, int32(1), blocks.Load())
+	})
+}
+
+func TestStartIdleHeartbeat_RequestedIntervalPinsIt(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		wrapped, last := withIdleTracking(func(substreams.ResponseFromAnyTier) error { return nil })
+		require.NoError(t, wrapped(&pbsubstreamsrpc.Response{}))
+
+		var heartbeats atomic.Int32
+		stop := startIdleHeartbeat(t.Context(), 2*time.Second, last, func() error {
+			heartbeats.Add(1)
+			return wrapped(&pbsubstreamsrpc.Response{})
+		})
+		defer stop()
+
+		time.Sleep(10 * time.Second)
+		synctest.Wait()
+		assert.Equal(t, int32(5), heartbeats.Load())
 	})
 }
 

@@ -83,7 +83,7 @@ var sinkWebhookCmd = &cobra.Command{
 		that block.
 
 		Reorganizations: with --final-blocks-only the sink only delivers blocks past finality and never sees
-		one. With --undo-buffer-size=N it holds the last N blocks back and absorbs any reorganization that fits
+		one. With --wait-confirmations=N it holds the last N blocks back and absorbs any reorganization that fits
 		in them. Otherwise, or for a reorganization deeper than the buffer, the receiver has already been sent
 		blocks that are no longer on the chain: --webhook-undo-url receives a notification naming the last valid
 		block, then the replacement blocks arrive as regular calls. Undo notifications follow the same retry,

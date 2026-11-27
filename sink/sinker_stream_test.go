@@ -32,7 +32,7 @@ func TestSinker_CompletionGetsLastHandledCursor(t *testing.T) {
 	s := newStreamingTestSinker(t, responses, func(c *SinkerConfig) {
 		c.StartBlock = 10
 		c.StopBlock = 13 // the request is extended by the buffer size
-		c.UndoBufferSize = 2
+		c.WaitConfirmations = 2
 	})
 
 	h := &recordingHandler{}

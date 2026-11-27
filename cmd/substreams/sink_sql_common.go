@@ -245,7 +245,7 @@ func isDatabaseChangesType(outputType string) bool {
 // addDatabaseChangesModeRunFlags registers the run flags that only apply when the
 // selected module outputs DatabaseChanges.
 func addDatabaseChangesModeRunFlags(flags *pflag.FlagSet) {
-	flags.Int("undo-buffer-size", 0, "If non-zero, handling of reorgs in the database is disabled. Instead, a buffer is introduced to only process blocks once they have been confirmed by that many blocks, introducing a latency but slightly reducing the load on the database when close to head. Set to 0 to enable reorg handling in the database (required for some databases like Postgres).")
+	sink.AddWaitConfirmationsFlags(flags, "If non-zero, handling of reorgs in the database is disabled. Instead, blocks are only processed once they are final or once that many newer blocks have arrived (assumed final), which adds that many blocks of latency near head but slightly reduces the load on the database. A reorganization deeper than that is a fatal error. Set to 0 to enable reorg handling in the database (required for some databases like Postgres).")
 	flags.Int("batch-block-flush-interval", 1_000, "When in catch up mode, flush every N blocks or after batch-row-flush-interval, whichever comes first. Set to 0 to disable and only use batch-row-flush-interval. Ineffective if the sink is now in the live portion of the chain where only 'live-block-flush-interval' applies.")
 	flags.Int("batch-row-flush-interval", 100_000, "When in catch up mode, flush every N rows or after batch-block-flush-interval, whichever comes first. Set to 0 to disable and only use batch-block-flush-interval. Ineffective if the sink is now in the live portion of the chain where only 'live-block-flush-interval' applies.")
 	flags.Int("live-block-flush-interval", 1, "When processing in live mode, flush every N blocks. Must be at least 1.")
@@ -287,7 +287,8 @@ var fromProtoRunFlagNames = []string{
 // databaseChangesFlagNames are the run flags that only mean something when the module
 // outputs DatabaseChanges.
 var databaseChangesFlagNames = []string{
-	"undo-buffer-size",
+	sink.FlagWaitConfirmations,
+	sink.FlagUndoBufferSize,
 	"batch-block-flush-interval",
 	"batch-row-flush-interval",
 	"live-block-flush-interval",
@@ -352,7 +353,7 @@ func addSinkRunFlags(flags *pflag.FlagSet, driver string) {
 	// silently ignored. It is also what the spool's safety rests on — liveness has to turn
 	// on the first undo-able block, not on a wall-clock guess. The database-changes sink
 	// does not look at liveness at all.
-	sink.AddFlagsToSet(flags, sink.FlagExcludeDefault(sink.FlagUndoBufferSize, sink.FlagLiveBlockTimeDelta))
+	sink.AddFlagsToSet(flags, sink.FlagExcludeDefault(sink.FlagWaitConfirmations, sink.FlagLiveBlockTimeDelta))
 	addBytesEncodingFlag(flags)
 	if driver == "clickhouse" {
 		addClusterFlag(flags)
@@ -466,6 +467,12 @@ func runDatabaseChangesSink(cmd *cobra.Command, driver, manifestPath, outputModu
 		return fmt.Errorf("new base sinker: %w", err)
 	}
 
+	// Already resolved (and the deprecated alias warned about) by [sink.NewFromViper] above.
+	waitConfirmations, err := sink.ResolveWaitConfirmations(cmd, zap.NewNop())
+	if err != nil {
+		return err
+	}
+
 	sinkerFactory := sinker.SinkerFactory(baseSink, sinker.SinkerFactoryOptions{
 		CursorTableName:         sflags.MustGetString(cmd, "cursors-table"),
 		HistoryTableName:        sflags.MustGetString(cmd, "history-table"),
@@ -474,7 +481,7 @@ func runDatabaseChangesSink(cmd *cobra.Command, driver, manifestPath, outputModu
 		BatchRowFlushInterval:   sflags.MustGetInt(cmd, "batch-row-flush-interval"),
 		LiveBlockFlushInterval:  sflags.MustGetInt(cmd, "live-block-flush-interval"),
 		OnModuleHashMismatch:    sflags.MustGetString(cmd, onModuleHashMismatchFlag),
-		HandleReorgs:            sflags.MustGetInt(cmd, "undo-buffer-size") == 0,
+		HandleReorgs:            waitConfirmations == 0,
 		FlushRetryCount:         sflags.MustGetInt(cmd, "flush-retry-count"),
 		FlushRetryDelay:         sflags.MustGetDuration(cmd, "flush-retry-delay"),
 		StandbyLock:             sflags.MustGetBool(cmd, "standby-lock"),

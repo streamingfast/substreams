@@ -240,7 +240,7 @@ config := &sink.SinkerConfig{
 
     // Performance tuning
     FinalBlocksOnly: false,               // bool - disable undo handling for faster processing
-    UndoBufferSize:  12,                  // int - number of blocks to buffer for undo handling
+    WaitConfirmations: 12,                // int - hold blocks back until final or 12 newer blocks arrived (absorbs reorgs within 12 blocks)
 
     // Development features
     DevOutputModules:    []string{},      // Debug specific modules

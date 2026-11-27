@@ -48,7 +48,7 @@ The cursor is stored in `--state-file` (`./state.cursor` by default). Your endpo
 ## Reorgs
 
 - `--final-blocks-only` delivers only final blocks, so the endpoint never sees a reorg.
-- `--undo-buffer-size=N` holds the last N blocks back and absorbs any reorg that fits in them.
+- `--wait-confirmations=N` holds the last N blocks back, until they are final or N newer blocks have arrived, and absorbs any reorg that fits in them. It adds N blocks of latency, and a deeper reorg is a fatal error.
 - Otherwise, `--webhook-undo-url` receives a notification naming the last valid block, then the replacement blocks arrive as regular calls:
 
 ```json

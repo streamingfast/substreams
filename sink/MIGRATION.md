@@ -222,7 +222,7 @@ The new version provides a comprehensive set of flags. Here are the key ones:
 - `--params` (-p): Module parameters
 - `--insecure`: Skip TLS verification
 - `--plaintext`: Use plaintext connection
-- `--undo-buffer-size`: Undo buffer size
+- `--wait-confirmations`: Hold blocks back until final or N newer blocks arrived (formerly `--undo-buffer-size`)
 - `--final-blocks-only`: Process only final blocks
 - `--development-mode`: Enable development mode
 - `--header` (-H): Additional headers

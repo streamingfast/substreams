@@ -20,6 +20,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Fix `firecore tools substreams purge` deleting module caches still used by long-running tier1 requests: tier1 now rewrites the `last_used` markers every hour while a request runs, instead of only at its start. `service.WithLastUsedRefreshInterval` changes the interval, and zero or less writes them only at request start.
 - Tier1 and tier2 now send HTTP/2 PINGs on a connection after 30s without reading anything from it, and close it if the PING is not acknowledged within 15s. A connection that dies silently, for example between a load balancer and the pod, now frees its streams in about 45s instead of waiting on TCP timeouts. Before, the HTTP/2 settings were ignored on TLS listeners, and no server PINGs were sent on any listener. The concurrent stream limit per connection stays as it effectively was: 250 on TLS listeners, 1000 on plaintext ones.
 
+### Sink
+
+- Changed: rename the sink flag `--undo-buffer-size` to `--wait-confirmations`, and `SinkerConfig.UndoBufferSize` to `SinkerConfig.WaitConfirmations`. It holds the most recent reversible blocks back from the sink until they are final, or until N newer blocks have arrived, in which case they are assumed final. A reorganization within N blocks is absorbed silently, a deeper one is fatal, and N blocks of latency are added near head. The help text and the sink docs now say so.
+- Deprecated: `--undo-buffer-size` still works as a hidden alias of `--wait-confirmations` and logs a warning when used. Setting both is an error. `SinkerConfig.UndoBufferSize`, `sink.FlagUndoBufferSize` and the `sink.WithBlockDataBuffer` option are deprecated as well; `UndoBufferSize` still applies when `WaitConfirmations` is unset.
+
 ### Security
 
 - Bump `golang.org/x/crypto` to `v0.58.1-0.20261009181718-2f1f834330b2` to fix GO-2026-5932.

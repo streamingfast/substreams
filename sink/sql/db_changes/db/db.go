@@ -134,7 +134,7 @@ func NewLoader(
 	}
 
 	if l.handleReorgs && l.dialect.OnlyInserts() {
-		return nil, fmt.Errorf("driver %s does not support reorg handling. You must use set a non-zero undo-buffer-size", sqlDB.Driver())
+		return nil, fmt.Errorf("driver %s does not support reorg handling. You must set a non-zero wait-confirmations", sqlDB.Driver())
 	}
 
 	logger.Info("created new DB loader",

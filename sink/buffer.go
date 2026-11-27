@@ -12,8 +12,9 @@ import (
 // goroutine, concurrent access is **not** implemented.
 //
 // When you see "final" in the context of this implementation, we talk
-// about our internal "fake" finality which happens once enough block
-// has "passed" which is the size of the undo block size
+// about our internal "pseudo" finality which happens once enough blocks
+// have "passed", which is the number of confirmations to wait for
+// (`--wait-confirmations`)
 type blockDataBuffer struct {
 	// data is kept striclty ordered and its ordering must be respected
 	// throughout the implementation.

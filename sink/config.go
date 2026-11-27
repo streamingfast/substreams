@@ -38,8 +38,19 @@ type SinkerConfig struct {
 	//
 	// The stop block is considered exclusive, meaning if you set StopBlock to 100, the last block processed
 	// will be 99.
-	StopBlock       uint64
-	UndoBufferSize  int
+	StopBlock uint64
+
+	// WaitConfirmations holds the most recent reversible blocks back from the handler until they are
+	// final or until this many newer blocks have arrived (assumed final). Reorganizations within it
+	// are absorbed silently, deeper ones are fatal. Effective only when [SinkerConfig.FinalBlocksOnly]
+	// is false.
+	WaitConfirmations int
+
+	// UndoBufferSize is the former name of [SinkerConfig.WaitConfirmations].
+	//
+	// Deprecated: Use [SinkerConfig.WaitConfirmations] instead.
+	UndoBufferSize int
+
 	FinalBlocksOnly bool
 	PartialBlocks   bool
 

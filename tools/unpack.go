@@ -49,7 +49,7 @@ func unpackE(cmd *cobra.Command, args []string) error {
 	packageName := "unknown"
 	if pkgBundle.Package.PackageMeta != nil && len(pkgBundle.Package.PackageMeta) > 0 {
 		if name := pkgBundle.Package.PackageMeta[0].Name; name != "" {
-			packageName = name
+			packageName = strings.ReplaceAll(name, "/", "-")
 		}
 	}
 

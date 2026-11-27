@@ -35,8 +35,8 @@ func init() {
 		Specifies output file where the generated "spkg" file will be written. You can use template directives when
 		specifying the value of the flag. You can use "{manifestDir}" which resolves to manifest's
 		directory. You can use "{spkgDefaultName}" which is the pre-computed default name in the form
-		"<name>-<version>" where "<name>" is the manifest's "package.name" value ("_" values in the name are
-		replaced by "-") and "<version>" is "package.version" value. You can use "{version}" which resolves
+		"<name>-<version>" where "<name>" is the manifest's "package.name" value ("_" and "/" values in the name
+		are replaced by "-") and "<version>" is "package.version" value. You can use "{version}" which resolves
 		to "package.version".
 	`))
 	//packCmd.Flags().StringArrayP("config", "c", []string{}, cli.FlagDescription(`path to a configuration file that contains overrides for the manifest`))
@@ -104,7 +104,7 @@ func runPack(cmd *cobra.Command, args []string) error {
 	packageMetadata := pkgBundle.Package.PackageMeta[0]
 	resolvedOutputFile := resolveOutputFile(originalOutputFile, map[string]string{
 		"manifestDir":     manifestDir,
-		"spkgDefaultName": fmt.Sprintf("%s-%s.spkg", strings.Replace(packageMetadata.Name, "_", "-", -1), packageMetadata.Version),
+		"spkgDefaultName": fmt.Sprintf("%s-%s.spkg", manifest.PackageNameFileSlug(packageMetadata.Name), packageMetadata.Version),
 		"version":         packageMetadata.Version,
 	})
 

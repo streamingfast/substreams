@@ -18,7 +18,7 @@ type Option func(s *Sinker)
 //
 // Deprecated: Do not rely on [New] and [Option], instead use [NewFromConfig] and
 // configure the [SinkerConfig] directly, the counterpart of this option is to set
-// [SinkerConfig.UndoBufferSize] to a value > 0, which is effective only if
+// [SinkerConfig.WaitConfirmations] to a value > 0, which is effective only if
 // [SinkerConfig.FinalBlocksOnly] is false, meaning that undo signals are expected.
 func WithBlockDataBuffer(bufferSize int) Option {
 	return func(s *Sinker) {

@@ -25,7 +25,7 @@ import (
 func init() {
 	sink.AddFlagsToSet(estimateLocalCmd.Flags(),
 		sink.FlagExcludeDefault(
-			sink.FlagUndoBufferSize,
+			sink.FlagWaitConfirmations,
 			sink.FlagDevelopmentMode,
 			sink.FlagNoopMode,
 			sink.FlagProtoPath,

@@ -174,6 +174,6 @@ This cleanup happens automatically during normal operation to prevent unbounded 
 
 **Missing primary key error**: Ensure all tables have primary keys defined and that substreams output matches the schema.
 
-**Performance issues**: Consider adjusting flush intervals or using undo-buffer-size for high-throughput scenarios.
+**Performance issues**: Consider adjusting flush intervals or using wait-confirmations for high-throughput scenarios.
 
 **History table growth**: Monitor cleanup operations and finality progression to ensure proper pruning.

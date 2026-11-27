@@ -37,7 +37,7 @@ const (
 	FlagPlaintext            = "plaintext"
 	FlagForceProtocolVersion = "force-protocol-version"
 
-	FlagUndoBufferSize     = "undo-buffer-size"
+	FlagWaitConfirmations  = "wait-confirmations"
 	FlagLiveBlockTimeDelta = "live-block-time-delta"
 	FlagDevelopmentMode    = "development-mode"
 	FlagMaxRetries         = "max-retries"
@@ -50,6 +50,11 @@ const (
 	FlagProtoDescriptorSet           = "proto-descriptor-set"
 	FlagPrometheusAddr               = "prometheus-addr"
 	FlagSkipCheckModuleBinariesExist = "skip-check-module-binaries-exist"
+
+	// FlagUndoBufferSize is the former name of [FlagWaitConfirmations], kept as a hidden alias of it.
+	//
+	// Deprecated: Use [FlagWaitConfirmations] instead.
+	FlagUndoBufferSize = "undo-buffer-size"
 )
 
 type FlagInclusionExclusion interface {
@@ -106,7 +111,7 @@ func (i flagsInclusion) IsExplicitlyExcluded(flag string) bool {
 // # Default Inclusion
 //
 // Added by default: [FlagEndpoint], [FlagStartBlock], [FlagStopBlock], [FlagNetwork], [FlagParams],
-// [FlagInsecure], [FlagPlaintext], [FlagForceProtocolVersion], [FlagUndoBufferSize], [FlagLiveBlockTimeDelta],
+// [FlagInsecure], [FlagPlaintext], [FlagForceProtocolVersion], [FlagWaitConfirmations], [FlagLiveBlockTimeDelta],
 // [FlagDevelopmentMode], [FlagNoopMode], [FlagFinalBlocksOnly], [FlagMaxRetries], [FlagSkipPackageValidation],
 // [FlagExtraHeaders], [FlagAPIKeyEnvvar], [FlagAPITokenEnvvar], [FlagProtoPath], [FlagProtoDescriptorSet],
 // [FlagPrometheusAddr]
@@ -131,7 +136,7 @@ func (i flagsInclusion) IsExplicitlyExcluded(flag string) bool {
 //	FlagInsecure: `--insecure` (defaults `false`)
 //	FlagPlaintext: `--plaintext` (defaults `false`)
 //	FlagForceProtocolVersion: `--force-protocol-version` (defaults `0`)
-//	FlagUndoBufferSize: `--undo-buffer-size` (defaults `0`)
+//	FlagWaitConfirmations: `--wait-confirmations` (defaults `0`), `--undo-buffer-size` is its deprecated hidden alias
 //	FlagLiveBlockTimeDelta: `--live-block-time-delta` (defaults `0`)
 //	FlagDevelopmentMode: `--development-mode` (defaults `false`)
 //	FlagNoopMode: `--noop-mode` (defaults `false`)
@@ -198,8 +203,9 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagInclusionExclusion) {
 		flags.Int(FlagForceProtocolVersion, 0, "Force the use of a specific protocol version (0=unset: v3 with fallback, 2=v2, 3=v3)")
 	}
 
-	if defaultFlagIncluded(FlagUndoBufferSize) {
-		flags.Int(FlagUndoBufferSize, 0, "Number of blocks to keep buffered to handle fork reorganizations")
+	// Excluding either the current or the former name excludes the flag and its alias.
+	if defaultFlagIncluded(FlagWaitConfirmations) && defaultFlagIncluded(FlagUndoBufferSize) {
+		AddWaitConfirmationsFlags(flags, WaitConfirmationsUsage)
 	}
 
 	if defaultFlagIncluded(FlagLiveBlockTimeDelta) {
@@ -302,7 +308,12 @@ func ConfigFromViper(
 	zlog *zap.Logger,
 	tracer logging.Tracer,
 ) (*SinkerConfig, error) {
-	params, network, undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, maxRetries, finalBlocksOnly, partialBlocks, skipPackageValidation, isNoopMode, extraHeaders, prometheusAddr, skipCheckModuleBinariesExist := getViperFlags(cmd)
+	params, network, liveBlockTimeDelta, isDevelopmentMode, maxRetries, finalBlocksOnly, partialBlocks, skipPackageValidation, isNoopMode, extraHeaders, prometheusAddr, skipCheckModuleBinariesExist := getViperFlags(cmd)
+
+	waitConfirmations, err := ResolveWaitConfirmations(cmd, zlog)
+	if err != nil {
+		return nil, err
+	}
 
 	// Parse start and stop blocks using utility functions
 	startBlockFlag := sflags.MustGetString(cmd, FlagStartBlock)
@@ -379,13 +390,13 @@ func ConfigFromViper(
 		zap.Bool("final_blocks_only", finalBlocksOnly),
 		zap.Bool("skip_package_validation", skipPackageValidation),
 		zap.Duration("live_block_time_delta", liveBlockTimeDelta),
-		zap.Int("undo_buffer_size", undoBufferSize),
+		zap.Int("wait_confirmations", waitConfirmations),
 		zap.Strings("extra_header_names", headerNames(extraHeaders)),
 	)
 
 	if finalBlocksOnly {
-		zlog.Debug("override undo buffer size to 0 since final blocks only is requested")
-		undoBufferSize = 0
+		zlog.Debug("override wait confirmations to 0 since final blocks only is requested")
+		waitConfirmations = 0
 	}
 
 	auth := newAuthenticator(sflags.MustGetString(cmd, FlagAPIKeyEnvvar), sflags.MustGetString(cmd, FlagAPITokenEnvvar))
@@ -433,7 +444,7 @@ func ConfigFromViper(
 		NoopMode:              isNoopMode,
 		StartBlock:            startBlock,
 		StopBlock:             stopBlock,
-		UndoBufferSize:        undoBufferSize,
+		WaitConfirmations:     waitConfirmations,
 		FinalBlocksOnly:       finalBlocksOnly,
 		PartialBlocks:         partialBlocks,
 		MaxRetries:            maxRetries,
@@ -491,7 +502,6 @@ func (config *SinkerConfig) CloneWithNewModule(
 func getViperFlags(cmd *cobra.Command) (
 	params []string,
 	network string,
-	undoBufferSize int,
 	liveBlockTimeDelta time.Duration,
 	isDevelopmentMode bool,
 	maxRetries int,
@@ -509,10 +519,6 @@ func getViperFlags(cmd *cobra.Command) (
 
 	if sflags.FlagDefined(cmd, FlagNetwork) {
 		network = sflags.MustGetString(cmd, FlagNetwork)
-	}
-
-	if sflags.FlagDefined(cmd, FlagUndoBufferSize) {
-		undoBufferSize = sflags.MustGetInt(cmd, FlagUndoBufferSize)
 	}
 
 	if sflags.FlagDefined(cmd, FlagLiveBlockTimeDelta) {

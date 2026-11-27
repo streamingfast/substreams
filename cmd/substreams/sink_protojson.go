@@ -42,7 +42,7 @@ func configureProtoJSONFlags(flags *pflag.FlagSet) {
 	// default sinker flags - ignore specific flags for noop sink
 	sink.AddFlagsToSet(flags,
 		sink.FlagExcludeDefault(
-			sink.FlagUndoBufferSize,
+			sink.FlagWaitConfirmations,
 			sink.FlagDevelopmentMode,
 			sink.FlagNoopMode,
 		),

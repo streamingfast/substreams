@@ -191,13 +191,18 @@ func NewFromConfig(
 		runDone:      make(chan struct{}),
 	}
 
+	waitConfirmations, err := config.effectiveWaitConfirmations()
+	if err != nil {
+		return nil, err
+	}
+
 	// Set up buffer unless final blocks only is configured
-	if config.UndoBufferSize > 0 && !config.FinalBlocksOnly {
-		s.buffer = newBlockDataBuffer(config.UndoBufferSize)
+	if waitConfirmations > 0 && !config.FinalBlocksOnly {
+		s.buffer = newBlockDataBuffer(waitConfirmations)
 	}
 
 	if s.FinalBlocksOnly && s.buffer != nil {
-		s.Logger.Debug("discarding undo buffer since final blocks only requested")
+		s.Logger.Debug("discarding wait confirmations buffer since final blocks only requested")
 		s.buffer = nil
 	}
 

@@ -165,6 +165,9 @@ func loadLocalProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 			if strings.HasSuffix(filename, sfproto.OptionsPath) {
 				return io.NopCloser(bytes.NewReader(sfproto.OptionsSource)), nil
 			}
+			if strings.HasSuffix(filename, sfproto.SchemaPath) {
+				return io.NopCloser(bytes.NewReader(sfproto.SchemaSource)), nil
+			}
 			if strings.HasSuffix(filename, sfproto.SQLSchemaPath) {
 				return io.NopCloser(bytes.NewReader(sfproto.SQLSchemaSource)), nil
 			}
@@ -382,6 +385,9 @@ func loadProtobufFromDirectory(pkg *pbsubstreams.Package, protoPath string) ([]*
 			// the source 'sf/substreams/options.proto' file is provided through go_embed, simulating that the file exists on disk.
 			if strings.HasSuffix(filename, sfproto.OptionsPath) {
 				return io.NopCloser(bytes.NewReader(sfproto.OptionsSource)), nil
+			}
+			if strings.HasSuffix(filename, sfproto.SchemaPath) {
+				return io.NopCloser(bytes.NewReader(sfproto.SchemaSource)), nil
 			}
 			if strings.HasSuffix(filename, sfproto.SQLSchemaPath) {
 				return io.NopCloser(bytes.NewReader(sfproto.SQLSchemaSource)), nil

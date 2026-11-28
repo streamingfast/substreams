@@ -17,27 +17,48 @@ modules:
       ignore_only:
         ENUM_VALUE_PREFIX:
           - proto/sf/substreams/sink/sql/schema/v1/schema.proto
+          - proto/sf/substreams/sink/v1/schema.proto
           - proto/sf/substreams/sink/sql/services/v1/services.proto
           - proto/sf/substreams/sink/sql/v1/deprecated.proto
         ENUM_VALUE_UPPER_SNAKE_CASE:
           - proto/sf/substreams/sink/sql/schema/v1/schema.proto
+          - proto/sf/substreams/sink/v1/schema.proto
           - proto/sf/substreams/sink/sql/services/v1/services.proto
           - proto/sf/substreams/sink/sql/v1/deprecated.proto
         ENUM_ZERO_VALUE_SUFFIX:
           - proto/sf/substreams/sink/sql/schema/v1/schema.proto
+          - proto/sf/substreams/sink/v1/schema.proto
           - proto/sf/substreams/sink/sql/services/v1/services.proto
           - proto/sf/substreams/sink/sql/v1/deprecated.proto
         FIELD_LOWER_SNAKE_CASE:
           - proto/sf/substreams/sink/sql/schema/v1/schema.proto
+          - proto/sf/substreams/sink/v1/schema.proto
         PACKAGE_DIRECTORY_MATCH:
           - proto/sf/substreams/sink/sql/schema/v1/schema.proto
+          - proto/sf/substreams/sink/v1/schema.proto
           - proto/sf/substreams/sink/sql/services/v1/services.proto
         PACKAGE_VERSION_SUFFIX:
           - proto/sf/substreams/sink/sql/schema/v1/schema.proto
+          - proto/sf/substreams/sink/v1/schema.proto
+        # The bare `schema` package (what makes `(schema.table)` short in user protos) is now defined in sink/v1 and
+        # re-exported from the historical sink/sql/schema/v1 path with `import public`.
+        PACKAGE_SAME_DIRECTORY:
+          - proto/sf/substreams/sink/sql/schema/v1/schema.proto
+          - proto/sf/substreams/sink/v1/schema.proto
+        PACKAGE_SAME_GO_PACKAGE:
+          - proto/sf/substreams/sink/sql/schema/v1/schema.proto
+          - proto/sf/substreams/sink/v1/schema.proto
+        IMPORT_NO_PUBLIC:
+          - proto/sf/substreams/sink/sql/schema/v1/schema.proto
+          - proto/sf/substreams/sink/v1/schema.proto
       disallow_comment_ignores: true
     breaking:
       use:
         - FILE
+      # The schema annotations moved to sink/v1/schema.proto, the old file re-exports them with `import public`:
+      # same package, same names, same field and extension numbers, so the wire and the `(schema.table)` usage are unchanged.
+      ignore:
+        - proto/sf/substreams/sink/sql/schema/v1/schema.proto
       except:
         - EXTENSION_NO_DELETE
         - FIELD_SAME_DEFAULT

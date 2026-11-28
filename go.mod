@@ -81,6 +81,7 @@ require (
 	github.com/streamingfast/firehose-networks v0.3.1
 	github.com/streamingfast/logging v1.2.3-0.20260810132752-360563ac68a9
 	github.com/streamingfast/pbgo v0.0.6-0.20260716142331-5a68101bc5a6
+	github.com/streamingfast/protox v0.0.0-20260610151242-cd8a8cf98c45
 	github.com/streamingfast/sf-tracing v0.0.0-20260716142341-6172a527bdd6
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b

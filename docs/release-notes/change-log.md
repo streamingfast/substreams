@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Sink
 
+- Add the `sink/rows` Go package, a typed row-stream extractor: it resolves a schema (tables, columns, logical types, keys) once from a protobuf output's `(schema.table)` / `(schema.field)` annotations and yields the rows of each block as a one-pass iterator (`rows.Stream`) of zero-copy views over the decoded message, parent before children, compatible with `dynamicpb` and `hyperpb`. `rows.NewProducer` picks the producer from the output module (annotated message tree, or one row per block for a plain message). The extractor walk is about 4x to 13x faster than the db_proto walk on the same messages and allocates nothing per row once rows are decoded. Nothing consumes it yet, existing sinks are unchanged.
 - Add `sf/substreams/sink/v1/schema.proto` as the home of the schema annotations. It keeps the root `schema` package, so `(schema.table)` and `(schema.field)` are written the same, and `sf/substreams/sink/sql/schema/v1/schema.proto` is now an `import public` of it, so existing modules and Go imports keep working unchanged. `substreams tools extract-proto --sql` writes and imports the new path.
 - Add table-level primary key options to the schema annotations: `primary_key_column` and `composite_primary_key: { columns: [...] }`, as an alternative to flagging fields with `primary_key: true`.
 

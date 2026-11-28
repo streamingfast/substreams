@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package sf.substreams.sink.schema.v1;
+
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/sink/schema/v1;pbschema";
+
+// Schema is the persisted form of a rows schema, the tables and typed columns a rows producer yields. A producer that
+// discovers tables at runtime saves its accumulated schema next to the cursor, so a restart keeps the column ids stable.
+// It carries names and types, not protobuf descriptors.
+message Schema {
+  // version increments every time a table or a column is added.
+  uint64 version = 1;
+  repeated Table tables = 2;
+
+  message Table {
+    string name = 1;
+    // message is the full name of the protobuf message the table was resolved from, empty for discovered tables.
+    string message = 2;
+    repeated Column columns = 3;
+    PrimaryKey primary_key = 4;
+    optional ChildOf child_of = 5;
+  }
+
+  message Column {
+    string name = 1;
+    LogicalType type = 2;
+    bool optional = 3;
+    bool unique = 4;
+    optional ForeignKey foreign_key = 5;
+  }
+
+  // PrimaryKey is a sum type: none (unset), a single column or a composite key. Values are column indexes.
+  message PrimaryKey {
+    oneof key {
+      uint32 single = 1;
+      CompositeKey composite = 2;
+    }
+  }
+
+  message CompositeKey {
+    repeated uint32 columns = 1;
+  }
+
+  message ChildOf {
+    string parent_table = 1;
+    string parent_field = 2;
+  }
+
+  message ForeignKey {
+    string table = 1;
+    string field = 2;
+  }
+
+  // LogicalType mirrors the Go rows.LogicalType. kind and elem are the lowercase kind names (string, int64, bigint, list...).
+  message LogicalType {
+    string kind = 1;
+    // elem is the element kind of a list.
+    string elem = 2;
+    uint32 bits = 3;
+    bool signed = 4;
+    int32 scale = 5;
+    // enum and struct hold the full protobuf names of the enum or message, for documentation and descriptor re-attachment.
+    string enum = 6;
+    string struct = 7;
+  }
+}

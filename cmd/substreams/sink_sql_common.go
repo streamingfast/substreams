@@ -660,7 +660,8 @@ func resolveFromProtoRootMessage(spkg *pbsubstreams.Package, outputModuleName, p
 	}
 
 	for _, descriptor := range fileDescriptor.GetDependencies() {
-		if descriptor.GetName() == "sf/substreams/sink/sql/schema/v1/schema.proto" {
+		// Both paths declare the same `schema` package: the previous one is an `import public` of the new one.
+		if name := descriptor.GetName(); name == "sf/substreams/sink/v1/schema.proto" || name == "sf/substreams/sink/sql/schema/v1/schema.proto" {
 			useProtoOption = true
 		}
 	}

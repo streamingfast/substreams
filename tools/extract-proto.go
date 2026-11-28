@@ -19,7 +19,7 @@ import (
 // schemaProtoPath is where the SQL sink's annotations live, and the import path a proto
 // has to use for them. The file is written alongside so the override parses without a
 // protobuf toolchain: imports resolve relative to the working directory.
-const schemaProtoPath = "sf/substreams/sink/sql/schema/v1/schema.proto"
+const schemaProtoPath = "sf/substreams/sink/v1/schema.proto"
 
 // schemaProtoPackage is the proto package that file declares, which is what qualifies the
 // extensions: `option (schema.table)`, not the file's directory path.
